@@ -1,0 +1,10 @@
+django-simple-history==3.8.0
+Django==5.2
+django-filter==25.1
+djangorestframework==3.16.0
+Markdown==3.8
+drf-spectacular==0.28.0
+requests==2.32.3
+mysqlclient==2.2.7
+django-unfold==0.55.1
+black==25.1.0
