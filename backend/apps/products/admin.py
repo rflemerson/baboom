@@ -1,12 +1,17 @@
 from unfold.admin import ModelAdmin, TabularInline
 from django.contrib import admin
+from django.utils.html import format_html
+
 from simple_history.admin import SimpleHistoryAdmin
+from treebeard.admin import TreeAdmin
+from treebeard.forms import movenodeform_factory
+
 from .models import (
     Brand,
     Store,
     Flavor,
-    TagCategory,
     Tag,
+    Category,
     Product,
     ProductStore,
     ProductPriceHistory,
@@ -18,40 +23,25 @@ from .models import (
 
 class ProductStoreInline(TabularInline):
     model = ProductStore
+    tab = True
     extra = 0
-    verbose_name = "Store Link"
-    verbose_name_plural = "Store Links"
-    autocomplete_fields = ["store"]
-    ordering_field = None
 
 
 class ProductFlavorNutritionalInfoInline(TabularInline):
     model = ProductFlavorNutritionalInfo
+    tab = True
     extra = 0
-    verbose_name = "Flavor-Nutrition Combination"
-    verbose_name_plural = "Flavor-Nutrition Combinations"
-    autocomplete_fields = ["flavor", "nutritional_info"]
-    ordering_field = None
 
 
 class AdditionalNutrientInline(TabularInline):
     model = AdditionalNutrient
     extra = 0
-    verbose_name = "Additional Nutrient"
-    verbose_name_plural = "Additional Nutrients"
-    ordering_field = None
 
 
 class ProductPriceHistoryInline(TabularInline):
     model = ProductPriceHistory
+    tab = True
     extra = 0
-    verbose_name = "Price and Stock History"
-    verbose_name_plural = "Price and Stock History"
-    ordering_field = None
-    fields = ["price", "stock_status", "collected_at"]
-    readonly_fields = ["collected_at"]
-    max_num = 10
-    ordering = ["-collected_at"]
 
 
 @admin.register(Brand)
@@ -77,31 +67,47 @@ class FlavorAdmin(ModelAdmin):
     list_per_page = 50
 
 
-@admin.register(TagCategory)
-class TagCategoryAdmin(ModelAdmin):
-    list_display = ("name", "description")
+@admin.register(Tag)
+class TagAdmin(TreeAdmin, ModelAdmin):
+    form = movenodeform_factory(Tag)
+    list_display = ("indented_title", "description")
+    list_display_links = ("indented_title",)
+    search_fields = ("name",)
+    list_per_page = 50
+    list_filter = ("name",)
+
+    def indented_title(self, obj):
+        depth = obj.get_depth() - 1
+        return format_html(
+            '<div style="padding-left:{}px">{}</div>', depth * 20, obj.name
+        )
+
+    indented_title.short_description = "Tag Name"
+
+
+@admin.register(Category)
+class CategoryAdmin(TreeAdmin, ModelAdmin):
+    form = movenodeform_factory(Category)
+    list_display = ("indented_title", "description")
+    list_display_links = ("indented_title",)
     search_fields = ("name",)
     list_per_page = 50
 
+    def indented_title(self, obj):
+        depth = obj.get_depth() - 1
+        return format_html(
+            '<div style="padding-left:{}px">{}</div>', depth * 20, obj.name
+        )
 
-@admin.register(Tag)
-class TagAdmin(ModelAdmin):
-    list_display = ("name", "category", "description")
-    list_filter = ("category",)
-    search_fields = ("name", "category__name")
-    list_per_page = 50
-    autocomplete_fields = ["category"]
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related("category")
+    indented_title.short_description = "Category Name"
 
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ("name", "brand", "weight", "packaging")
-    list_filter = ("brand", "packaging", "tags")
+    list_display = ("name", "brand", "weight", "packaging", "get_category")
+    list_filter = ("brand", "packaging", "category", "tags")
     search_fields = ("name", "brand__name")
-    autocomplete_fields = ["brand", "tags"]
+    autocomplete_fields = ["brand", "tags", "category"]
     inlines = [ProductStoreInline, ProductFlavorNutritionalInfoInline]
     list_per_page = 50
     filter_horizontal = ["tags"]
@@ -110,16 +116,21 @@ class ProductAdmin(ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("brand")
-            .prefetch_related("tags")
+            .select_related("brand", "category")
+            .prefetch_related("tags", "stores", "flavors")
         )
+
+    def get_category(self, obj):
+        return obj.category.name if obj.category else "-"
+
+    get_category.short_description = "Category"
 
 
 @admin.register(ProductStore)
 class ProductStoreAdmin(ModelAdmin):
-    list_display = ("product", "store", "affiliate_link", "product_link")
+    list_display = ("product", "store", "external_id", "product_link", "affiliate_link")
     list_filter = ("store",)
-    search_fields = ("product__name", "store__name")
+    search_fields = ("product__name", "store__name", "external_id")
     autocomplete_fields = ["product", "store"]
     list_per_page = 50
     inlines = [ProductPriceHistoryInline]
@@ -128,24 +139,35 @@ class ProductStoreAdmin(ModelAdmin):
         return super().get_queryset(request).select_related("product", "store")
 
 
-# Simple fix: Change inheritance order to prioritize Unfold's ModelAdmin
 @admin.register(ProductPriceHistory)
-class ProductPriceHistoryAdmin(ModelAdmin, SimpleHistoryAdmin):  # Changed order
-    list_display = ("store_link", "price", "stock_status", "collected_at")
-    list_filter = ("stock_status", "store_link__store", "collected_at")
-    search_fields = ("store_link__product__name", "store_link__store__name")
+class ProductPriceHistoryAdmin(ModelAdmin, SimpleHistoryAdmin):
+    list_display = ("get_product", "get_store", "price", "stock_status", "collected_at")
+    list_filter = ("stock_status", "store_product_link__store", "collected_at")
+    search_fields = (
+        "store_product_link__product__name",
+        "store_product_link__store__name",
+    )
     ordering = ("-collected_at",)
-    history_list_display = ["price", "stock_status"]
     date_hierarchy = "collected_at"
     list_per_page = 50
-    autocomplete_fields = ["store_link"]
+    autocomplete_fields = ["store_product_link"]
 
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
-            .select_related("store_link__product", "store_link__store")
+            .select_related("store_product_link__product", "store_product_link__store")
         )
+
+    def get_product(self, obj):
+        return obj.store_product_link.product.name
+
+    get_product.short_description = "Product"
+
+    def get_store(self, obj):
+        return obj.store_product_link.store.name
+
+    get_store.short_description = "Store"
 
 
 @admin.register(NutritionalInfo)
@@ -169,15 +191,15 @@ class NutritionalInfoAdmin(ModelAdmin):
 
 @admin.register(ProductFlavorNutritionalInfo)
 class ProductFlavorNutritionalInfoAdmin(ModelAdmin):
-    list_display = ("product", "flavor", "nutritional_info")
+    list_display = ("product", "flavor", "nutritional_profile")
     search_fields = ("product__name", "flavor__name")
     list_filter = ("flavor", "product__brand")
-    autocomplete_fields = ["product", "flavor", "nutritional_info"]
+    autocomplete_fields = ["product", "flavor", "nutritional_profile"]
     list_per_page = 50
 
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
-            .select_related("product", "flavor", "nutritional_info")
+            .select_related("product", "flavor", "nutritional_profile")
         )

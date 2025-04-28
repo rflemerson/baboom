@@ -1,5 +1,6 @@
 from django.db import models
 from simple_history.models import HistoricalRecords
+from treebeard.mp_tree import MP_Node
 
 
 class Brand(models.Model):
@@ -8,15 +9,16 @@ class Brand(models.Model):
         max_length=100, unique=True, verbose_name="Display Name"
     )
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Description of the brand"
+        blank=True, verbose_name="Description", help_text="Brand description"
     )
 
     class Meta:
         verbose_name = "Brand"
         verbose_name_plural = "Brands"
+        ordering = ["name"]
 
     def __str__(self):
-        return self.name
+        return self.display_name
 
 
 class Store(models.Model):
@@ -25,116 +27,188 @@ class Store(models.Model):
         max_length=100, unique=True, verbose_name="Display Name"
     )
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Description of the store"
+        blank=True, verbose_name="Description", help_text="Store description"
     )
 
     class Meta:
         verbose_name = "Store"
         verbose_name_plural = "Stores"
+        ordering = ["name"]
 
     def __str__(self):
-        return self.name
+        return self.display_name
 
 
 class Flavor(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Name")
-    description = models.TextField(blank=True, verbose_name="Description")
+    description = models.TextField(
+        blank=True, verbose_name="Description", help_text="Flavor description"
+    )
 
     class Meta:
         verbose_name = "Flavor"
         verbose_name_plural = "Flavors"
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
 
 
-class TagCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Category Name")
-    description = models.TextField(blank=True, null=True, verbose_name="Description")
-
-    class Meta:
-        verbose_name = "Tag Category"
-        verbose_name_plural = "Tag Categories"
-
-    def __str__(self):
-        return self.name
-
-
-class Tag(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Tag Name")
-    category = models.ForeignKey(
-        TagCategory,
-        on_delete=models.CASCADE,
-        related_name="tags",
-        verbose_name="Category",
+class Tag(MP_Node):
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Name",
+        help_text="Unique tag name",
     )
-    description = models.TextField(blank=True, null=True, verbose_name="Description")
+    description = models.TextField(
+        blank=True, verbose_name="Description", help_text="Tag description"
+    )
+
+    node_order_by = ["name"]
 
     class Meta:
         verbose_name = "Tag"
         verbose_name_plural = "Tags"
 
     def __str__(self):
-        return f"{self.name} ({self.category.name})"
+        return self.name
+
+
+class Category(MP_Node):
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Name",
+        help_text="Unique category name",
+    )
+    description = models.TextField(
+        blank=True, verbose_name="Description", help_text="Category description"
+    )
+
+    node_order_by = ["name"]
+
+    class Meta:
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
+
+    def __str__(self):
+        return self.name
 
 
 class Product(models.Model):
     PACKAGING_CHOICES = [
-        ("R", "Refill"),
-        ("C", "Container"),
+        ("REFILL", "Refill Package"),
+        ("CONTAINER", "Container Package"),
     ]
 
-    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name="Brand")
-    name = models.CharField(max_length=200, verbose_name="Name")
-    weight = models.PositiveIntegerField(
-        verbose_name="Weight (g)", help_text="Total weight in grams"
-    )
-    packaging = models.CharField(
-        max_length=1, choices=PACKAGING_CHOICES, verbose_name="Packaging"
+    name = models.CharField(max_length=200, verbose_name="Product Name")
+
+    brand = models.ForeignKey(
+        Brand, on_delete=models.CASCADE, verbose_name="Brand", related_name="products"
     )
 
-    stores = models.ManyToManyField(
-        Store,
-        through="ProductStore",
-        related_name="products",
-        verbose_name="Available Stores",
+    weight = models.PositiveIntegerField(
+        verbose_name="Weight (grams)", help_text="Total product weight in grams"
+    )
+    packaging = models.CharField(
+        max_length=20,
+        choices=PACKAGING_CHOICES,
+        verbose_name="Packaging Type",
+    )
+
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="categorized_products",
+        verbose_name="Product Category",
     )
 
     flavors = models.ManyToManyField(
         Flavor,
         through="ProductFlavorNutritionalInfo",
-        related_name="products",
+        related_name="flavored_products",
         verbose_name="Available Flavors",
+        blank=True,
+    )
+
+    stores = models.ManyToManyField(
+        Store,
+        through="ProductStore",
+        related_name="available_products",
+        verbose_name="Available In Stores",
+        blank=True,
     )
 
     tags = models.ManyToManyField(
-        Tag, related_name="products", blank=True, verbose_name="Tags"
+        Tag, related_name="tagged_products", verbose_name="Product Tags", blank=True
     )
 
     class Meta:
         unique_together = [["brand", "name"]]
         verbose_name = "Product"
         verbose_name_plural = "Products"
+        ordering = ["brand__name", "name"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["brand", "name"]),
+        ]
 
     def __str__(self):
-        return f"{self.brand} - {self.name}"
+        return f"{self.brand.name} - {self.name} ({self.weight}g)"
 
 
 class ProductStore(models.Model):
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, verbose_name="Store")
     product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, verbose_name="Product"
+        Product,
+        on_delete=models.CASCADE,
+        verbose_name="Related Product",
+        related_name="store_links",
     )
-    affiliate_link = models.URLField("Affiliate Link", null=True, blank=True)
-    product_link = models.URLField("Product Link")
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        verbose_name="Associated Store",
+        related_name="product_links",
+    )
+
+    external_id = models.CharField(
+        max_length=100,
+        verbose_name="Store Product ID",
+        help_text="Unique identifier in store system (e.g., SKU)",
+        blank=True,
+    )
+
+    product_link = models.URLField(
+        verbose_name="Store Product URL",
+        help_text="Direct URL to product page in the store",
+    )
+
+    affiliate_link = models.URLField(
+        verbose_name="Affiliate Tracking URL",
+        help_text="URL with affiliate tracking parameters",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
-        unique_together = [["product", "store"]]
-        verbose_name = "Product Store Link"
-        verbose_name_plural = "Product Store Links"
+        unique_together = [["product", "store"], ["store", "external_id"]]
+
+        verbose_name = "Store Product Link"
+        verbose_name_plural = "Store Product Links"
+
+        ordering = ["store__name", "product__name"]
+
+        indexes = [
+            models.Index(fields=["external_id"]),
+            models.Index(fields=["store", "product"]),
+        ]
 
     def __str__(self):
-        return f"{self.product} | {self.store}"
+        return f"{self.store.name} → {self.product.name}"
 
 
 class ProductPriceHistory(models.Model):
@@ -144,129 +218,232 @@ class ProductPriceHistory(models.Model):
         ("O", "Out of Stock"),
     ]
 
-    store_link = models.ForeignKey(
+    store_product_link = models.ForeignKey(
         ProductStore,
         on_delete=models.CASCADE,
-        related_name="price_history",
-        verbose_name="Store Link",
+        related_name="price_histories",
+        verbose_name="Store Product Link",
+        help_text="Link to specific product-store combination",
     )
-    price = models.DecimalField("Price", max_digits=10, decimal_places=2)
+
+    price = models.DecimalField(
+        verbose_name="Current Price",
+        max_digits=10,
+        decimal_places=2,
+        help_text="Price in local currency",
+    )
+
     stock_status = models.CharField(
-        "Stock Status", max_length=1, choices=STOCK_STATUS_CHOICES, default="A"
+        verbose_name="Inventory Status",
+        max_length=1,
+        choices=STOCK_STATUS_CHOICES,
+        default="A",
+        help_text="Current availability status",
     )
-    collected_at = models.DateTimeField("Collected at", auto_now_add=True)
+
+    collected_at = models.DateTimeField(
+        verbose_name="Collection Timestamp",
+        auto_now_add=True,
+        help_text="Automatic timestamp when record was created",
+    )
 
     history = HistoricalRecords(
-        verbose_name="History",
+        verbose_name="Version History",
         excluded_fields=["history"],
-        history_change_reason_field=models.TextField(null=True, blank=True),
+        history_change_reason_field=models.TextField(
+            null=True, blank=True, verbose_name="Change Reason"
+        ),
     )
 
     class Meta:
         ordering = ["-collected_at"]
         get_latest_by = "collected_at"
-        unique_together = [["store_link", "collected_at"]]
-        verbose_name = "Price and Stock History"
-        verbose_name_plural = "Price and Stock History"
+        unique_together = [["store_product_link", "collected_at"]]
+        verbose_name = "Price Tracking Record"
+        verbose_name_plural = "Price Tracking Records"
         indexes = [
             models.Index(fields=["collected_at"]),
             models.Index(fields=["stock_status"]),
+            models.Index(fields=["store_product_link", "collected_at"]),
         ]
 
     def __str__(self):
-        return f"{self.store_link} | ${self.price} ({self.collected_at})"
+        return f"{self.store_product_link} | {self.get_stock_status_display()} @ {self.collected_at:%Y-%m-%d %H:%M}"
 
 
 class NutritionalInfo(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
-        related_name="nutritional_infos",
-        verbose_name="Product",
+        related_name="nutritional_profiles",
+        verbose_name="Associated Product",
+        help_text="Product this nutritional information belongs to",
     )
+
     serving_size_grams = models.PositiveSmallIntegerField(
-        verbose_name="Serving size (g)"
+        verbose_name="Serving Size (g)",
+        help_text="Recommended serving size in grams",
     )
-    energy_kcal = models.PositiveSmallIntegerField(verbose_name="Energy value (kcal)")
+
+    energy_kcal = models.PositiveSmallIntegerField(
+        verbose_name="Energy Content (kcal)", help_text="Caloric value per serving"
+    )
+
     carbohydrates = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Carbohydrates (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Carbohydrates (g)",
+        help_text="Total carbohydrates per serving",
     )
+
     total_sugars = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Total sugars (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Total Sugars (g)",
+        help_text="Includes naturally occurring and added sugars",
     )
+
     added_sugars = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Added sugars (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Added Sugars (g)",
+        help_text="Sugars added during processing",
     )
+
     proteins = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Proteins (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Protein Content (g)",
+        help_text="Complete and incomplete proteins",
     )
+
     total_fats = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Total fats (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Total Fats (g)",
+        help_text="Includes all types of fats",
     )
+
     saturated_fats = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Saturated fats (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Saturated Fats (g)",
+        help_text="Typically solid at room temperature",
     )
+
     trans_fats = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Trans fats (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Trans Fats (g)",
+        help_text="Artificial trans fats should be avoided",
     )
+
     dietary_fiber = models.DecimalField(
-        max_digits=4, decimal_places=1, verbose_name="Dietary fiber (g)"
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Dietary Fiber (g)",
+        help_text="Soluble and insoluble fiber content",
     )
-    sodium = models.PositiveIntegerField(verbose_name="Sodium (mg)")
+
+    sodium = models.PositiveIntegerField(
+        verbose_name="Sodium Content (mg)", help_text="Salt equivalent per serving"
+    )
 
     class Meta:
         verbose_name = "Nutritional Information"
         verbose_name_plural = "Nutritional Information"
+        indexes = [
+            models.Index(fields=["product"]),
+        ]
 
     def __str__(self):
-        return f"{self.product} - {self.serving_size_grams}g"
+        return f"{self.product.name} - {self.serving_size_grams}g Profile"
 
 
 class AdditionalNutrient(models.Model):
-    COMMON_UNITS = [
-        ("g", "grams"),
-        ("mg", "milligrams"),
-        ("mcg", "micrograms"),
-        ("IU", "international units"),
-        ("%", "percentage"),
+    MEASUREMENT_UNITS = [
+        ("g", "Grams"),
+        ("mg", "Milligrams"),
+        ("mcg", "Micrograms"),
+        ("IU", "International Units"),
+        ("%", "Daily Value Percentage"),
     ]
 
-    nutritional_info = models.ForeignKey(
+    nutritional_profile = models.ForeignKey(
         NutritionalInfo,
         on_delete=models.CASCADE,
-        related_name="additional_nutrients",
-        verbose_name="Nutritional Information",
+        related_name="additional_components",
+        verbose_name="Nutritional Profile",
+        help_text="Associated nutritional profile",
     )
-    name = models.CharField(max_length=100, verbose_name="Nutrient")
-    value = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Value")
+
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Nutrient Name",
+        help_text="e.g., Vitamin C, Iron, Zinc",
+    )
+
+    value = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        verbose_name="Nutrient Quantity",
+        help_text="Measured amount per serving",
+    )
+
     unit = models.CharField(
-        max_length=10, choices=COMMON_UNITS, default="mg", verbose_name="Unit"
+        max_length=10,
+        choices=MEASUREMENT_UNITS,
+        default="mg",
+        verbose_name="Measurement Unit",
+        help_text="Unit of measurement for this nutrient",
     )
 
     class Meta:
-        unique_together = [["nutritional_info", "name"]]
-        verbose_name = "Additional Nutrient"
-        verbose_name_plural = "Additional Nutrients"
+        unique_together = [["nutritional_profile", "name"]]
+        verbose_name = "Micronutrient Data"
+        verbose_name_plural = "Micronutrients Data"
+        indexes = [
+            models.Index(fields=["name"]),
+        ]
 
     def __str__(self):
-        return f"{self.name}: {self.value} {self.unit}"
+        return f"{self.nutritional_profile} | {self.name} ({self.get_unit_display()})"
 
 
 class ProductFlavorNutritionalInfo(models.Model):
     product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, verbose_name="Product"
+        Product,
+        on_delete=models.CASCADE,
+        related_name="flavor_nutrition_profiles",
+        verbose_name="Base Product",
+        help_text="Main product associated with this flavor-nutrition combination",
     )
-    flavor = models.ForeignKey(Flavor, on_delete=models.CASCADE, verbose_name="Flavor")
-    nutritional_info = models.ForeignKey(
+
+    flavor = models.ForeignKey(
+        Flavor,
+        on_delete=models.CASCADE,
+        related_name="product_nutrition_profiles",
+        verbose_name="Product Flavor",
+        help_text="Specific flavor variant of the product",
+    )
+
+    nutritional_profile = models.ForeignKey(
         NutritionalInfo,
         on_delete=models.CASCADE,
-        verbose_name="Nutritional Information",
+        related_name="flavor_variants",
+        verbose_name="Nutritional Profile",
+        help_text="Detailed nutritional data for this specific flavor",
     )
 
     class Meta:
         unique_together = [["product", "flavor"]]
-        verbose_name = "Flavor and Nutrition"
-        verbose_name_plural = "Flavors and Nutrition"
+        verbose_name = "Flavor Nutrition Profile"
+        verbose_name_plural = "Flavor Nutrition Profiles"
+        ordering = ["product__name", "flavor__name"]
+        indexes = [
+            models.Index(fields=["product", "flavor"]),
+            models.Index(fields=["nutritional_profile"]),
+        ]
 
     def __str__(self):
-        return f"{self.product} - {self.flavor}"
+        return f"{self.product.name} - {self.flavor.name} Profile"

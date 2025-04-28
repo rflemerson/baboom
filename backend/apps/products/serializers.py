@@ -3,179 +3,106 @@ from .models import (
     Brand,
     Store,
     Flavor,
-    TagCategory,
     Tag,
+    Category,
     Product,
     ProductStore,
     ProductPriceHistory,
     NutritionalInfo,
-    AdditionalNutrient,
-    ProductFlavorNutritionalInfo,
 )
 
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
-        fields = ["id", "name", "display_name", "description"]
+        fields = ["id", "name", "display_name"]
+        read_only_fields = ["id"]
 
 
 class StoreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Store
-        fields = ["id", "name", "display_name", "description"]
+        fields = ["id", "name", "display_name"]
+        read_only_fields = ["id"]
 
 
 class FlavorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Flavor
-        fields = ["id", "name", "description"]
+        fields = ["id", "name"]
+        read_only_fields = ["id"]
 
 
-class TagCategorySerializer(serializers.ModelSerializer):
+class CategorySerializer(serializers.ModelSerializer):
     class Meta:
-        model = TagCategory
-        fields = ["id", "name", "description"]
+        model = Category
+        fields = ["id", "name"]
+        read_only_fields = ["id"]
 
 
 class TagSerializer(serializers.ModelSerializer):
-    category = TagCategorySerializer(read_only=True)
-
     class Meta:
         model = Tag
-        fields = ["id", "name", "category", "description"]
-
-
-class AdditionalNutrientSerializer(serializers.ModelSerializer):
-    unit_display = serializers.CharField(source="get_unit_display", read_only=True)
-
-    class Meta:
-        model = AdditionalNutrient
-        exclude = ["nutritional_info"]
-
-
-class NutritionalInfoSerializer(serializers.ModelSerializer):
-    additional_nutrients = AdditionalNutrientSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = NutritionalInfo
-        exclude = ["product"]  # Exclude product to avoid circular reference
+        fields = ["id", "name"]
+        read_only_fields = ["id"]
 
 
 class ProductPriceHistorySerializer(serializers.ModelSerializer):
-    """
-    Serializer for product price history entries.
-    Handles creating price history records with store relationships.
-    """
-
-    store = serializers.SerializerMethodField()
-    store_id = serializers.PrimaryKeyRelatedField(
-        queryset=Store.objects.all(),
-        write_only=True,
-    )
     stock_status_display = serializers.CharField(
         source="get_stock_status_display", read_only=True
     )
-    product = serializers.SerializerMethodField(read_only=True)
+    store_name = serializers.CharField(
+        source="store_product_link.store.name", read_only=True
+    )
 
     class Meta:
         model = ProductPriceHistory
         fields = [
             "id",
-            "store",
-            "store_id",
             "price",
             "stock_status",
             "stock_status_display",
             "collected_at",
-            "product",
+            "store_name",
+            "store_product_link",
         ]
-        read_only_fields = ["collected_at"]
-
-    def get_store(self, obj):
-        return StoreSerializer(obj.store_link.store).data
-
-    def get_product(self, obj):
-        return {"id": obj.store_link.product.id, "name": str(obj.store_link.product)}
-
-    def create(self, validated_data):
-        """
-        Create a new price history entry with proper store link.
-        """
-        store = validated_data.pop("store_id")
-        product_id = self.context.get("product_id")
-
-        try:
-            product = Product.objects.get(id=product_id)
-
-            # Get or create the ProductStore link
-            store_link, _ = ProductStore.objects.get_or_create(
-                product=product, store=store, defaults={"product_link": ""}
-            )
-
-            # Create the price history entry
-            price_history = ProductPriceHistory.objects.create(
-                store_link=store_link, **validated_data
-            )
-            return price_history
-
-        except Product.DoesNotExist:
-            raise serializers.ValidationError(
-                f"Product with ID {product_id} does not exist"
-            )
+        read_only_fields = ["id", "collected_at"]
+        extra_kwargs = {"store_product_link": {"write_only": True}}
 
 
 class ProductStoreSerializer(serializers.ModelSerializer):
-    """
-    Serializer for product-store relationship.
-    """
-
     store = StoreSerializer(read_only=True)
+    latest_price = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductStore
-        fields = ["id", "store", "affiliate_link", "product_link"]
+        fields = ["id", "store", "product_link", "latest_price"]
+        read_only_fields = ["id"]
+
+    def get_latest_price(self, obj):
+        latest = obj.price_histories.order_by("-collected_at").first()
+        return {
+            "price": latest.price if latest else None,
+            "collected_at": latest.collected_at if latest else None,
+            "stock_status": latest.get_stock_status_display() if latest else None,
+        }
 
 
-class ProductFlavorNutritionalInfoSerializer(serializers.ModelSerializer):
-    flavor = FlavorSerializer(read_only=True)
-    nutritional_info = NutritionalInfoSerializer(read_only=True)
-
+class NutritionalInfoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ProductFlavorNutritionalInfo
-        exclude = ["product"]
+        model = NutritionalInfo
+        fields = ["id", "serving_size_grams", "proteins", "carbohydrates", "total_fats"]
+        read_only_fields = ["id"]
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """
-    Main product serializer with calculated fields and related entities.
-    Read-only for API consumption.
-    """
-
-    # Basic fields
     brand = BrandSerializer(read_only=True)
+    category = CategorySerializer(read_only=True)
+    stores = ProductStoreSerializer(source="store_links", many=True, read_only=True)
     packaging_display = serializers.CharField(
         source="get_packaging_display", read_only=True
     )
-
-    # Related information
-    tags = TagSerializer(many=True, read_only=True)
-    nutritional_infos = NutritionalInfoSerializer(many=True, read_only=True)
-    flavor_nutritional_infos = ProductFlavorNutritionalInfoSerializer(
-        source="productflavornutritionalinfo_set", many=True, read_only=True
-    )
-
-    # Store information
-    stores = ProductStoreSerializer(
-        source="productstore_set", many=True, read_only=True
-    )
-
-    # Price information (latest only)
-    current_price = serializers.SerializerMethodField()
-
-    # For protein products - can be determined by tags now
     protein_concentration = serializers.SerializerMethodField()
-    total_protein = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -186,61 +113,24 @@ class ProductSerializer(serializers.ModelSerializer):
             "weight",
             "packaging",
             "packaging_display",
-            "tags",
-            "nutritional_infos",
-            "flavor_nutritional_infos",
+            "category",
             "stores",
-            "current_price",
             "protein_concentration",
-            "total_protein",
         ]
-        read_only_fields = fields  # All fields are read-only for API consumption
-
-    def get_current_price(self, obj):
-        """Get the most recent price entry for this product across all stores."""
-        latest_prices = []
-        for store_link in obj.productstore_set.all():
-            latest_price = store_link.price_history.order_by("-collected_at").first()
-            if latest_price:
-                latest_prices.append(
-                    {
-                        "store": store_link.store.name,
-                        "price": latest_price.price,
-                        "collected_at": latest_price.collected_at,
-                    }
-                )
-
-        return latest_prices if latest_prices else None
+        read_only_fields = ["id"]
 
     def get_protein_concentration(self, obj):
-        """Calculate protein concentration percentage for protein products."""
-        # Check if this is a protein product by looking at tags
-        is_protein_product = obj.tags.filter(
-            category__name__icontains="protein"
-        ).exists()
-
-        if not is_protein_product:
+        nutritional_profile = obj.nutritional_profiles.first()
+        if not nutritional_profile or nutritional_profile.serving_size_grams <= 0:
             return None
-
-        # Get the first nutritional info
-        ni = obj.nutritional_infos.first()
-        if (
-            ni
-            and ni.serving_size_grams
-            and ni.serving_size_grams > 0
-            and ni.proteins is not None
-        ):
-            try:
-                concentration = (float(ni.proteins) / ni.serving_size_grams) * 100
-                return round(concentration, 1)
-            except (ZeroDivisionError, ValueError):
-                return None
-        return None
-
-    def get_total_protein(self, obj):
-        """Calculate total protein content in grams for the entire product."""
-        concentration = self.get_protein_concentration(obj)
-        if concentration is not None and obj.weight is not None:
-            total_protein = obj.weight * (concentration / 100)
-            return round(total_protein, 1)
-        return None
+        try:
+            return round(
+                (
+                    float(nutritional_profile.proteins)
+                    / nutritional_profile.serving_size_grams
+                )
+                * 100,
+                1,
+            )
+        except (TypeError, ValueError, ZeroDivisionError):
+            return None

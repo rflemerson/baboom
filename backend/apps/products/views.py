@@ -1,87 +1,48 @@
-from rest_framework import viewsets, status, permissions, filters
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 from .models import (
-    Product,
-    ProductPriceHistory,
+    Product, ProductStore, ProductPriceHistory
 )
 from .serializers import (
-    ProductSerializer,
-    ProductPriceHistorySerializer,
+    ProductSerializer, ProductPriceHistorySerializer
 )
 
-
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoint for viewing products.
-    """
-
     serializer_class = ProductSerializer
     permission_classes = [permissions.AllowAny]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "brand__name", "tags__name"]
 
     @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
     def list(self, request, *args, **kwargs):
-        """List products with optional caching."""
         return super().list(request, *args, **kwargs)
 
     @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
     def retrieve(self, request, *args, **kwargs):
-        """Retrieve a product with optional caching."""
         return super().retrieve(request, *args, **kwargs)
 
     def get_queryset(self):
-        """
-        Optimizes the query and allows filtering by tags.
-        """
-        queryset = Product.objects.select_related(
-            "brand",  # For brand details
-        ).prefetch_related(
-            "tags__category",  # For tags with their categories
-            Prefetch(
-                "productstore_set",
-                queryset=Product.productstore_set.related.model.objects.select_related(
-                    "store"
+        queryset = (
+            Product.objects.select_related("brand", "category")
+            .prefetch_related(
+                Prefetch(
+                    "store_links",
+                    queryset=ProductStore.objects.select_related("store").prefetch_related(
+                        "price_histories"
+                    ),
                 ),
-            ),
-            Prefetch(
-                "productstore_set__price_history",
-                queryset=ProductPriceHistory.objects.order_by("-collected_at"),
-            ),
-            "nutritional_infos__additional_nutrients",  # For nutritional info with additional nutrients
-            "productflavornutritionalinfo_set__flavor",  # For flavor information
-            "productflavornutritionalinfo_set__nutritional_info",  # For flavor-specific nutritional info
+                "nutritional_profiles",
+            )
         )
-
-        # Filter by tag category
-        tag_category = self.request.query_params.get("tag_category")
-        if tag_category:
-            queryset = queryset.filter(tags__category__name__icontains=tag_category)
-
-        # Filter by tag name
-        tag_name = self.request.query_params.get("tag")
-        if tag_name:
-            queryset = queryset.filter(tags__name__icontains=tag_name)
-
-        # Filter by brand
+        
+        # Aplicar filtros básicos
         brand_id = self.request.query_params.get("brand_id")
         if brand_id:
             queryset = queryset.filter(brand_id=brand_id)
-
-        # Filter by name
-        name = self.request.query_params.get("name")
-        if name:
-            queryset = queryset.filter(name__icontains=name)
-
-        # Ensure distinct results when filtering by tag
-        if tag_category or tag_name:
-            queryset = queryset.distinct()
-
+            
         return queryset
 
     @action(
@@ -92,19 +53,34 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         permission_classes=[permissions.IsAuthenticated],
     )
     def add_price(self, request, pk=None):
-        """
-        Add a new price record for a product.
-        Requires authentication.
-        """
         product = self.get_object()
-        serializer = self.get_serializer(
-            data=request.data, context={"product_id": product.id}
-        )
+        store_id = request.data.get("store_id")
+        price = request.data.get("price")
+        
+        if not store_id or not price:
+            return Response(
+                {"error": "store_id e price são campos obrigatórios"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        try:
+            store_link = ProductStore.objects.get(product=product, store_id=store_id)
+        except ProductStore.DoesNotExist:
+            return Response(
+                {"error": "Ligação produto-loja não existe"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        serializer = ProductPriceHistorySerializer(data={
+            "store_product_link": store_link.id,
+            "price": price,
+            "stock_status": request.data.get("stock_status", "A")
+        })
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(
         detail=True,
@@ -113,19 +89,16 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         serializer_class=ProductPriceHistorySerializer,
     )
     def get_prices(self, request, pk=None):
-        """
-        Return the price history for a product.
-        """
         product = self.get_object()
-        price_history = ProductPriceHistory.objects.filter(
-            store_link__product=product
-        ).order_by("-collected_at")
+        latest_price = ProductPriceHistory.objects.filter(
+            store_product_link__product=product
+        ).order_by("-collected_at").first()
 
-        # Handle pagination if there are many prices
-        page = self.paginate_queryset(price_history)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        if not latest_price:
+            return Response(
+                {"detail": "Nenhum histórico de preço disponível para este produto"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-        serializer = self.get_serializer(price_history, many=True)
+        serializer = self.get_serializer(latest_price)
         return Response(serializer.data)
