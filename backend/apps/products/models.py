@@ -126,14 +126,6 @@ class Product(models.Model):
         verbose_name="Product Category",
     )
 
-    flavors = models.ManyToManyField(
-        Flavor,
-        through="ProductFlavorNutritionalInfo",
-        related_name="flavored_products",
-        verbose_name="Available Flavors",
-        blank=True,
-    )
-
     stores = models.ManyToManyField(
         Store,
         through="ProductStore",
@@ -272,92 +264,56 @@ class ProductPriceHistory(models.Model):
 
 
 class NutritionalInfo(models.Model):
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE,
-        related_name="nutritional_profiles",
-        verbose_name="Associated Product",
-        help_text="Product this nutritional information belongs to",
+    description = models.TextField(
+        blank=True, verbose_name="Description", help_text="Table description"
     )
 
     serving_size_grams = models.PositiveSmallIntegerField(
-        verbose_name="Serving Size (g)",
-        help_text="Recommended serving size in grams",
+        verbose_name="Serving Size (g)"
     )
 
-    energy_kcal = models.PositiveSmallIntegerField(
-        verbose_name="Energy Content (kcal)", help_text="Caloric value per serving"
-    )
+    energy_kcal = models.PositiveSmallIntegerField(verbose_name="Energy Content (kcal)")
 
     carbohydrates = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Carbohydrates (g)",
-        help_text="Total carbohydrates per serving",
+        max_digits=5, decimal_places=1, verbose_name="Carbohydrates (g)"
     )
 
     total_sugars = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Total Sugars (g)",
-        help_text="Includes naturally occurring and added sugars",
+        max_digits=5, decimal_places=1, verbose_name="Total Sugars (g)"
     )
 
     added_sugars = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Added Sugars (g)",
-        help_text="Sugars added during processing",
+        max_digits=5, decimal_places=1, verbose_name="Added Sugars (g)"
     )
 
     proteins = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Protein Content (g)",
-        help_text="Complete and incomplete proteins",
+        max_digits=5, decimal_places=1, verbose_name="Protein Content (g)"
     )
 
     total_fats = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Total Fats (g)",
-        help_text="Includes all types of fats",
+        max_digits=5, decimal_places=1, verbose_name="Total Fats (g)"
     )
 
     saturated_fats = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Saturated Fats (g)",
-        help_text="Typically solid at room temperature",
+        max_digits=5, decimal_places=1, verbose_name="Saturated Fats (g)"
     )
 
     trans_fats = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Trans Fats (g)",
-        help_text="Artificial trans fats should be avoided",
+        max_digits=5, decimal_places=1, verbose_name="Trans Fats (g)"
     )
 
     dietary_fiber = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        verbose_name="Dietary Fiber (g)",
-        help_text="Soluble and insoluble fiber content",
+        max_digits=5, decimal_places=1, verbose_name="Dietary Fiber (g)"
     )
 
-    sodium = models.PositiveIntegerField(
-        verbose_name="Sodium Content (mg)", help_text="Salt equivalent per serving"
-    )
+    sodium = models.PositiveIntegerField(verbose_name="Sodium Content (mg)")
 
     class Meta:
         verbose_name = "Nutritional Information"
-        verbose_name_plural = "Nutritional Information"
-        indexes = [
-            models.Index(fields=["product"]),
-        ]
+        verbose_name_plural = "Nutritional Information tables"
 
     def __str__(self):
-        return f"{self.product.name} - {self.serving_size_grams}g Profile"
+        return f"{self.product} - {self.serving_size_grams} g - Flavors: {', '.join(f.name for f in self.flavors.all())}"
 
 
 class AdditionalNutrient(models.Model):
@@ -410,40 +366,39 @@ class AdditionalNutrient(models.Model):
         return f"{self.nutritional_profile} | {self.name} ({self.get_unit_display()})"
 
 
-class ProductFlavorNutritionalInfo(models.Model):
+class ProductNutritionProfile(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
-        related_name="flavor_nutrition_profiles",
+        related_name="nutrition_profiles",
         verbose_name="Base Product",
-        help_text="Main product associated with this flavor-nutrition combination",
+        help_text="Product associated with this nutritional profile",
     )
 
-    flavor = models.ForeignKey(
-        Flavor,
-        on_delete=models.CASCADE,
-        related_name="product_nutrition_profiles",
-        verbose_name="Product Flavor",
-        help_text="Specific flavor variant of the product",
+    flavors = models.ManyToManyField(
+        "Flavor",
+        related_name="nutrition_profiles",
+        verbose_name="Flavors",
+        help_text="Flavors associated with this nutritional profile",
+        blank=True,
     )
 
-    nutritional_profile = models.ForeignKey(
+    nutritional_info = models.ForeignKey(
         NutritionalInfo,
         on_delete=models.CASCADE,
-        related_name="flavor_variants",
-        verbose_name="Nutritional Profile",
-        help_text="Detailed nutritional data for this specific flavor",
+        related_name="product_variants",
+        verbose_name="Nutritional Information tables",
+        help_text="Detailed nutritional data for this product variant",
     )
 
     class Meta:
-        unique_together = [["product", "flavor"]]
-        verbose_name = "Flavor Nutrition Profile"
-        verbose_name_plural = "Flavor Nutrition Profiles"
-        ordering = ["product__name", "flavor__name"]
+        unique_together = [["product", "nutritional_info"]]
+        verbose_name = "Product Nutrition Profile"
+        verbose_name_plural = "Product Nutrition Profiles"
+        ordering = ["product__name"]
         indexes = [
-            models.Index(fields=["product", "flavor"]),
-            models.Index(fields=["nutritional_profile"]),
+            models.Index(fields=["product", "nutritional_info"]),
         ]
 
     def __str__(self):
-        return f"{self.product.name} - {self.flavor.name} Profile"
+        return f"{self.product.name} - {self.nutritional_info.description}"
