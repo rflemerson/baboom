@@ -1,4 +1,6 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
 from .models import (
     Brand,
     Store,
@@ -14,39 +16,44 @@ from .models import (
 )
 
 
-class BrandSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Brand
-        fields = ["id", "name", "display_name"]
-        read_only_fields = ["id"]
-
-
 class StoreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Store
-        fields = ["id", "name", "display_name"]
-        read_only_fields = ["id"]
+        exclude = ["id"]
 
 
-class FlavorSerializer(serializers.ModelSerializer):
+class BrandSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Flavor
-        fields = ["id", "name"]
-        read_only_fields = ["id"]
+        model = Brand
+        exclude = ["id"]
 
 
-class CategorySerializer(serializers.ModelSerializer):
+class AdditionalNutrientSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Category
-        fields = ["id", "name"]
-        read_only_fields = ["id"]
+        model = AdditionalNutrient
+        exclude = ["id"]
 
 
-class TagSerializer(serializers.ModelSerializer):
+class NutritionalInfoSerializer(serializers.ModelSerializer):
+    additional_components = AdditionalNutrientSerializer(
+        source="additionalnutrient_set", many=True, read_only=True
+    )
+
     class Meta:
-        model = Tag
-        fields = ["id", "name"]
-        read_only_fields = ["id"]
+        model = NutritionalInfo
+        exclude = ["id", "product_profile"]
+
+
+class ProductNutritionProfileSerializer(serializers.ModelSerializer):
+    nutritional_info = NutritionalInfoSerializer(
+        source="nutritionalinfo_set", many=True, read_only=True
+    )
+
+    flavors = serializers.StringRelatedField(many=True, read_only=True)
+
+    class Meta:
+        model = ProductNutritionProfile
+        exclude = ["id", "product"]
 
 
 class ProductPriceHistorySerializer(serializers.ModelSerializer):
@@ -59,16 +66,8 @@ class ProductPriceHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductPriceHistory
-        fields = [
-            "id",
-            "price",
-            "stock_status",
-            "stock_status_display",
-            "collected_at",
-            "store_name",
-            "store_product_link",
-        ]
-        read_only_fields = ["id", "collected_at"]
+        exclude = ["id"]
+        read_only_fields = ["collected_at"]
         extra_kwargs = {
             "store_product_link": {"write_only": True},
         }
@@ -80,101 +79,39 @@ class ProductStoreSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductStore
-        fields = ["id", "store", "product_link", "latest_price"]
-        read_only_fields = ["id"]
+        exclude = ["id", "product"]
 
+    @extend_schema_field(dict)
     def get_latest_price(self, obj):
-        latest = obj.price_histories.order_by("-collected_at").first()
+        latest = obj.productpricehistory_set.order_by("-collected_at").first()
+        if not latest:
+            return None
         return {
-            "price": latest.price if latest else None,
-            "collected_at": latest.collected_at if latest else None,
-            "stock_status": latest.get_stock_status_display() if latest else None,
+            "price": latest.price,
+            "collected_at": latest.collected_at,
+            "stock_status": latest.get_stock_status_display(),
         }
-
-
-class AdditionalNutrientSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AdditionalNutrient
-        fields = ["id", "name", "value", "unit"]
-        read_only_fields = ["id"]
-
-
-class NutritionalInfoSerializer(serializers.ModelSerializer):
-    additional_components = AdditionalNutrientSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = NutritionalInfo
-        fields = [
-            "id",
-            "description",
-            "serving_size_grams",
-            "energy_kcal",
-            "carbohydrates",
-            "total_sugars",
-            "added_sugars",
-            "proteins",
-            "total_fats",
-            "saturated_fats",
-            "trans_fats",
-            "dietary_fiber",
-            "sodium",
-            "additional_components",
-        ]
-        read_only_fields = ["id"]
-
-
-class ProductNutritionProfileSerializer(serializers.ModelSerializer):
-    nutritional_info = NutritionalInfoSerializer(read_only=True)
-    flavors = FlavorSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = ProductNutritionProfile
-        fields = ["id", "nutritional_info", "flavors"]
-        read_only_fields = ["id"]
 
 
 class ProductSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
-    category = CategorySerializer(read_only=True)
-    stores = ProductStoreSerializer(source="store_links", many=True, read_only=True)
-    packaging_display = serializers.CharField(
-        source="get_packaging_display", read_only=True
+    category = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+    stores = ProductStoreSerializer(
+        source="productstore_set", many=True, read_only=True
     )
-    nutrition_profiles = ProductNutritionProfileSerializer(many=True, read_only=True)
-    protein_concentration = serializers.SerializerMethodField()
+    nutrition_profiles = ProductNutritionProfileSerializer(
+        source="productnutritionprofile_set", many=True, read_only=True
+    )
 
     class Meta:
         model = Product
-        fields = [
-            "id",
-            "brand",
-            "name",
-            "weight",
-            "packaging",
-            "packaging_display",
-            "category",
-            "stores",
-            "nutrition_profiles",
-            "protein_concentration",
-        ]
-        read_only_fields = ["id"]
+        fields = "__all__"
 
-    def get_protein_concentration(self, obj):
-        profile = obj.nutrition_profiles.first()
-        if (
-            not profile
-            or not profile.nutritional_info
-            or profile.nutritional_info.serving_size_grams <= 0
-        ):
-            return None
-        try:
-            return round(
-                (
-                    profile.nutritional_info.proteins
-                    / profile.nutritional_info.serving_size_grams
-                )
-                * 100,
-                1,
-            )
-        except (TypeError, ZeroDivisionError):
-            return None
+    @extend_schema_field(dict)
+    def get_category(self, obj):
+        return Category.dump_bulk()
+
+    @extend_schema_field(dict)
+    def get_tags(self, obj):
+        return Tag.dump_bulk()

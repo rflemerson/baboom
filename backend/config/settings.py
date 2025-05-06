@@ -44,6 +44,7 @@ THIRD_PARTY_APPS = [
     "simple_history",
     "rest_framework",
     "drf_spectacular",
+    "nested_admin",
 ]
 
 SELF_APPS = [

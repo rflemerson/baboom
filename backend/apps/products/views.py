@@ -5,40 +5,49 @@ from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
-from .models import Product, ProductStore, ProductPriceHistory, ProductNutritionProfile
+from .models import Product, ProductStore, ProductNutritionProfile
 from .serializers import (
     ProductSerializer,
     ProductPriceHistorySerializer,
-    ProductNutritionProfileSerializer,
 )
 
 
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for viewing product information.
+
+    Provides 'list' and 'retrieve' actions by default, plus custom endpoints
+    for adding price information and retrieving nutrition profiles.
+    """
+
     serializer_class = ProductSerializer
     permission_classes = [permissions.AllowAny]
 
-    @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 5))  # Cache list view for 5 minutes
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @method_decorator(cache_page(60 * 15))
+    @method_decorator(cache_page(60 * 15))  # Cache detail view for 15 minutes
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
     def get_queryset(self):
+        """
+        Get the queryset for products with optimized database access.
+        Optionally filters by brand_id if provided in query parameters.
+        """
         qs = Product.objects.select_related("brand", "category").prefetch_related(
             Prefetch(
-                "store_links",
+                "productstore_set",
                 queryset=ProductStore.objects.select_related("store").prefetch_related(
-                    "price_histories"
+                    "productpricehistory_set"
                 ),
             ),
             Prefetch(
-                "nutrition_profiles",
-                queryset=ProductNutritionProfile.objects.select_related(
-                    "nutritional_info"
-                ).prefetch_related(
-                    "flavors", "nutritional_info__additional_components"
+                "productnutritionprofile_set",
+                queryset=ProductNutritionProfile.objects.prefetch_related(
+                    "flavors",
+                    "nutritionalinfo_set__additionalnutrient_set",
                 ),
             ),
         )
@@ -55,21 +64,30 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         permission_classes=[permissions.IsAuthenticated],
     )
     def add_price(self, request, pk=None):
+        """
+        Add price information for a specific product at a specific store.
+
+        Requires authentication. The store_id and price must be provided
+        in the request data.
+        """
         product = self.get_object()
         store_id = request.data.get("store_id")
         price = request.data.get("price")
+
         if not store_id or price is None:
             return Response(
-                {"error": "store_id e price são campos obrigatórios"},
+                {"error": "store_id and price are required fields"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
         try:
             link = ProductStore.objects.get(product=product, store_id=store_id)
         except ProductStore.DoesNotExist:
             return Response(
-                {"error": "Ligação produto-loja não existe"},
+                {"error": "Product-store relationship does not exist"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
         serializer = ProductPriceHistorySerializer(
             data={
                 "store_product_link": link.id,
@@ -79,20 +97,5 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(
-        detail=True,
-        methods=["get"],
-        url_path="nutrition-profiles",
-        serializer_class=ProductNutritionProfileSerializer,
-    )
-    def get_nutrition_profiles(self, request, pk=None):
-        product = self.get_object()
-        profiles = (
-            ProductNutritionProfile.objects.filter(product=product)
-            .select_related("nutritional_info")
-            .prefetch_related("flavors", "nutritional_info__additional_components")
-        )
-        serializer = self.get_serializer(profiles, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

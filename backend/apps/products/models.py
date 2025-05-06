@@ -105,7 +105,7 @@ class Product(models.Model):
     name = models.CharField(max_length=200, verbose_name="Product Name")
 
     brand = models.ForeignKey(
-        Brand, on_delete=models.CASCADE, verbose_name="Brand", related_name="products"
+        Brand, on_delete=models.CASCADE, verbose_name="Brand"
     )
 
     weight = models.PositiveIntegerField(
@@ -122,20 +122,18 @@ class Product(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="categorized_products",
         verbose_name="Product Category",
     )
 
     stores = models.ManyToManyField(
         Store,
         through="ProductStore",
-        related_name="available_products",
         verbose_name="Available In Stores",
         blank=True,
     )
 
     tags = models.ManyToManyField(
-        Tag, related_name="tagged_products", verbose_name="Product Tags", blank=True
+        Tag, verbose_name="Product Tags", blank=True
     )
 
     class Meta:
@@ -157,14 +155,12 @@ class ProductStore(models.Model):
         Product,
         on_delete=models.CASCADE,
         verbose_name="Related Product",
-        related_name="store_links",
     )
 
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
         verbose_name="Associated Store",
-        related_name="product_links",
     )
 
     external_id = models.CharField(
@@ -213,7 +209,6 @@ class ProductPriceHistory(models.Model):
     store_product_link = models.ForeignKey(
         ProductStore,
         on_delete=models.CASCADE,
-        related_name="price_histories",
         verbose_name="Store Product Link",
         help_text="Link to specific product-store combination",
     )
@@ -264,8 +259,15 @@ class ProductPriceHistory(models.Model):
 
 
 class NutritionalInfo(models.Model):
-    description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Table description"
+    product_profile = models.ForeignKey(
+        "ProductNutritionProfile",
+        on_delete=models.CASCADE,
+        verbose_name="Product Nutrition Profile",
+        help_text="Product profile associated with this nutritional information",
+    )
+
+    description = models.CharField(
+        max_length=200, verbose_name="Description"
     )
 
     serving_size_grams = models.PositiveSmallIntegerField(
@@ -311,9 +313,14 @@ class NutritionalInfo(models.Model):
     class Meta:
         verbose_name = "Nutritional Information"
         verbose_name_plural = "Nutritional Information tables"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product_profile"], name="unique_nutritional_info_per_profile"
+            )
+        ]
 
     def __str__(self):
-        return f"{self.product} - {self.serving_size_grams} g - Flavors: {', '.join(f.name for f in self.flavors.all())}"
+        return f"{self.description} - {self.serving_size_grams}g"
 
 
 class AdditionalNutrient(models.Model):
@@ -328,7 +335,6 @@ class AdditionalNutrient(models.Model):
     nutritional_profile = models.ForeignKey(
         NutritionalInfo,
         on_delete=models.CASCADE,
-        related_name="additional_components",
         verbose_name="Nutritional Profile",
         help_text="Associated nutritional profile",
     )
@@ -370,35 +376,21 @@ class ProductNutritionProfile(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
-        related_name="nutrition_profiles",
         verbose_name="Base Product",
         help_text="Product associated with this nutritional profile",
     )
 
     flavors = models.ManyToManyField(
         "Flavor",
-        related_name="nutrition_profiles",
         verbose_name="Flavors",
         help_text="Flavors associated with this nutritional profile",
         blank=True,
     )
 
-    nutritional_info = models.ForeignKey(
-        NutritionalInfo,
-        on_delete=models.CASCADE,
-        related_name="product_variants",
-        verbose_name="Nutritional Information tables",
-        help_text="Detailed nutritional data for this product variant",
-    )
-
     class Meta:
-        unique_together = [["product", "nutritional_info"]]
         verbose_name = "Product Nutrition Profile"
         verbose_name_plural = "Product Nutrition Profiles"
         ordering = ["product__name"]
-        indexes = [
-            models.Index(fields=["product", "nutritional_info"]),
-        ]
 
     def __str__(self):
-        return f"{self.product.name} - {self.nutritional_info.description}"
+        return f"{self.product.name}"

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from simple_history.admin import SimpleHistoryAdmin
+import nested_admin
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
@@ -18,26 +18,63 @@ from .models import (
 )
 
 
-class ProductStoreInline(admin.TabularInline):
-    model = ProductStore
-    extra = 0
-
-
-class ProductNutritionProfileInline(admin.StackedInline):
-    model = ProductNutritionProfile
-    extra = 1
-    filter_horizontal = ["flavors"]
-    autocomplete_fields = ["nutritional_info"]
-
-
-class AdditionalNutrientInline(admin.TabularInline):
+class AdditionalNutrientInline(nested_admin.NestedTabularInline):
     model = AdditionalNutrient
     extra = 0
 
 
-class ProductPriceHistoryInline(admin.TabularInline):
+class NutritionalInfoInline(nested_admin.NestedStackedInline):
+    model = NutritionalInfo
+    inlines = [AdditionalNutrientInline]
+    extra = 1
+    min_num = 1
+    max_num = 1
+    validate_min = True
+    validate_max = True
+
+
+class ProductNutritionProfileInline(nested_admin.NestedStackedInline):
+    model = ProductNutritionProfile
+    inlines = [NutritionalInfoInline]
+    filter_horizontal = ["flavors"]
+    extra = 0
+    min_num = 1
+    validate_min = True
+
+
+class ProductStoreInline(nested_admin.NestedTabularInline):
+    model = ProductStore
+    extra = 0
+
+
+class ProductPriceHistoryInline(nested_admin.NestedTabularInline):
     model = ProductPriceHistory
     extra = 0
+    readonly_fields = ["collected_at"]
+
+
+@admin.register(Product)
+class ProductAdmin(nested_admin.NestedModelAdmin):
+    list_display = ("name", "brand", "weight", "packaging", "get_category")
+    list_filter = ("brand", "packaging", "category", "tags")
+    search_fields = ("name", "brand__name")
+    autocomplete_fields = ["brand", "tags", "category"]
+    inlines = [ProductStoreInline, ProductNutritionProfileInline]
+    list_per_page = 50
+    filter_horizontal = ["tags"]
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("brand", "category")
+            .prefetch_related("tags", "productnutritionprofile_set__nutritionalinfo_set")
+        )
+
+    def get_category(self, obj):
+        return obj.category.name if obj.category else "-"
+
+    get_category.short_description = "Category"
 
 
 @admin.register(Brand)
@@ -79,30 +116,6 @@ class CategoryAdmin(TreeAdmin):
     list_per_page = 50
 
 
-@admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "brand", "weight", "packaging", "get_category")
-    list_filter = ("brand", "packaging", "category", "tags")
-    search_fields = ("name", "brand__name")
-    autocomplete_fields = ["brand", "tags", "category"]
-    inlines = [ProductStoreInline, ProductNutritionProfileInline]
-    list_per_page = 50
-    filter_horizontal = ["tags"]
-
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .select_related("brand", "category")
-            .prefetch_related("tags", "nutrition_profiles")
-        )
-
-    def get_category(self, obj):
-        return obj.category.name if obj.category else "-"
-
-    get_category.short_description = "Category"
-
-
 @admin.register(ProductStore)
 class ProductStoreAdmin(admin.ModelAdmin):
     list_display = ("product", "store", "external_id", "product_link", "affiliate_link")
@@ -114,40 +127,3 @@ class ProductStoreAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("product", "store")
-
-
-@admin.register(NutritionalInfo)
-class NutritionalInfoAdmin(admin.ModelAdmin):
-    list_display = (
-        "description",
-        "serving_size_grams",
-        "energy_kcal",
-        "proteins",
-        "carbohydrates",
-    )
-    search_fields = ("description",)
-    inlines = [AdditionalNutrientInline]
-    list_per_page = 50
-
-
-@admin.register(ProductNutritionProfile)
-class ProductNutritionProfileAdmin(admin.ModelAdmin):
-    list_display = ("product", "get_flavors", "nutritional_info")
-    list_filter = ("product__brand",)
-    search_fields = ("product__name", "nutritional_info__description")
-    autocomplete_fields = ["product", "nutritional_info"]
-    filter_horizontal = ["flavors"]
-    list_per_page = 50
-
-    def get_flavors(self, obj):
-        return ", ".join([flavor.name for flavor in obj.flavors.all()[:3]])
-
-    get_flavors.short_description = "Flavors"
-
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .select_related("product", "nutritional_info")
-            .prefetch_related("flavors")
-        )
