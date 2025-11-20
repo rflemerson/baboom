@@ -112,16 +112,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": "djangodb",
-        "USER": "djangdbouser",
+        "USER": "djangodbuser",
         "PASSWORD": "djangodb!senha",
         "HOST": "localhost",
-        "PORT": "",
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
+        "PORT": "5432",
     }
 }
 
