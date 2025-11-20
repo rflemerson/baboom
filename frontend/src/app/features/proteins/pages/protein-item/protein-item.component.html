@@ -20,7 +20,7 @@
         <p-tag [value]="protein.weight + ' g'" styleClass="text-sm bg-blue-100 text-blue-800" [rounded]="true">
         </p-tag>
 
-        <p-tag [value]="protein.packaging === 'pote' ? 'Pote' : 'Refil'"
+        <p-tag [value]="protein.packaging === 'Container' ? 'Container' : 'Refill'"
           styleClass="text-sm bg-green-100 text-green-800" [rounded]="true">
         </p-tag>
 
@@ -53,7 +53,7 @@
         </div>
       </div>
 
-      <!-- Botão de compra -->
+      <!-- Purchase button -->
       <p-button label="Amazon" icon="pi pi-chevron-right" iconPos="right" [fluid]="true" class="w-full" />
     </div>
 

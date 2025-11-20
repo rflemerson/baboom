@@ -1,4 +1,4 @@
-<p-dataview #dv [value]="proteins" [paginator]="true" [rows]="5">
+<p-dataview #dv [value]="(proteins$ | async) || []" [paginator]="true" [rows]="5">
   <ng-template #list let-proteins>
     <div class="grid grid-cols-12 gap-4 grid-nogutter">
       <div class="col-span-12" *ngFor="let protein of proteins">
