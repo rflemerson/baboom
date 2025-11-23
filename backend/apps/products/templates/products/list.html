@@ -69,7 +69,7 @@
                             <div class="text-sm text-gray-500">
                                 <span class="text-gray-700">R$ {{ product.last_price }}</span>
                                 <span class="mx-1">/</span>
-                                <span>{{ product.total_protein }}g</span>
+                                <span>{{ product.total_protein|floatformat:0 }}g</span>
                             </div>
 
                             <!-- Price per gram -->
