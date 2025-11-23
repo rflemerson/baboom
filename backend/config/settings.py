@@ -54,6 +54,7 @@ THIRD_PARTY_APPS = [
     "django_tailwind_cli",
     "debug_toolbar",
     "django_htmx",
+    "heroicons",
 ]
 
 SELF_APPS = [
@@ -103,6 +104,9 @@ TEMPLATES = [
         "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
+            "builtins": [
+                "heroicons.templatetags.heroicons",
+            ],
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
