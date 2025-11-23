@@ -20,13 +20,13 @@ def product_list(request):
         Product.objects.select_related("brand", "category")
         .prefetch_related("tags")
         .annotate(
-            min_price=Subquery(latest_prices.values("price")[:1]),
+            last_price=Subquery(latest_prices.values("price")[:1]),
             total_protein=Subquery(nutrition_info.values("proteins")),
             serving_size=Subquery(nutrition_info.values("serving_size_grams")),
         )
         .annotate(
             price_per_gram=ExpressionWrapper(
-                F("min_price") / F("total_protein"),
+                F("last_price") / F("total_protein"),
                 output_field=DecimalField(max_digits=10, decimal_places=2),
             ),
             concentration=ExpressionWrapper(

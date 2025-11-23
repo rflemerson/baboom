@@ -55,37 +55,22 @@
                 <div class="text-center space-y-1">
                     <!-- Price total -->
                     <div class="text-sm text-gray-500">
-                        {% if product.min_price %}
-                        <span class="text-gray-700">R$ {{ product.min_price }}</span>
+                        <span class="text-gray-700">R$ {{ product.last_price }}</span>
                         <span class="mx-1">/</span>
                         <span>{{ product.total_protein }}g</span>
-                        {% else %}
-                        <span class="text-gray-400">Unavailable</span>
-                        {% endif %}
                     </div>
 
                     <!-- Price per gram -->
                     <div class="text-2xl font-semibold text-gray-900">
-                        {% if product.price_per_gram %}
                         {{ product.price_per_gram|floatformat:2 }} R$/g
-                        {% else %}
-                        --
-                        {% endif %}
                     </div>
                 </div>
 
                 <button
                     class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                     aria-label="Add to cart">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <svg class="ml-2 -mr-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
+                    {% heroicon_outline "shopping-cart" class="h-5 w-5" %}
+                    {% heroicon_outline "chevron-right" class="ml-2 -mr-1 h-4 w-4" %}
                 </button>
             </div>
         </div>
@@ -93,11 +78,7 @@
 </div>
 {% empty %}
 <div class="text-center py-12 bg-white rounded-lg border border-gray-200 border-dashed">
-    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        aria-hidden="true">
-        <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-    </svg>
+    {% heroicon_outline "document-plus" class="mx-auto h-12 w-12 text-gray-400" vector_effect="non-scaling-stroke" %}
     <h3 class="mt-2 text-sm font-medium text-gray-900">No products found</h3>
     <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filters.</p>
 </div>
