@@ -11,3 +11,4 @@ django-cors-headers==4.3.1
 psycopg2-binary==2.9.11
 django-treebeard==4.7.1
 django-nested-admin==4.1.6
+django-tailwind-cli==4.4.2

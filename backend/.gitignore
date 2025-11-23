@@ -1,7 +1,10 @@
 # Created by https://www.toptal.com/developers/gitignore/api/django
 # Edit at https://www.toptal.com/developers/gitignore?templates=django
 
-*.sqlite3
+### Tailwind CSS ###
+.django_tailwind_cli/
+*/css/dist/
+*/css/tailwind.css
 
 ### Django ###
 *.log
