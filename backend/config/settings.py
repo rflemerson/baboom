@@ -53,6 +53,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_tailwind_cli",
     "debug_toolbar",
+    "django_htmx",
 ]
 
 SELF_APPS = [
@@ -89,6 +90,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

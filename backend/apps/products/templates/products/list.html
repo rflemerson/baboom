@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="py-8">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Protein Comparison</h1>
+        <p class="text-gray-600 mt-2">Compare prices and nutritional info</p>
+    </div>
+
+    <!-- Filters (Placeholder for now) -->
+    <!-- <div class="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+        Filters here
+    </div> -->
+
+    <!-- Product List Container -->
+    <div id="product-list" class="flex flex-col gap-4">
+        {% include 'products/_product_list.html' %}
+    </div>
+</div>
+{% endblock %}
