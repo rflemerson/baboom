@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "baboom"
+version = "0.1.0"
+description = ""
+requires-python = ">= 3.14"
+
+dependencies = [
+  "gunicorn",
+  "whitenoise",
+  "psycopg",
+  "requests",
+  "Pillow",
+  "django",
+  "django-filter",
+  "django-simple-history",
+  "django-treebeard",
+  "django-nested-admin",
+  "django-environ",
+  "django-htmx",
+  "django-tailwind-cli",
+  "django-widget-tweaks",
+  "heroicons[django]",
+]
+
+[project.urls]
+Repository = "https://github.com/rflemerson/baboom"
+
+[project.optional-dependencies]
+dev = [
+  "black",
+]
