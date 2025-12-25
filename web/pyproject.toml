@@ -56,8 +56,16 @@ select = [
     "UP",  # pyupgrade
     "DJ",  # django specific
     "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "ERA", # eradicate (commented code)
+    "T20", # flake8-print
+    "RUF", # ruff-specific rules
+    "A",   # flake8-builtins
 ]
-ignore = ["E501"]
+ignore = ["E501", "RUF012"]
 
 [tool.ruff.lint.per-file-ignores]
 "baboom/settings/__init__.py" = ["F403", "F405"]

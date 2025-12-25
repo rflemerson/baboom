@@ -13,15 +13,15 @@ def tag_classes(tag_name: str | None) -> str:
 
     if "whey" in tag_name:
         return "bg-blue-600 text-white"
-    elif "pea" in tag_name:
+    if "pea" in tag_name:
         return "bg-emerald-600 text-white"
-    elif "soy" in tag_name:
+    if "soy" in tag_name:
         return "bg-amber-600 text-black"
-    elif "rice" in tag_name:
+    if "rice" in tag_name:
         return "bg-orange-500 text-white"
-    elif "hemp" in tag_name:
+    if "hemp" in tag_name:
         return "bg-violet-600 text-white"
-    elif "plant" in tag_name:
+    if "plant" in tag_name:
         return "bg-lime-500 text-black"
 
     return "bg-gray-400 text-white"
@@ -37,9 +37,9 @@ def category_classes(category_name: str | None) -> str:
 
     if "animal" in category_name:
         return "bg-red-500 text-white"
-    elif "plant" in category_name:
+    if "plant" in category_name:
         return "bg-green-400 text-black"
-    elif "blend" in category_name:
+    if "blend" in category_name:
         return "bg-pink-500 text-white"
 
     return "bg-gray-400 text-white"
