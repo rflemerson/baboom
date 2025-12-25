@@ -32,4 +32,13 @@ Repository = "https://github.com/rflemerson/baboom"
 [project.optional-dependencies]
 dev = [
   "black",
+  "mypy",
+  "django-stubs",
+  "django-stubs-ext",
 ]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "baboom.settings.base"

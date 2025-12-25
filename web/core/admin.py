@@ -1,5 +1,8 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
+from django.http import HttpRequest
 import nested_admin
+from django.db.models import QuerySet
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
@@ -12,100 +15,84 @@ from .models import (
     Product,
     ProductStore,
     ProductPriceHistory,
-    NutritionalInfo,
-    AdditionalNutrient,
-    ProductNutritionProfile,
+    NutritionFacts,
+    Micronutrient,
+    ProductNutrition,
 )
 
 
-class AdditionalNutrientInline(nested_admin.NestedTabularInline):
-    model = AdditionalNutrient
+class MicronutrientInline(nested_admin.NestedTabularInline):
+    model = Micronutrient
     extra = 0
+    min_num = 0
+    classes = ["collapse"]
 
 
-class NutritionalInfoInline(nested_admin.NestedStackedInline):
-    model = NutritionalInfo
-    inlines = [AdditionalNutrientInline]
-    extra = 1
-    min_num = 1
-    max_num = 1
-    validate_min = True
-    validate_max = True
-
-
-class ProductNutritionProfileInline(nested_admin.NestedStackedInline):
-    model = ProductNutritionProfile
-    inlines = [NutritionalInfoInline]
+class ProductNutritionInline(nested_admin.NestedTabularInline):
+    model = ProductNutrition
+    extra = 0
+    autocomplete_fields = ["nutrition_facts"]
     filter_horizontal = ["flavors"]
-    extra = 0
-    min_num = 1
-    validate_min = True
+    classes = ["collapse"]
 
 
 class ProductPriceHistoryInline(nested_admin.NestedTabularInline):
     model = ProductPriceHistory
     extra = 0
-    min_num = 1
-    validate_min = True
     readonly_fields = ["collected_at"]
     fields = ("price", "stock_status", "collected_at")
+    ordering = ("-collected_at",)
+    max_num = 5
 
 
 class ProductStoreInline(nested_admin.NestedTabularInline):
     model = ProductStore
-    extra = 0
     inlines = [ProductPriceHistoryInline]
+    extra = 0
     min_num = 1
-    validate_min = True
-    readonly_fields = ["latest_price_info"]
     fields = (
         "store",
+        "external_id",
         "product_link",
         "affiliate_link",
-        "external_id",
-        "latest_price_info",
     )
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("productpricehistory_set")
-
-    def latest_price_info(self, obj):
-        latest_price = obj.productpricehistory_set.order_by("-collected_at").first()
-        if latest_price:
-            return f"R$ {latest_price.price} ({latest_price.get_stock_status_display()}) em {latest_price.collected_at.strftime('%d/%m/%Y')}"
-        return "Nenhum preço registrado ainda."
-
-    latest_price_info.short_description = "Último Preço Registrado"
 
 
 @admin.register(Product)
 class ProductAdmin(nested_admin.NestedModelAdmin):
-    list_display = ("name", "brand", "weight", "packaging", "get_category")
+    show_facets = admin.ShowFacets.ALWAYS
+    list_display = (
+        "name",
+        "brand",
+        "weight",
+        "packaging",
+        "get_category",
+        "created_at",
+    )
     list_filter = ("brand", "packaging", "category", "tags")
     search_fields = ("name", "brand__name")
     autocomplete_fields = ["brand", "tags", "category"]
-    inlines = [ProductStoreInline, ProductNutritionProfileInline]
-    list_per_page = 50
+    inlines = [ProductStoreInline, ProductNutritionInline]
+    list_per_page = 20
     filter_horizontal = ["tags"]
+    save_on_top = True
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
         return (
             super()
             .get_queryset(request)
             .select_related("brand", "category")
-            .prefetch_related(
-                "tags", "productnutritionprofile_set__nutritionalinfo_set"
-            )
+            .prefetch_related("tags")
         )
 
-    def get_category(self, obj):
+    @admin.display(description="Categoria", ordering="category__name")
+    def get_category(self, obj: Product) -> str:
         return obj.category.name if obj.category else "-"
-
-    get_category.short_description = "Category"
 
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
+    show_facets = admin.ShowFacets.ALWAYS
     list_display = ("name", "display_name")
     search_fields = ("name", "display_name")
     prepopulated_fields = {"display_name": ("name",)}
@@ -143,40 +130,41 @@ class CategoryAdmin(TreeAdmin):
     list_per_page = 50
 
 
-class FullProductPriceHistoryInline(admin.TabularInline):
-    model = ProductPriceHistory
-    extra = 0
-    readonly_fields = ["collected_at"]
 
 
 @admin.register(ProductStore)
 class ProductStoreAdmin(admin.ModelAdmin):
-    list_display = ("product", "store", "external_id", "product_link", "affiliate_link")
+    show_facets = admin.ShowFacets.ALWAYS
+    list_display = ("product", "store", "external_id", "get_last_price")
     list_filter = ("store",)
     search_fields = ("product__name", "store__name", "external_id")
     autocomplete_fields = ["product", "store"]
-    inlines = [FullProductPriceHistoryInline]
-    list_per_page = 50
 
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related("product", "store")
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("product", "store")
+            .prefetch_related("price_history")
+        )
+
+    @admin.display(description="Último Preço")
+    def get_last_price(self, obj: ProductStore) -> str:
+        last = obj.price_history.first()
+        return f"R$ {last.price}" if last else "-"
 
 
 @admin.register(ProductPriceHistory)
 class ProductPriceHistoryAdmin(admin.ModelAdmin):
     list_display = ("store_product_link", "price", "stock_status", "collected_at")
     list_filter = ("stock_status", "collected_at", "store_product_link__store")
-    search_fields = (
-        "store_product_link__product__name",
-        "store_product_link__store__name",
-    )
     autocomplete_fields = ["store_product_link"]
     readonly_fields = ["collected_at"]
-    list_per_page = 50
 
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .select_related("store_product_link__product", "store_product_link__store")
-        )
+
+@admin.register(NutritionFacts)
+class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
+    list_display = ("description", "serving_size_grams", "energy_kcal")
+    search_fields = ("description",)
+    inlines = [MicronutrientInline]
+    list_per_page = 20

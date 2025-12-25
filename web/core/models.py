@@ -1,120 +1,156 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from django.db.models import OuterRef, Subquery, F, ExpressionWrapper, DecimalField
 from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
 
 
 class Brand(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Name")
-    display_name = models.CharField(
-        max_length=100, unique=True, verbose_name="Display Name"
-    )
+    name = models.CharField(_("Name"), max_length=100, unique=True)
+    display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Brand description"
+        _("Description"), blank=True, help_text=_("Brand description")
     )
 
     class Meta:
-        verbose_name = "Brand"
-        verbose_name_plural = "Brands"
+        verbose_name = _("Brand")
+        verbose_name_plural = _("Brands")
         ordering = ["name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.display_name
 
 
 class Store(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Name")
-    display_name = models.CharField(
-        max_length=100, unique=True, verbose_name="Display Name"
-    )
+    name = models.CharField(_("Name"), max_length=100, unique=True)
+    display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Store description"
+        _("Description"), blank=True, help_text=_("Store description")
     )
 
     class Meta:
-        verbose_name = "Store"
-        verbose_name_plural = "Stores"
+        verbose_name = _("Store")
+        verbose_name_plural = _("Stores")
         ordering = ["name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.display_name
 
 
 class Flavor(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Name")
+    name = models.CharField(_("Name"), max_length=100, unique=True)
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Flavor description"
+        _("Description"), blank=True, help_text=_("Flavor description")
     )
 
     class Meta:
-        verbose_name = "Flavor"
-        verbose_name_plural = "Flavors"
+        verbose_name = _("Flavor")
+        verbose_name_plural = _("Flavors")
         ordering = ["name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
 class Tag(MP_Node):
     name = models.CharField(
-        max_length=100,
-        unique=True,
-        verbose_name="Name",
-        help_text="Unique tag name",
+        _("Name"), max_length=100, unique=True, help_text=_("Unique tag name")
     )
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Tag description"
+        _("Description"), blank=True, help_text=_("Tag description")
     )
 
     node_order_by = ["name"]
 
     class Meta:
-        verbose_name = "Tag"
-        verbose_name_plural = "Tags"
+        verbose_name = _("Tag")
+        verbose_name_plural = _("Tags")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
 class Category(MP_Node):
     name = models.CharField(
+        _("Name"),
         max_length=100,
         unique=True,
-        verbose_name="Name",
-        help_text="Unique category name",
+        help_text=_("Unique category name"),
     )
     description = models.TextField(
-        blank=True, verbose_name="Description", help_text="Category description"
+        _("Description"), blank=True, help_text=_("Category description")
     )
 
     node_order_by = ["name"]
 
     class Meta:
-        verbose_name = "Category"
-        verbose_name_plural = "Categories"
+        verbose_name = _("Category")
+        verbose_name_plural = _("Categories")
 
     def __str__(self):
         return self.name
 
 
+class ProductQuerySet(models.QuerySet):
+    def with_stats(self) -> models.QuerySet:
+        latest_prices = ProductPriceHistory.objects.filter(
+            store_product_link__product=OuterRef("pk")
+        ).order_by("-collected_at")
+
+        nutrition_info = NutritionFacts.objects.filter(
+            product_profiles__product=OuterRef("pk")
+        ).values("proteins", "serving_size_grams")[:1]
+
+        return (
+            self.select_related("brand", "category")
+            .prefetch_related("tags")
+            .annotate(
+                last_price=Subquery(latest_prices.values("price")[:1]),
+                per_serving_protein=Subquery(nutrition_info.values("proteins")),
+                serving_size_val=Subquery(nutrition_info.values("serving_size_grams")),
+            )
+            .annotate(
+                total_protein=ExpressionWrapper(
+                    (F("weight") * F("per_serving_protein")) / F("serving_size_val"),
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                ),
+                concentration=ExpressionWrapper(
+                    (F("per_serving_protein") / F("serving_size_val")) * 100,
+                    output_field=DecimalField(max_digits=5, decimal_places=1),
+                ),
+            )
+            .annotate(
+                price_per_gram=ExpressionWrapper(
+                    F("last_price") / F("total_protein"),
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                ),
+            )
+        )
+
+
 class Product(models.Model):
-    PACKAGING_CHOICES = [
-        ("REFILL", "Refill Package"),
-        ("CONTAINER", "Container Package"),
-    ]
+    class Packaging(models.TextChoices):
+        REFILL = "REFILL", _("Refill Package")
+        CONTAINER = "CONTAINER", _("Container Package")
+        BAR = "BAR", _("Bar")
+        OTHER = "OTHER", _("Other")
 
-    name = models.CharField(max_length=200, verbose_name="Product Name")
-
-    brand = models.ForeignKey(
-        Brand, on_delete=models.CASCADE, verbose_name="Brand"
+    name = models.CharField(_("Product Name"), max_length=200)
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name=_("Brand"))
+    description = models.TextField(
+        _("Description"), blank=True, help_text=_("Marketing description")
     )
 
     weight = models.PositiveIntegerField(
-        verbose_name="Weight (grams)", help_text="Total product weight in grams"
+        _("Weight (grams)"), help_text=_("Total product weight in grams")
     )
+
     packaging = models.CharField(
+        _("Packaging Type"),
         max_length=20,
-        choices=PACKAGING_CHOICES,
-        verbose_name="Packaging Type",
+        choices=Packaging.choices,
+        default=Packaging.CONTAINER,
     )
 
     category = models.ForeignKey(
@@ -122,31 +158,46 @@ class Product(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="Product Category",
+        verbose_name=_("Product Category"),
     )
 
     stores = models.ManyToManyField(
         Store,
         through="ProductStore",
-        verbose_name="Available In Stores",
+        verbose_name=_("Available In Stores"),
         blank=True,
     )
 
-    tags = models.ManyToManyField(
-        Tag, verbose_name="Product Tags", blank=True
+    tags = models.ManyToManyField(Tag, verbose_name=_("Product Tags"), blank=True)
+
+    created_at = models.DateTimeField(
+        _("Created At"),
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(
+        _("Updated At"),
+        auto_now=True,
     )
 
+    objects = ProductQuerySet.as_manager()
+
     class Meta:
-        unique_together = [["brand", "name"]]
-        verbose_name = "Product"
-        verbose_name_plural = "Products"
+        verbose_name = _("Product")
+        verbose_name_plural = _("Products")
         ordering = ["brand__name", "name"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["brand", "name", "weight"], name="unique_product_brand_weight"
+            )
+        ]
+
         indexes = [
             models.Index(fields=["name"]),
             models.Index(fields=["brand", "name"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.brand.name} - {self.name} ({self.weight}g)"
 
 
@@ -154,243 +205,233 @@ class ProductStore(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
-        verbose_name="Related Product",
+        verbose_name=_("Related Product"),
+        related_name="store_links",
     )
 
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
-        verbose_name="Associated Store",
+        verbose_name=_("Associated Store"),
     )
 
     external_id = models.CharField(
+        _("Store Product ID"),
         max_length=100,
-        verbose_name="Store Product ID",
-        help_text="Unique identifier in store system (e.g., SKU)",
+        help_text=_("Unique identifier in store system (e.g., SKU)"),
         blank=True,
     )
 
     product_link = models.URLField(
-        verbose_name="Store Product URL",
-        help_text="Direct URL to product page in the store",
+        _("Store Product URL"),
+        help_text=_("Direct URL to product page in the store"),
     )
 
     affiliate_link = models.URLField(
-        verbose_name="Affiliate Tracking URL",
-        help_text="URL with affiliate tracking parameters",
+        _("Affiliate Tracking URL"),
+        help_text=_("URL with affiliate tracking parameters"),
         blank=True,
         null=True,
     )
 
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
-        unique_together = [["product", "store"], ["store", "external_id"]]
-
-        verbose_name = "Store Product Link"
-        verbose_name_plural = "Store Product Links"
-
+        verbose_name = _("Store Product Link")
+        verbose_name_plural = _("Store Product Links")
         ordering = ["store__name", "product__name"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "store"], name="unique_product_store"
+            ),
+            models.UniqueConstraint(
+                fields=["store", "external_id"],
+                name="unique_store_external_id",
+                condition=models.Q(external_id__isnull=False)
+                & ~models.Q(external_id=""),
+            ),
+        ]
 
         indexes = [
             models.Index(fields=["external_id"]),
             models.Index(fields=["store", "product"]),
         ]
 
-    def __str__(self):
-        return f"{self.store.name} → {self.product.name}"
+    def __str__(self) -> str:
+        return f"{self.store.name} -> {self.product.name}"
 
 
 class ProductPriceHistory(models.Model):
-    STOCK_STATUS_CHOICES = [
-        ("A", "Available"),
-        ("L", "Last Units"),
-        ("O", "Out of Stock"),
-    ]
+    class StockStatus(models.TextChoices):
+        AVAILABLE = "A", _("Available")
+        LAST_UNITS = "L", _("Last Units")
+        OUT_OF_STOCK = "O", _("Out of Stock")
 
     store_product_link = models.ForeignKey(
         ProductStore,
         on_delete=models.CASCADE,
-        verbose_name="Store Product Link",
-        help_text="Link to specific product-store combination",
+        verbose_name=_("Store Product Link"),
+        related_name="price_history",
     )
 
     price = models.DecimalField(
-        verbose_name="Current Price",
+        _("Current Price"),
         max_digits=10,
         decimal_places=2,
-        help_text="Price in local currency",
     )
 
     stock_status = models.CharField(
-        verbose_name="Inventory Status",
+        _("Inventory Status"),
         max_length=1,
-        choices=STOCK_STATUS_CHOICES,
-        default="A",
-        help_text="Current availability status",
+        choices=StockStatus.choices,
+        default=StockStatus.AVAILABLE,
     )
 
     collected_at = models.DateTimeField(
-        verbose_name="Collection Timestamp",
+        _("Collection Timestamp"),
         auto_now_add=True,
-        help_text="Automatic timestamp when record was created",
     )
 
     history = HistoricalRecords(
-        verbose_name="Version History",
+        verbose_name=_("Version History"),
         excluded_fields=["history"],
-        history_change_reason_field=models.TextField(
-            null=True, blank=True, verbose_name="Change Reason"
-        ),
     )
 
     class Meta:
         ordering = ["-collected_at"]
         get_latest_by = "collected_at"
-        unique_together = [["store_product_link", "collected_at"]]
-        verbose_name = "Price Tracking Record"
-        verbose_name_plural = "Price Tracking Records"
+        verbose_name = _("Price Tracking Record")
+        verbose_name_plural = _("Price Tracking Records")
+
         indexes = [
             models.Index(fields=["collected_at"]),
             models.Index(fields=["stock_status"]),
             models.Index(fields=["store_product_link", "collected_at"]),
         ]
 
-    def __str__(self):
-        return f"{self.store_product_link} | {self.get_stock_status_display()} @ {self.collected_at:%Y-%m-%d %H:%M}"
+    def __str__(self) -> str:
+        return f"{self.store_product_link} | R${self.price} @ {self.collected_at:%d/%m %H:%M}"
 
 
-class NutritionalInfo(models.Model):
-    product_profile = models.ForeignKey(
-        "ProductNutritionProfile",
-        on_delete=models.CASCADE,
-        verbose_name="Product Nutrition Profile",
-        help_text="Product profile associated with this nutritional information",
-    )
+class NutritionFacts(models.Model):
+    # product and flavors moved to ProductNutrition
 
     description = models.CharField(
-        max_length=200, verbose_name="Description"
+        _("Internal Label"),
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin."
+        ),
     )
 
-    serving_size_grams = models.PositiveSmallIntegerField(
-        verbose_name="Serving Size (g)"
-    )
-
-    energy_kcal = models.PositiveSmallIntegerField(verbose_name="Energy Content (kcal)")
-
-    carbohydrates = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Carbohydrates (g)"
-    )
-
+    serving_size_grams = models.PositiveSmallIntegerField(_("Serving Size (g)"))
+    energy_kcal = models.PositiveSmallIntegerField(_("Energy (kcal)"))
+    proteins = models.DecimalField(_("Proteins (g)"), max_digits=5, decimal_places=1)
+    carbohydrates = models.DecimalField(_("Carbs (g)"), max_digits=5, decimal_places=1)
     total_sugars = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Total Sugars (g)"
+        _("Total Sugars (g)"), max_digits=5, decimal_places=1, default=0
     )
-
     added_sugars = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Added Sugars (g)"
+        _("Added Sugars (g)"), max_digits=5, decimal_places=1, default=0
     )
-
-    proteins = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Protein Content (g)"
-    )
-
     total_fats = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Total Fats (g)"
+        _("Total Fats (g)"), max_digits=5, decimal_places=1
     )
-
     saturated_fats = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Saturated Fats (g)"
+        _("Saturated Fats (g)"), max_digits=5, decimal_places=1, default=0
     )
-
     trans_fats = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Trans Fats (g)"
+        _("Trans Fats (g)"), max_digits=5, decimal_places=1, default=0
     )
-
     dietary_fiber = models.DecimalField(
-        max_digits=5, decimal_places=1, verbose_name="Dietary Fiber (g)"
+        _("Dietary Fiber (g)"), max_digits=5, decimal_places=1, default=0
     )
-
-    sodium = models.PositiveIntegerField(verbose_name="Sodium Content (mg)")
+    sodium = models.PositiveIntegerField(_("Sodium (mg)"), default=0)
 
     class Meta:
-        verbose_name = "Nutritional Information"
-        verbose_name_plural = "Nutritional Information tables"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["product_profile"], name="unique_nutritional_info_per_profile"
-            )
-        ]
+        verbose_name = _("Nutrition Facts")
+        verbose_name_plural = _("Nutrition Facts")
 
-    def __str__(self):
-        return f"{self.description} - {self.serving_size_grams}g"
+    def __str__(self) -> str:
+        return f"{self.description or 'Generic Nutrition Facts'}"
 
 
-class AdditionalNutrient(models.Model):
-    MEASUREMENT_UNITS = [
-        ("g", "Grams"),
-        ("mg", "Milligrams"),
-        ("mcg", "Micrograms"),
-        ("IU", "International Units"),
-        ("%", "Daily Value Percentage"),
-    ]
+class Micronutrient(models.Model):
+    class Units(models.TextChoices):
+        GRAM = "g", "g"
+        MILLIGRAM = "mg", "mg"
+        MICROGRAM = "mcg", "mcg"
+        IU = "IU", "IU"
+        PERCENT = "%", "%"
 
-    nutritional_profile = models.ForeignKey(
-        NutritionalInfo,
-        on_delete=models.CASCADE,
-        verbose_name="Nutritional Profile",
-        help_text="Associated nutritional profile",
+    nutrition_facts = models.ForeignKey(
+        NutritionFacts, on_delete=models.CASCADE, related_name="micronutrients"
     )
 
     name = models.CharField(
+        _("Nutrient Name"),
         max_length=100,
-        verbose_name="Nutrient Name",
-        help_text="e.g., Vitamin C, Iron, Zinc",
+        help_text=_("e.g., Vitamin C, Iron"),
     )
 
     value = models.DecimalField(
+        _("Quantity"),
         max_digits=10,
         decimal_places=3,
-        verbose_name="Nutrient Quantity",
-        help_text="Measured amount per serving",
     )
 
     unit = models.CharField(
+        _("Unit"),
         max_length=10,
-        choices=MEASUREMENT_UNITS,
-        default="mg",
-        verbose_name="Measurement Unit",
-        help_text="Unit of measurement for this nutrient",
+        choices=Units.choices,
+        default=Units.MILLIGRAM,
     )
 
     class Meta:
-        unique_together = [["nutritional_profile", "name"]]
-        verbose_name = "Micronutrient Data"
-        verbose_name_plural = "Micronutrients Data"
-        indexes = [
-            models.Index(fields=["name"]),
+        verbose_name = _("Micronutrient")
+        verbose_name_plural = _("Micronutrients")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["nutrition_facts", "name"], name="unique_nutrient_per_facts"
+            )
         ]
 
-    def __str__(self):
-        return f"{self.nutritional_profile} | {self.name} ({self.get_unit_display()})"
+    def __str__(self) -> str:
+        return f"{self.name}: {self.value}{self.unit}"
 
 
-class ProductNutritionProfile(models.Model):
+class ProductNutrition(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
-        verbose_name="Base Product",
-        help_text="Product associated with this nutritional profile",
+        verbose_name=_("Base Product"),
+        related_name="nutrition_profiles",
+    )
+
+    nutrition_facts = models.ForeignKey(
+        NutritionFacts,
+        on_delete=models.CASCADE,
+        verbose_name=_("Nutrition Facts"),
+        related_name="product_profiles",
     )
 
     flavors = models.ManyToManyField(
-        "Flavor",
-        verbose_name="Flavors",
-        help_text="Flavors associated with this nutritional profile",
+        Flavor,
+        verbose_name=_("Flavors"),
         blank=True,
     )
 
     class Meta:
-        verbose_name = "Product Nutrition Profile"
-        verbose_name_plural = "Product Nutrition Profiles"
-        ordering = ["product__name"]
+        verbose_name = _("Product Nutrition Profile")
+        verbose_name_plural = _("Product Nutrition Profiles")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "nutrition_facts"],
+                name="unique_product_nutrition_facts",
+            )
+        ]
 
-    def __str__(self):
-        return f"{self.product.name}"
+    def __str__(self) -> str:
+        return f"{self.product.name} - {self.nutrition_facts}"
