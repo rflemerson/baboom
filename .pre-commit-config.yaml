@@ -37,9 +37,7 @@ repos:
           "django-nested-admin",
           "django-environ",
           "django-htmx",
-          "django-tailwind-cli",
-          "django-widget-tweaks",
-          "heroicons[django]"
+          "django-widget-tweaks"
         ]
         args: ["--config-file", "pyproject.toml"]
 

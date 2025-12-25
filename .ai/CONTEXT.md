@@ -19,10 +19,8 @@
 | Layer | Technology | Details |
 |-------|------------|---------|
 | **Backend** | Django 6.0 | "Fat Models", Async ORM, Native Background Tasks. |
-| **Frontend** | Tailwind CSS | Utility-first via `django-tailwind-cli`. |
 | **Interactivity** | Alpine.js | Client-side reactive state (v3.15). |
 | **Server Events** | HTMX | HTML-over-the-wire updates. |
-| **Icons** | Heroicons | `heroicons[django]` wrapper. |
 
 ---
 
@@ -50,19 +48,10 @@
 
 ## 🎨 Frontend Best Practices
 
-### Tailwind CSS
-*   **Mobile-First**: `w-full md:w-64`.
-*   **No `@apply`**: Use Django `{% include %}` for components instead of abstraction capabilities of CSS.
-*   **Watcher**: Run `python manage.py tailwind watch`.
-
 ### HTMX & Alpine.js
 *   **CSRF**: Configured globally in `base.html` (`hx-headers`).
 *   **Partials**: Return only the HTML fragment needed for the request.
 *   **State**: Use Alpine (`x-data`) for purely client-side UI (modals, dropdowns). Bridge to server events via `hx-trigger`.
-
-### Heroicons
-*   **Usage**: `{% heroicon_outline "shopping-cart" class="h-5 w-5" %}`.
-*   **Rules**: Always specify `class="h-X w-X"`.
 
 ---
 

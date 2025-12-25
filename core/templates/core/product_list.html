@@ -1,89 +1,22 @@
 {% extends "base.html" %}
-
 {% load product_tags %}
 
 {% block content %}
-  <div class="py-8">
-    <!-- Filters (Placeholder for now) -->
-    <!-- <div class="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-        Filters here
-</div> -->
-    <!-- Product List Container -->
-    <div class="flex flex-col gap-4">
-      {% for product in products %}
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div class="flex flex-col sm:flex-row p-4">
-            <!-- Main Info -->
-            <div class="flex flex-1 flex-col sm:flex-row justify-between items-center gap-4">
-              <div class="flex-1">
-                <span class="text-sm text-gray-500">{{ product.name }}</span>
-                <h3 class="text-xl font-semibold text-gray-900">{{ product.brand.name }}</h3>
-                <div class="flex flex-wrap gap-2 mt-2">
-                  {% for tag in product.tags.all %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium {{ tag.name|tag_classes }}">
-                      {{ tag.name }}
-                    </span>
-                  {% endfor %}
-                </div>
-                <!-- Details Badges -->
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <!-- Origin -->
-                  {% if product.category %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium {{ product.category.name|category_classes }}">
-                      {{ product.category.name }}
-                    </span>
-                  {% endif %}
-                  <!-- Weight -->
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                    {{ product.weight }} g
-                  </span>
-                  <!-- Packaging -->
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                    {{ product.get_packaging_display }}
-                  </span>
-                  <!-- Concentration -->
-                  {% if product.concentration %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
-                      {{ product.concentration|floatformat:1 }}%
-                    </span>
-                  {% endif %}
-                </div>
-              </div>
-              <!-- Price Section -->
-              <div class="flex flex-col md:items-center gap-3 min-w-[180px] border border-gray-200 rounded-lg p-4">
-                <div class="text-center space-y-1">
-                  <!-- Price total -->
-                  <div class="text-sm text-gray-500">
-                    <span class="text-gray-700">R$ {{ product.last_price }}</span>
-                    <span class="mx-1">/</span>
-                    <span>{{ product.total_protein|floatformat:0 }}g</span>
-                  </div>
-                  <!-- Price per gram -->
-                  <div class="text-2xl font-semibold text-gray-900">
-                    {{ product.price_per_gram|floatformat:2 }}
-                    R$/g
-                  </div>
-                </div>
-                <a href="{{ product.external_link|default:'#' }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-                   aria-label="Buy on Store">
-                  {% heroicon_outline "shopping-cart" class="h-5 w-5" %}
-                  {% heroicon_outline "chevron-right" class="ml-2 -mr-1 h-4 w-4" %}
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% empty %}
-        <div class="text-center py-12 bg-white rounded-lg border border-gray-200 border-dashed">
-          {% heroicon_outline "document-plus" class="mx-auto h-12 w-12 text-gray-400"
-          vector_effect="non-scaling-stroke" %}
-          <h3 class="mt-2 text-sm font-medium text-gray-900">No products found</h3>
-          <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filters.</p>
-        </div>
-      {% endfor %}
+  <div class="drawer drawer-end">
+    
+    <input id="filter-drawer" type="checkbox" class="drawer-toggle" />
+    
+    <div class="drawer-content py-6">
+      
+      {% include "core/partials/quick_filters.html" %}
+
+      <div id="product-list" class="flex flex-col gap-4">
+        {% include "core/partials/product_list_results.html" %}
+      </div>
+
     </div>
+
+    {% include "core/partials/filter_drawer.html" %}
+
   </div>
 {% endblock content %}

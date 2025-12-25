@@ -29,22 +29,13 @@ INSTALLED_APPS += ["django_filters"]
 INSTALLED_APPS += ["django_htmx"]
 MIDDLEWARE += ["django_htmx.middleware.HtmxMiddleware"]
 
-# Tailwind CSS
-INSTALLED_APPS += ["django_tailwind_cli"]
-
-# Heroicons
-INSTALLED_APPS += ["heroicons"]
-TEMPLATES[0]["OPTIONS"].setdefault("builtins", []).append(
-    "heroicons.templatetags.heroicons"
-)
-
 # Django Widget Tweaks
 INSTALLED_APPS += ["widget_tweaks"]
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "assets"]
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 env_name = os.getenv("DJANGO_ENV", "development")
 

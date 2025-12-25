@@ -2,9 +2,7 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=django
 
 ### Tailwind CSS ###
-.django_tailwind_cli/
-*/css/dist/
-*/css/tailwind.css
+static/css/*
 
 ### Django ###
 *.log

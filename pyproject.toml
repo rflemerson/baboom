@@ -21,9 +21,7 @@ dependencies = [
   "django-nested-admin",
   "django-environ",
   "django-htmx",
-  "django-tailwind-cli",
   "django-widget-tweaks",
-  "heroicons[django]",
 ]
 
 [project.urls]
@@ -92,7 +90,7 @@ ignore_errors = true
 [tool.djlint]
 profile = "django"
 extension = "html"
-ignore = "H030,H031" # Ignore annoying "img alt" (handled by curlylint) or others if needed
+ignore = "H030,H031"
 indent = 2
 blank_line_after_tag = "load,extends,include"
 
