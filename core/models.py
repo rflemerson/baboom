@@ -1,5 +1,13 @@
 from django.db import models
-from django.db.models import DecimalField, ExpressionWrapper, F, OuterRef, Subquery
+from django.db.models import (
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    FloatField,
+    OuterRef,
+    Subquery,
+)
+from django.db.models.functions import Cast
 from django.utils.translation import gettext_lazy as _
 from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
@@ -105,17 +113,34 @@ class ProductQuerySet(models.QuerySet):
             self.select_related("brand", "category")
             .prefetch_related("tags")
             .annotate(
-                last_price=Subquery(latest_prices.values("price")[:1]),
-                per_serving_protein=Subquery(nutrition_info.values("proteins")),
-                serving_size_val=Subquery(nutrition_info.values("serving_size_grams")),
+                last_price=Subquery(
+                    latest_prices.values("price")[:1],
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                ),
+                per_serving_protein=Subquery(
+                    nutrition_info.values("proteins"),
+                    output_field=DecimalField(max_digits=5, decimal_places=1),
+                ),
+                serving_size_val=Subquery(
+                    nutrition_info.values("serving_size_grams"),
+                    output_field=DecimalField(max_digits=5, decimal_places=1),
+                ),
             )
             .annotate(
                 total_protein=ExpressionWrapper(
-                    (F("weight") * F("per_serving_protein")) / F("serving_size_val"),
+                    (
+                        F("weight")
+                        * Cast(F("per_serving_protein"), output_field=FloatField())
+                    )
+                    / Cast(F("serving_size_val"), output_field=FloatField()),
                     output_field=DecimalField(max_digits=10, decimal_places=2),
                 ),
                 concentration=ExpressionWrapper(
-                    (F("per_serving_protein") / F("serving_size_val")) * 100,
+                    (
+                        Cast(F("per_serving_protein"), output_field=FloatField())
+                        / Cast(F("serving_size_val"), output_field=FloatField())
+                    )
+                    * 100,
                     output_field=DecimalField(max_digits=5, decimal_places=1),
                 ),
             )

@@ -8,7 +8,10 @@
 1.  **Workflow**: Use `pre-commit run --all-files` for Quality Assurance.
 2.  **Versions**: **Python 3.14+** and **Django 6.0**.
 3.  **Filesystem**: Modify only files within the active workspace.
-4.  **Context**: Read this file fully before starting tasks.
+4.  **Commits**: Follow **Angular Convention** (`type(scope): subject`).
+    *   Types: `feat` (new feature), `fix` (bug fix), `docs` (docs), `style` (formatting), `refactor` (code change, no features), `test` (adding tests), `chore` (build/tools).
+    *   Example: `feat(products): add protein calculation logic`
+5.  **Context**: Read this file fully before starting tasks.
 
 ---
 
@@ -66,23 +69,24 @@
 ### Running Locally
 ```bash
 source .venv/bin/activate
+# OPTION A: Quick Start (Reset DB + Seed + Test)
+./.ai/automation/setup_local.sh
+
+# OPTION B: Manual Run
 python manage.py runserver
 ```
 
 ### Quality Assurance (Mandatory)
 Before "delivering" a task, you must ensure the suite passes:
 ```bash
-pre-commit run --all-files
+./.ai/automation/verify_work.sh
 ```
-This runs:
-*   **Ruff** (Lint/Format)
-*   **MyPy** (Strict Types)
-*   **Deptry** (Dependencies)
-*   **DjLint** (Template Styles)
+This runs `python manage.py test` AND `pre-commit run --all-files`. If it fails, fix the issues.
 
 ---
 
 ## 📂 Directories
-*   `docs/todo/`: Active backlog (Security, Improvements, Performance).
+*   `.ai/`: **AI Workspace** (Scripts, Context, Seed).
+*   `.ai/temp/`: **Sandbox**. Create any ad-hoc script here.
 *   `baboom/`: Main project configuration.
 *   `core/`, `products/`: Application logic.
