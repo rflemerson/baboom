@@ -8,10 +8,9 @@
 1.  **Workflow**: Use `pre-commit run --all-files` for Quality Assurance.
 2.  **Versions**: **Python 3.14+** and **Django 6.0**.
 3.  **Filesystem**: Modify only files within the active workspace.
-4.  **Commits**: Follow **Angular Convention** (`type(scope): subject`).
-    *   Types: `feat` (new feature), `fix` (bug fix), `docs` (docs), `style` (formatting), `refactor` (code change, no features), `test` (adding tests), `chore` (build/tools).
-    *   Example: `feat(products): add protein calculation logic`
-5.  **Context**: Read this file fully before starting tasks.
+4.  **Commits**: **DO NOT COMMIT**. Stage your changes (`git add .`) and propose the Angular-style message in your final notification. User will execute the commit.
+5.  **Knowledge Sharing**: If you discover a new pattern, fix, or requirement, **UPDATE THIS FILE**. Keep the context living and evolving.
+6.  **Context**: Read this file fully before starting tasks.
 
 ---
 

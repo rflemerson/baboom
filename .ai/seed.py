@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "baboom.settings")
 django.setup()
 
-from core.models import (
+from core.models import (  # noqa: E402
     Brand,
     Category,
     NutritionFacts,
@@ -23,7 +23,7 @@ from core.models import (
 
 
 def run_seed():
-    print("🌱 Seeding database from .ai/seed.py...")
+    print("🌱 Seeding database from .ai/seed.py...")  # noqa: T201
 
     # Clear existing data
     Product.objects.all().delete()
@@ -59,13 +59,13 @@ def run_seed():
     for i, (name, weight, cat) in enumerate(products_data):
         p = Product.objects.create(
             name=f"{name} {i + 1}",
-            brand=random.choice(brands),
+            brand=random.choice(brands),  # noqa: S311
             weight=weight,
             category=cat,
         )
 
         # Nutrition
-        prot = Decimal(random.randint(20, 28))
+        prot = Decimal(random.randint(20, 28))  # noqa: S311
         serving = 30
 
         fact = NutritionFacts.objects.create(
@@ -81,15 +81,16 @@ def run_seed():
         # Price
         link = ProductStore.objects.create(
             product=p,
-            store=random.choice(stores),
+            store=random.choice(stores),  # noqa: S311
             product_link="http://example.com/product",
             external_id=f"SKU-{i}",
         )
         ProductPriceHistory.objects.create(
-            store_product_link=link, price=Decimal(random.randint(80, 200))
+            store_product_link=link,
+            price=Decimal(random.randint(80, 200)),  # noqa: S311
         )
 
-    print("✅ Successfully seeded database with 5 products!")
+    print("✅ Successfully seeded database with 5 products!")  # noqa: T201
 
 
 if __name__ == "__main__":

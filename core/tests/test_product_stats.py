@@ -60,7 +60,8 @@ class ProductStatsTest(TestCase):
         p = Product.objects.with_stats().first()
 
         # Assert
-        self.assertIsNotNone(p)
+        if p is None:
+            self.fail("Product not found")
 
         # 1. Concentration: (24g / 30g) * 100 = 80.0%
         self.assertEqual(p.concentration, Decimal("80.0"))
@@ -82,6 +83,8 @@ class ProductStatsTest(TestCase):
         result = qs.first()
 
         # Assert
-        self.assertIsNotNone(result)
+        if result is None:
+            self.fail("Product not found")
+
         self.assertIsNone(result.last_price)
         self.assertIsNone(result.price_per_gram)
