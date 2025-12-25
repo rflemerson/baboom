@@ -31,11 +31,37 @@ Repository = "https://github.com/rflemerson/baboom"
 
 [project.optional-dependencies]
 dev = [
-  "black",
   "mypy",
   "django-stubs",
   "django-stubs-ext",
+  "ruff",
+  "pre-commit",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+exclude = [
+    ".venv",
+    ".git",
+    "migrations",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "DJ",  # django specific
+    "B",   # flake8-bugbear
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"baboom/settings/__init__.py" = ["F403", "F405"]
+"core/models.py" = ["DJ001"]
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]

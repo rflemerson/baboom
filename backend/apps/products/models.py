@@ -104,9 +104,7 @@ class Product(models.Model):
 
     name = models.CharField(max_length=200, verbose_name="Product Name")
 
-    brand = models.ForeignKey(
-        Brand, on_delete=models.CASCADE, verbose_name="Brand"
-    )
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name="Brand")
 
     weight = models.PositiveIntegerField(
         verbose_name="Weight (grams)", help_text="Total product weight in grams"
@@ -132,9 +130,7 @@ class Product(models.Model):
         blank=True,
     )
 
-    tags = models.ManyToManyField(
-        Tag, verbose_name="Product Tags", blank=True
-    )
+    tags = models.ManyToManyField(Tag, verbose_name="Product Tags", blank=True)
 
     class Meta:
         unique_together = [["brand", "name"]]
@@ -266,9 +262,7 @@ class NutritionalInfo(models.Model):
         help_text="Product profile associated with this nutritional information",
     )
 
-    description = models.CharField(
-        max_length=200, verbose_name="Description"
-    )
+    description = models.CharField(max_length=200, verbose_name="Description")
 
     serving_size_grams = models.PositiveSmallIntegerField(
         verbose_name="Serving Size (g)"

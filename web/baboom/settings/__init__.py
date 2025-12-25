@@ -7,7 +7,10 @@ from .logs import *
 INSTALLED_APPS += ["core"]
 
 # Whitenoise
-MIDDLEWARE.insert(MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1, "whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE.insert(
+    MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+)
 
 # Simple History
 INSTALLED_APPS += ["simple_history"]
@@ -31,7 +34,9 @@ INSTALLED_APPS += ["django_tailwind_cli"]
 
 # Heroicons
 INSTALLED_APPS += ["heroicons"]
-TEMPLATES[0]["OPTIONS"].setdefault("builtins", []).append("heroicons.templatetags.heroicons")
+TEMPLATES[0]["OPTIONS"].setdefault("builtins", []).append(
+    "heroicons.templatetags.heroicons"
+)
 
 # Django Widget Tweaks
 INSTALLED_APPS += ["widget_tweaks"]

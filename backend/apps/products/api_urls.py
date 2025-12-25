@@ -4,8 +4,8 @@ from rest_framework.routers import SimpleRouter
 from .api_views import ProductViewSet
 
 router = SimpleRouter()
-router.register(r'products', ProductViewSet, basename='product')
+router.register(r"products", ProductViewSet, basename="product")
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]

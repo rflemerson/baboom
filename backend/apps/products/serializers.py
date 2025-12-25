@@ -4,7 +4,6 @@ from rest_framework import serializers
 from .models import (
     Brand,
     Store,
-    Flavor,
     Tag,
     Category,
     Product,

@@ -1,7 +1,6 @@
 from django.db import models
+from django.db.models import DecimalField, ExpressionWrapper, F, OuterRef, Subquery
 from django.utils.translation import gettext_lazy as _
-from django.utils import timezone
-from django.db.models import OuterRef, Subquery, F, ExpressionWrapper, DecimalField
 from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
 
@@ -168,7 +167,9 @@ class Product(models.Model):
         blank=True,
     )
 
-    tags: models.ManyToManyField = models.ManyToManyField(Tag, verbose_name=_("Product Tags"), blank=True)
+    tags: models.ManyToManyField = models.ManyToManyField(
+        Tag, verbose_name=_("Product Tags"), blank=True
+    )
 
     created_at = models.DateTimeField(
         _("Created At"),

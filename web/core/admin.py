@@ -1,23 +1,22 @@
-from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
-from django.http import HttpRequest
 import nested_admin
+from django.contrib import admin
 from django.db.models import QuerySet
+from django.http import HttpRequest
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
 from .models import (
     Brand,
-    Store,
-    Flavor,
-    Tag,
     Category,
-    Product,
-    ProductStore,
-    ProductPriceHistory,
-    NutritionFacts,
+    Flavor,
     Micronutrient,
+    NutritionFacts,
+    Product,
     ProductNutrition,
+    ProductPriceHistory,
+    ProductStore,
+    Store,
+    Tag,
 )
 
 
@@ -128,8 +127,6 @@ class CategoryAdmin(TreeAdmin):
     list_display = ("name", "description")
     search_fields = ("name",)
     list_per_page = 50
-
-
 
 
 @admin.register(ProductStore)

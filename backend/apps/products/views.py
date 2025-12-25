@@ -3,7 +3,7 @@ from .models import Product
 
 
 def product_list(request):
-    from django.db.models import Min, OuterRef, Subquery, F, ExpressionWrapper, DecimalField
+    from django.db.models import OuterRef, Subquery, F, ExpressionWrapper, DecimalField
     from .models import ProductPriceHistory, NutritionalInfo
 
     # Subquery to get the latest price for each product-store link
@@ -27,7 +27,7 @@ def product_list(request):
         .annotate(
             total_protein=ExpressionWrapper(
                 (F("weight") * F("per_serving_protein")) / F("serving_size_val"),
-                output_field=DecimalField(max_digits=10, decimal_places=2)
+                output_field=DecimalField(max_digits=10, decimal_places=2),
             ),
             concentration=ExpressionWrapper(
                 (F("per_serving_protein") / F("serving_size_val")) * 100,
