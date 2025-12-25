@@ -7,3 +7,40 @@ repos:
         exclude: ^infra/
       - id: ruff-format
         exclude: ^infra/
+
+  - repo: https://github.com/riverside-healthcare/djlint
+    rev: v1.36.4
+    hooks:
+      - id: djlint-reformat-django
+        files: ^web/
+      - id: djlint-django
+        files: ^web/
+
+  - repo: https://github.com/rtts/djhtml
+    rev: 3.0.10
+    hooks:
+      - id: djhtml
+        files: ^web/
+
+  - repo: https://github.com/thibaudcolas/curlylint
+    rev: v0.13.1
+    hooks:
+      - id: curlylint
+        files: ^web/.*\.html$
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: bash -c "cd web && mypy ."
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^web/
+
+      - id: deptry
+        name: deptry
+        entry: bash -c "cd web && deptry . --ignore DEP002"
+        language: system
+        pass_filenames: false
+        files: ^web/

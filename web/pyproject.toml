@@ -36,6 +36,11 @@ dev = [
   "django-stubs-ext",
   "ruff",
   "pre-commit",
+  "djlint",
+  "djhtml",
+  "curlylint",
+  "deptry",
+  "safety",
 ]
 
 [tool.ruff]
@@ -83,3 +88,15 @@ django_settings_module = "baboom.settings.base"
 [[tool.mypy.overrides]]
 module = ["baboom.*"]
 ignore_errors = true
+
+[tool.djlint]
+profile = "django"
+extension = "html"
+ignore = "H030,H031" # Ignore annoying "img alt" (handled by curlylint) or others if needed
+indent = 2
+blank_line_after_tag = "load,extends,include"
+
+[tool.deptry]
+ignore_notebooks = true
+extend_exclude = ["infra", "assets"]
+ignore = ["DEP002"]

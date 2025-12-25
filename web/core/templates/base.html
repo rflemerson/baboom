@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 {% load tailwind_cli %}
 {% load django_htmx %}
-<html lang="en">
 
-<head>
+<html lang="en">
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Baboom</title>
     {% tailwind_css %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.7/htmx.min.js"
-        integrity="sha512-IisGoumHahmfNIhP4wUV3OhgQZaaDBuD6IG4XlyjT77IUkwreZL3T3afO4xXuDanSalZ57Un+UlAbarQjNZCTQ=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            integrity="sha512-IisGoumHahmfNIhP4wUV3OhgQZaaDBuD6IG4XlyjT77IUkwreZL3T3afO4xXuDanSalZ57Un+UlAbarQjNZCTQ=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
     {% htmx_script %}
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.15.0/cdn.min.js"
-        integrity="sha512-4M615JhFufNLsrK5+qpW7oZJ8ooDJlzcUqd/+LVic8e9+0JuoO0KLnIf0NGg3e3tvFxRRdngx1VLtiOwPtYM4A=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-</head>
-
-<body class="bg-gray-50" hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
+    <script defer
+            src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.15.0/cdn.min.js"
+            integrity="sha512-4M615JhFufNLsrK5+qpW7oZJ8ooDJlzcUqd/+LVic8e9+0JuoO0KLnIf0NGg3e3tvFxRRdngx1VLtiOwPtYM4A=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  </head>
+  <body class="bg-gray-50" hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
     <div class="container mx-auto px-4">
-        {% block content %}{% endblock %}
+      {% block content %}
+      {% endblock content %}
     </div>
-</body>
-
+  </body>
 </html>
