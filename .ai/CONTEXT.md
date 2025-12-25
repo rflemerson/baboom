@@ -37,6 +37,9 @@
     ```
 *   **Partials**: Use `{% partialdef %}` for HTMX fragments.
 *   **CSP**: Configure `CSP_SOURCES` natively in settings.
+*   **Logging**: Use `import logging` with `logger = logging.getLogger(__name__)`.
+    *   **Level**: `INFO` for general events, `DEBUG` for verbose data, `ERROR` for exceptions.
+    *   **Format**: Structured Log ready (Keys/Values preferred over long strings).
 
 ### 2. Architecture
 *   **Project Structure**: Monorepo root. Apps in `core`, `products`.

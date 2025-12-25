@@ -1,3 +1,5 @@
+import logging
+
 from django.db import models
 from django.db.models import (
     DecimalField,
@@ -12,6 +14,8 @@ from django.db.models.functions import Cast
 from django.utils.translation import gettext_lazy as _
 from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
+
+logger = logging.getLogger(__name__)
 
 
 class Brand(models.Model):
@@ -102,6 +106,7 @@ class Category(MP_Node):
 
 class ProductQuerySet(models.QuerySet):
     def with_stats(self) -> models.QuerySet:
+        logger.debug("Calculating stats for ProductQuerySet")
         latest_prices = ProductPriceHistory.objects.filter(
             store_product_link__product=OuterRef("pk")
         ).order_by("-collected_at")
