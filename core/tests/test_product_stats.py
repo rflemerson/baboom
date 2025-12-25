@@ -73,6 +73,9 @@ class ProductStatsTest(TestCase):
         # Note: Database might round depending on precision, checking 2 places
         self.assertEqual(round(p.price_per_gram, 3), Decimal("0.125"))
 
+        # 4. Link Check
+        self.assertEqual(p.external_link, "http://example.com")
+
     def test_missing_price_handling(self):
         """Ensure products without price don't crash the queryset"""
         # Create a product without price
@@ -88,3 +91,4 @@ class ProductStatsTest(TestCase):
 
         self.assertIsNone(result.last_price)
         self.assertIsNone(result.price_per_gram)
+        self.assertIsNone(result.external_link)

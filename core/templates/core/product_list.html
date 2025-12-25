@@ -64,11 +64,14 @@
                     R$/g
                   </div>
                 </div>
-                <button class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-                        aria-label="Add to cart">
+                <a href="{{ product.external_link|default:'#' }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                   aria-label="Buy on Store">
                   {% heroicon_outline "shopping-cart" class="h-5 w-5" %}
                   {% heroicon_outline "chevron-right" class="ml-2 -mr-1 h-4 w-4" %}
-                </button>
+                </a>
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ from django.db.models import (
     FloatField,
     OuterRef,
     Subquery,
+    URLField,
 )
 from django.db.models.functions import Cast
 from django.utils.translation import gettext_lazy as _
@@ -116,6 +117,10 @@ class ProductQuerySet(models.QuerySet):
                 last_price=Subquery(
                     latest_prices.values("price")[:1],
                     output_field=DecimalField(max_digits=10, decimal_places=2),
+                ),
+                external_link=Subquery(
+                    latest_prices.values("store_product_link__product_link")[:1],
+                    output_field=URLField(),
                 ),
                 per_serving_protein=Subquery(
                     nutrition_info.values("proteins"),
