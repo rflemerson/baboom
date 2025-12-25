@@ -5,41 +5,41 @@ register = template.Library()
 
 @register.filter
 def tag_classes(tag_name: str | None) -> str:
-    """Return Tailwind classes for a given tag name."""
+    """Return DaisyUI modifier classes for a given tag name."""
     if not tag_name:
-        return "bg-gray-500 text-white"
+        return "badge-neutral"
 
     tag_name = tag_name.lower()
 
     if "whey" in tag_name:
-        return "bg-blue-600 text-white"
+        return "badge-primary"
     if "pea" in tag_name:
-        return "bg-emerald-600 text-white"
+        return "badge-success"
     if "soy" in tag_name:
-        return "bg-amber-600 text-black"
+        return "badge-warning"
     if "rice" in tag_name:
-        return "bg-orange-500 text-white"
+        return "badge-accent"
     if "hemp" in tag_name:
-        return "bg-violet-600 text-white"
+        return "badge-secondary"
     if "plant" in tag_name:
-        return "bg-lime-500 text-black"
+        return "badge-success"
 
-    return "bg-gray-400 text-white"
+    return "badge-neutral"
 
 
 @register.filter
 def category_classes(category_name: str | None) -> str:
-    """Return Tailwind classes for a given category name."""
+    """Return DaisyUI modifier classes for a given category name."""
     if not category_name:
-        return "bg-gray-400 text-white"
+        return "badge-neutral"
 
     category_name = category_name.lower()
 
     if "animal" in category_name:
-        return "bg-red-500 text-white"
+        return "badge-error"
     if "plant" in category_name:
-        return "bg-green-400 text-black"
+        return "badge-success"
     if "blend" in category_name:
-        return "bg-pink-500 text-white"
+        return "badge-info"
 
-    return "bg-gray-400 text-white"
+    return "badge-neutral"
