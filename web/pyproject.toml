@@ -39,6 +39,13 @@ dev = [
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = ["^baboom/"]
 
 [tool.django-stubs]
 django_settings_module = "baboom.settings.base"
+
+[[tool.mypy.overrides]]
+module = ["baboom.*"]
+ignore_errors = true

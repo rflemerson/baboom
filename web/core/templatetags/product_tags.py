@@ -3,7 +3,7 @@ from django import template
 register = template.Library()
 
 @register.filter
-def tag_classes(tag_name):
+def tag_classes(tag_name: str | None) -> str:
     """Return Tailwind classes for a given tag name."""
     if not tag_name:
         return "bg-gray-500 text-white"
@@ -26,7 +26,7 @@ def tag_classes(tag_name):
     return "bg-gray-400 text-white"
 
 @register.filter
-def category_classes(category_name):
+def category_classes(category_name: str | None) -> str:
     """Return Tailwind classes for a given category name."""
     if not category_name:
         return "bg-gray-400 text-white"

@@ -54,10 +54,10 @@ class Flavor(models.Model):
 
 
 class Tag(MP_Node):
-    name = models.CharField(
+    name: models.CharField = models.CharField(
         _("Name"), max_length=100, unique=True, help_text=_("Unique tag name")
     )
-    description = models.TextField(
+    description: models.TextField = models.TextField(
         _("Description"), blank=True, help_text=_("Tag description")
     )
 
@@ -72,13 +72,13 @@ class Tag(MP_Node):
 
 
 class Category(MP_Node):
-    name = models.CharField(
+    name: models.CharField = models.CharField(
         _("Name"),
         max_length=100,
         unique=True,
         help_text=_("Unique category name"),
     )
-    description = models.TextField(
+    description: models.TextField = models.TextField(
         _("Description"), blank=True, help_text=_("Category description")
     )
 
@@ -161,14 +161,14 @@ class Product(models.Model):
         verbose_name=_("Product Category"),
     )
 
-    stores = models.ManyToManyField(
+    stores: models.ManyToManyField = models.ManyToManyField(
         Store,
         through="ProductStore",
         verbose_name=_("Available In Stores"),
         blank=True,
     )
 
-    tags = models.ManyToManyField(Tag, verbose_name=_("Product Tags"), blank=True)
+    tags: models.ManyToManyField = models.ManyToManyField(Tag, verbose_name=_("Product Tags"), blank=True)
 
     created_at = models.DateTimeField(
         _("Created At"),
