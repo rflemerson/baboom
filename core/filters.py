@@ -9,20 +9,12 @@ class ProductFilter(django_filters.FilterSet):
     search = django_filters.CharFilter(
         method="filter_search",
         label="Search",
-        widget=forms.TextInput(
-            attrs={
-                "class": "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
-                "placeholder": "Search name, brand...",
-            }
-        ),
+        widget=forms.TextInput(attrs={"placeholder": "Search..."}),
     )
     brand = django_filters.AllValuesFilter(
         field_name="brand__name",
-        widget=forms.Select(
-            attrs={
-                "class": "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            }
-        ),
+        empty_label="Brand",
+        widget=forms.Select(),
     )
 
     class Meta:

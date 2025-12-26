@@ -10,11 +10,11 @@
       <i class="fas fa-sliders-h"></i> Filters
     </label>
     <div class="divider divider-horizontal mx-2 h-6"></div>
-    <label class="input input-sm input-bordered flex items-center gap-2 rounded-full flex-1 max-w-xs">
+    <label class="input input-sm input-bordered flex items-center gap-2 rounded-full w-48 shrink-0">
       <i class="fas fa-search opacity-50"></i>
       {% render_field filter.form.search class="grow border-none focus:ring-0 p-0" placeholder="Search..." %}
     </label>
-    {% render_field filter.form.brand class="select select-bordered select-sm rounded-full max-w-xs" %}
+    {% render_field filter.form.brand class="select select-bordered select-sm rounded-full w-40 shrink-0" %}
     <a href="{% url 'product_list' %}"
        class="btn btn-ghost btn-sm rounded-full gap-2 opacity-70 ml-auto">
       <i class="fas fa-times"></i> Clear
