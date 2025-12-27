@@ -8,7 +8,7 @@ env = environ.Env()
 
 
 # Project apps
-INSTALLED_APPS += ["core"]
+INSTALLED_APPS += ["core", "scrapers"]
 
 # Whitenoise
 MIDDLEWARE.insert(
