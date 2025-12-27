@@ -11,13 +11,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml /app/
+COPY . /app/
 
 RUN pip install --no-cache-dir .
 
-COPY . /app/
 
-RUN python manage.py tailwind build
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000

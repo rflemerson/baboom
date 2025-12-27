@@ -17,3 +17,15 @@ services:
       timeout: 30s
       retries: 3
 
+  celery:
+    build: .
+    command: celery -A baboom worker -l info
+    volumes:
+      - .:/app
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+      - DJANGO_SETTINGS_MODULE=baboom.settings
+    depends_on:
+      rabbitmq:
+        condition: service_healthy

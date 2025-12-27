@@ -1,6 +1,11 @@
 import os
 
+import environ
+
 from .base import *
+
+env = environ.Env()
+
 
 # Project apps
 INSTALLED_APPS += ["core"]
@@ -78,8 +83,10 @@ LOGGING = {
 }
 
 # Celery Configuration
-CELERY_BROKER_URL = "amqp://guest:guest@localhost:5672//"
-CELERY_RESULT_BACKEND = "rpc://"
+CELERY_BROKER_URL = env(
+    "CELERY_BROKER_URL", default="amqp://guest:guest@localhost:5672//"
+)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="rpc://")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
