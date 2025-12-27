@@ -1,4 +1,7 @@
-from .base import BASE_DIR, INSTALLED_APPS, MIDDLEWARE
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .base import BASE_DIR, INSTALLED_APPS, MIDDLEWARE, STATICFILES_DIRS
 
 # Project apps
 INSTALLED_APPS += ["core"]
