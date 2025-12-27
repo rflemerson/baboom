@@ -66,9 +66,10 @@ class ProductAdmin(nested_admin.NestedModelAdmin):
         "weight",
         "packaging",
         "get_category",
+        "is_manually_curated",
         "created_at",
     )
-    list_filter = ("brand", "packaging", "category", "tags")
+    list_filter = ("brand", "packaging", "category", "tags", "is_manually_curated")
     search_fields = ("name", "brand__name")
     autocomplete_fields = ["brand", "tags", "category"]
     inlines = [ProductStoreInline, ProductNutritionInline]

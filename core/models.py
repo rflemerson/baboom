@@ -206,6 +206,14 @@ class Product(models.Model):
         Tag, verbose_name=_("Product Tags"), blank=True
     )
 
+    is_manually_curated = models.BooleanField(
+        _("Manually Curated"),
+        default=False,
+        help_text=_(
+            "If checked, the scraper will NOT update the name, description, or brand of this product."
+        ),
+    )
+
     created_at = models.DateTimeField(
         _("Created At"),
         auto_now_add=True,
