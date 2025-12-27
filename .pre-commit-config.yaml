@@ -38,7 +38,8 @@ repos:
           "django-nested-admin",
           "django-environ",
           "django-htmx",
-          "django-widget-tweaks"
+          "django-widget-tweaks",
+          "celery",
         ]
         args: ["--config-file", "pyproject.toml"]
 
