@@ -23,6 +23,9 @@ dependencies = [
   "django-htmx",
   "django-widget-tweaks",
   "celery",
+  "playwright",
+  "beautifulsoup4",
+  "lxml",
 ]
 
 [project.urls]
