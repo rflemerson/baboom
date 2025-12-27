@@ -11,6 +11,21 @@ class ProductFilter(django_filters.FilterSet):
         label="Search",
         widget=forms.TextInput(attrs={"placeholder": "Search..."}),
     )
+    ordering = django_filters.OrderingFilter(
+        fields=(
+            ("price_per_gram", "price_per_gram"),
+            ("last_price", "price"),
+            ("total_protein", "protein"),
+            ("concentration", "concentration"),
+        ),
+        field_labels={
+            "price_per_gram": "Price per Gram",
+            "last_price": "Total Price",
+            "total_protein": "Total Protein",
+            "concentration": "Concentration",
+        },
+        label="Sort by",
+    )
     brand = django_filters.AllValuesFilter(
         field_name="brand__name",
         empty_label="Brand",
