@@ -80,7 +80,7 @@ ignore = ["E501", "RUF012"]
 "baboom/settings/__init__.py" = ["F403", "F405"]
 
 "core/models.py" = ["DJ001"]
-"scripts/*.py" = ["T201"]
+
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]
