@@ -180,6 +180,16 @@ class Product(models.Model):
         _("Weight (grams)"), help_text=_("Total product weight in grams")
     )
 
+    ean = models.CharField(
+        _("EAN/GTIN"),
+        max_length=14,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("European Article Number / Global Trade Item Number"),
+    )
+
     packaging = models.CharField(
         _("Packaging Type"),
         max_length=20,

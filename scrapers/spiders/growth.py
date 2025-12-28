@@ -191,6 +191,8 @@ class GrowthSpider(BaseSpider):
 
             # If item has attributes (flavors), price might vary, but listing usually gives main price.
 
+            ean = item.get("ean") or item.get("gtin") or ""
+
             if not name or not price:
                 return None
 
@@ -202,6 +204,7 @@ class GrowthSpider(BaseSpider):
                 "item_list_name": category_name,
                 "url": url,
                 "stock": stock,
+                "ean": ean,
             }
 
         except Exception as e:

@@ -148,6 +148,8 @@ class DarkLabSpider(BaseSpider):
             if selected_variant.get("available"):
                 stock = 999  # Dummy for available
 
+            ean = selected_variant.get("barcode", "")
+
             if not price:
                 return None
 
@@ -159,6 +161,7 @@ class DarkLabSpider(BaseSpider):
                 "item_list_name": category_name,
                 "url": url,
                 "stock": stock,
+                "ean": ean,
             }
         except Exception as e:
             logger.warning(f"Item parse error: {e}")

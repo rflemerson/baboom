@@ -13,9 +13,10 @@ class BlackSkullSpider(BaseSpider):
     API_ENDPOINT = "https://www.blackskullusa.com.br/_v/segment/graphql/v1"
     API_TREE = "https://www.blackskullusa.com.br/api/catalog_system/pub/category/tree/3"
 
+    # Updated Query with EAN + Context
     GRAPHQL_QUERY = """
     query productSearch($selectedFacets: [SelectedFacetInput], $from: Int, $to: Int, $orderBy: String) {
-      productSearch(selectedFacets: $selectedFacets, from: $from, to: $to, orderBy: $orderBy, hideUnavailableItems: true, simulationBehavior: default) {
+      productSearch(selectedFacets: $selectedFacets, from: $from, to: $to, orderBy: $orderBy, hideUnavailableItems: true, simulationBehavior: default) @context(provider: "vtex.search-graphql") {
         products {
           productId
           productName
@@ -24,6 +25,7 @@ class BlackSkullSpider(BaseSpider):
           items {
             itemId
             name
+            ean
             sellers {
               sellerId
               commertialOffer {
@@ -170,6 +172,8 @@ class BlackSkullSpider(BaseSpider):
             if not price:
                 return None
 
+            ean = first_sku.get("ean", "")
+
             return {
                 "item_id": str(pid),
                 "item_name": name,
@@ -178,6 +182,7 @@ class BlackSkullSpider(BaseSpider):
                 "item_list_name": category_name,
                 "url": url,
                 "stock": int(stock),
+                "ean": ean,
             }
 
         except Exception:

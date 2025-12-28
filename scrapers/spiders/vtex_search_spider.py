@@ -153,6 +153,8 @@ class VtexSearchSpider(BaseSpider):
             if not active_seller:
                 return None
 
+            ean = first_sku.get("ean", "")
+
             comm_offer = active_seller.get("commertialOffer", {})
             price = comm_offer.get("Price")
             stock = comm_offer.get("AvailableQuantity", 0)
@@ -168,6 +170,7 @@ class VtexSearchSpider(BaseSpider):
                 "item_list_name": category_name,  # Use dynamic category name
                 "url": url,
                 "stock": int(stock),
+                "ean": ean,
             }
         except Exception as e:
             logger.debug(f"Item parse error: {e}")

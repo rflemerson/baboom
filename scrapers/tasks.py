@@ -25,7 +25,7 @@ def scrape_growth_monitor():
     saved_count = 0
     for item in items:
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.gsuplementos.com.br"
+            item, store_url_base="https://www.gsuplementos.com.br", store_slug="growth"
         )
         saved_count += 1
 
@@ -45,7 +45,9 @@ def scrape_blackskull_monitor():
     for item in items:
         # Pass generic domain, though spider should try to find specific URL
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.blackskullusa.com.br"
+            item,
+            store_url_base="https://www.blackskullusa.com.br",
+            store_slug="black_skull",
         )
         saved_count += 1
 
@@ -61,7 +63,9 @@ def scrape_integral_monitor():
     saved_count = 0
     for item in items:
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.integralmedica.com.br"
+            item,
+            store_url_base="https://www.integralmedica.com.br",
+            store_slug="integral_medica",
         )
         saved_count += 1
 
@@ -78,7 +82,9 @@ def scrape_maxtitanium_monitor():
     for item in items:
         # Pass generic domain
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.maxtitanium.com.br"
+            item,
+            store_url_base="https://www.maxtitanium.com.br",
+            store_slug="max_titanium",
         )
         saved_count += 1
 
@@ -94,7 +100,9 @@ def scrape_probiotica_monitor():
     saved_count = 0
     for item in items:
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.probiotica.com.br"
+            item,
+            store_url_base="https://www.probiotica.com.br",
+            store_slug="probiotica",
         )
         saved_count += 1
 
@@ -110,7 +118,9 @@ def scrape_darklab_monitor():
     saved_count = 0
     for item in items:
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.darklabsuplementos.com.br"
+            item,
+            store_url_base="https://www.darklabsuplementos.com.br",
+            store_slug="dark_lab",
         )
         saved_count += 1
 
@@ -126,7 +136,7 @@ def scrape_dux_monitor():
     saved_count = 0
     for item in items:
         ScraperService.save_product_from_datalayer(
-            item, store_url_base="https://www.duxhumanhealth.com"
+            item, store_url_base="https://www.duxhumanhealth.com", store_slug="dux"
         )
         saved_count += 1
 
