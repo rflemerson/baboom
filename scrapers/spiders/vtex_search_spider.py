@@ -97,7 +97,8 @@ class VtexSearchSpider(BaseSpider):
 
                     for item in data:
                         try:
-                            processed_item = self._process_item(item)
+                            # Pass category_slug to process_item
+                            processed_item = self._process_item(item, category_slug)
                             if processed_item:
                                 all_products.append(processed_item)
                         except Exception as e:
@@ -115,7 +116,7 @@ class VtexSearchSpider(BaseSpider):
 
         return all_products
 
-    def _process_item(self, item):
+    def _process_item(self, item, category_name="proteina"):
         """
         Map VTEX API Product to our internal dict structure.
         """
@@ -164,7 +165,7 @@ class VtexSearchSpider(BaseSpider):
                 "item_name": name,
                 "price": float(price),
                 "item_brand": brand,
-                "item_list_name": "proteina",  # Generic bucket, can be refined if needed
+                "item_list_name": category_name,  # Use dynamic category name
                 "url": url,
                 "stock": int(stock),
             }

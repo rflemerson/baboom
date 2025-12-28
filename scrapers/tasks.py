@@ -2,10 +2,10 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 
 from .services import ScraperService
-from .spiders.blackskull_api import BlackSkullApiSpider
+from .spiders.blackskull import BlackSkullApiSpider
 from .spiders.dark_lab import DarkLabSpider
 from .spiders.dux import DuxSpider
-from .spiders.growth_api import GrowthApiSpider
+from .spiders.growth import GrowthApiSpider
 from .spiders.integral_medica import IntegralMedicaSpider
 from .spiders.max_titanium import MaxTitaniumSpider
 from .spiders.probiotica import ProbioticaSpider
