@@ -27,12 +27,13 @@ class ScraperService:
             return None
 
         # Pure Data Lake Ingestion
+        # Update logic: Store + SKU is the unique constraint.
         obj, _ = ScrapedItem.objects.update_or_create(
-            url=product_url,
+            store=store_slug,
+            sku=sku,
             defaults={
-                "store": store_slug,
+                "url": product_url,  # URL is now just data, not key
                 "external_id": external_id,
-                "sku": sku,
                 "ean": ean,
                 "raw_data": data,
             },

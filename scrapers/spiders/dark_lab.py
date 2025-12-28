@@ -162,7 +162,7 @@ class DarkLabSpider(BaseSpider):
                 "url": url,
                 "stock": stock,
                 "ean": ean,
-                "sku": selected_variant.get("sku", ""),
+                "sku": str(selected_variant.get("id", "")),
             }
         except Exception as e:
             logger.warning(f"Item parse error: {e}")

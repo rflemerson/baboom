@@ -10,7 +10,7 @@ class ScrapedItem(models.Model):
         LINKED = "linked", _("Linked")
         IGNORED = "ignored", _("Ignored")
 
-    url = models.URLField(unique=True, max_length=500)
+    url = models.URLField(max_length=500)
     store = models.CharField(max_length=100, db_index=True)
     external_id = models.CharField(max_length=100, db_index=True)
 
@@ -48,5 +48,10 @@ class ScrapedItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["store", "sku"], name="unique_store_sku")
+        ]
+
     def __str__(self):
-        return f"[{self.store}] {self.external_id} - {self.status}"
+        return f"[{self.store}] {self.sku} ({self.external_id})"
