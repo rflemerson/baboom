@@ -18,9 +18,18 @@ class GrowthApiSpider(BaseSpider):
         "https://www.gsuplementos.com.br/api/v2/front/url/product/listing/category"
     )
 
-    # Static Category URLs for now (Proteins)
-    # Could be dynamic later via Menus API
-    CATEGORY_URLS = ["/proteina/", "/creatina/", "/aminoacidos/"]
+    # Expanded Category List
+    CATEGORY_URLS = [
+        "/proteina/",
+        "/creatina/",
+        "/aminoacidos/",
+        "/pre-treino/",
+        "/carboidratos/",
+        "/vitaminas/",
+        "/acessorios/",
+        "/roupas/",
+        "/kits/",
+    ]
 
     def crawl(self):
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")

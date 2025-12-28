@@ -10,60 +10,93 @@ logger = logging.getLogger(__name__)
 class DuxSpider(BaseSpider):
     BRAND_NAME = "Dux Nutrition"
     BASE_URL = "https://www.duxhumanhealth.com"
-    # Using 'proteinas' category logic from Research
-    API_ENDPOINT = "https://www.duxhumanhealth.com/api/catalog_system/pub/products/search/proteinas"
+    API_TREE = "https://www.duxhumanhealth.com/api/catalog_system/pub/category/tree/3"
+    FALLBACK_CATEGORIES = ["proteinas", "creatina", "saude", "vestuario", "acessorios"]
+
+    def _fetch_categories(self):
+        try:
+            resp = requests.get(self.API_TREE, headers=self.get_headers(), timeout=10)
+            if resp.status_code != 200:
+                logger.warning(f"Failed to fetch category tree: {resp.status_code}")
+                return []
+
+            tree = resp.json()
+            slugs = set()
+
+            def extract_slugs(nodes):
+                for node in nodes:
+                    url = node.get("url", "")
+                    if url:
+                        url = url.rstrip("/")
+                        slug = url.split("/")[-1]
+                        if slug:
+                            slugs.add(slug)
+                    if "children" in node:
+                        extract_slugs(node["children"])
+
+            extract_slugs(tree)
+            return list(slugs)
+        except Exception as e:
+            logger.error(f"Error fetching categories: {e}")
+            return []
 
     def crawl(self):
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
 
-        products = []
-        start = 0
-        step = 50
+        categories = self._fetch_categories()
+        if not categories:
+            logger.info("Using Fallback Categories.")
+            categories = self.FALLBACK_CATEGORIES
 
-        while True:
-            end = start + step - 1
-            params = {"_from": start, "_to": end}
-            logger.info(f"Fetching products {start} to {end}...")
+        logger.info(f"Discovered {len(categories)} categories to crawl.")
 
-            try:
-                response = requests.get(
-                    self.API_ENDPOINT,
-                    params=params,
-                    headers=self.get_headers(),
-                    timeout=30,
-                )
+        all_products = []
 
-                # VTEX often returns 206 for partial content (pagination)
-                if response.status_code not in [200, 206]:
-                    logger.error(f"API Error {response.status_code}: {response.text}")
+        for category_slug in categories:
+            logger.info(f"Crawling Category: {category_slug}")
+            search_url = f"https://www.duxhumanhealth.com/api/catalog_system/pub/products/search/{category_slug}"
+
+            start = 0
+            step = 50
+
+            while True:
+                end = start + step - 1
+                params = {"_from": start, "_to": end}
+
+                try:
+                    response = requests.get(
+                        search_url,
+                        params=params,
+                        headers=self.get_headers(),
+                        timeout=30,
+                    )
+
+                    if response.status_code not in [200, 206]:
+                        break
+
+                    data = response.json()
+                    if not data:
+                        break
+
+                    for item in data:
+                        try:
+                            processed_item = self._process_item(item)
+                            if processed_item:
+                                all_products.append(processed_item)
+                        except Exception as e:
+                            logger.debug(f"Skipping item: {e}")
+
+                    if len(data) < step:
+                        break
+
+                    start += step
+                    self.sleep_random(0.5, 1.0)
+
+                except Exception as e:
+                    logger.error(f"Error crawling {category_slug}: {e}")
                     break
 
-                data = response.json()
-
-                if not data:
-                    logger.info("No more products found.")
-                    break
-
-                logger.info(f"Fetched {len(data)} products.")
-
-                for item in data:
-                    try:
-                        processed_item = self._process_item(item)
-                        if processed_item:
-                            products.append(processed_item)
-                    except Exception as e:
-                        logger.error(
-                            f"Error processing item {item.get('productId')}: {e}"
-                        )
-
-                start += step
-                self.sleep_random(1, 2)
-
-            except Exception as e:
-                logger.error(f"Request failed: {e}")
-                break
-
-        return products
+        return all_products
 
     def _process_item(self, item):
         try:
