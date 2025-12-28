@@ -1,5 +1,4 @@
 import logging
-import re
 from decimal import Decimal
 from typing import Any
 
@@ -19,27 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class ScraperService:
-    @staticmethod
-    def _extract_weight(name: str) -> int:
-        """
-        Attempts to extract weight in grams from product name.
-        E.g. "Whey 1kg" -> 1000, "Creatina 300g" -> 300.
-        Defaults to 0 if not found.
-        """
-        # Patterns for kg and g
-        kg_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:kg|Kg|KG)", name)
-        if kg_match:
-            val = float(kg_match.group(1).replace(",", "."))
-            return int(val * 1000)
-
-        g_match = re.search(
-            r"(\d+)\s*(?:g|G)(?!\w)", name
-        )  # negative lookahead to avoid 'green' etc
-        if g_match:
-            return int(g_match.group(1))
-
-        return 0
-
     @staticmethod
     @transaction.atomic
     def save_product_from_datalayer(data: dict[str, Any], store_url_base: str):
@@ -109,11 +87,9 @@ class ScraperService:
         if existing_link:
             product = existing_link.product
         else:
-            # Fallback: Try to find by Name + Brand (to avoid duplicates if re-scraping new store IDs for same product)
-            weight = ScraperService._extract_weight(name)
-            product = Product.objects.filter(
-                brand=brand, name=name, weight=weight
-            ).first()
+            # Fallback: Try to find by Name + Brand
+            product = Product.objects.filter(brand=brand, name=name).first()
+            weight = int(data.get("weight", 0))
 
             if not product:
                 # Create New Product
