@@ -10,16 +10,22 @@ logger = logging.getLogger(__name__)
 class MaxTitaniumSpider(BaseSpider):
     BRAND_NAME = "Max Titanium"
     BASE_URL = "https://www.maxtitanium.com.br"
-    # Using 'whey' search which is reliable, or we could use /api/catalog_system/pub/products/search?fq=C:45
-    # Let's stick to the search term 'whey' used in research for now, it's safer than guessing category IDs that might change
+    # Dynamic Category Tree API
     API_TREE = "https://www.maxtitanium.com.br/api/catalog_system/pub/category/tree/3"
+
+    # Fallback categories if tree fails (Expanded to cover all protein sources)
     FALLBACK_CATEGORIES = [
         "whey-protein",
+        "proteinas",
         "creatina",
         "aminoacidos",
         "pre-treino",
         "massas",
         "emagrecimento",
+        "barras-de-proteina",
+        "proteina-vegana",
+        "albumina",
+        "paginas-especiais",
     ]
 
     def _fetch_categories(self):

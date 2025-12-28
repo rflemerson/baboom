@@ -10,15 +10,21 @@ logger = logging.getLogger(__name__)
 class ProbioticaSpider(BaseSpider):
     BRAND_NAME = "Probiótica"
     BASE_URL = "https://www.probiotica.com.br"
-    # Same strategy as Max Titanium: Search for 'whey'
+    # Dynamic Category Tree API
     API_TREE = "https://www.probiotica.com.br/api/catalog_system/pub/category/tree/3"
+
+    # Fallback categories if tree fails
     FALLBACK_CATEGORIES = [
         "whey-protein",
+        "proteinas",
         "creatina",
         "aminoacidos",
         "pre-treino",
         "massas",
         "emagrecimento",
+        "barras",
+        "vegan",
+        "kit",
     ]
 
     def _fetch_categories(self):

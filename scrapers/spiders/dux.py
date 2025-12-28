@@ -11,7 +11,15 @@ class DuxSpider(BaseSpider):
     BRAND_NAME = "Dux Nutrition"
     BASE_URL = "https://www.duxhumanhealth.com"
     API_TREE = "https://www.duxhumanhealth.com/api/catalog_system/pub/category/tree/3"
-    FALLBACK_CATEGORIES = ["proteinas", "creatina", "saude", "vestuario", "acessorios"]
+    FALLBACK_CATEGORIES = [
+        "proteinas",
+        "creatina",
+        "saude",
+        "vestuario",
+        "acessorios",
+        "barras",
+        "vegan",
+    ]
 
     def _fetch_categories(self):
         try:
