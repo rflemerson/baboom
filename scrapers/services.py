@@ -17,8 +17,11 @@ class ScraperService:
         """
         Saves raw scraped data to ScrapedItem (Pure Ingestion).
         """
-        external_id = str(data.get("item_id"))
-        sku = str(data.get("sku", ""))
+        # Priority for External ID: SKU > Item ID
+        # This ensures variants are treated as unique items if SKU is present.
+        sku = str(data.get("sku", "")).strip()
+        external_id = str(data.get("item_id", "")).strip()
+
         ean = data.get("ean", data.get("gtin", data.get("barcode", ""))) or ""
         product_url = data.get("url", store_url_base)
 
@@ -27,13 +30,13 @@ class ScraperService:
             return None
 
         # Pure Data Lake Ingestion
-        # Update logic: Store + SKU is the unique constraint.
+        # Unique Constraint is (store, external_id, sku)
         obj, _ = ScrapedItem.objects.update_or_create(
             store=store_slug,
+            external_id=external_id,
             sku=sku,
             defaults={
-                "url": product_url,  # URL is now just data, not key
-                "external_id": external_id,
+                "url": product_url,
                 "ean": ean,
                 "raw_data": data,
             },

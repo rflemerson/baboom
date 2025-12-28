@@ -10,7 +10,7 @@ class ScrapedItem(models.Model):
         LINKED = "linked", _("Linked")
         IGNORED = "ignored", _("Ignored")
 
-    url = models.URLField(max_length=500)
+    url = models.URLField(unique=True, max_length=500)
     store = models.CharField(max_length=100, db_index=True)
     external_id = models.CharField(max_length=100, db_index=True)
 
@@ -25,7 +25,7 @@ class ScrapedItem(models.Model):
         max_length=100,
         blank=True,
         db_index=True,
-        help_text=_("SKU extracted from source"),
+        help_text=_("SKU/Variant ID extracted from source"),
     )
 
     raw_data = models.JSONField(default=dict)
@@ -50,8 +50,11 @@ class ScrapedItem(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["store", "sku"], name="unique_store_sku")
+            models.UniqueConstraint(
+                fields=["store", "external_id", "sku"],
+                name="unique_scraped_item_composite_key",
+            )
         ]
 
     def __str__(self):
-        return f"[{self.store}] {self.sku} ({self.external_id})"
+        return f"[{self.store}] {self.external_id} / {self.sku}"
