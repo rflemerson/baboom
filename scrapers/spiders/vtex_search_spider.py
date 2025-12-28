@@ -171,6 +171,7 @@ class VtexSearchSpider(BaseSpider):
                 "url": url,
                 "stock": int(stock),
                 "ean": ean,
+                "sku": first_sku.get("itemId", ""),
             }
         except Exception as e:
             logger.debug(f"Item parse error: {e}")

@@ -183,6 +183,7 @@ class BlackSkullSpider(BaseSpider):
                 "url": url,
                 "stock": int(stock),
                 "ean": ean,
+                "sku": first_sku.get("itemId", ""),
             }
 
         except Exception:

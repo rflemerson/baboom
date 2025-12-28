@@ -21,6 +21,13 @@ class ScrapedItem(models.Model):
         help_text=_("EAN/GTIN extracted from source"),
     )
 
+    sku = models.CharField(
+        max_length=100,
+        blank=True,
+        db_index=True,
+        help_text=_("SKU extracted from source"),
+    )
+
     raw_data = models.JSONField(default=dict)
 
     status = models.CharField(

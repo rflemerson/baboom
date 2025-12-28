@@ -205,6 +205,7 @@ class GrowthSpider(BaseSpider):
                 "url": url,
                 "stock": stock,
                 "ean": ean,
+                "sku": item.get("sku", ""),
             }
 
         except Exception as e:
