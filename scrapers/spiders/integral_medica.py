@@ -11,8 +11,6 @@ class IntegralMedicaSpider(VtexSearchSpider):
     API_TREE = (
         "https://www.integralmedica.com.br/api/catalog_system/pub/category/tree/3"
     )
-
-    # Fallback categories if tree fails
     FALLBACK_CATEGORIES = [
         "proteina",
         "creatina",

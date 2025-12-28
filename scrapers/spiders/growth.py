@@ -17,9 +17,11 @@ class GrowthApiSpider(BaseSpider):
     API_ENDPOINT = (
         "https://www.gsuplementos.com.br/api/v2/front/url/product/listing/category"
     )
+    # New Dynamic Menu Endpoint
+    API_MENU = "https://www.gsuplementos.com.br/api/v2/front/struct/menus/nova-home-suplementos-categorias"
 
-    # Expanded Category List
-    CATEGORY_URLS = [
+    # Expanded Category List (Fallback)
+    FALLBACK_CATEGORIES = [
         "/proteina/",
         "/creatina/",
         "/aminoacidos/",
@@ -29,17 +31,94 @@ class GrowthApiSpider(BaseSpider):
         "/acessorios/",
         "/roupas/",
         "/kits/",
+        "/vegano/",
     ]
+
+    def _fetch_categories(self):
+        """
+        Fetch dynamic categories from the 'nova-home-suplementos-categorias' menu endpoint.
+        """
+        try:
+            logger.info("Fetching dynamic categories for Growth...")
+            # Headers are crucial for Wap.Store
+            response = requests.get(
+                self.API_MENU,
+                headers=self.get_headers(),
+                verify=False,  # noqa: S501
+                timeout=15,
+            )
+
+            if response.status_code != 200:
+                logger.warning(f"Failed to fetch menu: {response.status_code}")
+                return []
+
+            data = response.json()
+            # The structure for menus usually involves a list under 'data' or directly.
+            # Expected Wap.Store V2 structure:
+            # key 'data' -> list of objects with 'name', 'url', 'children'
+
+            menu_items = data.get("data", [])
+            if isinstance(data, list):
+                menu_items = data
+
+            urls = set()
+
+            def extract_urls(items):
+                for item in items:
+                    # 'url' might be full "https://..." or relative
+                    raw_url = item.get("url") or item.get("link")
+                    if raw_url:
+                        # Extract the path part
+                        # If full url, split
+                        if "gsuplementos.com.br" in raw_url:
+                            path = raw_url.split("gsuplementos.com.br")[-1]
+                        else:
+                            path = raw_url
+
+                        # Ensure it ends with / and starts with /
+                        if not path.startswith("/"):
+                            path = "/" + path
+                        if not path.endswith("/"):
+                            path = path + "/"
+
+                        # Basic validation
+                        if len(path) > 1:
+                            urls.add(path)
+
+                    # Check children
+                    children = item.get("children", []) or item.get("itens", [])
+                    if children:
+                        extract_urls(children)
+
+            extract_urls(menu_items)
+            return list(urls)
+
+        except Exception as e:
+            logger.error(f"Error fetching Growth categories: {e}")
+            return []
 
     def crawl(self):
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
 
+        # Dynamic Discovery
+        categories = self._fetch_categories()
+
+        if not categories:
+            logger.info("Using Fallback Categories.")
+            categories = self.FALLBACK_CATEGORIES
+
+        logger.info(f"Discovered {len(categories)} categories to crawl.")
+
         all_products = []
 
-        for category_slug in self.CATEGORY_URLS:
-            logger.info(f"Crawling Category: {category_slug}")
+        for category_url in categories:
+            logger.info(f"Crawling Category: {category_url}")
             # The API expects just the slug (e.g. "proteina"), but urls might be "/proteina/"
-            slug_clean = category_slug.strip("/")
+            slug_clean = category_url.strip("/")
+
+            # Skip empty slugs
+            if not slug_clean:
+                continue
 
             page = 1
             limit = 30  # Max limit observed
@@ -68,7 +147,7 @@ class GrowthApiSpider(BaseSpider):
 
                     for item in products_list:
                         try:
-                            processed_item = self._process_item(item, category_slug)
+                            processed_item = self._process_item(item, slug_clean)
                             if processed_item:
                                 all_products.append(processed_item)
                         except Exception as e:
@@ -83,7 +162,7 @@ class GrowthApiSpider(BaseSpider):
                     self.sleep_random(1, 2)
 
                 except Exception as e:
-                    logger.error(f"Error crawling {category_slug}: {e}")
+                    logger.error(f"Error crawling {category_url}: {e}")
                     break
 
         return all_products
@@ -125,7 +204,7 @@ class GrowthApiSpider(BaseSpider):
                 "item_name": name,
                 "price": price,
                 "item_brand": self.BRAND_NAME,
-                "item_list_name": category_name.strip("/"),
+                "item_list_name": category_name,
                 "url": url,
                 "stock": stock,
             }
