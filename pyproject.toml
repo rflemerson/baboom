@@ -25,7 +25,9 @@ dependencies = [
   "celery",
   "playwright",
   "beautifulsoup4",
+
   "lxml",
+  "urllib3",
 ]
 
 [project.urls]
@@ -76,7 +78,9 @@ ignore = ["E501", "RUF012"]
 
 [tool.ruff.lint.per-file-ignores]
 "baboom/settings/__init__.py" = ["F403", "F405"]
+
 "core/models.py" = ["DJ001"]
+"scripts/*.py" = ["T201"]
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]
