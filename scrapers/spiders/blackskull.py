@@ -175,9 +175,6 @@ class BlackSkullSpider(BaseSpider):
             ean = first_sku.get("ean", "")
             sku = first_sku.get("itemId", "")
 
-            if url and sku:
-                url = f"{url}?skuId={sku}"
-
             # Only essential identification data + raw payload
             return {
                 "item_id": str(pid),

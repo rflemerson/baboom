@@ -146,9 +146,6 @@ class DarkLabSpider(BaseSpider):
             ean = selected_variant.get("barcode", "")
             sku = str(selected_variant.get("id", ""))
 
-            if url and sku:
-                url = f"{url}?variant={sku}"
-
             # Only essential identification data + raw payload
             return {
                 "item_id": pid,

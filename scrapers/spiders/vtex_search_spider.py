@@ -163,10 +163,6 @@ class VtexSearchSpider(BaseSpider):
             if price is None:
                 return None
 
-            # Deeplink to specific SKU if possible
-            if url and sku:
-                url = f"{url}?skuId={sku}"
-
             # Only essential identification data + raw payload
             return {
                 "item_id": str(pid),
