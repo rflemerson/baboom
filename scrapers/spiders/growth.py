@@ -11,16 +11,13 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger(__name__)
 
 
-class GrowthApiSpider(BaseSpider):
+class GrowthSpider(BaseSpider):
     BRAND_NAME = "Growth Supplements"
     BASE_URL = "https://www.gsuplementos.com.br"
     API_ENDPOINT = (
         "https://www.gsuplementos.com.br/api/v2/front/url/product/listing/category"
     )
-    # New Dynamic Menu Endpoint
     API_MENU = "https://www.gsuplementos.com.br/api/v2/front/struct/menus/nova-home-suplementos-categorias"
-
-    # Expanded Category List (Fallback)
     FALLBACK_CATEGORIES = [
         "/proteina/",
         "/creatina/",
@@ -40,7 +37,7 @@ class GrowthApiSpider(BaseSpider):
         """
         try:
             logger.info("Fetching dynamic categories for Growth...")
-            # Headers are crucial for Wap.Store
+
             response = requests.get(
                 self.API_MENU,
                 headers=self.get_headers(),
@@ -53,11 +50,11 @@ class GrowthApiSpider(BaseSpider):
                 return []
 
             data = response.json()
-            # The structure for menus usually involves a list under 'data' or directly.
-            # Expected Wap.Store V2 structure:
-            # key 'data' -> list of objects with 'name', 'url', 'children'
-
+            # Wap.Store V2 menu structure handling
             menu_items = data.get("data", [])
+            if not menu_items:
+                menu_items = data.get("menu", [])
+
             if isinstance(data, list):
                 menu_items = data
 
@@ -189,9 +186,7 @@ class GrowthApiSpider(BaseSpider):
             slug = item.get("slug")
             url = f"{self.BASE_URL}/{slug}" if slug else ""
 
-            # Stock check not explicit in list, assume available if listed?
-            # Or balance check? Let's check 'balance' or 'stock'.
-            # Checking 'balance' field often present in wap.store
+            # Check 'balance' or 'stock'. Checking 'balance' field often present in wap.store
             stock = int(item.get("balance", 0))
 
             # If item has attributes (flavors), price might vary, but listing usually gives main price.

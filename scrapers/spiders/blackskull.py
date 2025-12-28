@@ -7,14 +7,12 @@ from .base_spider import BaseSpider
 logger = logging.getLogger(__name__)
 
 
-class BlackSkullApiSpider(BaseSpider):
+class BlackSkullSpider(BaseSpider):
     BRAND_NAME = "Black Skull"
     BASE_URL = "https://www.blackskullusa.com.br"
     API_ENDPOINT = "https://www.blackskullusa.com.br/_v/segment/graphql/v1"
+    API_TREE = "https://www.blackskullusa.com.br/api/catalog_system/pub/category/tree/3"
 
-    # Query matching standard VTEX IO "productSearch" or similar persisted query
-    # This query string must match what the site expects if using GET (persisted)
-    # or you can use POST with full body. POST is reliably easier if not blocked.
     GRAPHQL_QUERY = """
     query productSearch($selectedFacets: [SelectedFacetInput], $from: Int, $to: Int, $orderBy: String) {
       productSearch(selectedFacets: $selectedFacets, from: $from, to: $to, orderBy: $orderBy, hideUnavailableItems: true, simulationBehavior: default) {
@@ -40,108 +38,127 @@ class BlackSkullApiSpider(BaseSpider):
     }
     """
 
+    def _fetch_categories(self):
+        """
+        Fetch dynamic categories from the VTEX Category Tree codebase.
+        """
+        try:
+            logger.info("Fetching categories for Black Skull...")
+            response = requests.get(
+                self.API_TREE, headers=self.get_headers(), timeout=10
+            )
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch categories: {response.status_code}")
+                return []
+
+            categories = []
+            for item in response.json():
+                if item.get("hasChildren") or item.get("url"):
+                    url = item.get("url", "")
+                    # Extract last part of URL as slug
+                    slug = url.split("/")[-1] if url else ""
+                    if slug:
+                        categories.append(slug)
+
+            return categories
+
+        except Exception as e:
+            logger.error(f"Error fetching categories: {e}")
+            return []
+
     def crawl(self):
+        """
+        Main crawl method: fetches categories and iterates over them using GraphQL facets.
+        """
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
-
         all_products = []
-        # We can implement pagination or categories here.
-        # For simplicity, let's try a broad search or specific category if needed.
-        # Check if faceting is needed. "Proteina" might be a facet.
 
-        # Facet for 'Proteina' -> Usually requires checking URL structure: /proteina
-        # Or we can just list EVERYTHING by not filtering too strictly?
-        # Let's try iterating pages of a broad search.
+        categories = self._fetch_categories()
+        if not categories:
+            logger.info("No dynamic categories found, using fallback.")
+            categories = [
+                "proteina",
+                "aminoacidos",
+                "vitaminas",
+                "vestuario",
+                "acessorios",
+                "kits",
+            ]
 
-        start = 0
-        step = 50
+        logger.info(f"Discovered {len(categories)} categories to crawl.")
 
-        # Category Facet: "cluster" or "category-1"
-        # Using a reliable category ID or slug is safer.
-        # Let's assume we want "Proteinas"
+        for category in categories:
+            logger.info(f"Crawling Category: {category}")
+            start = 0
+            step = 50
 
-        while True:
-            end = start + step - 1
+            while True:
+                end = start + step - 1
 
-            variables = {
-                "from": start,
-                "to": end,
-                "orderBy": "OrderByScoreDESC",  # or OrderByPriceDESC
-                "selectedFacets": [
-                    # If we leave empty, it might search all.
-                    # Filtering generally yields better results but requires knowing facets.
-                ],
-            }
+                # Facet for category is usually key="c" value="<slug>"
+                variables = {
+                    "from": start,
+                    "to": end,
+                    "orderBy": "OrderByScoreDESC",
+                    "selectedFacets": [{"key": "c", "value": category}],
+                }
 
-            # If we don't pass facets, it searches whole store
+                try:
+                    payload = {"query": self.GRAPHQL_QUERY, "variables": variables}
+                    response = requests.post(
+                        self.API_ENDPOINT,
+                        json=payload,
+                        headers=self.get_headers(),
+                        timeout=30,
+                    )
 
-            try:
-                # Need to hash query if using GET persisted, but POST works often
-                payload = {"query": self.GRAPHQL_QUERY, "variables": variables}
+                    if response.status_code != 200:
+                        logger.error(f"GraphQL Error: {response.text}")
+                        break
 
-                # IMPORTANT: Calculate SHA256 if standard requests fail,
-                # but let's try raw POST first.
+                    data = response.json()
+                    if "errors" in data:
+                        logger.error(f"GraphQL Body Errors: {data['errors']}")
+                        break
 
-                response = requests.post(
-                    self.API_ENDPOINT,
-                    json=payload,
-                    headers=self.get_headers(),
-                    timeout=30,
-                )
+                    products = (
+                        data.get("data", {})
+                        .get("productSearch", {})
+                        .get("products", [])
+                    )
+                    if not products:
+                        break
 
-                if response.status_code != 200:
-                    logger.error(f"GraphQL Error: {response.text}")
-                    break
-
-                data = response.json()
-
-                # Check for errors in body
-                if "errors" in data:
-                    logger.error(f"GraphQL Body Errors: {data['errors']}")
-                    break
-
-                # Item Path: data -> products -> products
-                products = (
-                    data.get("data", {}).get("productSearch", {}).get("products", [])
-                )
-
-                if not products:
-                    break
-
-                for item in products:
-                    try:
-                        processed = self._process_item(item)
+                    for item in products:
+                        processed = self._process_item(item, category)
                         if processed:
                             all_products.append(processed)
-                    except Exception as e:
-                        logger.debug(f"Item error: {e}")
 
-                # Determine when to stop
-                if len(products) < step:
+                    # Determine when to stop
+                    if len(products) < step:
+                        break
+
+                    start += step
+                    self.sleep_random(0.5, 1.5)
+
+                except Exception as e:
+                    logger.error(f"Crawl error for {category}: {e}")
                     break
-
-                start += step
-                self.sleep_random(1, 2)
-
-            except Exception as e:
-                logger.error(f"Crawl error: {e}")
-                break
 
         return all_products
 
-    def _process_item(self, item):
+    def _process_item(self, item, category_name="proteina"):
         try:
             pid = item.get("productId")
             name = item.get("productName")
             link_text = item.get("linkText")
             url = f"{self.BASE_URL}/{link_text}/p" if link_text else ""
 
-            # SKUs
             items_list = item.get("items", [])
             if not items_list:
                 return None
 
             first_sku = items_list[0]
-
             sellers = first_sku.get("sellers", [])
             if not sellers:
                 return None
@@ -158,7 +175,7 @@ class BlackSkullApiSpider(BaseSpider):
                 "item_name": name,
                 "price": float(price),
                 "item_brand": self.BRAND_NAME,
-                "item_list_name": "proteina",  # Default bucket for search results
+                "item_list_name": category_name,
                 "url": url,
                 "stock": int(stock),
             }

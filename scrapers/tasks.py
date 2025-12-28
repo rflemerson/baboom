@@ -2,10 +2,10 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 
 from .services import ScraperService
-from .spiders.blackskull import BlackSkullApiSpider
+from .spiders.blackskull import BlackSkullSpider
 from .spiders.dark_lab import DarkLabSpider
 from .spiders.dux import DuxSpider
-from .spiders.growth import GrowthApiSpider
+from .spiders.growth import GrowthSpider
 from .spiders.integral_medica import IntegralMedicaSpider
 from .spiders.max_titanium import MaxTitaniumSpider
 from .spiders.probiotica import ProbioticaSpider
@@ -19,7 +19,7 @@ def scrape_growth_monitor():
     Task to scrape Growth Supplements via API (Wap.Store)
     """
     logger.info("Starting Growth Monitor Task (API)")
-    spider = GrowthApiSpider()
+    spider = GrowthSpider()
     items = spider.crawl()
 
     saved_count = 0
@@ -38,7 +38,7 @@ def scrape_blackskull_monitor():
     Task to scrape Black Skull via API (VTEX GraphQL)
     """
     logger.info("Starting Black Skull Monitor Task (API)")
-    spider = BlackSkullApiSpider()
+    spider = BlackSkullSpider()
     items = spider.crawl()
 
     saved_count = 0
