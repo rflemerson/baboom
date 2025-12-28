@@ -154,6 +154,7 @@ class VtexSearchSpider(BaseSpider):
                 return None
 
             ean = first_sku.get("ean", "")
+            sku = first_sku.get("itemId", "")
 
             comm_offer = active_seller.get("commertialOffer", {})
             price = comm_offer.get("Price")
@@ -162,16 +163,23 @@ class VtexSearchSpider(BaseSpider):
             if price is None:
                 return None
 
+            # Deeplink to specific SKU if possible
+            if url and sku:
+                url = f"{url}?skuId={sku}"
+
+            # Only essential identification data + raw payload
             return {
                 "item_id": str(pid),
-                "item_name": name,
-                "price": float(price),
-                "item_brand": brand,
-                "item_list_name": category_name,  # Use dynamic category name
-                "url": url,
-                "stock": int(stock),
+                "sku": sku,
                 "ean": ean,
-                "sku": first_sku.get("itemId", ""),
+                "url": url,
+                # Descriptive fields for raw_data context (not forced schema)
+                "name": name,
+                "price": float(price),
+                "brand": brand,
+                "category": category_name,
+                "stock": int(stock),  # Real stock, no dummy
+                "original_payload": item,
             }
         except Exception as e:
             logger.debug(f"Item parse error: {e}")

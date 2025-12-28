@@ -143,26 +143,32 @@ class DarkLabSpider(BaseSpider):
             selected_variant = variants[0]
             price = selected_variant.get("price")
 
-            # Stock: Shopify JSON usually has 'available' boolean, sometimes 'inventory_quantity' if leaked
-            stock = 0
-            if selected_variant.get("available"):
-                stock = 999  # Dummy for available
-
             ean = selected_variant.get("barcode", "")
+            sku = str(selected_variant.get("id", ""))
 
-            if not price:
-                return None
+            if url and sku:
+                url = f"{url}?variant={sku}"
 
+            # Only essential identification data + raw payload
             return {
                 "item_id": pid,
-                "item_name": name,
-                "price": float(price),
-                "item_brand": brand,
-                "item_list_name": category_name,
-                "url": url,
-                "stock": stock,
+                "sku": sku,
                 "ean": ean,
-                "sku": selected_variant.get("sku", ""),
+                "url": url,
+                # Flatten important fields for easy access in raw_data if needed,
+                # but basically we just want the identifier.
+                # The service saves this whole dict as 'raw_data'.
+                # So we should include the original item data?
+                # The current service saves 'data' argument as 'raw_data'.
+                # So we should mix in the scraped attributes but NOT fake them.
+                "name": name,
+                "price": price,
+                "stock": 1
+                if selected_variant.get("available")
+                else 0,  # Boolean to int, but no fake 999
+                "brand": brand,
+                "category": category_name,
+                "original_payload": item,  # Full original JSON
             }
         except Exception as e:
             logger.warning(f"Item parse error: {e}")

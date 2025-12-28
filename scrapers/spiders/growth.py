@@ -196,16 +196,19 @@ class GrowthSpider(BaseSpider):
             if not name or not price:
                 return None
 
+            # Only essential identification data + raw payload
             return {
                 "item_id": str(pid),
-                "item_name": name,
-                "price": price,
-                "item_brand": self.BRAND_NAME,
-                "item_list_name": category_name,
-                "url": url,
-                "stock": stock,
-                "ean": ean,
                 "sku": item.get("sku", ""),
+                "ean": ean,
+                "url": url,
+                # Descriptive fields
+                "name": name,
+                "price": price,
+                "brand": self.BRAND_NAME,
+                "category": category_name,
+                "stock": stock,
+                "original_payload": item,
             }
 
         except Exception as e:

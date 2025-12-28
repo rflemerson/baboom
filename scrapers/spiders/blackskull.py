@@ -173,17 +173,24 @@ class BlackSkullSpider(BaseSpider):
                 return None
 
             ean = first_sku.get("ean", "")
+            sku = first_sku.get("itemId", "")
 
+            if url and sku:
+                url = f"{url}?skuId={sku}"
+
+            # Only essential identification data + raw payload
             return {
                 "item_id": str(pid),
-                "item_name": name,
-                "price": float(price),
-                "item_brand": self.BRAND_NAME,
-                "item_list_name": category_name,
-                "url": url,
-                "stock": int(stock),
+                "sku": sku,
                 "ean": ean,
-                "sku": first_sku.get("itemId", ""),
+                "url": url,
+                # Descriptive fields for raw_data context
+                "name": name,
+                "price": float(price),
+                "brand": self.BRAND_NAME,
+                "category": category_name,
+                "stock": int(stock),
+                "original_payload": item,
             }
 
         except Exception:
