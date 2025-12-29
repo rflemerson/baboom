@@ -117,7 +117,8 @@ class VtexLegacyAPI:
                                         .get("commertialOffer", {})
                                         .get("AvailableQuantity")
                                     )
-                                    logger.info(f"  > Price: {price} | Stock: {stock}")
+                                    ean = sku.get("ean")
+                                    logger.info(f"  > Price: {price} | Stock: {stock} | EAN: {ean}")
                 else:
                     logger.warning(f"Search Failed: {resp.status_code}")
 

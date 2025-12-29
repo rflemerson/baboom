@@ -52,10 +52,13 @@ class ShopifyDOCAPI:
                         price = v.get("price")
                         qty = v.get("inventory_quantity")
                         avail = v.get("available")
+                        barcode = v.get("barcode")
                         logger.info(f"  > Variant Price: {price}")
                         logger.info(
                             f"  > Available: {avail} | Qty: {qty} (Note: Qty often hidden/None in public API)"
                         )
+                        logger.info(f"  > Barcode (EAN): {barcode}")
+                    logger.info("-" * 30)
             else:
                 logger.warning(f"Failed: {resp.text[:100]}")
 

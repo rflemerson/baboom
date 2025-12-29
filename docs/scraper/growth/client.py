@@ -103,9 +103,15 @@ class WapStoreAPI:
                 logger.info("found 'conteudo' key (often contains 'produtos').")
                 if "produtos" in data["conteudo"]:
                     prods = data["conteudo"]["produtos"]
-                    logger.info(f"Products Found: {len(prods)}")
                     if prods:
-                        logger.info(f"Sample Product: {prods[0].get('nome')}")
+                        logger.info(f"Products Found: {len(prods)}")
+                        first_prod = prods[0]
+                        logger.info(f"Sample Product: {first_prod.get('nome')}")
+                        # Debug: Print full JSON keys and sample values to find EAN
+                        import json
+                        logger.info(f"Full Sample Product Data: {json.dumps(first_prod, indent=2, ensure_ascii=False)}")
+                    else:
+                        logger.info("No products found in list.")
 
     def run_tests(self):
         # 1. Menu Structure
