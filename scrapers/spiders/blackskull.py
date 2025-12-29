@@ -58,16 +58,20 @@ class BlackSkullSpider(BaseSpider):
         processed_ids = set()
 
         categories = self._fetch_categories()
+        fallback_categories = [
+            "proteina",
+            "aminoacidos",
+            "vitaminas",
+            "vestuario",
+            "acessorios",
+            "kits",
+        ]
+
+        self.check_category_discrepancy(categories, fallback_categories)
+
         if not categories:
             logger.info("No dynamic categories found, using fallback.")
-            categories = [
-                "proteina",
-                "aminoacidos",
-                "vitaminas",
-                "vestuario",
-                "acessorios",
-                "kits",
-            ]
+            categories = fallback_categories
 
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
@@ -272,6 +276,7 @@ class BlackSkullSpider(BaseSpider):
                 ean=str(ean),
                 sku=str(sku),
                 pid=str(pid),
+                category=category_name,
             )
 
         except Exception as e:

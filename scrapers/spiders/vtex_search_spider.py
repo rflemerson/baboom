@@ -63,6 +63,10 @@ class VtexSearchSpider(BaseSpider):
 
         # Dynamic Discovery
         categories = self._fetch_categories()
+
+        # Check for discrepancies
+        self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
+
         if not categories:
             logger.info("Using Fallback Categories.")
             categories = self.FALLBACK_CATEGORIES
@@ -110,7 +114,7 @@ class VtexSearchSpider(BaseSpider):
                             processed_ids.add(item_id)
 
                             # Pass category_slug to process_and_save
-                            saved_obj = self._process_and_save(item)
+                            saved_obj = self._process_and_save(item, category_slug)
                             if saved_obj:
                                 all_products.append(saved_obj)
                                 items_in_page += 1
@@ -130,7 +134,7 @@ class VtexSearchSpider(BaseSpider):
         logger.info(f"Crawl finished. Total products: {len(all_products)}")
         return all_products
 
-    def _process_and_save(self, item: dict) -> Any | None:
+    def _process_and_save(self, item: dict, category: str) -> Any | None:
         """
         Map VTEX API Product to ScraperService and save.
         """
@@ -223,6 +227,7 @@ class VtexSearchSpider(BaseSpider):
                 ean=str(ean),
                 sku=str(sku_code),
                 pid=str(pid),
+                category=category,
             )
         except Exception as e:
             logger.debug(f"Item parse error: {e}")

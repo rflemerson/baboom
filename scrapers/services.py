@@ -23,6 +23,7 @@ class ScraperService:
         ean: str = "",
         sku: str = "",
         pid: str = "",
+        category: str = "",
     ) -> ScrapedItem | None:
         obj, created = ScrapedItem.objects.update_or_create(
             store_slug=store_slug,
@@ -36,6 +37,7 @@ class ScraperService:
                 "ean": ean,
                 "sku": sku,
                 "pid": pid,
+                "category": category,
             },
         )
 

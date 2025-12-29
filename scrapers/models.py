@@ -39,6 +39,12 @@ class ScrapedItem(models.Model):
         help_text=_("Name extracted from source"),
     )
 
+    category = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=_("Category/Department extracted from source"),
+    )
+
     price = models.DecimalField(
         max_digits=10,
         decimal_places=2,

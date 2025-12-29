@@ -99,6 +99,10 @@ class GrowthSpider(BaseSpider):
         logger.info(f"Starting crawl for {self.BRAND_NAME}")
 
         categories = self._fetch_categories()
+
+        # Check for discrepancies
+        self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
+
         if not categories:
             logger.info("Using fallback categories")
             categories = self.FALLBACK_CATEGORIES
@@ -152,7 +156,7 @@ class GrowthSpider(BaseSpider):
 
                         processed_ids.add(item_id)
 
-                        saved_obj = self._process_and_save(item)
+                        saved_obj = self._process_and_save(item, category_path)
                         if saved_obj:
                             all_products.append(saved_obj)
                             items_in_page += 1
@@ -171,7 +175,7 @@ class GrowthSpider(BaseSpider):
         logger.info(f"Crawl finished. Total products: {len(all_products)}")
         return all_products
 
-    def _process_and_save(self, item: dict) -> Any | None:
+    def _process_and_save(self, item: dict, category: str) -> Any | None:
         try:
             # 1. ID & Name
             external_id = str(item.get("id"))
@@ -231,6 +235,7 @@ class GrowthSpider(BaseSpider):
                 ean=str(ean),
                 sku=sku,
                 pid=external_id,  # PID is often same as ID
+                category=category,
             )
 
         except Exception as e:
