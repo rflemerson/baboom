@@ -15,16 +15,22 @@ class BlackSkullSpider(BaseSpider):
     BRAND_NAME = "Black Skull"
     STORE_SLUG = "black_skull"
     BASE_URL = "https://www.blackskullusa.com.br"
+
     API_ENDPOINT = "https://www.blackskullusa.com.br/_v/segment/graphql/v1"
     API_TREE = "https://www.blackskullusa.com.br/api/catalog_system/pub/category/tree/3"
 
-    # Persisted Query Hash for "Products" query
     QUERY_HASH = "ee2478d319404f621c3e0426e79eba3997665d48cb277a53bf0c3276e8e53c22"
 
+    FALLBACK_CATEGORIES = [
+        "proteina",
+        "aminoacidos",
+        "vitaminas",
+        "vestuario",
+        "acessorios",
+        "kits",
+    ]
+
     def _fetch_categories(self) -> list[str]:
-        """
-        Fetch dynamic categories from the VTEX Category Tree codebase.
-        """
         try:
             logger.info("Fetching categories for Black Skull...")
             response = requests.get(
@@ -38,7 +44,6 @@ class BlackSkullSpider(BaseSpider):
             for item in response.json():
                 if item.get("hasChildren") or item.get("url"):
                     url = item.get("url", "")
-                    # Extract last part of URL as slug
                     slug = url.split("/")[-1] if url else ""
                     if slug:
                         categories.append(slug)
@@ -50,28 +55,16 @@ class BlackSkullSpider(BaseSpider):
             return []
 
     def crawl(self) -> list[Any]:
-        """
-        Main crawl method: fetches categories and iterates over them using GraphQL facets.
-        """
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
         all_products = []
         processed_ids = set()
 
         categories = self._fetch_categories()
-        fallback_categories = [
-            "proteina",
-            "aminoacidos",
-            "vitaminas",
-            "vestuario",
-            "acessorios",
-            "kits",
-        ]
-
-        self.check_category_discrepancy(categories, fallback_categories)
+        self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
             logger.info("No dynamic categories found, using fallback.")
-            categories = fallback_categories
+            categories = self.FALLBACK_CATEGORIES
 
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
@@ -83,12 +76,11 @@ class BlackSkullSpider(BaseSpider):
             while True:
                 end = start + step - 1
 
-                # 1. Create Variables Dictionary
                 variables_dict = {
                     "hideUnavailableItems": False,
-                    "category": category,  # Try passing the slug here
+                    "category": category,
                     "specificationFilters": [],
-                    "orderBy": "OrderByScoreDESC",  # or OrderByTopSaleDESC
+                    "orderBy": "OrderByScoreDESC",
                     "from": start,
                     "to": end,
                     "shippingOptions": [],
@@ -101,11 +93,9 @@ class BlackSkullSpider(BaseSpider):
                     },
                 }
 
-                # 2. Stringify and Base64 Encode variables
                 vars_json = json.dumps(variables_dict, separators=(",", ":"))
                 vars_b64 = base64.b64encode(vars_json.encode("utf-8")).decode("utf-8")
 
-                # 3. Create Extensions JSON
                 extensions_dict = {
                     "persistedQuery": {
                         "version": 1,
@@ -117,14 +107,13 @@ class BlackSkullSpider(BaseSpider):
                 }
                 extensions_json = json.dumps(extensions_dict, separators=(",", ":"))
 
-                # 4. Params
                 params = {
-                    "workspace": "master",  # or 'newblackpdp', defaulting to master usually safer unless specified
+                    "workspace": "master",
                     "maxAge": "short",
                     "appsEtag": "remove",
                     "domain": "store",
                     "locale": "pt-BR",
-                    "operationName": "Products",  # Identifying the name of the query
+                    "operationName": "Products",
                     "variables": "{}",
                     "extensions": extensions_json,
                 }
@@ -146,15 +135,12 @@ class BlackSkullSpider(BaseSpider):
                         logger.error(f"GraphQL Body Errors: {data['errors']}")
                         break
 
-                    # Helper to extract products list from various potential structures
                     products_list = []
 
-                    # 1. Try 'productSearch' -> 'products' (Standard)
                     p_search = data.get("data", {}).get("productSearch")
                     if p_search and isinstance(p_search, dict):
                         products_list = p_search.get("products", [])
 
-                    # 2. Try 'products' (Direct List or Wrapper)
                     if not products_list:
                         p_direct = data.get("data", {}).get("products")
                         if isinstance(p_direct, list):
@@ -181,20 +167,6 @@ class BlackSkullSpider(BaseSpider):
                         except Exception as e:
                             logger.debug(f"Skipping item: {e}")
 
-                    # Determine when to stop
-                    if len(products_list) < step:
-                        break
-                        if item_id in processed_ids:
-                            continue
-
-                        processed_ids.add(item_id)
-
-                        saved_obj = self._process_and_save(item, category)
-                        if saved_obj:
-                            all_products.append(saved_obj)
-                            items_in_page += 1
-
-                    # Determine when to stop
                     if len(products_list) < step:
                         break
 
@@ -220,7 +192,6 @@ class BlackSkullSpider(BaseSpider):
                 return None
 
             first_sku = items_list[0]
-            # Find seller
             sellers = first_sku.get("sellers", [])
             active_seller = None
             if sellers:
@@ -233,16 +204,11 @@ class BlackSkullSpider(BaseSpider):
             if not active_seller:
                 return None
 
-            # Strict Extraction
-            # (Brand is part of item but unused here)
-
             comm_offer = active_seller.get("commertialOffer", {})
             price = comm_offer.get("Price")
 
-            # Stock & Availability
             stock_quantity = comm_offer.get("AvailableQuantity")
 
-            # Actually trust stock_quantity for mapping
             try:
                 stock_quantity = (
                     int(stock_quantity) if stock_quantity is not None else 0
@@ -250,7 +216,6 @@ class BlackSkullSpider(BaseSpider):
             except (ValueError, TypeError):
                 stock_quantity = 0
 
-            # Determine Status
             from ..models import ScrapedItem
 
             if stock_quantity > 0:
@@ -264,7 +229,6 @@ class BlackSkullSpider(BaseSpider):
             ean = first_sku.get("ean", "")
             sku = first_sku.get("itemId", "")
 
-            # Save via Service
             return ScraperService.save_product(
                 store_slug=self.STORE_SLUG,
                 external_id=str(pid),

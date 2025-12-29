@@ -18,7 +18,6 @@ class GrowthSpider(BaseSpider):
     STORE_SLUG = "growth"
     BASE_URL = "https://www.gsuplementos.com.br"
 
-    # API Endpoints
     API_LISTING = (
         "https://www.gsuplementos.com.br/api/v2/front/url/product/listing/category"
     )
@@ -35,9 +34,6 @@ class GrowthSpider(BaseSpider):
     ]
 
     def get_headers(self) -> dict[str, str]:
-        """
-        Headers strictly required by Wap.Store / Sucuri WAF.
-        """
         return {
             "User-Agent": "insomnia/12.2.0",  # Critical for WAF bypass
             "app-token": "wapstore",  # Critical for API auth
@@ -48,9 +44,6 @@ class GrowthSpider(BaseSpider):
         }
 
     def _fetch_categories(self) -> list[str]:
-        """
-        Fetch dynamic category slugs from the menu API.
-        """
         logger.info("Fetching dynamic categories...")
         try:
             resp = requests.get(
@@ -99,8 +92,6 @@ class GrowthSpider(BaseSpider):
         logger.info(f"Starting crawl for {self.BRAND_NAME}")
 
         categories = self._fetch_categories()
-
-        # Check for discrepancies
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
@@ -177,16 +168,13 @@ class GrowthSpider(BaseSpider):
 
     def _process_and_save(self, item: dict, category: str) -> Any | None:
         try:
-            # 1. ID & Name
             external_id = str(item.get("id"))
             name = item.get("nome") or item.get("name")
             if not external_id or not name:
                 return None
 
-            # 2. SKU
             sku = str(item.get("sku") or "")
 
-            # 3. URL
             link_slug = item.get("link") or item.get("slug") or item.get("url")
             product_url = ""
             if link_slug:
@@ -195,7 +183,6 @@ class GrowthSpider(BaseSpider):
                 else:
                     product_url = f"{self.BASE_URL}/{link_slug}"
 
-            # 4. Price
             # Structure: "precos": { "vista": 139.50, "por": 139.50 }
             price_val = None
             precos = item.get("precos")
@@ -204,7 +191,6 @@ class GrowthSpider(BaseSpider):
             elif "price" in item:
                 price_val = item["price"]
 
-            # 5. Stock
             # Structure: "estoque": 100
             stock_quantity = item.get("estoque") or item.get("balance") or 0
             try:
@@ -212,7 +198,6 @@ class GrowthSpider(BaseSpider):
             except (ValueError, TypeError):
                 stock_quantity = 0
 
-            # Determine status based on quantity
             from ..models import ScrapedItem
 
             if stock_quantity > 0:
@@ -220,10 +205,8 @@ class GrowthSpider(BaseSpider):
             else:
                 stock_status = ScrapedItem.StockStatus.OUT_OF_STOCK
 
-            # 6. EAN (Not reliable in listing, but let's try)
             ean = item.get("ean") or item.get("gtin") or ""
 
-            # Save via Service
             return ScraperService.save_product(
                 store_slug=self.STORE_SLUG,
                 external_id=external_id,
@@ -234,7 +217,7 @@ class GrowthSpider(BaseSpider):
                 stock_status=stock_status,
                 ean=str(ean),
                 sku=sku,
-                pid=external_id,  # PID is often same as ID
+                pid=external_id,
                 category=category,
             )
 

@@ -13,9 +13,9 @@ class DarkLabSpider(BaseSpider):
     BRAND_NAME = "Dark Lab"
     STORE_SLUG = "dark_lab"
     BASE_URL = "https://www.darklabsuplementos.com.br"
+
     API_COLLECTIONS = "https://www.darklabsuplementos.com.br/collections.json"
 
-    # Fallback if dynamic fetching fails
     FALLBACK_CATEGORIES = [
         "best-sellers",
         "whey-protein",
@@ -36,10 +36,6 @@ class DarkLabSpider(BaseSpider):
         }
 
     def _fetch_categories(self) -> list[str]:
-        """
-        Fetch dynamic collections (categories) from Shopify's collections.json endpoint.
-        Returns a list of collection handles (slugs).
-        """
         try:
             logger.info("Fetching categories for Dark Lab...")
             response = requests.get(
@@ -66,15 +62,11 @@ class DarkLabSpider(BaseSpider):
             return []
 
     def crawl(self) -> list[Any]:
-        """
-        Main crawl method: fetches collections and iterates over them to get products.
-        """
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
         all_products = []
         processed_ids = set()
 
         categories = self._fetch_categories()
-
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
@@ -85,15 +77,12 @@ class DarkLabSpider(BaseSpider):
 
         for category in categories:
             logger.info(f"Crawling Category: {category}")
-
-            # Shopify usually allows fetching products for a specific collection via:
-            # /collections/{handle}/products.json
             collection_endpoint = (
                 f"{self.BASE_URL}/collections/{category}/products.json"
             )
 
             page = 1
-            limit = 250  # Shopify often allows up to 250 per page
+            limit = 250
 
             while True:
                 params = {"page": page, "limit": limit}
@@ -116,7 +105,6 @@ class DarkLabSpider(BaseSpider):
                     products = data.get("products", [])
 
                     if not products:
-                        # Empty page means done
                         break
 
                     items_in_page = 0
@@ -135,7 +123,6 @@ class DarkLabSpider(BaseSpider):
                         except Exception as e:
                             logger.debug(f"Item error in {category}: {e}")
 
-                    # Determine when to stop
                     if len(products) < limit:
                         break
 
@@ -156,14 +143,11 @@ class DarkLabSpider(BaseSpider):
             handle = item.get("handle")
             url = f"{self.BASE_URL}/products/{handle}" if handle else ""
 
-            # Find Price in variants
             variants = item.get("variants", [])
             if not variants:
                 return None
 
-            # Pick first available or just first
             selected_variant = variants[0]
-            # Try to find an available one usually
             for v in variants:
                 if v.get("available"):
                     selected_variant = v
@@ -171,19 +155,14 @@ class DarkLabSpider(BaseSpider):
 
             price = selected_variant.get("price")
 
-            # Strict Stock/Availability
-            # Shopify JSON public often lacks inventory_quantity, usually returns "available": boolean
-            is_available = selected_variant.get("available")  # Boolean
+            is_available = selected_variant.get("available")
             inventory_quantity = selected_variant.get("inventory_quantity")
 
             if inventory_quantity is not None:
                 stock_quantity = int(inventory_quantity)
             else:
-                # If quantity is hidden, infer from available boolean
                 stock_quantity = 100 if is_available else 0
 
-            # Additional check for 0 stock but available=true (preorder?)
-            # Trust 'available' boolean for status
             from ..models import ScrapedItem
 
             if is_available:
@@ -193,9 +172,7 @@ class DarkLabSpider(BaseSpider):
                 stock_quantity = 0
 
             ean = selected_variant.get("barcode")
-            sku = str(
-                selected_variant.get("id", "")
-            )  # Use Variant ID as unique SKU ref or sku field
+            sku = str(selected_variant.get("id", ""))
 
             if not price:
                 return None
