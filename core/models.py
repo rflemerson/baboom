@@ -369,8 +369,6 @@ class ProductPriceHistory(models.Model):
 
 
 class NutritionFacts(models.Model):
-    # product and flavors moved to ProductNutrition
-
     description = models.CharField(
         _("Internal Label"),
         max_length=200,
