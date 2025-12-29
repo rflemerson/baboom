@@ -1,11 +1,11 @@
 import logging
 from typing import Any
 
-import requests
 import urllib3
 
 from ..services import ScraperService
 from .base_spider import BaseSpider
+from .http_client import HttpClient
 
 # Disable warnings for verify=False as per API strategy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -33,27 +33,37 @@ class GrowthSpider(BaseSpider):
         "/vegano/",
     ]
 
+    def __init__(self) -> None:
+        self.http_client = HttpClient(timeout=30)
+
     def get_headers(self) -> dict[str, str]:
         return {
-            "User-Agent": "insomnia/12.2.0",  # Critical for WAF bypass
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
             "app-token": "wapstore",  # Critical for API auth
-            "Accept": "application/json",
             "Content-Type": "application/json",
             "Origin": "https://www.gsuplementos.com.br",
             "Referer": "https://www.gsuplementos.com.br/",
+            "Sec-Ch-Ua": '"Chromium";v="120", "Google Chrome";v="120", "Not_A Brand";v="8"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Linux"',
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
         }
 
     def _fetch_categories(self) -> list[str]:
         logger.info("Fetching dynamic categories...")
         try:
-            resp = requests.get(
+            resp = self.http_client.get(
                 self.API_MENU,
                 headers=self.get_headers(),
-                verify=False,  # noqa: S501
-                timeout=15,
+                verify=False,
             )
-            if resp.status_code != 200:
-                logger.warning(f"Menu API failed: {resp.status_code}")
+            if resp is None or resp.status_code != 200:
+                logger.warning(
+                    f"Menu API failed: {resp.status_code if resp else 'No response'}"
+                )
                 return []
 
             data = resp.json()
@@ -113,17 +123,16 @@ class GrowthSpider(BaseSpider):
                 params = {"url": category_path, "offset": offset, "limit": limit}
 
                 try:
-                    resp = requests.get(
+                    resp = self.http_client.get(
                         self.API_LISTING,
-                        params=params,  # type: ignore
+                        params=params,
                         headers=self.get_headers(),
-                        verify=False,  # noqa: S501
-                        timeout=30,
+                        verify=False,
                     )
 
-                    if resp.status_code != 200:
+                    if resp is None or resp.status_code != 200:
                         logger.debug(
-                            f"Category {category_path} ended or failed: {resp.status_code}"
+                            f"Category {category_path} ended or failed: {resp.status_code if resp else 'No response'}"
                         )
                         break
 

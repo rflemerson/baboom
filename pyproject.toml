@@ -28,6 +28,7 @@ dependencies = [
 
   "lxml",
   "urllib3",
+  "curl_cffi",
 ]
 
 [project.urls]
@@ -104,5 +105,5 @@ blank_line_after_tag = "load,extends,include"
 
 [tool.deptry]
 ignore_notebooks = true
-extend_exclude = ["infra", "assets"]
+extend_exclude = ["infra", "assets", "docs"]
 ignore = ["DEP002"]

@@ -8,6 +8,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Try to import Sucuri bypass module
+try:
+    from sucuri_bypass import SucuriBypass
+
+    HAS_BYPASS = True
+    logger.info("Sucuri bypass module loaded successfully")
+except ImportError:
+    HAS_BYPASS = False
+    logger.warning("Sucuri bypass module not available, using standard requests")
+
 
 class WapStoreAPI:
     """
@@ -29,18 +39,41 @@ class WapStoreAPI:
     def __init__(self):
         # Suppress insecure request warnings if verify=False
         requests.packages.urllib3.disable_warnings()  # type: ignore
+        
+        # Initialize bypass if available
+        self.bypass = SucuriBypass() if HAS_BYPASS else None
 
     def test_endpoint(self, name, endpoint, params=None):
         url = f"{self.BASE_URL}{endpoint}"
+        if params:
+            from urllib.parse import urlencode
+            url = f"{url}?{urlencode(params)}"
+        
         logger.info(f"--- Testing Endpoint: {name} ---")
         logger.info(f"URL: {url}")
-        logger.info(f"Params: {params}")
 
         try:
+            # Try bypass methods first if available
+            if self.bypass:
+                result = self.bypass.get(url)
+                if result and result.get("success"):
+                    logger.info(f"Success via {result['method']}")
+                    content = result["content"]
+                    
+                    # Try to parse as JSON
+                    import json
+                    try:
+                        data = json.loads(content)
+                        self._parse_response(data)
+                        return
+                    except json.JSONDecodeError:
+                        logger.info("Response is not JSON, likely HTML page")
+                        return
+
+            # Fallback to standard requests
             response = requests.get(
                 url,
                 headers=self.HEADERS,
-                params=params,
                 verify=self.VERIFY_SSL,
                 timeout=15,
             )
@@ -49,28 +82,30 @@ class WapStoreAPI:
 
             if response.status_code == 200:
                 data = response.json()
-                # Try to output a summary of keys
-                if isinstance(data, dict):
-                    keys = list(data.keys())
-                    logger.info(f"Response Keys: {keys}")
-
-                    # Specific checks based on known structure
-                    if "data" in data:
-                        logger.info("found 'data' key.")
-                    if "conteudo" in data:
-                        logger.info("found 'conteudo' key (often contains 'produtos').")
-                        if "produtos" in data["conteudo"]:
-                            prods = data["conteudo"]["produtos"]
-                            logger.info(f"Products Found: {len(prods)}")
-                            if prods:
-                                logger.info(f"Sample Product: {prods[0].get('nome')}")
-
+                self._parse_response(data)
             else:
                 logger.warning(f"Response Body Preview: {response.text[:200]}")
 
         except Exception as e:
             logger.error(f"Error testing {name}: {e}")
         logger.info("\n")
+
+    def _parse_response(self, data):
+        """Parse and log API response structure."""
+        if isinstance(data, dict):
+            keys = list(data.keys())
+            logger.info(f"Response Keys: {keys}")
+
+            # Specific checks based on known structure
+            if "data" in data:
+                logger.info("found 'data' key.")
+            if "conteudo" in data:
+                logger.info("found 'conteudo' key (often contains 'produtos').")
+                if "produtos" in data["conteudo"]:
+                    prods = data["conteudo"]["produtos"]
+                    logger.info(f"Products Found: {len(prods)}")
+                    if prods:
+                        logger.info(f"Sample Product: {prods[0].get('nome')}")
 
     def run_tests(self):
         # 1. Menu Structure
