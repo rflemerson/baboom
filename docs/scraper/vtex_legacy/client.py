@@ -75,9 +75,11 @@ class VtexLegacyAPI:
             logger.error(f"Tree Error: {e}")
 
         # 2. Product Search
-        if slugs:
-            slug = slugs[0]
-            search_endpoint = f"/api/catalog_system/pub/products/search/{slug}"
+        # Note: Probiótica returns 0 products when searching by slug, so we search without it
+        if slugs or store_key == "probiotica":
+            # Force Probiótica to search without slug (their category search doesn't work)
+            slug = "" if store_key == "probiotica" else (slugs[0] if slugs else "")
+            search_endpoint = f"/api/catalog_system/pub/products/search/{slug}" if slug else "/api/catalog_system/pub/products/search"
             logger.info(f"Testing Search API: {search_endpoint}")
 
             try:
