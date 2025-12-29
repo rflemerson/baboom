@@ -1,7 +1,9 @@
 import logging
+from typing import Any
 
 import requests
 
+from ..services import ScraperService
 from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
@@ -15,12 +17,14 @@ class VtexSearchSpider(BaseSpider):
 
     # Abstract attributes to be defined by subclasses
     BRAND_NAME = ""
+    # STORE_SLUG must be defined by subclasses or inferred
+    STORE_SLUG = ""
     BASE_URL = ""
     API_TREE = ""
     # List of slugs to use if Tree API fails
     FALLBACK_CATEGORIES: list[str] = []
 
-    def _fetch_categories(self):
+    def _fetch_categories(self) -> list[str]:
         """
         Fetch dynamic category tree from VTEX API.
         Returns a list of category URL slugs (e.g. 'whey-protein', 'creatina').
@@ -34,7 +38,7 @@ class VtexSearchSpider(BaseSpider):
             tree = resp.json()
             slugs = set()
 
-            def extract_slugs(nodes):
+            def extract_slugs(nodes: list[dict]) -> None:
                 for node in nodes:
                     # 'url' usually looks like "https://domain.com/whey-protein"
                     url = node.get("url", "")
@@ -54,7 +58,7 @@ class VtexSearchSpider(BaseSpider):
             logger.error(f"Error fetching categories: {e}")
             return []
 
-    def crawl(self):
+    def crawl(self) -> list[Any]:
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
 
         # Dynamic Discovery
@@ -66,6 +70,7 @@ class VtexSearchSpider(BaseSpider):
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
         all_products = []
+        processed_ids = set()
 
         for category_slug in categories:
             logger.info(f"Crawling Category: {category_slug}")
@@ -95,12 +100,20 @@ class VtexSearchSpider(BaseSpider):
                     if not data:
                         break
 
+                    items_in_page = 0
                     for item in data:
                         try:
-                            # Pass category_slug to process_item
-                            processed_item = self._process_item(item, category_slug)
-                            if processed_item:
-                                all_products.append(processed_item)
+                            item_id = str(item.get("productId"))
+                            if item_id in processed_ids:
+                                continue
+
+                            processed_ids.add(item_id)
+
+                            # Pass category_slug to process_and_save
+                            saved_obj = self._process_and_save(item)
+                            if saved_obj:
+                                all_products.append(saved_obj)
+                                items_in_page += 1
                         except Exception as e:
                             logger.debug(f"Skipping item: {e}")
 
@@ -114,18 +127,18 @@ class VtexSearchSpider(BaseSpider):
                     logger.error(f"Error crawling {category_slug}: {e}")
                     break
 
+        logger.info(f"Crawl finished. Total products: {len(all_products)}")
         return all_products
 
-    def _process_item(self, item, category_name="proteina"):
+    def _process_and_save(self, item: dict) -> Any | None:
         """
-        Map VTEX API Product to our internal dict structure.
+        Map VTEX API Product to ScraperService and save.
         """
         try:
             # 1. Basic Info
             pid = item.get("productId")
             name = item.get("productName")
-            # Use subclass BRAND_NAME if item doesn't specify, or respect item brand
-            brand = item.get("brand") or self.BRAND_NAME
+
             link_text = item.get("linkText")
             url = f"{self.BASE_URL}/{link_text}/p" if link_text else ""
 
@@ -134,8 +147,20 @@ class VtexSearchSpider(BaseSpider):
             if not skus:
                 return None
 
-            # Pick the first SKU
-            first_sku = skus[0]
+            # Pick the first SKU or find default
+            first_sku = None
+            for sku_chem in skus:
+                # Find sellers
+                sellers_chem = sku_chem.get("sellers", [])
+                for seller in sellers_chem:
+                    if seller.get("sellerDefault"):
+                        first_sku = sku_chem
+                        break
+                if first_sku:
+                    break
+
+            if not first_sku:
+                first_sku = skus[0]
 
             # Check availability and price in sellers
             sellers = first_sku.get("sellers", [])
@@ -154,29 +179,51 @@ class VtexSearchSpider(BaseSpider):
                 return None
 
             ean = first_sku.get("ean", "")
-            sku = first_sku.get("itemId", "")
+            sku_code = first_sku.get("itemId", "")
 
+            # Strict Extraction
             comm_offer = active_seller.get("commertialOffer", {})
             price = comm_offer.get("Price")
-            stock = comm_offer.get("AvailableQuantity", 0)
+
+            # Stock & Availability
+            stock_quantity = comm_offer.get("AvailableQuantity")
+            try:
+                stock_quantity = (
+                    int(stock_quantity) if stock_quantity is not None else 0
+                )
+            except (ValueError, TypeError):
+                stock_quantity = 0
+
+            # Determine Status
+            from ..models import ScrapedItem
+
+            if stock_quantity > 0:
+                stock_status = ScrapedItem.StockStatus.AVAILABLE
+            else:
+                stock_status = ScrapedItem.StockStatus.OUT_OF_STOCK
 
             if price is None:
                 return None
 
-            # Only essential identification data + raw payload
-            return {
-                "item_id": str(pid),
-                "sku": sku,
-                "ean": ean,
-                "url": url,
-                # Descriptive fields for raw_data context (not forced schema)
-                "name": name,
-                "price": float(price),
-                "brand": brand,
-                "category": category_name,
-                "stock": int(stock),  # Real stock, no dummy
-                "original_payload": item,
-            }
+            # Ensure STORE_SLUG is set
+            store_slug = self.STORE_SLUG
+            if not store_slug:
+                # Fallback if subclass forgot to define it, mostly for safety
+                store_slug = self.BRAND_NAME.lower().replace(" ", "_")
+
+            # Save via Service
+            return ScraperService.save_product(
+                store_slug=store_slug,
+                external_id=str(pid),
+                url=url,
+                name=str(name) if name else "",
+                price=float(price),
+                stock_quantity=stock_quantity,
+                stock_status=stock_status,
+                ean=str(ean),
+                sku=str(sku_code),
+                pid=str(pid),
+            )
         except Exception as e:
             logger.debug(f"Item parse error: {e}")
             return None

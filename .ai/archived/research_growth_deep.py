@@ -43,7 +43,15 @@ def run():
                 print(f"   -> Count: {len(products)}")
                 if products:
                     print("   SUCCESS! First item:")
-                    print(json.dumps(products[0], indent=2))
+                    # print(json.dumps(products[0], indent=2))
+                    first = products[0]
+                    print(f"   Name: {first.get('nome')}")
+                    print(f"   EAN keys check: 'ean' in keys: {'ean' in first}, 'gtin' in keys: {'gtin' in first}")
+                    print(f"   Keys: {list(first.keys())}")
+                    if 'variacoes' in first:
+                         print(f"   Variacoes count: {len(first['variacoes'])}")
+                         if first['variacoes']:
+                             print(f"   First Var Keys: {list(first['variacoes'][0].keys())}")
             else:
                 print("   'conteudo' or 'produtos' key not found.")
                 print(json.dumps(data)[:500])

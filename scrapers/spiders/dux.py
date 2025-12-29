@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 class DuxSpider(VtexSearchSpider):
     BRAND_NAME = "Dux Nutrition"
+    STORE_SLUG = "dux_nutrition"
     BASE_URL = "https://www.duxhumanhealth.com"
     API_TREE = "https://www.duxhumanhealth.com/api/catalog_system/pub/category/tree/3"
     FALLBACK_CATEGORIES = [

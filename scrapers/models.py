@@ -46,6 +46,12 @@ class ScrapedItem(models.Model):
         null=True,
     )
 
+    stock_quantity = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text=_("Available quantity in stock"),
+    )
+
     stock_status = models.CharField(
         max_length=1,
         blank=True,

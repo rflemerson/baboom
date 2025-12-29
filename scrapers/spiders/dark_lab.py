@@ -1,7 +1,9 @@
 import logging
+from typing import Any
 
 import requests
 
+from ..services import ScraperService
 from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
@@ -9,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class DarkLabSpider(BaseSpider):
     BRAND_NAME = "Dark Lab"
+    STORE_SLUG = "dark_lab"
     BASE_URL = "https://www.darklabsuplementos.com.br"
     API_COLLECTIONS = "https://www.darklabsuplementos.com.br/collections.json"
 
@@ -26,7 +29,13 @@ class DarkLabSpider(BaseSpider):
         "vitaminas",
     ]
 
-    def _fetch_categories(self):
+    def get_headers(self) -> dict[str, str]:
+        return {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json",
+        }
+
+    def _fetch_categories(self) -> list[str]:
         """
         Fetch dynamic collections (categories) from Shopify's collections.json endpoint.
         Returns a list of collection handles (slugs).
@@ -56,12 +65,13 @@ class DarkLabSpider(BaseSpider):
             logger.error(f"Error fetching categories: {e}")
             return []
 
-    def crawl(self):
+    def crawl(self) -> list[Any]:
         """
         Main crawl method: fetches collections and iterates over them to get products.
         """
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
         all_products = []
+        processed_ids = set()
 
         categories = self._fetch_categories()
         if not categories:
@@ -103,13 +113,22 @@ class DarkLabSpider(BaseSpider):
                     products = data.get("products", [])
 
                     if not products:
+                        # Empty page means done
                         break
 
+                    items_in_page = 0
                     for item in products:
                         try:
-                            processed = self._process_item(item, category)
-                            if processed:
-                                all_products.append(processed)
+                            item_id = str(item.get("id"))
+                            if item_id in processed_ids:
+                                continue
+
+                            processed_ids.add(item_id)
+
+                            saved_obj = self._process_and_save(item)
+                            if saved_obj:
+                                all_products.append(saved_obj)
+                                items_in_page += 1
                         except Exception as e:
                             logger.debug(f"Item error in {category}: {e}")
 
@@ -124,13 +143,13 @@ class DarkLabSpider(BaseSpider):
                     logger.error(f"Crawl error for {category}: {e}")
                     break
 
+        logger.info(f"Crawl finished. Total products: {len(all_products)}")
         return all_products
 
-    def _process_item(self, item, category_name="products-json"):
+    def _process_and_save(self, item: dict) -> Any | None:
         try:
             pid = str(item.get("id"))
             name = item.get("title")
-            brand = item.get("vendor") or self.BRAND_NAME
             handle = item.get("handle")
             url = f"{self.BASE_URL}/products/{handle}" if handle else ""
 
@@ -141,32 +160,56 @@ class DarkLabSpider(BaseSpider):
 
             # Pick first available or just first
             selected_variant = variants[0]
+            # Try to find an available one usually
+            for v in variants:
+                if v.get("available"):
+                    selected_variant = v
+                    break
+
             price = selected_variant.get("price")
 
-            ean = selected_variant.get("barcode", "")
-            sku = str(selected_variant.get("id", ""))
+            # Strict Stock/Availability
+            # Shopify JSON public often lacks inventory_quantity, usually returns "available": boolean
+            is_available = selected_variant.get("available")  # Boolean
+            inventory_quantity = selected_variant.get("inventory_quantity")
 
-            # Only essential identification data + raw payload
-            return {
-                "item_id": pid,
-                "sku": sku,
-                "ean": ean,
-                "url": url,
-                # Flatten important fields for easy access in raw_data if needed,
-                # but basically we just want the identifier.
-                # The service saves this whole dict as 'raw_data'.
-                # So we should include the original item data?
-                # The current service saves 'data' argument as 'raw_data'.
-                # So we should mix in the scraped attributes but NOT fake them.
-                "name": name,
-                "price": price,
-                "stock": 1
-                if selected_variant.get("available")
-                else 0,  # Boolean to int, but no fake 999
-                "brand": brand,
-                "category": category_name,
-                "original_payload": item,  # Full original JSON
-            }
+            if inventory_quantity is not None:
+                stock_quantity = int(inventory_quantity)
+            else:
+                # If quantity is hidden, infer from available boolean
+                stock_quantity = 100 if is_available else 0
+
+            # Additional check for 0 stock but available=true (preorder?)
+            # Trust 'available' boolean for status
+            from ..models import ScrapedItem
+
+            if is_available:
+                stock_status = ScrapedItem.StockStatus.AVAILABLE
+            else:
+                stock_status = ScrapedItem.StockStatus.OUT_OF_STOCK
+                stock_quantity = 0
+
+            ean = selected_variant.get("barcode")
+            sku = str(
+                selected_variant.get("id", "")
+            )  # Use Variant ID as unique SKU ref or sku field
+
+            if not price:
+                return None
+
+            return ScraperService.save_product(
+                store_slug=self.STORE_SLUG,
+                external_id=pid,
+                url=url,
+                name=str(name) if name else "",
+                price=float(price),
+                stock_quantity=stock_quantity,
+                stock_status=stock_status,
+                ean=str(ean) if ean else "",
+                sku=sku,
+                pid=pid,
+            )
+
         except Exception as e:
             logger.warning(f"Item parse error: {e}")
             return None

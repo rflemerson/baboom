@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 class ProbioticaSpider(VtexSearchSpider):
     BRAND_NAME = "Probiótica"
+    STORE_SLUG = "probiotica"
     BASE_URL = "https://www.probiotica.com.br"
     API_TREE = "https://www.probiotica.com.br/api/catalog_system/pub/category/tree/3"
     FALLBACK_CATEGORIES = [
