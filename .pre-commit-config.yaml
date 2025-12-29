@@ -4,9 +4,9 @@ repos:
     hooks:
       - id: ruff
         args: [ --fix ]
-        exclude: ^\.ai/
+        exclude: ^\.ai/|^docs/
       - id: ruff-format
-        exclude: ^\.ai/
+        exclude: ^\.ai/|^docs/
 
   - repo: https://github.com/riverside-healthcare/djlint
     rev: v1.36.4
@@ -29,7 +29,7 @@ repos:
     rev: v1.19.1
     hooks:
       - id: mypy
-        exclude: ^baboom/settings/|^\.ai/
+        exclude: ^baboom/settings/|^\.ai/|^docs/
         additional_dependencies: [
           "django-stubs",
           "types-PyYAML",
@@ -50,4 +50,4 @@ repos:
     hooks:
       - id: deptry
         args: ["."]
-        exclude: ^\.ai/
+        exclude: ^\.ai/|^docs/

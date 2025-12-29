@@ -54,6 +54,7 @@ exclude = [
     ".venv",
     ".git",
     "migrations",
+    "docs",
 ]
 
 [tool.ruff.lint]
