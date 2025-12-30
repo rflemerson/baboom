@@ -117,3 +117,30 @@ class ScrapedItem(models.Model):
 
     def __str__(self):
         return f"[{self.store_slug}] {self.external_id} - {self.get_stock_status_display()}"
+
+
+class OpenFoodFactsData(models.Model):
+    ean = models.CharField(
+        "EAN",
+        max_length=14,
+        unique=True,
+        db_index=True,
+        help_text="European Article Number / GTIN",
+    )
+
+    raw_data = models.JSONField(
+        "Raw Open Food Facts Data",
+        blank=True,
+        null=True,
+        help_text="Full JSON response from Open Food Facts API",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Open Food Facts Data"
+        verbose_name_plural = "Open Food Facts Data"
+
+    def __str__(self) -> str:
+        return f"OFF Data for {self.ean}"

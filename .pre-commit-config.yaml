@@ -42,6 +42,8 @@ repos:
           "django-htmx",
           "django-widget-tweaks",
           "celery",
+          "django-celery-results",
+          "django-celery-beat",
         ]
         args: ["--config-file", "pyproject.toml"]
 
