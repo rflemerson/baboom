@@ -83,10 +83,13 @@ LOGGING = {
 }
 
 # Celery Configuration
+INSTALLED_APPS += ["django_celery_results", "django_celery_beat"]
+
 CELERY_BROKER_URL = env(
     "CELERY_BROKER_URL", default="amqp://guest:guest@localhost:5672//"
 )
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="rpc://")
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

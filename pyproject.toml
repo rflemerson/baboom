@@ -29,6 +29,8 @@ dependencies = [
   "lxml",
   "urllib3",
   "curl_cffi",
+  "django-celery-results",
+  "django-celery-beat",
 ]
 
 [project.urls]
