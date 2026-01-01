@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-{% load django_htmx %}
+{% load django_htmx i18n %}
 
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,7 +16,7 @@
     {% htmx_script %}
     <script defer
             src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.15.0/cdn.min.js"
-            integrity="sha512-4M615JhFufNLsrK5+qpW7oZJ8ooDJlzcUqd/+LVic8e9+0JuoO0KLnIf0NGg3e3tvFxRRdngx1VLtiOwPtYM4A=="
+            integrity="sha512-4M615JhFufNLsrK5+qpW7oZJ8ooDJlzcUqd/+LVic8e3+0JuoO0KLnIf0NGg3e3tvFxRRdngx1VLtiOwPtYM4A=="
             crossorigin="anonymous"
             referrerpolicy="no-referrer"></script>
     <link rel="stylesheet"

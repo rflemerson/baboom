@@ -1,4 +1,4 @@
-{% load product_tags %}
+{% load product_tags i18n %}
 
 {% for product in products %}
   <div class="card md:card-side bg-base-100 shadow-sm hover:shadow-md transition-shadow">
@@ -43,7 +43,7 @@
            rel="noopener noreferrer"
            class="btn btn-primary btn-sm md:btn-md w-full md:w-auto gap-2">
           <i class="fas fa-shopping-cart"></i>
-          Buy Now
+          {% trans "Buy Now" %}
         </a>
       </div>
     </div>
@@ -51,7 +51,7 @@
 {% empty %}
   <div class="text-center py-12 bg-base-100 rounded-lg border border-base-200 border-dashed">
     <i class="fas fa-file-medical text-4xl text-base-content/30 mx-auto"></i>
-    <h3 class="mt-2 text-sm font-medium text-base-content">No products found</h3>
-    <p class="mt-1 text-sm text-base-content/60">Try adjusting your search or filters.</p>
+    <h3 class="mt-2 text-sm font-medium text-base-content">{% trans "No products found" %}</h3>
+    <p class="mt-1 text-sm text-base-content/60">{% trans "Try adjusting your search or filters." %}</p>
   </div>
 {% endfor %}

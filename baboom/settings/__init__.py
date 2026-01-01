@@ -41,6 +41,22 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
+# i18n: Supported languages
+LANGUAGE_CODE = "pt-br"
+LANGUAGES = [
+    ("pt-br", "Português (Brasil)"),
+    ("en", "English"),
+    ("es", "Español"),
+]
+LOCALE_PATHS = [BASE_DIR / "locale"]
+
+# LocaleMiddleware (after SessionMiddleware, before CommonMiddleware)
+MIDDLEWARE.insert(
+    MIDDLEWARE.index("django.contrib.sessions.middleware.SessionMiddleware") + 1,
+    "django.middleware.locale.LocaleMiddleware",
+)
+
+
 # Logging Configuration
 # Best Practice: Structured/JSON logging recommended for Production.
 # Currently set to Console/Simple for Development.
