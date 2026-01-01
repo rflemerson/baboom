@@ -4,9 +4,9 @@
 {% block breadcrumbs %}
   <div class="breadcrumbs">
     <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
-    › <a href="{% url 'admin:app_list' app_label='scrapers' %}">Scrapers</a>
-    › <a href="{% url 'admin:scrapers_scrapeditem_changelist' %}">Scraped Items</a>
-    › Link to Product
+    &rsaquo; <a href="{% url 'admin:app_list' app_label='scrapers' %}">Scrapers</a>
+    &rsaquo; <a href="{% url 'admin:scrapers_scrapeditem_changelist' %}">Scraped Items</a>
+    &rsaquo; Link to Product
   </div>
 {% endblock breadcrumbs %}
 
