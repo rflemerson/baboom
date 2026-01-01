@@ -1,0 +1,440 @@
+# Baboom - Brazilian Portuguese Translation
+# Copyright (C) 2026 Baboom
+# This file is distributed under the same license as the Baboom package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Baboom 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 21:48+0000\n"
+"PO-Revision-Date: 2026-01-01 21:49+0000\n"
+"Last-Translator: Baboom Team\n"
+"Language-Team: Portuguese (Brazil)\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: core/models.py:22 core/models.py:38 core/models.py:54 core/models.py:70
+#: core/models.py:88
+msgid "Name"
+msgstr "Nome"
+
+#: core/models.py:23 core/models.py:39
+msgid "Display Name"
+msgstr "Nome de Exibição"
+
+#: core/models.py:25 core/models.py:41 core/models.py:56 core/models.py:73
+#: core/models.py:94 core/models.py:176
+msgid "Description"
+msgstr "Descrição"
+
+#: core/models.py:25
+msgid "Brand description"
+msgstr "Descrição da marca"
+
+#: core/models.py:29 core/models.py:174
+#: core/templates/core/partials/filter_drawer.html:29
+msgid "Brand"
+msgstr "Marca"
+
+#: core/models.py:30
+msgid "Brands"
+msgstr "Marcas"
+
+#: core/models.py:41
+msgid "Store description"
+msgstr "Descrição da loja"
+
+#: core/models.py:45
+msgid "Store"
+msgstr "Loja"
+
+#: core/models.py:46
+msgid "Stores"
+msgstr "Lojas"
+
+#: core/models.py:56
+msgid "Flavor description"
+msgstr "Descrição do sabor"
+
+#: core/models.py:60
+msgid "Flavor"
+msgstr "Sabor"
+
+#: core/models.py:61 core/models.py:472
+msgid "Flavors"
+msgstr "Sabores"
+
+#: core/models.py:70
+msgid "Unique tag name"
+msgstr "Nome único da tag"
+
+#: core/models.py:73
+msgid "Tag description"
+msgstr "Descrição da tag"
+
+#: core/models.py:79
+msgid "Tag"
+msgstr "Tag"
+
+#: core/models.py:80
+msgid "Tags"
+msgstr "Tags"
+
+#: core/models.py:91
+msgid "Unique category name"
+msgstr "Nome único da categoria"
+
+#: core/models.py:94
+msgid "Category description"
+msgstr "Descrição da categoria"
+
+#: core/models.py:100
+msgid "Category"
+msgstr "Categoria"
+
+#: core/models.py:101
+msgid "Categories"
+msgstr "Categorias"
+
+#: core/models.py:168
+msgid "Refill Package"
+msgstr "Refil"
+
+#: core/models.py:169
+msgid "Container Package"
+msgstr "Pote"
+
+#: core/models.py:170
+msgid "Bar"
+msgstr "Barra"
+
+#: core/models.py:171
+msgid "Other"
+msgstr "Outro"
+
+#: core/models.py:173
+msgid "Product Name"
+msgstr "Nome do Produto"
+
+#: core/models.py:176
+msgid "Marketing description"
+msgstr "Descrição de marketing"
+
+#: core/models.py:180
+msgid "Weight (grams)"
+msgstr "Peso (gramas)"
+
+#: core/models.py:180
+msgid "Total product weight in grams"
+msgstr "Peso total do produto em gramas"
+
+#: core/models.py:184
+msgid "EAN/GTIN"
+msgstr "EAN/GTIN"
+
+#: core/models.py:190
+msgid "European Article Number / Global Trade Item Number"
+msgstr "Código de Barras / Número Global de Item Comercial"
+
+#: core/models.py:194
+msgid "Packaging Type"
+msgstr "Tipo de Embalagem"
+
+#: core/models.py:205
+msgid "Product Category"
+msgstr "Categoria do Produto"
+
+#: core/models.py:211
+msgid "Available In Stores"
+msgstr "Disponível nas Lojas"
+
+#: core/models.py:216
+msgid "Product Tags"
+msgstr "Tags do Produto"
+
+#: core/models.py:220
+msgid "Published"
+msgstr "Publicado"
+
+#: core/models.py:222
+msgid "If checked, this product will be visible on the public website."
+msgstr "Se marcado, este produto será visível no site."
+
+#: core/models.py:226
+msgid "Created At"
+msgstr "Criado em"
+
+#: core/models.py:230
+msgid "Updated At"
+msgstr "Atualizado em"
+
+#: core/models.py:237
+msgid "Product"
+msgstr "Produto"
+
+#: core/models.py:238
+msgid "Products"
+msgstr "Produtos"
+
+#: core/models.py:260
+msgid "Related Product"
+msgstr "Produto Relacionado"
+
+#: core/models.py:267
+msgid "Associated Store"
+msgstr "Loja Associada"
+
+#: core/models.py:271
+msgid "Store Product ID"
+msgstr "ID do Produto na Loja"
+
+#: core/models.py:273
+msgid "Unique identifier in store system (e.g., SKU)"
+msgstr "Identificador único no sistema da loja (ex: SKU)"
+
+#: core/models.py:278
+msgid "Store Product URL"
+msgstr "URL do Produto na Loja"
+
+#: core/models.py:279
+msgid "Direct URL to product page in the store"
+msgstr "URL direta para a página do produto na loja"
+
+#: core/models.py:283
+msgid "Affiliate Tracking URL"
+msgstr "URL de Afiliado"
+
+#: core/models.py:284
+msgid "URL with affiliate tracking parameters"
+msgstr "URL com parâmetros de rastreamento de afiliado"
+
+#: core/models.py:292 core/models.py:326
+msgid "Store Product Link"
+msgstr "Link do Produto na Loja"
+
+#: core/models.py:293
+msgid "Store Product Links"
+msgstr "Links de Produtos nas Lojas"
+
+#: core/models.py:319 scrapers/models.py:15
+msgid "Available"
+msgstr "Disponível"
+
+#: core/models.py:320 scrapers/models.py:16
+msgid "Last Units"
+msgstr "Últimas Unidades"
+
+#: core/models.py:321 scrapers/models.py:17
+msgid "Out of Stock"
+msgstr "Fora de Estoque"
+
+#: core/models.py:331
+msgid "Current Price"
+msgstr "Preço Atual"
+
+#: core/models.py:337
+msgid "Inventory Status"
+msgstr "Status do Estoque"
+
+#: core/models.py:344
+msgid "Collection Timestamp"
+msgstr "Data da Coleta"
+
+#: core/models.py:349
+msgid "Version History"
+msgstr "Histórico de Versões"
+
+#: core/models.py:356
+msgid "Price Tracking Record"
+msgstr "Registro de Preço"
+
+#: core/models.py:357
+msgid "Price Tracking Records"
+msgstr "Registros de Preço"
+
+#: core/models.py:371
+msgid "Internal Label"
+msgstr "Rótulo Interno"
+
+#: core/models.py:375
+msgid ""
+"E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin."
+msgstr ""
+"Ex: 'Saborizada' ou 'Natural' - ajuda a identificar esta tabela no admin."
+
+#: core/models.py:379
+msgid "Serving Size (g)"
+msgstr "Porção (g)"
+
+#: core/models.py:380
+msgid "Energy (kcal)"
+msgstr "Energia (kcal)"
+
+#: core/models.py:381
+msgid "Proteins (g)"
+msgstr "Proteínas (g)"
+
+#: core/models.py:382
+msgid "Carbs (g)"
+msgstr "Carboidratos (g)"
+
+#: core/models.py:384
+msgid "Total Sugars (g)"
+msgstr "Açúcares Totais (g)"
+
+#: core/models.py:387
+msgid "Added Sugars (g)"
+msgstr "Açúcares Adicionados (g)"
+
+#: core/models.py:390
+msgid "Total Fats (g)"
+msgstr "Gorduras Totais (g)"
+
+#: core/models.py:393
+msgid "Saturated Fats (g)"
+msgstr "Gorduras Saturadas (g)"
+
+#: core/models.py:396
+msgid "Trans Fats (g)"
+msgstr "Gorduras Trans (g)"
+
+#: core/models.py:399
+msgid "Dietary Fiber (g)"
+msgstr "Fibra Alimentar (g)"
+
+#: core/models.py:401
+msgid "Sodium (mg)"
+msgstr "Sódio (mg)"
+
+#: core/models.py:404 core/models.py:405 core/models.py:466
+msgid "Nutrition Facts"
+msgstr "Informação Nutricional"
+
+#: core/models.py:424
+msgid "Nutrient Name"
+msgstr "Nome do Nutriente"
+
+#: core/models.py:426
+msgid "e.g., Vitamin C, Iron"
+msgstr "ex: Vitamina C, Ferro"
+
+#: core/models.py:430
+msgid "Quantity"
+msgstr "Quantidade"
+
+#: core/models.py:436
+msgid "Unit"
+msgstr "Unidade"
+
+#: core/models.py:443
+msgid "Micronutrient"
+msgstr "Micronutriente"
+
+#: core/models.py:444
+msgid "Micronutrients"
+msgstr "Micronutrientes"
+
+#: core/models.py:459
+msgid "Base Product"
+msgstr "Produto Base"
+
+#: core/models.py:477
+msgid "Product Nutrition Profile"
+msgstr "Perfil Nutricional do Produto"
+
+#: core/models.py:478
+msgid "Product Nutrition Profiles"
+msgstr "Perfis Nutricionais dos Produtos"
+
+#: core/templates/core/partials/filter_drawer.html:5
+msgid "close sidebar"
+msgstr "fechar menu"
+
+#: core/templates/core/partials/filter_drawer.html:9
+#: core/templates/core/partials/quick_filters.html:10
+msgid "Filters"
+msgstr "Filtros"
+
+#: core/templates/core/partials/filter_drawer.html:22
+msgid "Search"
+msgstr "Buscar"
+
+#: core/templates/core/partials/filter_drawer.html:38
+#: core/templates/core/partials/quick_filters.html:22
+msgid "Clear"
+msgstr "Limpar"
+
+#: core/templates/core/partials/filter_drawer.html:43
+msgid "Apply"
+msgstr "Aplicar"
+
+#: core/templates/core/partials/product_list_results.html:46
+msgid "Buy Now"
+msgstr "Comprar"
+
+#: core/templates/core/partials/product_list_results.html:54
+msgid "No products found"
+msgstr "Nenhum produto encontrado"
+
+#: core/templates/core/partials/product_list_results.html:55
+msgid "Try adjusting your search or filters."
+msgstr "Tente ajustar sua busca ou filtros."
+
+#: core/templates/core/partials/quick_filters.html:15
+msgid "Search..."
+msgstr "Buscar..."
+
+#: scrapers/admin.py:17
+msgid "Please select only one item to create a product from."
+msgstr "Por favor, selecione apenas um item para criar um produto."
+
+#: scrapers/models.py:10
+msgid "New"
+msgstr "Novo"
+
+#: scrapers/models.py:11
+msgid "Linked"
+msgstr "Vinculado"
+
+#: scrapers/models.py:12
+msgid "Ignored"
+msgstr "Ignorado"
+
+#: scrapers/models.py:22
+msgid "Store identifier"
+msgstr "Identificador da loja"
+
+#: scrapers/models.py:28
+msgid "Unique ID from Store"
+msgstr "ID único da loja"
+
+#: scrapers/models.py:34
+msgid "URL to product page"
+msgstr "URL da página do produto"
+
+#: scrapers/models.py:40
+msgid "Name extracted from source"
+msgstr "Nome extraído da fonte"
+
+#: scrapers/models.py:46
+msgid "Category/Department extracted from source"
+msgstr "Categoria/Departamento extraído da fonte"
+
+#: scrapers/models.py:59
+msgid "Available quantity in stock"
+msgstr "Quantidade disponível em estoque"
+
+#: scrapers/models.py:72
+msgid "Product ID extracted from source"
+msgstr "ID do produto extraído da fonte"
+
+#: scrapers/models.py:79
+msgid "EAN/GTIN extracted from source"
+msgstr "EAN/GTIN extraído da fonte"
+
+#: scrapers/models.py:86
+msgid "SKU extracted from source"
+msgstr "SKU extraído da fonte"
