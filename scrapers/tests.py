@@ -74,3 +74,121 @@ class ScraperIntegrationTests(TestCase):
 
         first = ScrapedItem.objects.filter(store_slug="growth").first()
         self.assertIsNotNone(first)
+
+
+class SyncPriceToCoreTests(TestCase):
+    """
+    Unit tests for ScraperService.sync_price_to_core()
+    """
+
+    def setUp(self):
+        from core.models import Brand, Product, ProductStore, Store
+
+        self.brand = Brand.objects.create(name="test_brand", display_name="Test Brand")
+        self.store = Store.objects.create(name="test_store", display_name="Test Store")
+        self.product = Product.objects.create(
+            name="Test Whey",
+            brand=self.brand,
+            weight=900,
+        )
+        self.product_store = ProductStore.objects.create(
+            product=self.product,
+            store=self.store,
+            external_id="TEST123",
+            product_link="https://test.com/product",
+        )
+
+    def test_sync_creates_price_history_for_linked_item(self):
+        from decimal import Decimal
+
+        from core.models import ProductPriceHistory
+
+        # When a LINKED ScrapedItem is created, the signal automatically
+        # calls sync_price_to_core and creates a PriceHistory
+        ScrapedItem.objects.create(
+            store_slug="test_store",
+            external_id="TEST123",
+            price=Decimal("199.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            status=ScrapedItem.Status.LINKED,
+            product_store=self.product_store,
+        )
+
+        # Signal should have created the price history automatically
+        self.assertEqual(ProductPriceHistory.objects.count(), 1)
+        price_record = ProductPriceHistory.objects.first()
+        assert price_record is not None  # noqa: S101
+        self.assertEqual(price_record.price, Decimal("199.90"))
+        self.assertEqual(price_record.stock_status, "A")
+
+    def test_sync_skips_if_price_unchanged(self):
+        from decimal import Decimal
+
+        from core.models import ProductPriceHistory
+        from scrapers.services import ScraperService
+
+        ProductPriceHistory.objects.create(
+            store_product_link=self.product_store,
+            price=Decimal("199.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+        )
+
+        item = ScrapedItem.objects.create(
+            store_slug="test_store",
+            external_id="TEST123",
+            price=Decimal("199.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            status=ScrapedItem.Status.LINKED,
+            product_store=self.product_store,
+        )
+
+        result = ScraperService.sync_price_to_core(item)
+
+        self.assertFalse(result)
+        self.assertEqual(ProductPriceHistory.objects.count(), 1)
+
+    def test_sync_skips_if_not_linked(self):
+        from decimal import Decimal
+
+        from core.models import ProductPriceHistory
+        from scrapers.services import ScraperService
+
+        item = ScrapedItem.objects.create(
+            store_slug="test_store",
+            external_id="TEST456",
+            price=Decimal("199.90"),
+            status=ScrapedItem.Status.NEW,
+        )
+
+        result = ScraperService.sync_price_to_core(item)
+
+        self.assertFalse(result)
+        self.assertEqual(ProductPriceHistory.objects.count(), 0)
+
+    def test_sync_creates_new_record_on_price_change(self):
+        from decimal import Decimal
+
+        from core.models import ProductPriceHistory
+
+        # Create initial linked item (signal creates first price history)
+        item = ScrapedItem.objects.create(
+            store_slug="test_store",
+            external_id="TEST123",
+            price=Decimal("199.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            status=ScrapedItem.Status.LINKED,
+            product_store=self.product_store,
+        )
+
+        # Verify first price was created
+        self.assertEqual(ProductPriceHistory.objects.count(), 1)
+
+        # Update with new price
+        item.price = Decimal("179.90")
+        item.save()
+
+        # Should have 2 price records now
+        self.assertEqual(ProductPriceHistory.objects.count(), 2)
+        latest = ProductPriceHistory.objects.first()
+        assert latest is not None  # noqa: S101
+        self.assertEqual(latest.price, Decimal("179.90"))
