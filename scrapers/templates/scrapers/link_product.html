@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+
 {% load i18n admin_urls static %}
 
 {% block breadcrumbs %}
@@ -9,28 +10,18 @@
     &rsaquo; Link to Product
   </div>
 {% endblock breadcrumbs %}
-
 {% block content %}
   <h1>Link selected items to a Product</h1>
   <p>Select the product you want to link the following items to:</p>
-
   <ul>
-    {% for item in items %}
-      <li>{{ item }}</li>
-    {% endfor %}
+    {% for item in items %}<li>{{ item }}</li>{% endfor %}
   </ul>
-
   <form action="" method="post">
     {% csrf_token %}
     {{ form.as_p }}
-
-    {% for item in items %}
-      <input type="hidden" name="_selected_action" value="{{ item.pk }}" />
-    {% endfor %}
-
+    {% for item in items %}<input type="hidden" name="_selected_action" value="{{ item.pk }}" />{% endfor %}
     <input type="hidden" name="action" value="link_to_product" />
     <input type="hidden" name="apply" value="1" />
-
     <div class="submit-row">
       <input type="submit" value="Link Products" class="default" />
     </div>
