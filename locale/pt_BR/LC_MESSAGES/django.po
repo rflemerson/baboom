@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Baboom 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-01 21:48+0000\n"
+"POT-Creation-Date: 2026-01-01 22:05+0000\n"
 "PO-Revision-Date: 2026-01-01 21:49+0000\n"
 "Last-Translator: Baboom Team\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -382,6 +382,25 @@ msgstr "Nenhum produto encontrado"
 #: core/templates/core/partials/product_list_results.html:55
 msgid "Try adjusting your search or filters."
 msgstr "Tente ajustar sua busca ou filtros."
+
+#: core/templates/core/partials/product_list_results.html:61
+msgid "Show"
+msgstr "Exibir"
+
+#: core/templates/core/partials/product_list_results.html:71
+msgid "per page"
+msgstr "por página"
+
+#: core/templates/core/partials/product_list_results.html:74
+#, python-format
+msgid ""
+"\n"
+"        Showing %(start)s - %(end)s of %(total)s\n"
+"      "
+msgstr ""
+"\n"
+"        Exibindo %(start)s - %(end)s de %(total)s\n"
+"      "
 
 #: core/templates/core/partials/quick_filters.html:15
 msgid "Search..."
