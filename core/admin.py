@@ -89,6 +89,18 @@ class ProductAdmin(nested_admin.NestedModelAdmin):
     def get_category(self, obj: Product) -> str:
         return obj.category.name if obj.category else "-"
 
+    def get_changeform_initial_data(self, request):
+        """
+        Populate initial form data from GET parameters.
+        Example: /admin/core/product/add/?initial_name=Whey&initial_ean=123
+        """
+        initial = super().get_changeform_initial_data(request)
+        for key, value in request.GET.items():
+            if key.startswith("initial_"):
+                field_name = key.replace("initial_", "")
+                initial[field_name] = value
+        return initial
+
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
