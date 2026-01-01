@@ -101,7 +101,7 @@ ignore_errors = true
 [tool.djlint]
 profile = "django"
 extension = "html"
-ignore = "H030,H031,H023"
+ignore = "H030,H031"
 indent = 2
 blank_line_after_tag = "load,extends,include"
 
