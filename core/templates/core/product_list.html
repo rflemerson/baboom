@@ -3,12 +3,12 @@
 {% load product_tags %}
 
 {% block content %}
-  <div class="drawer drawer-end">
+  <div class="drawer drawer-end flex-1 flex flex-col">
     <input id="filter-drawer" type="checkbox" class="drawer-toggle" />
-    <div class="drawer-content py-6">
+    <div class="drawer-content py-6 flex-1 flex flex-col">
       {% include "core/partials/quick_filters.html" %}
 
-      <div id="product-list" class="flex flex-col gap-4">
+      <div id="product-list" class="flex flex-col gap-4 flex-1">
         {% include "core/partials/product_list_results.html" %}
 
       </div>
