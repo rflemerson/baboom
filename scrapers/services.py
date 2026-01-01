@@ -51,14 +51,14 @@ class ScraperService:
     @staticmethod
     def sync_price_to_core(scraped_item: ScrapedItem) -> bool:
         """
-        Sincroniza preço/estoque de um ScrapedItem linkado para ProductPriceHistory.
+        Syncs price/stock from a LINKED ScrapedItem to ProductPriceHistory.
 
-        Só cria novo registro se:
-        1. Item está LINKED
-        2. Preço OU estoque mudou desde último registro
+        Only creates a new record if:
+        1. Item status is LINKED
+        2. Price OR stock changed since the last record
 
         Returns:
-            True se criou novo registro, False caso contrário
+            True if a new record was created, False otherwise
         """
         if scraped_item.status != ScrapedItem.Status.LINKED:
             logger.debug(f"Item {scraped_item} not LINKED, skipping sync")

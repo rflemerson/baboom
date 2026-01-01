@@ -56,11 +56,11 @@ def scrape_maxtitanium_monitor():
 
 @shared_task
 def scrape_probiotica_monitor():
-    logger.info("Starting Probiótica Monitor Task")
+    logger.info("Starting Probiotica Monitor Task")
     spider = ProbioticaSpider()
     items = spider.crawl()
     saved_count = len(items)
-    return f"Probiótica Monitor: Saved/Updated {saved_count} items."
+    return f"Probiotica Monitor: Saved/Updated {saved_count} items."
 
 
 @shared_task

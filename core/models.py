@@ -216,12 +216,10 @@ class Product(models.Model):
         Tag, verbose_name=_("Product Tags"), blank=True
     )
 
-    is_manually_curated = models.BooleanField(
-        _("Manually Curated"),
+    is_published = models.BooleanField(
+        _("Published"),
         default=False,
-        help_text=_(
-            "If checked, the scraper will NOT update the name, description, or brand of this product."
-        ),
+        help_text=_("If checked, this product will be visible on the public website."),
     )
 
     created_at = models.DateTimeField(

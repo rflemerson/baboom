@@ -66,10 +66,10 @@ class ProductAdmin(nested_admin.NestedModelAdmin):
         "weight",
         "packaging",
         "get_category",
-        "is_manually_curated",
+        "is_published",
         "created_at",
     )
-    list_filter = ("brand", "packaging", "category", "tags", "is_manually_curated")
+    list_filter = ("brand", "packaging", "category", "tags", "is_published")
     search_fields = ("name", "brand__name")
     autocomplete_fields = ["brand", "tags", "category"]
     inlines = [ProductStoreInline, ProductNutritionInline]
@@ -158,7 +158,7 @@ class ProductStoreAdmin(admin.ModelAdmin):
             .prefetch_related("price_history")
         )
 
-    @admin.display(description="Último Preço")
+    @admin.display(description="Last Price")
     def get_last_price(self, obj: ProductStore) -> str:
         last = obj.price_history.first()
         return f"R$ {last.price}" if last else "-"
