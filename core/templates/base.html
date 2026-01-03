@@ -27,6 +27,19 @@
   </head>
   <body class="bg-base-200 min-h-screen flex flex-col"
         hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
+    {% if messages %}
+      <div class="toast toast-top toast-end z-[100]">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} shadow-lg"
+               x-data="{ show: true }"
+               x-show="show"
+               x-transition.duration.500ms
+               x-init="setTimeout(() => show = false, 5000)">
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
     {% include "core/partials/header.html" %}
 
     <div class="container mx-auto px-4 flex-1 flex flex-col">

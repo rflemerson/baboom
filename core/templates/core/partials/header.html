@@ -22,28 +22,9 @@
 </header>
 <input type="checkbox" id="alert-modal" class="modal-toggle" />
 <div class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">{% trans "Get Price Alerts" %}</h3>
-    <p class="py-4 text-base-content/70">
-      {% trans "Enter your email to receive notifications when prices drop on your favorite products." %}
-    </p>
-    <form method="post" action="{% url 'subscribe_alerts' %}" class="space-y-4">
-      {% csrf_token %}
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text">{% trans "Email" %}</span>
-        </label>
-        <input type="email"
-               name="email"
-               placeholder="{% trans "your@email.com" %}"
-               class="input input-bordered w-full"
-               required />
-      </div>
-      <div class="modal-action">
-        <label for="alert-modal" class="btn btn-ghost">{% trans "Cancel" %}</label>
-        <button type="submit" class="btn btn-primary">{% trans "Subscribe" %}</button>
-      </div>
-    </form>
+  <div class="modal-box p-0 bg-transparent shadow-none">
+    {% include "core/partials/alerts/form.html" %}
+
   </div>
   <label class="modal-backdrop" for="alert-modal">Close</label>
 </div>

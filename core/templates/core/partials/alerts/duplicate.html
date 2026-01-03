@@ -1,0 +1,18 @@
+{% load i18n %}
+
+<div id="alert-content" class="modal-box">
+  <div class="text-info text-5xl mb-4 text-center">
+    <i class="fas fa-info-circle"></i>
+  </div>
+  <h3 class="font-bold text-lg text-center">{% trans "Already Subscribed" %}</h3>
+  <p class="py-4 text-base-content/70 text-center">
+    {% trans "The email" %} <strong>{{ email }}</strong> {% trans "is already in our database." %}
+  </p>
+  <div class="modal-action flex-col gap-2 sm:flex-row sm:justify-end">
+    <label for="alert-modal" class="btn btn-ghost">{% trans "Close" %}</label>
+    <button hx-get="{% url 'subscribe_alerts' %}"
+            hx-target="#alert-content"
+            hx-swap="outerHTML"
+            class="btn btn-primary">{% trans "Use another email" %}</button>
+  </div>
+</div>

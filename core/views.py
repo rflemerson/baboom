@@ -1,5 +1,7 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -46,15 +48,55 @@ def product_list(request: HttpRequest) -> HttpResponse:
 def subscribe_alerts(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         email = request.POST.get("email", "").strip()
+
+        # HTMX handling
+        if getattr(request, "htmx", False):
+            # 1. Validate existence
+            if not email:
+                return render(
+                    request,
+                    "core/partials/alerts/form.html",
+                    {"error": _("Please enter an email address.")},
+                )
+
+            # 2. Validate format
+            try:
+                validate_email(email)
+            except ValidationError:
+                return render(
+                    request,
+                    "core/partials/alerts/form.html",
+                    {"error": _("Invalid email format."), "email": email},
+                )
+
+            # 3. Create subscription
+            try:
+                AlertSubscriber.objects.create(email=email)
+                return render(
+                    request, "core/partials/alerts/success.html", {"email": email}
+                )
+            except IntegrityError:
+                return render(
+                    request, "core/partials/alerts/duplicate.html", {"email": email}
+                )
+
+        # Fallback for non-HTMX requests (old behavior)
         if email:
             try:
+                validate_email(email)
                 AlertSubscriber.objects.create(email=email)
                 messages.success(
                     request, _("You're subscribed! We'll notify you when prices drop.")
                 )
+            except ValidationError:
+                messages.error(request, _("Invalid email format."))
             except IntegrityError:
                 messages.info(request, _("This email is already subscribed."))
         else:
             messages.error(request, _("Please enter a valid email."))
+
+    # If it's a GET request via HTMX (e.g. "Use another email" button), return fresh form
+    if request.method == "GET" and getattr(request, "htmx", False):
+        return render(request, "core/partials/alerts/form.html")
 
     return redirect("product_list")
