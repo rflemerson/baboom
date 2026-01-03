@@ -16,11 +16,13 @@
         <span class="label-text">{% trans "Email" %}</span>
       </label>
       {{ form.email }}
-      {% if error %}
-        <label class="label">
-          <span class="label-text-alt text-error">{{ error }}</span>
-        </label>
-      {% endif %}
+      <div class="min-h-[24px]">
+        {% if error %}
+          <label class="label py-0">
+            <span class="label-text-alt text-error">{{ error }}</span>
+          </label>
+        {% endif %}
+      </div>
     </div>
     <div class="modal-action">
       <label for="alert-modal" class="btn btn-ghost">{% trans "Cancel" %}</label>
