@@ -27,6 +27,8 @@
   </head>
   <body class="bg-base-200 min-h-screen flex flex-col"
         hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
+    {% include "core/partials/header.html" %}
+
     <div class="container mx-auto px-4 flex-1 flex flex-col">
       {% block content %}
       {% endblock content %}

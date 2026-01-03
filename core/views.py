@@ -1,9 +1,12 @@
+from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.utils.translation import gettext as _
 
 from .filters import ProductFilter
-from .models import Product
+from .models import AlertSubscriber, Product
 
 DEFAULT_PER_PAGE = 12
 PER_PAGE_OPTIONS = [12, 24, 48]
@@ -38,3 +41,20 @@ def product_list(request: HttpRequest) -> HttpResponse:
         template_name = "core/product_list.html"
 
     return render(request, template_name, context)
+
+
+def subscribe_alerts(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip()
+        if email:
+            try:
+                AlertSubscriber.objects.create(email=email)
+                messages.success(
+                    request, _("You're subscribed! We'll notify you when prices drop.")
+                )
+            except IntegrityError:
+                messages.info(request, _("This email is already subscribed."))
+        else:
+            messages.error(request, _("Please enter a valid email."))
+
+    return redirect("product_list")

@@ -485,3 +485,18 @@ class ProductNutrition(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product.name} - {self.nutrition_facts}"
+
+
+class AlertSubscriber(models.Model):
+    """Stores email subscriptions for price alerts."""
+
+    email = models.EmailField(_("Email"), unique=True)
+    is_active = models.BooleanField(_("Active"), default=True)
+    created_at = models.DateTimeField(_("Subscribed At"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Alert Subscriber")
+        verbose_name_plural = _("Alert Subscribers")
+
+    def __str__(self) -> str:
+        return self.email
