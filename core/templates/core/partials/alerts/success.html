@@ -8,7 +8,11 @@
   <p class="py-4 text-base-content/70">
     {% trans "We've added" %} <strong>{{ email }}</strong> {% trans "to our list. You'll be the first to know about price drops!" %}
   </p>
-  <div class="modal-action justify-center">
-    <label for="alert-modal" class="btn btn-primary">{% trans "Awesome!" %}</label>
+  <div class="modal-action flex-col gap-2 sm:flex-row sm:justify-center">
+    <label for="alert-modal" class="btn btn-primary">{% trans "Close" %}</label>
+    <button hx-get="{% url 'subscribe_alerts' %}"
+            hx-target="#alert-content"
+            hx-swap="outerHTML"
+            class="btn btn-ghost">{% trans "Subscribe another email" %}</button>
   </div>
 </div>

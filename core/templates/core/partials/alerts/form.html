@@ -8,17 +8,14 @@
   <form hx-post="{% url 'subscribe_alerts' %}"
         hx-target="#alert-content"
         hx-swap="outerHTML"
-        class="space-y-4">
+        class="space-y-4"
+        novalidate>
     {% csrf_token %}
     <div class="form-control">
       <label class="label">
         <span class="label-text">{% trans "Email" %}</span>
       </label>
-      <input type="email"
-             name="email"
-             placeholder="{% trans "your@email.com" %}"
-             class="input input-bordered w-full {% if error %}input-error{% endif %}"
-             required />
+      {{ form.email }}
       {% if error %}
         <label class="label">
           <span class="label-text-alt text-error">{{ error }}</span>
