@@ -1,10 +1,8 @@
 {% load i18n %}
 
 <div id="alert-content" class="modal-box">
-  <h3 class="font-bold text-lg">{% trans "Get Price Alerts" %}</h3>
-  <p class="py-4 text-base-content/70">
-    {% trans "Enter your email to receive notifications when prices drop on your favorite products." %}
-  </p>
+  <h3 class="font-bold text-lg">{% trans "Alerts" %}</h3>
+  <p class="py-4 text-base-content/70">{% trans "Enter your email to receive notifications." %}</p>
   <form hx-post="{% url 'subscribe_alerts' %}"
         hx-target="#alert-content"
         hx-swap="outerHTML"

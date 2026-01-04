@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Baboom 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-01 22:05+0000\n"
+"POT-Creation-Date: 2026-01-04 00:44+0000\n"
 "PO-Revision-Date: 2026-01-01 21:49+0000\n"
 "Last-Translator: Baboom Team\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -15,6 +15,18 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: core/forms.py:9
+msgid "Please enter a valid email address."
+msgstr "Por favor, insira um endereço de email válido."
+
+#: core/forms.py:13
+msgid "your@email.com"
+msgstr "seu@email.com"
+
+#: core/forms.py:21
+msgid "This email is already subscribed."
+msgstr "Este email já está cadastrado."
 
 #: core/models.py:22 core/models.py:38 core/models.py:54 core/models.py:70
 #: core/models.py:88
@@ -349,6 +361,79 @@ msgstr "Perfil Nutricional do Produto"
 msgid "Product Nutrition Profiles"
 msgstr "Perfis Nutricionais dos Produtos"
 
+#: core/models.py:493 core/templates/core/partials/alerts/form.html:16
+msgid "Email"
+msgstr "Email"
+
+#: core/models.py:494
+msgid "Active"
+msgstr "Ativo"
+
+#: core/models.py:495
+msgid "Subscribed At"
+msgstr "Inscrito Em"
+
+#: core/models.py:498
+msgid "Alert Subscriber"
+msgstr "Assinante de Alerta"
+
+#: core/models.py:499
+msgid "Alert Subscribers"
+msgstr "Assinantes de Alerta"
+
+#: core/templates/core/partials/alerts/duplicate.html:7
+msgid "Already Subscribed"
+msgstr "Já Inscrito"
+
+#: core/templates/core/partials/alerts/duplicate.html:9
+msgid "The email"
+msgstr "O email"
+
+#: core/templates/core/partials/alerts/duplicate.html:9
+msgid "is already in our database."
+msgstr "já está em nosso banco de dados."
+
+#: core/templates/core/partials/alerts/duplicate.html:12
+#: core/templates/core/partials/alerts/success.html:12
+msgid "Close"
+msgstr "Fechar"
+
+#: core/templates/core/partials/alerts/duplicate.html:16
+msgid "Use another email"
+msgstr "Usar outro email"
+
+#: core/templates/core/partials/alerts/form.html:4
+msgid "Alerts"
+msgstr "Alertas"
+
+#: core/templates/core/partials/alerts/form.html:6
+msgid "Enter your email to receive notifications."
+msgstr "Digite seu email para receber notificações."
+
+#: core/templates/core/partials/alerts/form.html:28
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: core/templates/core/partials/alerts/form.html:29
+msgid "Subscribe"
+msgstr "Inscrever-se"
+
+#: core/templates/core/partials/alerts/success.html:7
+msgid "You're Subscribed!"
+msgstr "Você está Inscrito!"
+
+#: core/templates/core/partials/alerts/success.html:9
+msgid "We've added"
+msgstr "Adicionamos"
+
+#: core/templates/core/partials/alerts/success.html:9
+msgid "to our list. You'll be the first to know about price drops!"
+msgstr "à nossa lista. Você será o primeiro a saber sobre quedas de preço!"
+
+#: core/templates/core/partials/alerts/success.html:16
+msgid "Subscribe another email"
+msgstr "Inscrever outro email"
+
 #: core/templates/core/partials/filter_drawer.html:5
 msgid "close sidebar"
 msgstr "fechar menu"
@@ -370,6 +455,10 @@ msgstr "Limpar"
 #: core/templates/core/partials/filter_drawer.html:43
 msgid "Apply"
 msgstr "Aplicar"
+
+#: core/templates/core/partials/header.html:28
+msgid "Price Alerts"
+msgstr "Alertas de Preço"
 
 #: core/templates/core/partials/product_list_results.html:46
 msgid "Buy Now"
@@ -405,6 +494,14 @@ msgstr ""
 #: core/templates/core/partials/quick_filters.html:15
 msgid "Search..."
 msgstr "Buscar..."
+
+#: core/views.py:64
+msgid "You're subscribed! We'll notify you when prices drop."
+msgstr "Você está inscrito! Vamos notificá-lo quando os preços caírem."
+
+#: core/views.py:83
+msgid "Invalid input."
+msgstr "Entrada inválida."
 
 #: scrapers/admin.py:17
 msgid "Please select only one item to create a product from."
@@ -457,3 +554,6 @@ msgstr "EAN/GTIN extraído da fonte"
 #: scrapers/models.py:86
 msgid "SKU extracted from source"
 msgstr "SKU extraído da fonte"
+
+#~ msgid "Get Price Alerts"
+#~ msgstr "Receber Alertas de Preço"

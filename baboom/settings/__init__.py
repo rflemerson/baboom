@@ -42,9 +42,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # i18n: Supported languages
-LANGUAGE_CODE = "pt-br"
+# i18n: Supported languages
+LANGUAGE_CODE = "pt-BR"
 LANGUAGES = [
-    ("pt-br", "Português (Brasil)"),
+    ("pt-BR", "Português (Brasil)"),
     ("en", "English"),
     ("es", "Español"),
 ]
