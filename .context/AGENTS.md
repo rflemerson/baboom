@@ -1,0 +1,52 @@
+# AGENTS.md Best Practices
+
+This document serves as a "Meta-Guide" for creating `AGENTS.md` files, based on the [Agents.md Standard](https://agents.md/).
+
+## 1. Philosophy: "README for Agents"
+While `README.md` is for humans, `AGENTS.md` is for Large Language Models (LLMs). It should be:
+- **Predictable**: Always at the root (`/AGENTS.md`).
+- **High-Signal**: Dense, actionable information. No fluff.
+- **Context-First**: Optimized for RAG (Retrieval-Augmented Generation) ingestion.
+
+## 2. File Naming & Location
+- **Root**: `/AGENTS.md` (Main entry point).
+- **Subdirectories**: `/subdir/AGENTS.md` (Context specific to that folder).
+- **Imports**: Use `@` syntax to import modular context files (e.g., `@.context/tech-stack.md`).
+
+## 3. Recommended Structure
+A robust `AGENTS.md` should follow this structure:
+
+### I. Project Context
+Brief, high-level overview. define the "Identity" of the project.
+> "Baboom is a supplement cost-benefit comparator..."
+
+### II. Tech Stack & Dependencies
+List versions explicitly. Agents assume defaults if not specified.
+> "Python 3.14.2, Django 6.0, Tailwind CSS (Standalone)"
+
+### III. Development Workflow
+Explicit commands for common tasks. Don't let the agent guess.
+```bash
+# Workflow
+Test: python manage.py test
+Lint: pre-commit run --all-files
+Run: python manage.py runserver
+```
+
+### IV. Coding Standards (The "Rules")
+Use "Do" and "Don't" format.
+- **Do**: Use functional views for HTMX.
+- **Don't**: Use inline styles.
+
+## 4. Anti-Patterns to Avoid
+- **Duplication**: Don't copy-paste large docs. Import them.
+- **Vagueness**: Avoid "Write good code". Be specific: "Use Python Type Hints".
+- **Outdated Info**: An outdated `AGENTS.md` is worse than none. Keep it live.
+
+## 5. Metadata for Tools (Optional)
+You can embed hints for specific AI tools if needed (e.g., strict non-searchable exclusions).
+
+## 6. Maintenance Policy: Living Documentation
+**CRITICAL RULE**: Documentation must never get stale.
+1.  **Update on Sight**: If you read this or any documentation (e.g., in `.context/`) and find it conflicts with the actual code/environment, **you must update it immediately** before proceeding with other tasks.
+2.  **Update on Change**: If you make *any* significant change to the code (e.g., adding a library, changing a workflow, refactoring architecture), you **must search for and update** the relevant documentation in the same step.
