@@ -9,6 +9,7 @@
     pkgs.python314
     pkgs.ruff
     pkgs.djlint
+    pkgs.redis
   ];
 
   # Sets environment variables in the workspace
