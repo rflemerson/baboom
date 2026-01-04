@@ -1,11 +1,27 @@
 import logging
 
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
 
 logger = logging.getLogger(__name__)
+
+
+class BaseModel(models.Model):
+    created_at = models.DateTimeField(
+        _("Created At"),
+        db_index=True,
+        default=timezone.now,
+    )
+    updated_at = models.DateTimeField(
+        _("Updated At"),
+        auto_now=True,
+    )
+
+    class Meta:
+        abstract = True
 
 
 class Brand(models.Model):

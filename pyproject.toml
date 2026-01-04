@@ -48,6 +48,7 @@ dev = [
   "curlylint",
   "deptry",
   "safety",
+  "factory-boy",
 ]
 
 [tool.ruff]
