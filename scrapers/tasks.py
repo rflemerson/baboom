@@ -1,14 +1,6 @@
 from celery import shared_task
 from celery.utils.log import get_task_logger
 
-from .spiders.blackskull import BlackSkullSpider
-from .spiders.dark_lab import DarkLabSpider
-from .spiders.dux import DuxSpider
-from .spiders.growth import GrowthSpider
-from .spiders.integral_medica import IntegralMedicaSpider
-from .spiders.max_titanium import MaxTitaniumSpider
-from .spiders.probiotica import ProbioticaSpider
-
 logger = get_task_logger(__name__)
 
 
@@ -17,6 +9,8 @@ def scrape_growth_monitor():
     """
     Task to scrape Growth Supplements via API (Wap.Store)
     """
+    from .spiders.growth import GrowthSpider
+
     logger.info("Starting Growth Monitor Task (API)")
     spider = GrowthSpider()
     items = spider.crawl()
@@ -29,6 +23,8 @@ def scrape_blackskull_monitor():
     """
     Task to scrape Black Skull via API (VTEX GraphQL)
     """
+    from .spiders.blackskull import BlackSkullSpider
+
     logger.info("Starting Black Skull Monitor Task (API)")
     spider = BlackSkullSpider()
     items = spider.crawl()
@@ -38,6 +34,8 @@ def scrape_blackskull_monitor():
 
 @shared_task
 def scrape_integral_monitor():
+    from .spiders.integral_medica import IntegralMedicaSpider
+
     logger.info("Starting Integral Medica Monitor Task")
     spider = IntegralMedicaSpider()
     items = spider.crawl()
@@ -47,6 +45,8 @@ def scrape_integral_monitor():
 
 @shared_task
 def scrape_maxtitanium_monitor():
+    from .spiders.max_titanium import MaxTitaniumSpider
+
     logger.info("Starting Max Titanium Monitor Task")
     spider = MaxTitaniumSpider()
     items = spider.crawl()
@@ -56,6 +56,8 @@ def scrape_maxtitanium_monitor():
 
 @shared_task
 def scrape_probiotica_monitor():
+    from .spiders.probiotica import ProbioticaSpider
+
     logger.info("Starting Probiotica Monitor Task")
     spider = ProbioticaSpider()
     items = spider.crawl()
@@ -65,6 +67,8 @@ def scrape_probiotica_monitor():
 
 @shared_task
 def scrape_darklab_monitor():
+    from .spiders.dark_lab import DarkLabSpider
+
     logger.info("Starting Dark Lab Monitor Task")
     spider = DarkLabSpider()
     items = spider.crawl()
@@ -74,6 +78,8 @@ def scrape_darklab_monitor():
 
 @shared_task
 def scrape_dux_monitor():
+    from .spiders.dux import DuxSpider
+
     logger.info("Starting Dux Nutrition Monitor Task")
     spider = DuxSpider()
     items = spider.crawl()

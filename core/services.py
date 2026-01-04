@@ -1,8 +1,6 @@
 import logging
 from typing import TYPE_CHECKING
 
-from django.core.exceptions import ValidationError
-
 from .models import AlertSubscriber
 
 if TYPE_CHECKING:
@@ -15,10 +13,10 @@ def alert_subscriber_create(*, email: str) -> "AlertSubscriber":
     """
     Creates a new alert subscriber.
     """
-    if AlertSubscriber.objects.filter(email=email).exists():
-        raise ValidationError("This email is already subscribed.", code="unique")
+    subscriber = AlertSubscriber(email=email)
+    subscriber.full_clean()
+    subscriber.save()
 
-    subscriber = AlertSubscriber.objects.create(email=email)
     logger.info(f"New subscriber created: {email}")
 
     return subscriber
