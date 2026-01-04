@@ -1,25 +1,65 @@
 {% load widget_tweaks i18n %}
 
-<div class="flex items-center gap-2 mb-6 p-1 overflow-x-auto">
+<div class="mb-6 p-1">
   <form hx-get="{% url 'product_list' %}"
         hx-target="#product-list"
-        hx-trigger="change, keyup delay:500ms from:find input"
-        class="contents">
+        hx-trigger="change, keyup delay:500ms from:find input[name=search]"
+        class="flex justify-between items-center w-full gap-4">
+    {# Hidden inputs to preserve current state when the other field buttons are clicked #}
+    <input type="hidden" name="sort_by" value="{{ filter.current_sort_key }}">
+    <input type="hidden" name="sort_dir" value="{{ filter.current_sort_dir }}">
     <label for="filter-drawer"
-           class="btn btn-primary btn-sm rounded-full text-white gap-2 drawer-button">
+           class="btn btn-primary btn-sm rounded-full text-white gap-2 drawer-button shrink-0">
       <i class="fas fa-sliders-h"></i> {% trans "Filters" %}
     </label>
-    <div class="divider divider-horizontal mx-2 h-6"></div>
-    <label class="input input-sm input-bordered flex items-center gap-2 rounded-full w-48 shrink-0">
-      <i class="fas fa-search opacity-50"></i>
-      {% trans "Search..." as search_placeholder %}
-      {% render_field filter.form.search class="grow border-none focus:ring-0 p-0" placeholder=search_placeholder %}
-    </label>
-    {% render_field filter.form.brand class="select select-bordered select-sm rounded-full w-40 shrink-0" %}
-    {% render_field filter.form.ordering class="select select-bordered select-sm rounded-full w-40 shrink-0" %}
-    <a href="{% url 'product_list' %}"
-       class="btn btn-ghost btn-sm rounded-full gap-2 opacity-70 ml-auto">
-      <i class="fas fa-times"></i> {% trans "Clear" %}
-    </a>
+    <div class="flex items-center gap-2 flex-nowrap justify-end flex-1 min-w-0">
+      <div class="join shrink flex-1 min-w-[120px] max-w-xs">
+        {% trans "Search..." as search_placeholder %}
+        {% render_field filter.form.search class="input input-sm input-bordered join-item w-full focus:outline-none" placeholder=search_placeholder %}
+        <span class="btn btn-sm btn-ghost join-item border border-base-300 border-l-0">
+          <i class="fas fa-search opacity-60"></i>
+        </span>
+      </div>
+      <div class="dropdown dropdown-end shrink-0">
+        <div tabindex="0"
+             role="button"
+             class="btn btn-ghost btn-sm gap-1 border border-base-300 min-w-[6.5rem] justify-between">
+          <span class="text-sm font-normal">{{ filter.current_sort_label }}</span>
+          <i class="fas fa-chevron-down text-xs opacity-60"></i>
+        </div>
+        <ul tabindex="0"
+            class="dropdown-content menu bg-base-100 rounded-box z-50 w-40 p-2 shadow-lg border border-base-300 mt-1">
+          {% for key, label, is_active in filter.sort_choices %}
+            <li>
+              <button type="submit"
+                      name="sort_by"
+                      value="{{ key }}"
+                      {% if is_active %}class="active"{% endif %}>{{ label }}</button>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="join shrink-0 border border-base-300 rounded-lg">
+        <button type="submit"
+                name="sort_dir"
+                value="asc"
+                class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'asc' %}btn-active{% endif %}"
+                title="{% trans "Low to High" %}">
+          <i class="fas fa-arrow-up-short-wide"></i>
+        </button>
+        <button type="submit"
+                name="sort_dir"
+                value="desc"
+                class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'desc' %}btn-active{% endif %}"
+                title="{% trans "High to Low" %}">
+          <i class="fas fa-arrow-down-wide-short"></i>
+        </button>
+      </div>
+      <a href="{% url 'product_list' %}"
+         class="btn btn-ghost btn-sm btn-circle opacity-70 shrink-0"
+         title="{% trans "Clear filters" %}">
+        <i class="fas fa-times"></i>
+      </a>
+    </div>
   </form>
 </div>
