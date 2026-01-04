@@ -1,10 +1,11 @@
 {% load static i18n %}
 
 <header class="navbar bg-base-100 shadow-sm mb-6">
-  <div class="container mx-auto px-4 flex justify-between items-center">
-    <div class="flex items-center gap-4">
-      <a href="{% url 'product_list' %}" class="flex items-center gap-3">
-        <picture>
+  <div class="container mx-auto px-4 grid grid-cols-[1fr_auto_1fr] items-center">
+    <!-- Left: Monkey Icon -->
+    <div class="justify-self-start">
+      <a href="{% url 'product_list' %}" class="block">
+        <picture class="hidden sm:block">
           <source srcset="{% static 'images/logo-header-600w.avif' %}"
                   type="image/avif">
           <source srcset="{% static 'images/logo-header-600w.webp' %}"
@@ -15,17 +16,31 @@
                width="82"
                height="64" />
         </picture>
-        <span class="hidden sm:inline text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-[#E37921] to-[#122E41]">BABOOM</span>
       </a>
     </div>
-    <div class="flex-none">
+    <!-- Center: Logo Name -->
+    <div class="justify-self-center">
+      <a href="{% url 'product_list' %}" class="block">
+        <img src="{% static 'images/logo-name.svg' %}"
+             alt="Baboom"
+             class="h-10 w-auto"
+             width="137"
+             height="40" />
+      </a>
+    </div>
+    <!-- Right: Alerts -->
+    <div class="justify-self-end">
       <label for="alert-modal"
              class="btn btn-ghost btn-sm gap-2"
+             x-data="{ hover: false }"
+             x-on:mouseenter="hover = true"
+             x-on:mouseleave="hover = false"
              hx-get="{% url 'subscribe_alerts' %}"
              hx-target="#alert-content"
              hx-swap="outerHTML">
-        <i class="fas fa-bell"></i>
-        <span class="hidden sm:inline">{% trans "Price Alerts" %}</span>
+        <i class="fas fa-bomb transition-colors duration-300"
+           :class="hover ? 'fa-shake' : ''"></i>
+        <span class="hidden sm:inline">{% trans "Alerts" %}</span>
       </label>
     </div>
   </div>
