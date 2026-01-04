@@ -93,7 +93,7 @@ check_untyped_defs = true
 ignore_missing_imports = true
 
 [tool.django-stubs]
-django_settings_module = "baboom.settings.base"
+django_settings_module = "baboom.settings"
 
 [[tool.mypy.overrides]]
 module = ["baboom.*"]

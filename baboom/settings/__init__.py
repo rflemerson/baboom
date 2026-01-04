@@ -1,119 +1,20 @@
 import os
 
-import environ
+# 1. Start with the Pure Django Base Settings
+from baboom.django.base import *
 
-from .base import *
+from .celery import *
 
-env = environ.Env()
+# 3. Add Component Configurations
+from .logging import *
 
+# 2. Add Project Specific Configuration (Apps, Middleware, Static, Locale)
+from .project import *
 
-# Project apps
-INSTALLED_APPS += ["core", "scrapers"]
-
-# Whitenoise
-MIDDLEWARE.insert(
-    MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-)
-
-# Simple History
-INSTALLED_APPS += ["simple_history"]
-MIDDLEWARE += ["simple_history.middleware.HistoryRequestMiddleware"]
-
-# Treebeard
-INSTALLED_APPS += ["treebeard"]
-
-# Nested Admin
-INSTALLED_APPS += ["nested_admin"]
-
-# Django Filter
-INSTALLED_APPS += ["django_filters"]
-
-# HTMX
-INSTALLED_APPS += ["django_htmx"]
-MIDDLEWARE += ["django_htmx.middleware.HtmxMiddleware"]
-
-# Django Widget Tweaks
-INSTALLED_APPS += ["widget_tweaks"]
-
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
-
-# i18n: Supported languages
-LANGUAGE_CODE = "pt-BR"
-LANGUAGES = [
-    ("pt-BR", "Português (Brasil)"),
-    ("en", "English"),
-    ("es", "Español"),
-]
-LOCALE_PATHS = [BASE_DIR / "locale"]
-
-# LocaleMiddleware (after SessionMiddleware, before CommonMiddleware)
-MIDDLEWARE.insert(
-    MIDDLEWARE.index("django.contrib.sessions.middleware.SessionMiddleware") + 1,
-    "django.middleware.locale.LocaleMiddleware",
-)
-
-
-# Logging Configuration
-# Best Practice: Structured/JSON logging recommended for Production.
-# Currently set to Console/Simple for Development.
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
-            "style": "{",
-        },
-        "simple": {
-            "format": "{levelname} {message}",
-            "style": "{",
-        },
-    },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "WARNING",
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "core": {
-            "handlers": ["console"],
-            "level": "DEBUG",
-            "propagate": False,
-        },
-    },
-}
-
-# Celery Configuration
-INSTALLED_APPS += ["django_celery_results", "django_celery_beat"]
-
-CELERY_BROKER_URL = env(
-    "CELERY_BROKER_URL", default="amqp://guest:guest@localhost:5672//"
-)
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "UTC"
-
+# 4. Apply Environment Specific Overrides (Dev vs Prod)
 env_name = os.getenv("DJANGO_ENV", "development")
 
 if env_name == "production":
-    from .production import *
+    from baboom.django.production import *
 else:
-    from .development import *
+    from baboom.django.development import *

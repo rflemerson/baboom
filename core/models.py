@@ -24,7 +24,7 @@ class BaseModel(models.Model):
         abstract = True
 
 
-class Brand(models.Model):
+class Brand(BaseModel):
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
@@ -40,7 +40,7 @@ class Brand(models.Model):
         return self.display_name
 
 
-class Store(models.Model):
+class Store(BaseModel):
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
@@ -56,7 +56,7 @@ class Store(models.Model):
         return self.display_name
 
 
-class Flavor(models.Model):
+class Flavor(BaseModel):
     name = models.CharField(_("Name"), max_length=100, unique=True)
     description = models.TextField(
         _("Description"), blank=True, help_text=_("Flavor description")
@@ -71,7 +71,7 @@ class Flavor(models.Model):
         return self.name
 
 
-class Tag(MP_Node):
+class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
     name: models.CharField = models.CharField(
         _("Name"), max_length=100, unique=True, help_text=_("Unique tag name")
     )
@@ -89,13 +89,14 @@ class Tag(MP_Node):
         return self.name
 
 
-class Category(MP_Node):
+class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
     name: models.CharField = models.CharField(
         _("Name"),
         max_length=100,
         unique=True,
         help_text=_("Unique category name"),
     )
+
     description: models.TextField = models.TextField(
         _("Description"), blank=True, help_text=_("Category description")
     )
@@ -110,7 +111,7 @@ class Category(MP_Node):
         return self.name
 
 
-class Product(models.Model):
+class Product(BaseModel):
     class Packaging(models.TextChoices):
         REFILL = "REFILL", _("Refill Package")
         CONTAINER = "CONTAINER", _("Container Package")
@@ -169,15 +170,6 @@ class Product(models.Model):
         help_text=_("If checked, this product will be visible on the public website."),
     )
 
-    created_at = models.DateTimeField(
-        _("Created At"),
-        auto_now_add=True,
-    )
-    updated_at = models.DateTimeField(
-        _("Updated At"),
-        auto_now=True,
-    )
-
     class Meta:
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
@@ -198,7 +190,7 @@ class Product(models.Model):
         return f"{self.brand.name} - {self.name} ({self.weight}g)"
 
 
-class ProductStore(models.Model):
+class ProductStore(BaseModel):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -230,8 +222,6 @@ class ProductStore(models.Model):
         blank=True,
         null=True,
     )
-
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = _("Store Product Link")
@@ -311,7 +301,7 @@ class ProductPriceHistory(models.Model):
         return f"{self.store_product_link} | R${self.price} @ {self.collected_at:%d/%m %H:%M}"
 
 
-class NutritionFacts(models.Model):
+class NutritionFacts(BaseModel):
     description = models.CharField(
         _("Internal Label"),
         max_length=200,
@@ -353,7 +343,7 @@ class NutritionFacts(models.Model):
         return f"{self.description or 'Generic Nutrition Facts'}"
 
 
-class Micronutrient(models.Model):
+class Micronutrient(BaseModel):
     class Units(models.TextChoices):
         GRAM = "g", "g"
         MILLIGRAM = "mg", "mg"
@@ -397,7 +387,7 @@ class Micronutrient(models.Model):
         return f"{self.name}: {self.value}{self.unit}"
 
 
-class ProductNutrition(models.Model):
+class ProductNutrition(BaseModel):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -432,12 +422,11 @@ class ProductNutrition(models.Model):
         return f"{self.product.name} - {self.nutrition_facts}"
 
 
-class AlertSubscriber(models.Model):
+class AlertSubscriber(BaseModel):
     """Stores email subscriptions for price alerts."""
 
     email = models.EmailField(_("Email"), unique=True)
     is_active = models.BooleanField(_("Active"), default=True)
-    created_at = models.DateTimeField(_("Subscribed At"), auto_now_add=True)
 
     class Meta:
         verbose_name = _("Alert Subscriber")
