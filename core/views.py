@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -6,14 +7,15 @@ from django.utils.translation import gettext as _
 
 from .filters import ProductFilter
 from .forms import AlertSubscriptionForm
-from .models import Product
+from .selectors import product_list_with_stats
+from .services import alert_subscriber_create
 
 DEFAULT_PER_PAGE = 12
 PER_PAGE_OPTIONS = [12, 24, 48]
 
 
 def product_list(request: HttpRequest) -> HttpResponse:
-    products_qs = Product.objects.with_stats()
+    products_qs = product_list_with_stats()
     product_filter = ProductFilter(request.GET, queryset=products_qs)
 
     try:
@@ -53,34 +55,40 @@ def subscribe_alerts(request: HttpRequest) -> HttpResponse:
         form = AlertSubscriptionForm(request.POST)
 
         if form.is_valid():
-            form.save()
-            if is_htmx:
-                return render(
-                    request,
-                    "core/partials/alerts/success.html",
-                    {"email": form.cleaned_data["email"]},
-                )
-            messages.success(
-                request, _("You're subscribed! We'll notify you when prices drop.")
-            )
-        else:
-            # Check for duplicate error code using as_data() for robustness
-            email_errors = form.errors.as_data().get("email", [])
-            is_duplicate = any(e.code == "unique" for e in email_errors)
-
-            if is_htmx:
-                if is_duplicate:
+            email = form.cleaned_data["email"]
+            try:
+                alert_subscriber_create(email=email)
+                if is_htmx:
                     return render(
                         request,
-                        "core/partials/alerts/duplicate.html",
-                        {"email": request.POST.get("email")},
+                        "core/partials/alerts/success.html",
+                        {"email": email},
                     )
-
+                messages.success(
+                    request, _("You're subscribed! We'll notify you when prices drop.")
+                )
+            except ValidationError as e:
+                # Handle service-level validation errors (e.g. unique constraint)
+                if hasattr(e, "code") and e.code == "unique":
+                    if is_htmx:
+                        return render(
+                            request,
+                            "core/partials/alerts/duplicate.html",
+                            {"email": email},
+                        )
+                    messages.error(request, e.message)
+                else:
+                    messages.error(request, str(e))
+        else:
+            # Handle form-level validation errors
+            if is_htmx:
                 # Add error class to widget for rendering
                 form.fields["email"].widget.attrs["class"] += " input-error"
                 # Use the first error message for display
                 error_msg = (
-                    email_errors[0].message if email_errors else _("Invalid input.")
+                    form.errors["email"][0]
+                    if "email" in form.errors
+                    else _("Invalid input.")
                 )
                 return render(
                     request,

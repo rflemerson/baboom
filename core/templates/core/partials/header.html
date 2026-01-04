@@ -39,7 +39,7 @@
              hx-target="#alert-content"
              hx-swap="outerHTML">
         <i class="fas fa-bomb transition-colors duration-300"
-           :class="hover ? 'fa-shake' : ''"></i>
+           x-bind:class="hover ? 'fa-shake' : ''"></i>
         <span class="hidden sm:inline">{% trans "Alerts" %}</span>
       </label>
     </div>
