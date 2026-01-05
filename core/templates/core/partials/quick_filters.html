@@ -3,16 +3,27 @@
 <div class="mb-6 p-1">
   <form hx-get="{% url 'product_list' %}"
         hx-target="#product-list"
+        hx-trigger="submit"
+        hx-include="[name='sort_by'][data-fallback], [name='sort_dir'][data-fallback]"
         class="flex justify-between items-center w-full gap-4">
-    {# Hidden inputs to preserve current state - disabled by button onclick to prevent duplicates #}
-    <input type="hidden" name="sort_by" value="{{ filter.current_sort_key }}" data-fallback>
-    <input type="hidden" name="sort_dir" value="{{ filter.current_sort_dir }}" data-fallback>
+    {# Hidden inputs to preserve current state for search submissions #}
+    <input type="hidden"
+           name="sort_by"
+           value="{{ filter.current_sort_key }}"
+           data-fallback>
+    <input type="hidden"
+           name="sort_dir"
+           value="{{ filter.current_sort_dir }}"
+           data-fallback>
     <label for="filter-drawer"
            class="btn btn-primary btn-sm rounded-full text-white gap-2 drawer-button shrink-0">
       <i class="fas fa-sliders-h"></i> {% trans "Filters" %}
     </label>
     <div class="flex items-center gap-2 flex-nowrap justify-end flex-1 min-w-0">
-      <div class="flex shrink-0 items-center justify-end" x-data="{ open: {{ request.GET.search|yesno:'true,false' }} }">
+      <div class="flex shrink-0 items-center justify-end"
+           x-data="{ open: {{ request.GET.search|yesno:'true,false' }} }"
+           @click.outside="if(open) { if($refs.searchInput.value.trim()) { $el.closest('form').requestSubmit(); } else { open = false; } }"
+           @keydown.escape="if(open) { if(!$refs.searchInput.value.trim()) open = false }">
         {# Input Group #}
         <div x-show="open"
              x-transition:enter="transition-all ease-out duration-300"
@@ -23,10 +34,10 @@
              x-transition:leave-end="opacity-0 max-w-0"
              class="flex overflow-hidden shrink-0"
              x-cloak>
-          <button type="button"
-                  @click="open = false; $refs.searchInput.value = ''"
+          <button type="submit"
+                  @click="$refs.searchInput.value = ''"
                   class="btn btn-sm btn-ghost border-y border-l border-r-0 border-base-300 rounded-l-lg rounded-r-none hover:border-r-0 shrink-0 h-8 min-h-0"
-                  title="{% trans "Close" %}">
+                  title="{% trans "Clear" %}">
             <i class="fas fa-times opacity-60"></i>
           </button>
           {% trans "Search..." as search_placeholder %}
@@ -53,32 +64,23 @@
             class="dropdown-content menu bg-base-100 rounded-box z-50 w-40 p-2 shadow-lg border border-base-300 mt-1">
           {% for key, label, is_active in filter.sort_choices %}
             <li>
-              <button type="submit"
-                      name="sort_by"
-                      value="{{ key }}"
-                      onclick="this.form.querySelector('input[name=sort_by][data-fallback]').disabled=true"
-                      {% if is_active %}class="active"{% endif %}>{{ label }}</button>
+              <a href="?sort_by={{ key }}&sort_dir={{ filter.current_sort_dir }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+                 {% if is_active %}class="active"{% endif %}>{{ label }}</a>
             </li>
           {% endfor %}
         </ul>
       </div>
       <div class="join shrink-0 border border-base-300 rounded-lg">
-        <button type="submit"
-                name="sort_dir"
-                value="asc"
-                onclick="this.form.querySelector('input[name=sort_dir][data-fallback]').disabled=true"
-                class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'asc' %}btn-active{% endif %}"
-                title="{% trans "Low to High" %}">
+        <a href="?sort_by={{ filter.current_sort_key }}&sort_dir=asc{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+           class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'asc' %}btn-active{% endif %}"
+           title="{% trans "Low to High" %}">
           <i class="fas fa-arrow-up-short-wide"></i>
-        </button>
-        <button type="submit"
-                name="sort_dir"
-                value="desc"
-                onclick="this.form.querySelector('input[name=sort_dir][data-fallback]').disabled=true"
-                class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'desc' %}btn-active{% endif %}"
-                title="{% trans "High to Low" %}">
+        </a>
+        <a href="?sort_by={{ filter.current_sort_key }}&sort_dir=desc{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+           class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'desc' %}btn-active{% endif %}"
+           title="{% trans "High to Low" %}">
           <i class="fas fa-arrow-down-wide-short"></i>
-        </button>
+        </a>
       </div>
       <a href="{% url 'product_list' %}"
          class="btn btn-ghost btn-sm btn-circle opacity-70 shrink-0"

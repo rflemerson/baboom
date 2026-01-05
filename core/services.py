@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def alert_subscriber_create(*, email: str) -> "AlertSubscriber":
+def alert_subscriber_create(*, email: str) -> AlertSubscriber:
     """
     Creates a new alert subscriber.
     """
