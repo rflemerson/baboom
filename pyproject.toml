@@ -46,6 +46,7 @@ dev = [
   "djlint",
   "djhtml",
   "deptry",
+  "vulture",
   "safety",
   "factory-boy",
 ]
@@ -109,3 +110,10 @@ blank_line_after_tag = "load,extends,include"
 ignore_notebooks = true
 extend_exclude = ["infra", "assets", "docs"]
 ignore = ["DEP002"]
+
+[tool.vulture]
+paths = ["core", "scrapers", "baboom"]
+exclude = ["*/migrations/*", ".venv/", "docs/", "*/settings/*"]
+ignore_decorators = ["@admin.register", "@receiver", "@app.task", "@task", "@shared_task"]
+ignore_names = ["Meta", "get_*", "clean_*", "save_*", "form_valid", "form_invalid", "dispatch", "get_queryset", "get_context_data", "setUp", "tearDown", "test_*", "sender", "args", "cls"]
+min_confidence = 80

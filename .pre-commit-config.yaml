@@ -47,3 +47,9 @@ repos:
       - id: deptry
         args: ["."]
         exclude: ^\.ai/|^docs/
+
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: v2.14
+    hooks:
+      - id: vulture
+        exclude: ^migrations/|^\.ai/|^docs/
