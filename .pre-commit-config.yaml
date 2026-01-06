@@ -19,13 +19,6 @@ repos:
     hooks:
       - id: djhtml
 
-  - repo: https://github.com/thibaudcolas/curlylint
-    rev: v0.13.1
-    hooks:
-      - id: curlylint
-        files: .*\.html$
-        exclude: (quick_filters|product_list|product_list_results)\.html$
-
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
     hooks:

@@ -45,7 +45,6 @@ dev = [
   "pre-commit",
   "djlint",
   "djhtml",
-  "curlylint",
   "deptry",
   "safety",
   "factory-boy",
