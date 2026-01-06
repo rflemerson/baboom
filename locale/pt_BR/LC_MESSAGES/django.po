@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Baboom 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-04 00:44+0000\n"
+"POT-Creation-Date: 2026-01-06 00:27+0000\n"
 "PO-Revision-Date: 2026-01-01 21:49+0000\n"
 "Last-Translator: Baboom Team\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -15,6 +15,43 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: core/filters.py:11 core/filters.py:31
+msgid "Price/g"
+msgstr "Preço/g"
+
+#: core/filters.py:12
+msgid "Price"
+msgstr "Preço"
+
+#: core/filters.py:13
+msgid "Protein"
+msgstr "Proteína"
+
+#: core/filters.py:14
+msgid "Concentration"
+msgstr "Concentração"
+
+#: core/filters.py:17 core/templates/core/partials/quick_filters.html:76
+msgid "Low to High"
+msgstr "Menor para Maior"
+
+#: core/filters.py:18 core/templates/core/partials/quick_filters.html:81
+msgid "High to Low"
+msgstr "Maior para Menor"
+
+#: core/filters.py:45 core/templates/core/partials/filter_drawer.html:22
+#: core/templates/core/partials/quick_filters.html:52
+msgid "Search"
+msgstr "Buscar"
+
+#: core/filters.py:46 core/templates/core/partials/quick_filters.html:43
+msgid "Search..."
+msgstr "Buscar..."
+
+#: core/filters.py:50
+msgid "All Brands"
+msgstr "Todas as Marcas"
 
 #: core/forms.py:9
 msgid "Please enter a valid email address."
@@ -28,356 +65,352 @@ msgstr "seu@email.com"
 msgid "This email is already subscribed."
 msgstr "Este email já está cadastrado."
 
-#: core/models.py:22 core/models.py:38 core/models.py:54 core/models.py:70
-#: core/models.py:88
+#: core/models.py:14
+msgid "Created At"
+msgstr "Criado em"
+
+#: core/models.py:19
+msgid "Updated At"
+msgstr "Atualizado em"
+
+#: core/models.py:28 core/models.py:44 core/models.py:60 core/models.py:76
+#: core/models.py:94
 msgid "Name"
 msgstr "Nome"
 
-#: core/models.py:23 core/models.py:39
+#: core/models.py:29 core/models.py:45
 msgid "Display Name"
 msgstr "Nome de Exibição"
 
-#: core/models.py:25 core/models.py:41 core/models.py:56 core/models.py:73
-#: core/models.py:94 core/models.py:176
+#: core/models.py:31 core/models.py:47 core/models.py:62 core/models.py:79
+#: core/models.py:101 core/models.py:124
 msgid "Description"
 msgstr "Descrição"
 
-#: core/models.py:25
+#: core/models.py:31
 msgid "Brand description"
 msgstr "Descrição da marca"
 
-#: core/models.py:29 core/models.py:174
+#: core/models.py:35 core/models.py:122
 #: core/templates/core/partials/filter_drawer.html:29
 msgid "Brand"
 msgstr "Marca"
 
-#: core/models.py:30
+#: core/models.py:36
 msgid "Brands"
 msgstr "Marcas"
 
-#: core/models.py:41
+#: core/models.py:47
 msgid "Store description"
 msgstr "Descrição da loja"
 
-#: core/models.py:45
+#: core/models.py:51
 msgid "Store"
 msgstr "Loja"
 
-#: core/models.py:46
+#: core/models.py:52
 msgid "Stores"
 msgstr "Lojas"
 
-#: core/models.py:56
+#: core/models.py:62
 msgid "Flavor description"
 msgstr "Descrição do sabor"
 
-#: core/models.py:60
+#: core/models.py:66
 msgid "Flavor"
 msgstr "Sabor"
 
-#: core/models.py:61 core/models.py:472
+#: core/models.py:67 core/models.py:407
 msgid "Flavors"
 msgstr "Sabores"
 
-#: core/models.py:70
+#: core/models.py:76
 msgid "Unique tag name"
 msgstr "Nome único da tag"
 
-#: core/models.py:73
+#: core/models.py:79
 msgid "Tag description"
 msgstr "Descrição da tag"
 
-#: core/models.py:79
+#: core/models.py:85
 msgid "Tag"
 msgstr "Tag"
 
-#: core/models.py:80
+#: core/models.py:86
 msgid "Tags"
 msgstr "Tags"
 
-#: core/models.py:91
+#: core/models.py:97
 msgid "Unique category name"
 msgstr "Nome único da categoria"
 
-#: core/models.py:94
+#: core/models.py:101
 msgid "Category description"
 msgstr "Descrição da categoria"
 
-#: core/models.py:100
+#: core/models.py:107
 msgid "Category"
 msgstr "Categoria"
 
-#: core/models.py:101
+#: core/models.py:108
 msgid "Categories"
 msgstr "Categorias"
 
-#: core/models.py:168
+#: core/models.py:116
 msgid "Refill Package"
 msgstr "Refil"
 
-#: core/models.py:169
+#: core/models.py:117
 msgid "Container Package"
 msgstr "Pote"
 
-#: core/models.py:170
+#: core/models.py:118
 msgid "Bar"
 msgstr "Barra"
 
-#: core/models.py:171
+#: core/models.py:119
 msgid "Other"
 msgstr "Outro"
 
-#: core/models.py:173
+#: core/models.py:121
 msgid "Product Name"
 msgstr "Nome do Produto"
 
-#: core/models.py:176
+#: core/models.py:124
 msgid "Marketing description"
 msgstr "Descrição de marketing"
 
-#: core/models.py:180
+#: core/models.py:128
 msgid "Weight (grams)"
 msgstr "Peso (gramas)"
 
-#: core/models.py:180
+#: core/models.py:128
 msgid "Total product weight in grams"
 msgstr "Peso total do produto em gramas"
 
-#: core/models.py:184
+#: core/models.py:132
 msgid "EAN/GTIN"
 msgstr "EAN/GTIN"
 
-#: core/models.py:190
+#: core/models.py:138
 msgid "European Article Number / Global Trade Item Number"
 msgstr "Código de Barras / Número Global de Item Comercial"
 
-#: core/models.py:194
+#: core/models.py:142
 msgid "Packaging Type"
 msgstr "Tipo de Embalagem"
 
-#: core/models.py:205
+#: core/models.py:153
 msgid "Product Category"
 msgstr "Categoria do Produto"
 
-#: core/models.py:211
+#: core/models.py:159
 msgid "Available In Stores"
 msgstr "Disponível nas Lojas"
 
-#: core/models.py:216
+#: core/models.py:164
 msgid "Product Tags"
 msgstr "Tags do Produto"
 
-#: core/models.py:220
+#: core/models.py:168
 msgid "Published"
 msgstr "Publicado"
 
-#: core/models.py:222
+#: core/models.py:170
 msgid "If checked, this product will be visible on the public website."
 msgstr "Se marcado, este produto será visível no site."
 
-#: core/models.py:226
-msgid "Created At"
-msgstr "Criado em"
-
-#: core/models.py:230
-msgid "Updated At"
-msgstr "Atualizado em"
-
-#: core/models.py:237
+#: core/models.py:174
 msgid "Product"
 msgstr "Produto"
 
-#: core/models.py:238
+#: core/models.py:175
 msgid "Products"
 msgstr "Produtos"
 
-#: core/models.py:260
+#: core/models.py:197
 msgid "Related Product"
 msgstr "Produto Relacionado"
 
-#: core/models.py:267
+#: core/models.py:204
 msgid "Associated Store"
 msgstr "Loja Associada"
 
-#: core/models.py:271
+#: core/models.py:208
 msgid "Store Product ID"
 msgstr "ID do Produto na Loja"
 
-#: core/models.py:273
+#: core/models.py:210
 msgid "Unique identifier in store system (e.g., SKU)"
 msgstr "Identificador único no sistema da loja (ex: SKU)"
 
-#: core/models.py:278
+#: core/models.py:215
 msgid "Store Product URL"
 msgstr "URL do Produto na Loja"
 
-#: core/models.py:279
+#: core/models.py:216
 msgid "Direct URL to product page in the store"
 msgstr "URL direta para a página do produto na loja"
 
-#: core/models.py:283
+#: core/models.py:220
 msgid "Affiliate Tracking URL"
 msgstr "URL de Afiliado"
 
-#: core/models.py:284
+#: core/models.py:221
 msgid "URL with affiliate tracking parameters"
 msgstr "URL com parâmetros de rastreamento de afiliado"
 
-#: core/models.py:292 core/models.py:326
+#: core/models.py:227 core/models.py:261
 msgid "Store Product Link"
 msgstr "Link do Produto na Loja"
 
-#: core/models.py:293
+#: core/models.py:228
 msgid "Store Product Links"
 msgstr "Links de Produtos nas Lojas"
 
-#: core/models.py:319 scrapers/models.py:15
+#: core/models.py:254 scrapers/models.py:15
 msgid "Available"
 msgstr "Disponível"
 
-#: core/models.py:320 scrapers/models.py:16
+#: core/models.py:255 scrapers/models.py:16
 msgid "Last Units"
 msgstr "Últimas Unidades"
 
-#: core/models.py:321 scrapers/models.py:17
+#: core/models.py:256 scrapers/models.py:17
 msgid "Out of Stock"
 msgstr "Fora de Estoque"
 
-#: core/models.py:331
+#: core/models.py:266
 msgid "Current Price"
 msgstr "Preço Atual"
 
-#: core/models.py:337
+#: core/models.py:272
 msgid "Inventory Status"
 msgstr "Status do Estoque"
 
-#: core/models.py:344
+#: core/models.py:279
 msgid "Collection Timestamp"
 msgstr "Data da Coleta"
 
-#: core/models.py:349
+#: core/models.py:284
 msgid "Version History"
 msgstr "Histórico de Versões"
 
-#: core/models.py:356
+#: core/models.py:291
 msgid "Price Tracking Record"
 msgstr "Registro de Preço"
 
-#: core/models.py:357
+#: core/models.py:292
 msgid "Price Tracking Records"
 msgstr "Registros de Preço"
 
-#: core/models.py:371
+#: core/models.py:306
 msgid "Internal Label"
 msgstr "Rótulo Interno"
 
-#: core/models.py:375
+#: core/models.py:310
 msgid ""
 "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin."
 msgstr ""
 "Ex: 'Saborizada' ou 'Natural' - ajuda a identificar esta tabela no admin."
 
-#: core/models.py:379
+#: core/models.py:314
 msgid "Serving Size (g)"
 msgstr "Porção (g)"
 
-#: core/models.py:380
+#: core/models.py:315
 msgid "Energy (kcal)"
 msgstr "Energia (kcal)"
 
-#: core/models.py:381
+#: core/models.py:316
 msgid "Proteins (g)"
 msgstr "Proteínas (g)"
 
-#: core/models.py:382
+#: core/models.py:317
 msgid "Carbs (g)"
 msgstr "Carboidratos (g)"
 
-#: core/models.py:384
+#: core/models.py:319
 msgid "Total Sugars (g)"
 msgstr "Açúcares Totais (g)"
 
-#: core/models.py:387
+#: core/models.py:322
 msgid "Added Sugars (g)"
 msgstr "Açúcares Adicionados (g)"
 
-#: core/models.py:390
+#: core/models.py:325
 msgid "Total Fats (g)"
 msgstr "Gorduras Totais (g)"
 
-#: core/models.py:393
+#: core/models.py:328
 msgid "Saturated Fats (g)"
 msgstr "Gorduras Saturadas (g)"
 
-#: core/models.py:396
+#: core/models.py:331
 msgid "Trans Fats (g)"
 msgstr "Gorduras Trans (g)"
 
-#: core/models.py:399
+#: core/models.py:334
 msgid "Dietary Fiber (g)"
 msgstr "Fibra Alimentar (g)"
 
-#: core/models.py:401
+#: core/models.py:336
 msgid "Sodium (mg)"
 msgstr "Sódio (mg)"
 
-#: core/models.py:404 core/models.py:405 core/models.py:466
+#: core/models.py:339 core/models.py:340 core/models.py:401
 msgid "Nutrition Facts"
 msgstr "Informação Nutricional"
 
-#: core/models.py:424
+#: core/models.py:359
 msgid "Nutrient Name"
 msgstr "Nome do Nutriente"
 
-#: core/models.py:426
+#: core/models.py:361
 msgid "e.g., Vitamin C, Iron"
 msgstr "ex: Vitamina C, Ferro"
 
-#: core/models.py:430
+#: core/models.py:365
 msgid "Quantity"
 msgstr "Quantidade"
 
-#: core/models.py:436
+#: core/models.py:371
 msgid "Unit"
 msgstr "Unidade"
 
-#: core/models.py:443
+#: core/models.py:378
 msgid "Micronutrient"
 msgstr "Micronutriente"
 
-#: core/models.py:444
+#: core/models.py:379
 msgid "Micronutrients"
 msgstr "Micronutrientes"
 
-#: core/models.py:459
+#: core/models.py:394
 msgid "Base Product"
 msgstr "Produto Base"
 
-#: core/models.py:477
+#: core/models.py:412
 msgid "Product Nutrition Profile"
 msgstr "Perfil Nutricional do Produto"
 
-#: core/models.py:478
+#: core/models.py:413
 msgid "Product Nutrition Profiles"
 msgstr "Perfis Nutricionais dos Produtos"
 
-#: core/models.py:493 core/templates/core/partials/alerts/form.html:16
+#: core/models.py:428 core/templates/core/partials/alerts/form.html:14
 msgid "Email"
 msgstr "Email"
 
-#: core/models.py:494
+#: core/models.py:429
 msgid "Active"
 msgstr "Ativo"
 
-#: core/models.py:495
-msgid "Subscribed At"
-msgstr "Inscrito Em"
-
-#: core/models.py:498
+#: core/models.py:432
 msgid "Alert Subscriber"
 msgstr "Assinante de Alerta"
 
-#: core/models.py:499
+#: core/models.py:433
 msgid "Alert Subscribers"
 msgstr "Assinantes de Alerta"
 
@@ -403,18 +436,19 @@ msgid "Use another email"
 msgstr "Usar outro email"
 
 #: core/templates/core/partials/alerts/form.html:4
+#: core/templates/core/partials/header.html:43
 msgid "Alerts"
 msgstr "Alertas"
 
-#: core/templates/core/partials/alerts/form.html:6
+#: core/templates/core/partials/alerts/form.html:5
 msgid "Enter your email to receive notifications."
 msgstr "Digite seu email para receber notificações."
 
-#: core/templates/core/partials/alerts/form.html:28
+#: core/templates/core/partials/alerts/form.html:26
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: core/templates/core/partials/alerts/form.html:29
+#: core/templates/core/partials/alerts/form.html:27
 msgid "Subscribe"
 msgstr "Inscrever-se"
 
@@ -439,26 +473,18 @@ msgid "close sidebar"
 msgstr "fechar menu"
 
 #: core/templates/core/partials/filter_drawer.html:9
-#: core/templates/core/partials/quick_filters.html:10
+#: core/templates/core/partials/quick_filters.html:20
 msgid "Filters"
 msgstr "Filtros"
 
-#: core/templates/core/partials/filter_drawer.html:22
-msgid "Search"
-msgstr "Buscar"
-
 #: core/templates/core/partials/filter_drawer.html:38
-#: core/templates/core/partials/quick_filters.html:22
+#: core/templates/core/partials/quick_filters.html:40
 msgid "Clear"
 msgstr "Limpar"
 
 #: core/templates/core/partials/filter_drawer.html:43
 msgid "Apply"
 msgstr "Aplicar"
-
-#: core/templates/core/partials/header.html:28
-msgid "Price Alerts"
-msgstr "Alertas de Preço"
 
 #: core/templates/core/partials/product_list_results.html:46
 msgid "Buy Now"
@@ -491,15 +517,15 @@ msgstr ""
 "        Exibindo %(start)s - %(end)s de %(total)s\n"
 "      "
 
-#: core/templates/core/partials/quick_filters.html:15
-msgid "Search..."
-msgstr "Buscar..."
+#: core/templates/core/partials/quick_filters.html:87
+msgid "Clear filters"
+msgstr "Limpar filtros"
 
-#: core/views.py:64
+#: core/views.py:68
 msgid "You're subscribed! We'll notify you when prices drop."
 msgstr "Você está inscrito! Vamos notificá-lo quando os preços caírem."
 
-#: core/views.py:83
+#: core/views.py:91
 msgid "Invalid input."
 msgstr "Entrada inválida."
 
@@ -554,6 +580,12 @@ msgstr "EAN/GTIN extraído da fonte"
 #: scrapers/models.py:86
 msgid "SKU extracted from source"
 msgstr "SKU extraído da fonte"
+
+#~ msgid "Subscribed At"
+#~ msgstr "Inscrito Em"
+
+#~ msgid "Price Alerts"
+#~ msgstr "Alertas de Preço"
 
 #~ msgid "Get Price Alerts"
 #~ msgstr "Receber Alertas de Preço"
