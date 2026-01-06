@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Baboom 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-06 00:27+0000\n"
+"POT-Creation-Date: 2026-01-06 00:43+0000\n"
 "PO-Revision-Date: 2026-01-01 21:49+0000\n"
 "Last-Translator: Baboom Team\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -32,20 +32,20 @@ msgstr "Proteína"
 msgid "Concentration"
 msgstr "Concentração"
 
-#: core/filters.py:17 core/templates/core/partials/quick_filters.html:76
+#: core/filters.py:17 core/templates/core/partials/quick_filters.html:77
 msgid "Low to High"
 msgstr "Menor para Maior"
 
-#: core/filters.py:18 core/templates/core/partials/quick_filters.html:81
+#: core/filters.py:18 core/templates/core/partials/quick_filters.html:82
 msgid "High to Low"
 msgstr "Maior para Menor"
 
 #: core/filters.py:45 core/templates/core/partials/filter_drawer.html:22
-#: core/templates/core/partials/quick_filters.html:52
+#: core/templates/core/partials/quick_filters.html:53
 msgid "Search"
 msgstr "Buscar"
 
-#: core/filters.py:46 core/templates/core/partials/quick_filters.html:43
+#: core/filters.py:46 core/templates/core/partials/quick_filters.html:44
 msgid "Search..."
 msgstr "Buscar..."
 
@@ -473,12 +473,12 @@ msgid "close sidebar"
 msgstr "fechar menu"
 
 #: core/templates/core/partials/filter_drawer.html:9
-#: core/templates/core/partials/quick_filters.html:20
+#: core/templates/core/partials/quick_filters.html:21
 msgid "Filters"
 msgstr "Filtros"
 
 #: core/templates/core/partials/filter_drawer.html:38
-#: core/templates/core/partials/quick_filters.html:40
+#: core/templates/core/partials/quick_filters.html:41
 msgid "Clear"
 msgstr "Limpar"
 
@@ -486,27 +486,27 @@ msgstr "Limpar"
 msgid "Apply"
 msgstr "Aplicar"
 
-#: core/templates/core/partials/product_list_results.html:46
+#: core/templates/core/partials/product_list_results.html:51
 msgid "Buy Now"
 msgstr "Comprar"
 
-#: core/templates/core/partials/product_list_results.html:54
+#: core/templates/core/partials/product_list_results.html:59
 msgid "No products found"
 msgstr "Nenhum produto encontrado"
 
-#: core/templates/core/partials/product_list_results.html:55
+#: core/templates/core/partials/product_list_results.html:60
 msgid "Try adjusting your search or filters."
 msgstr "Tente ajustar sua busca ou filtros."
 
-#: core/templates/core/partials/product_list_results.html:61
+#: core/templates/core/partials/product_list_results.html:66
 msgid "Show"
 msgstr "Exibir"
 
-#: core/templates/core/partials/product_list_results.html:71
+#: core/templates/core/partials/product_list_results.html:76
 msgid "per page"
 msgstr "por página"
 
-#: core/templates/core/partials/product_list_results.html:74
+#: core/templates/core/partials/product_list_results.html:79
 #, python-format
 msgid ""
 "\n"
@@ -517,7 +517,15 @@ msgstr ""
 "        Exibindo %(start)s - %(end)s de %(total)s\n"
 "      "
 
-#: core/templates/core/partials/quick_filters.html:87
+#: core/templates/core/partials/quick_filters.html:93
+msgid "List view"
+msgstr "Visualização em lista"
+
+#: core/templates/core/partials/quick_filters.html:100
+msgid "Grid view"
+msgstr "Visualização em grade"
+
+#: core/templates/core/partials/quick_filters.html:106
 msgid "Clear filters"
 msgstr "Limpar filtros"
 

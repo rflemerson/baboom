@@ -83,6 +83,24 @@
             <i class="fas fa-arrow-down-wide-short"></i>
           </a>
         </div>
+        <div class="join shrink-0 border border-base-300 rounded-lg"
+             x-data="{ view: localStorage.getItem('viewMode') || 'list' }"
+             x-init="$dispatch('view-changed', { view: view })">
+          <button type="button"
+                  @click="view = 'list'; localStorage.setItem('viewMode', 'list'); $dispatch('view-changed', { view: 'list' })"
+                  :class="view === 'list' ? 'btn-active' : ''"
+                  class="btn btn-ghost btn-sm join-item"
+                  title="{% trans "List view" %}">
+            <i class="fas fa-list"></i>
+          </button>
+          <button type="button"
+                  @click="view = 'grid'; localStorage.setItem('viewMode', 'grid'); $dispatch('view-changed', { view: 'grid' })"
+                  :class="view === 'grid' ? 'btn-active' : ''"
+                  class="btn btn-ghost btn-sm join-item"
+                  title="{% trans "Grid view" %}">
+            <i class="fas fa-grip"></i>
+          </button>
+        </div>
         <a href="{% url 'product_list' %}"
            class="btn btn-ghost btn-sm btn-circle opacity-70 shrink-0"
            title="{% trans "Clear filters" %}">
