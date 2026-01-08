@@ -19,7 +19,7 @@
   </div>
 {% endfor %}
 {% if page_obj.has_other_pages or page_obj.paginator.count > 0 %}
-  <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-base-200">
+  <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-base-200 col-span-full">
     <div class="flex items-center gap-2 text-sm text-base-content/70">
       <span>{% trans "Show" %}</span>
       <select class="select select-bordered select-sm w-20"
