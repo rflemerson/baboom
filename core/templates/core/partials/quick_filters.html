@@ -16,7 +16,7 @@
            value="{{ filter.current_sort_dir }}"
            data-fallback>
     <label for="filter-drawer"
-           class="btn btn-primary btn-sm rounded-full text-white gap-2 drawer-button shrink-0">
+           class="btn btn-primary btn-sm rounded-lg text-white gap-2 drawer-button shrink-0">
       <i class="fas fa-sliders-h"></i> {% trans "Filters" %}
     </label>
     <div class="flex items-center gap-2 flex-nowrap justify-end flex-1 min-w-0">
@@ -101,7 +101,7 @@
         </button>
       </div>
       <a href="{% url 'product_list' %}"
-         class="btn btn-ghost btn-sm btn-circle opacity-70 shrink-0"
+         class="btn btn-ghost btn-sm btn-square rounded-lg border border-base-300 opacity-70 shrink-0"
          title="{% trans "Clear filters" %}">
         <i class="fas fa-times"></i>
       </a>
