@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-01 21:45+0000\n"
+"POT-Creation-Date: 2026-01-08 23:23+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,336 +17,456 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-#: core/models.py:22 core/models.py:38 core/models.py:54 core/models.py:70
-#: core/models.py:88
+
+#: core/filters.py:11 core/filters.py:31
+msgid "Price/g"
+msgstr ""
+
+#: core/filters.py:12
+msgid "Price"
+msgstr ""
+
+#: core/filters.py:13
+msgid "Protein"
+msgstr ""
+
+#: core/filters.py:14
+msgid "Concentration"
+msgstr ""
+
+#: core/filters.py:17 core/templates/core/partials/quick_filters.html:76
+msgid "Low to High"
+msgstr ""
+
+#: core/filters.py:18 core/templates/core/partials/quick_filters.html:81
+msgid "High to Low"
+msgstr ""
+
+#: core/filters.py:45 core/templates/core/partials/filter_drawer.html:22
+#: core/templates/core/partials/quick_filters.html:52
+msgid "Search"
+msgstr ""
+
+#: core/filters.py:46 core/templates/core/partials/quick_filters.html:43
+msgid "Search..."
+msgstr ""
+
+#: core/filters.py:50
+msgid "All Brands"
+msgstr ""
+
+#: core/forms.py:9
+msgid "Please enter a valid email address."
+msgstr ""
+
+#: core/forms.py:13
+msgid "your@email.com"
+msgstr ""
+
+#: core/forms.py:21
+msgid "This email is already subscribed."
+msgstr ""
+
+#: core/models.py:14
+msgid "Created At"
+msgstr ""
+
+#: core/models.py:19
+msgid "Updated At"
+msgstr ""
+
+#: core/models.py:28 core/models.py:44 core/models.py:60 core/models.py:76
+#: core/models.py:94
 msgid "Name"
 msgstr ""
 
-#: core/models.py:23 core/models.py:39
+#: core/models.py:29 core/models.py:45
 msgid "Display Name"
 msgstr ""
 
-#: core/models.py:25 core/models.py:41 core/models.py:56 core/models.py:73
-#: core/models.py:94 core/models.py:176
+#: core/models.py:31 core/models.py:47 core/models.py:62 core/models.py:79
+#: core/models.py:101 core/models.py:124
 msgid "Description"
 msgstr ""
 
-#: core/models.py:25
+#: core/models.py:31
 msgid "Brand description"
 msgstr ""
 
-#: core/models.py:29 core/models.py:174
+#: core/models.py:35 core/models.py:122
 #: core/templates/core/partials/filter_drawer.html:29
 msgid "Brand"
 msgstr ""
 
-#: core/models.py:30
+#: core/models.py:36
 msgid "Brands"
 msgstr ""
 
-#: core/models.py:41
+#: core/models.py:47
 msgid "Store description"
 msgstr ""
 
-#: core/models.py:45
+#: core/models.py:51
 msgid "Store"
 msgstr ""
 
-#: core/models.py:46
+#: core/models.py:52
 msgid "Stores"
 msgstr ""
 
-#: core/models.py:56
+#: core/models.py:62
 msgid "Flavor description"
 msgstr ""
 
-#: core/models.py:60
+#: core/models.py:66
 msgid "Flavor"
 msgstr ""
 
-#: core/models.py:61 core/models.py:472
+#: core/models.py:67 core/models.py:407
 msgid "Flavors"
 msgstr ""
 
-#: core/models.py:70
+#: core/models.py:76
 msgid "Unique tag name"
 msgstr ""
 
-#: core/models.py:73
+#: core/models.py:79
 msgid "Tag description"
 msgstr ""
 
-#: core/models.py:79
+#: core/models.py:85
 msgid "Tag"
 msgstr ""
 
-#: core/models.py:80
+#: core/models.py:86
 msgid "Tags"
 msgstr ""
 
-#: core/models.py:91
+#: core/models.py:97
 msgid "Unique category name"
 msgstr ""
 
-#: core/models.py:94
+#: core/models.py:101
 msgid "Category description"
 msgstr ""
 
-#: core/models.py:100
+#: core/models.py:107
 msgid "Category"
 msgstr ""
 
-#: core/models.py:101
+#: core/models.py:108
 msgid "Categories"
 msgstr ""
 
-#: core/models.py:168
+#: core/models.py:116
 msgid "Refill Package"
 msgstr ""
 
-#: core/models.py:169
+#: core/models.py:117
 msgid "Container Package"
 msgstr ""
 
-#: core/models.py:170
+#: core/models.py:118
 msgid "Bar"
 msgstr ""
 
-#: core/models.py:171
+#: core/models.py:119
 msgid "Other"
 msgstr ""
 
-#: core/models.py:173
+#: core/models.py:121
 msgid "Product Name"
 msgstr ""
 
-#: core/models.py:176
+#: core/models.py:124
 msgid "Marketing description"
 msgstr ""
 
-#: core/models.py:180
+#: core/models.py:128
 msgid "Weight (grams)"
 msgstr ""
 
-#: core/models.py:180
+#: core/models.py:128
 msgid "Total product weight in grams"
 msgstr ""
 
-#: core/models.py:184
+#: core/models.py:132
 msgid "EAN/GTIN"
 msgstr ""
 
-#: core/models.py:190
+#: core/models.py:138
 msgid "European Article Number / Global Trade Item Number"
 msgstr ""
 
-#: core/models.py:194
+#: core/models.py:142
 msgid "Packaging Type"
 msgstr ""
 
-#: core/models.py:205
+#: core/models.py:153
 msgid "Product Category"
 msgstr ""
 
-#: core/models.py:211
+#: core/models.py:159
 msgid "Available In Stores"
 msgstr ""
 
-#: core/models.py:216
+#: core/models.py:164
 msgid "Product Tags"
 msgstr ""
 
-#: core/models.py:220
+#: core/models.py:168
 msgid "Published"
 msgstr ""
 
-#: core/models.py:222
+#: core/models.py:170
 msgid "If checked, this product will be visible on the public website."
 msgstr ""
 
-#: core/models.py:226
-msgid "Created At"
-msgstr ""
-
-#: core/models.py:230
-msgid "Updated At"
-msgstr ""
-
-#: core/models.py:237
+#: core/models.py:174
 msgid "Product"
 msgstr ""
 
-#: core/models.py:238
+#: core/models.py:175
 msgid "Products"
 msgstr ""
 
-#: core/models.py:260
+#: core/models.py:197
 msgid "Related Product"
 msgstr ""
 
-#: core/models.py:267
+#: core/models.py:204
 msgid "Associated Store"
 msgstr ""
 
-#: core/models.py:271
+#: core/models.py:208
 msgid "Store Product ID"
 msgstr ""
 
-#: core/models.py:273
+#: core/models.py:210
 msgid "Unique identifier in store system (e.g., SKU)"
 msgstr ""
 
-#: core/models.py:278
+#: core/models.py:215
 msgid "Store Product URL"
 msgstr ""
 
-#: core/models.py:279
+#: core/models.py:216
 msgid "Direct URL to product page in the store"
 msgstr ""
 
-#: core/models.py:283
+#: core/models.py:220
 msgid "Affiliate Tracking URL"
 msgstr ""
 
-#: core/models.py:284
+#: core/models.py:221
 msgid "URL with affiliate tracking parameters"
 msgstr ""
 
-#: core/models.py:292 core/models.py:326
+#: core/models.py:227 core/models.py:261
 msgid "Store Product Link"
 msgstr ""
 
-#: core/models.py:293
+#: core/models.py:228
 msgid "Store Product Links"
 msgstr ""
 
-#: core/models.py:319 scrapers/models.py:15
+#: core/models.py:254 scrapers/models.py:15
 msgid "Available"
 msgstr ""
 
-#: core/models.py:320 scrapers/models.py:16
+#: core/models.py:255 scrapers/models.py:16
 msgid "Last Units"
 msgstr ""
 
-#: core/models.py:321 scrapers/models.py:17
+#: core/models.py:256 scrapers/models.py:17
 msgid "Out of Stock"
 msgstr ""
 
-#: core/models.py:331
+#: core/models.py:266
 msgid "Current Price"
 msgstr ""
 
-#: core/models.py:337
+#: core/models.py:272
 msgid "Inventory Status"
 msgstr ""
 
-#: core/models.py:344
+#: core/models.py:279
 msgid "Collection Timestamp"
 msgstr ""
 
-#: core/models.py:349
+#: core/models.py:284
 msgid "Version History"
 msgstr ""
 
-#: core/models.py:356
+#: core/models.py:291
 msgid "Price Tracking Record"
 msgstr ""
 
-#: core/models.py:357
+#: core/models.py:292
 msgid "Price Tracking Records"
 msgstr ""
 
-#: core/models.py:371
+#: core/models.py:306
 msgid "Internal Label"
 msgstr ""
 
-#: core/models.py:375
+#: core/models.py:310
 msgid ""
 "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin."
 msgstr ""
 
-#: core/models.py:379
+#: core/models.py:314
 msgid "Serving Size (g)"
 msgstr ""
 
-#: core/models.py:380
+#: core/models.py:315
 msgid "Energy (kcal)"
 msgstr ""
 
-#: core/models.py:381
+#: core/models.py:316
 msgid "Proteins (g)"
 msgstr ""
 
-#: core/models.py:382
+#: core/models.py:317
 msgid "Carbs (g)"
 msgstr ""
 
-#: core/models.py:384
+#: core/models.py:319
 msgid "Total Sugars (g)"
 msgstr ""
 
-#: core/models.py:387
+#: core/models.py:322
 msgid "Added Sugars (g)"
 msgstr ""
 
-#: core/models.py:390
+#: core/models.py:325
 msgid "Total Fats (g)"
 msgstr ""
 
-#: core/models.py:393
+#: core/models.py:328
 msgid "Saturated Fats (g)"
 msgstr ""
 
-#: core/models.py:396
+#: core/models.py:331
 msgid "Trans Fats (g)"
 msgstr ""
 
-#: core/models.py:399
+#: core/models.py:334
 msgid "Dietary Fiber (g)"
 msgstr ""
 
-#: core/models.py:401
+#: core/models.py:336
 msgid "Sodium (mg)"
 msgstr ""
 
-#: core/models.py:404 core/models.py:405 core/models.py:466
+#: core/models.py:339 core/models.py:340 core/models.py:401
 msgid "Nutrition Facts"
 msgstr ""
 
-#: core/models.py:424
+#: core/models.py:359
 msgid "Nutrient Name"
 msgstr ""
 
-#: core/models.py:426
+#: core/models.py:361
 msgid "e.g., Vitamin C, Iron"
 msgstr ""
 
-#: core/models.py:430
+#: core/models.py:365
 msgid "Quantity"
 msgstr ""
 
-#: core/models.py:436
+#: core/models.py:371
 msgid "Unit"
 msgstr ""
 
-#: core/models.py:443
+#: core/models.py:378
 msgid "Micronutrient"
 msgstr ""
 
-#: core/models.py:444
+#: core/models.py:379
 msgid "Micronutrients"
 msgstr ""
 
-#: core/models.py:459
+#: core/models.py:394
 msgid "Base Product"
 msgstr ""
 
-#: core/models.py:477
+#: core/models.py:412
 msgid "Product Nutrition Profile"
 msgstr ""
 
-#: core/models.py:478
+#: core/models.py:413
 msgid "Product Nutrition Profiles"
+msgstr ""
+
+#: core/models.py:428 core/templates/core/partials/alerts/form.html:14
+msgid "Email"
+msgstr ""
+
+#: core/models.py:429
+msgid "Active"
+msgstr ""
+
+#: core/models.py:432
+msgid "Alert Subscriber"
+msgstr ""
+
+#: core/models.py:433
+msgid "Alert Subscribers"
+msgstr ""
+
+#: core/templates/core/partials/alerts/duplicate.html:7
+msgid "Already Subscribed"
+msgstr ""
+
+#: core/templates/core/partials/alerts/duplicate.html:9
+msgid "The email"
+msgstr ""
+
+#: core/templates/core/partials/alerts/duplicate.html:9
+msgid "is already in our database."
+msgstr ""
+
+#: core/templates/core/partials/alerts/duplicate.html:12
+#: core/templates/core/partials/alerts/success.html:12
+msgid "Close"
+msgstr ""
+
+#: core/templates/core/partials/alerts/duplicate.html:16
+msgid "Use another email"
+msgstr ""
+
+#: core/templates/core/partials/alerts/form.html:4
+#: core/templates/core/partials/header.html:43
+msgid "Alerts"
+msgstr ""
+
+#: core/templates/core/partials/alerts/form.html:5
+msgid "Enter your email to receive notifications."
+msgstr ""
+
+#: core/templates/core/partials/alerts/form.html:26
+msgid "Cancel"
+msgstr ""
+
+#: core/templates/core/partials/alerts/form.html:27
+msgid "Subscribe"
+msgstr ""
+
+#: core/templates/core/partials/alerts/success.html:7
+msgid "You're Subscribed!"
+msgstr ""
+
+#: core/templates/core/partials/alerts/success.html:9
+msgid "We've added"
+msgstr ""
+
+#: core/templates/core/partials/alerts/success.html:9
+msgid "to our list. You'll be the first to know about price drops!"
+msgstr ""
+
+#: core/templates/core/partials/alerts/success.html:16
+msgid "Subscribe another email"
 msgstr ""
 
 #: core/templates/core/partials/filter_drawer.html:5
@@ -354,16 +474,12 @@ msgid "close sidebar"
 msgstr ""
 
 #: core/templates/core/partials/filter_drawer.html:9
-#: core/templates/core/partials/quick_filters.html:10
+#: core/templates/core/partials/quick_filters.html:20
 msgid "Filters"
 msgstr ""
 
-#: core/templates/core/partials/filter_drawer.html:22
-msgid "Search"
-msgstr ""
-
 #: core/templates/core/partials/filter_drawer.html:38
-#: core/templates/core/partials/quick_filters.html:22
+#: core/templates/core/partials/quick_filters.html:40
 msgid "Clear"
 msgstr ""
 
@@ -371,20 +487,53 @@ msgstr ""
 msgid "Apply"
 msgstr ""
 
-#: core/templates/core/partials/product_list_results.html:46
+#: core/templates/core/partials/product_card.html:62
+#: core/templates/core/partials/product_row.html:47
 msgid "Buy Now"
 msgstr ""
 
-#: core/templates/core/partials/product_list_results.html:54
+#: core/templates/core/partials/product_list_results.html:17
 msgid "No products found"
 msgstr ""
 
-#: core/templates/core/partials/product_list_results.html:55
+#: core/templates/core/partials/product_list_results.html:18
 msgid "Try adjusting your search or filters."
 msgstr ""
 
-#: core/templates/core/partials/quick_filters.html:15
-msgid "Search..."
+#: core/templates/core/partials/product_list_results.html:24
+msgid "Show"
+msgstr ""
+
+#: core/templates/core/partials/product_list_results.html:34
+msgid "per page"
+msgstr ""
+
+#: core/templates/core/partials/product_list_results.html:37
+#, python-format
+msgid ""
+"\n"
+"        Showing %(start)s - %(end)s of %(total)s\n"
+"      "
+msgstr ""
+
+#: core/templates/core/partials/quick_filters.html:92
+msgid "List view"
+msgstr ""
+
+#: core/templates/core/partials/quick_filters.html:99
+msgid "Grid view"
+msgstr ""
+
+#: core/templates/core/partials/quick_filters.html:105
+msgid "Clear filters"
+msgstr ""
+
+#: core/views.py:68
+msgid "You're subscribed! We'll notify you when prices drop."
+msgstr ""
+
+#: core/views.py:91
+msgid "Invalid input."
 msgstr ""
 
 #: scrapers/admin.py:17
