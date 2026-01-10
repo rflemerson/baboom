@@ -17,24 +17,3 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "postgres",
-        "USER": "postgres.nfoylbmemuvbniumofmn",
-        "PASSWORD": "Baboom@dev!p4ssw0rd",
-        "HOST": "aws-1-sa-east-1.pooler.supabase.com",
-        "PORT": "5432",
-        "OPTIONS": {
-            "connect_timeout": 10,
-        },
-    }
-}
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
