@@ -26,3 +26,9 @@ It is **YOUR RESPONSIBILITY** to keep `AGENTS.md` and its imports alive.
 -   **New Pattern?** If you establish a new project pattern, **DOCUMENT IT**.
 
 You are the guardian of this project's "Brain". Keep it sharp.
+
+## 3. Commit Protocol
+**NEVER**, under any circumstances, commit code without **EXPLICIT** user authorization.
+-   Always ask for permission before running `git commit`.
+-   Even if you are fixing a small error or amending a previous commit, **ASK FIRST**.
+-   **NEVER SKIP CHECKS**. Always run pre-commit hooks. Do NOT use `--no-verify`.
