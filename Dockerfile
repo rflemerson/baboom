@@ -10,7 +10,7 @@ RUN curl -sL daisyui.com/fast | bash
 
 COPY . .
 
-RUN ./tailwindcss -i static/css/input.css -o static/css/output.css --minify
+RUN cd static/css && ./tailwindcss -i input.css -o static/css/output.css --minify
 
 # ============================================
 # Stage 2: Python Application
