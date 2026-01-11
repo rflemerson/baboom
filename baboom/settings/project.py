@@ -1,7 +1,5 @@
 from baboom.django.base import BASE_DIR, INSTALLED_APPS, MIDDLEWARE
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 # Project apps
 INSTALLED_APPS += ["core", "scrapers"]
 
@@ -50,13 +48,5 @@ STORAGES = {
 LANGUAGE_CODE = "pt-BR"
 LANGUAGES = [
     ("pt-BR", "Português (Brasil)"),
-    ("en", "English"),
-    ("es", "Español"),
 ]
 LOCALE_PATHS = [BASE_DIR / "locale"]
-
-# LocaleMiddleware (after SessionMiddleware, before CommonMiddleware)
-MIDDLEWARE.insert(
-    MIDDLEWARE.index("django.contrib.sessions.middleware.SessionMiddleware") + 1,
-    "django.middleware.locale.LocaleMiddleware",
-)
