@@ -10,7 +10,7 @@ RUN curl -sL daisyui.com/fast | bash
 
 COPY . .
 
-RUN ./tailwindcss -i input.css -o output.css --minify
+RUN cd static/css && ./tailwindcss -i input.css -o output.css --minify
 
 # ============================================
 # Stage 2: Python Application
@@ -33,7 +33,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY . /app/
 RUN pip install --no-cache-dir .
 
-COPY --from=css-builder /build/output.css /app/static/css/output.css
+COPY --from=css-builder /build/static/css/output.css /app/static/css/output.css
 
 RUN python manage.py compilemessages --ignore=.venv || true
 RUN python manage.py collectstatic --noinput
