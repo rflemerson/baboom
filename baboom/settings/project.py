@@ -1,5 +1,7 @@
 from baboom.django.base import BASE_DIR, INSTALLED_APPS, MIDDLEWARE
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 # Project apps
 INSTALLED_APPS += ["core", "scrapers"]
 
