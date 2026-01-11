@@ -6,7 +6,7 @@ services:
     volumes:
       - media_data:/app/media
     ports:
-      - "8000:8000"
+      - "8080:8000"
     environment:
       - DJANGO_ENV=${DJANGO_ENV}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
