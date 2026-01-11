@@ -5,12 +5,14 @@ FROM debian:bookworm-slim AS css-builder
 
 WORKDIR /build
 
-RUN apt-get update && apt-get install -y curl bash && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 RUN curl -sL daisyui.com/fast | bash
 
 COPY . .
 
-RUN ./tailwindcss -i input.css -o static/css/output.css --minify
+RUN ./tailwindcss -i input.css -o output.css --minify
+
 
 # ============================================
 # Stage 2: Python Application
@@ -33,14 +35,13 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY . /app/
 RUN pip install --no-cache-dir .
 
-COPY --from=css-builder /build/static/css/output.css /app/static/css/output.css
-
-RUN python manage.py compilemessages --ignore=.venv || true
-RUN python manage.py collectstatic --noinput
+COPY --from=css-builder /build/output.css /app/static/css/output.css
 
 RUN chown -R appuser:appuser /app
-
 USER appuser
+
+RUN python manage.py compilemessages --ignore=.venv || true
+RUN python manage.py collectstatic --noinput --clear
 
 EXPOSE 8000
 
