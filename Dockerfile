@@ -1,3 +1,26 @@
+# ============================================
+# Stage 1: Build Tailwind CSS with DaisyUI
+# ============================================
+FROM debian:bookworm-slim AS css-builder
+
+WORKDIR /build/static/css
+
+# Install curl and bash
+RUN apt-get update && apt-get install -y curl bash && rm -rf /var/lib/apt/lists/*
+
+# Download Tailwind + DaisyUI using official script
+RUN curl -sL daisyui.com/fast | bash
+
+# Copy templates for content scanning
+COPY core/templates /build/templates
+
+# Build CSS
+RUN ./tailwindcss -i input.css -o output.css --minify
+
+
+# ============================================
+# Stage 2: Python Application
+# ============================================
 FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -8,7 +31,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
-    curl \
     gettext \
     && rm -rf /var/lib/apt/lists/*
 
@@ -17,15 +39,10 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY . /app/
 RUN pip install --no-cache-dir .
 
+# Copy compiled CSS from builder stage
+COPY --from=css-builder /build/static/css/output.css /app/static/css/output.css
+
 RUN python manage.py compilemessages --ignore=.venv || true
-
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 \
-    && chmod +x tailwindcss-linux-x64 \
-    && curl -sL https://unpkg.com/daisyui@latest/dist/index.mjs -o static/css/daisyui.mjs \
-    && curl -sL https://unpkg.com/daisyui@latest/dist/theme.mjs -o static/css/daisyui-theme.mjs \
-    && ./tailwindcss-linux-x64 -i static/css/input.css -o static/css/output.css --minify \
-    && rm tailwindcss-linux-x64
-
 RUN python manage.py collectstatic --noinput
 
 RUN chown -R appuser:appuser /app
