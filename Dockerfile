@@ -5,17 +5,12 @@ FROM debian:bookworm-slim AS css-builder
 
 WORKDIR /build
 
-# Install curl and bash
 RUN apt-get update && apt-get install -y curl bash && rm -rf /var/lib/apt/lists/*
-
-# Download Tailwind + DaisyUI using official script
 RUN curl -sL daisyui.com/fast | bash
 
 COPY . .
 
-# Build CSS
-RUN ./tailwindcss -i baboom/static/css/input.css -o output.css --minify
-
+RUN ./tailwindcss -i input.css -o output.css --minify
 
 # ============================================
 # Stage 2: Python Application
@@ -38,8 +33,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY . /app/
 RUN pip install --no-cache-dir .
 
-# Copy compiled CSS from builder stage
-COPY --from=css-builder /build/static/css/output.css /app/static/css/output.css
+COPY --from=css-builder /build/output.css /app/static/css/output.css
 
 RUN python manage.py compilemessages --ignore=.venv || true
 RUN python manage.py collectstatic --noinput
