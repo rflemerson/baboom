@@ -1,7 +1,8 @@
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
 
@@ -101,3 +102,21 @@ def subscribe_alerts(request: HttpRequest) -> HttpResponse:
                     messages.error(request, str(err))
 
     return redirect("product_list")
+
+def components_playground(request: HttpRequest) -> HttpResponse:
+    """
+    View for testing and developing components in isolation.
+    """
+    if not request.user.is_staff:
+        # Simple protection, or just allow in DEBUG mode
+        if not settings.DEBUG:
+            raise Http404
+
+    # Get some sample data for testing
+    from .selectors import product_list_with_stats
+    sample_product = product_list_with_stats().first()
+    
+    context = {
+        "product": sample_product,
+    }
+    return render(request, "core/playground.html", context)

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load component_tags %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8">Component Playground</h1>
+
+  {% if not product %}
+    <div class="alert alert-warning">
+      <span>No products found in database to test with. Please seed some data.</span>
+    </div>
+  {% else %}
+    
+    <div class="space-y-12">
+      
+      <!-- Price Tag Component Test -->
+      <section>
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">Price Tag</h2>
+        <div class="p-4 border rounded-lg bg-base-100 max-w-xs">
+           <p class="text-sm text-gray-500 mb-2">Standalone usage:</p>
+           {% component "price_tag" price=199.90 unit_price=0.25 align="center" %}{% endcomponent %}
+        </div>
+      </section>
+
+      <!-- Product Card (Grid) Test -->
+      <section>
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">Product Card (Grid Variant)</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {% component "product_card" product=product variant="grid" %}{% endcomponent %}
+        </div>
+      </section>
+
+      <!-- Product Card (List) Test -->
+      <section>
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">Product Card (List Variant)</h2>
+        <div class="flex flex-col gap-4">
+          {% component "product_card" product=product variant="list" %}{% endcomponent %}
+        </div>
+      </section>
+
+    </div>
+
+  {% endif %}
+</div>
+{% endblock %}

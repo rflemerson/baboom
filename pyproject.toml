@@ -31,6 +31,7 @@ dependencies = [
   "curl_cffi",
   "django-celery-results",
   "django-celery-beat",
+  "django-components",
 ]
 
 [project.urls]

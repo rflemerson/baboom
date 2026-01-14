@@ -29,6 +29,9 @@ MIDDLEWARE += ["django_htmx.middleware.HtmxMiddleware"]
 # Django Widget Tweaks
 INSTALLED_APPS += ["widget_tweaks"]
 
+# Django Components
+INSTALLED_APPS += ["django_components"]
+
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -50,3 +53,28 @@ LANGUAGES = [
     ("pt-BR", "Português (Brasil)"),
 ]
 LOCALE_PATHS = [BASE_DIR / "locale"]
+
+# Templates Configuration
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": False,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+            "loaders": [
+                "django.template.loaders.filesystem.Loader",
+                "django.template.loaders.app_directories.Loader",
+                "django_components.template_loader.Loader",
+            ],
+            "builtins": [
+                "django_components.templatetags.component_tags",
+            ],
+        },
+    },
+]
