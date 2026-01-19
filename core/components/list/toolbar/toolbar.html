@@ -1,7 +1,7 @@
 {% load widget_tweaks i18n component_tags %}
 
 <div class="sticky top-0 z-40 navbar bg-base-100 shadow-sm rounded-box mb-6 gap-4 p-2">
-  <form hx-get="{% url 'product_list' %}"
+  <form hx-get="{% url 'list' %}"
         hx-target="#product-list"
         hx-select="#product-list"
         hx-trigger="submit"
@@ -101,7 +101,7 @@
           <i class="fas fa-grip"></i>
         </button>
       </div>
-      <a href="{% url 'product_list' %}"
+      <a href="{% url 'list' %}"
          class="btn btn-ghost btn-sm btn-square rounded-lg border border-base-300 opacity-70 shrink-0"
          title="{% trans "Clear filters" %}">
         <i class="fas fa-times"></i>

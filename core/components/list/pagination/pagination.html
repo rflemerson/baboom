@@ -5,7 +5,7 @@
     <div class="flex items-center gap-2 text-sm text-base-content/70">
       <span>{% trans "Show" %}</span>
       <select class="select select-bordered select-sm w-20"
-              hx-get="{% url 'product_list' %}"
+              hx-get="{% url 'list' %}"
               hx-target="#product-list"
               hx-select="#product-list"
               hx-include="[name='search'], [name='brand'], [name='ordering']"

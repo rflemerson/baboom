@@ -11,7 +11,7 @@ from core.models import (
     ProductStore,
     Store,
 )
-from core.views import product_list
+from core.views import list_view
 
 
 class ProductListViewTests(TestCase):
@@ -60,11 +60,11 @@ class ProductListViewTests(TestCase):
 
     def test_product_list_view_standard(self):
         """Standard GET request should render the full template."""
-        request = self.factory.get(reverse("product_list"))
+        request = self.factory.get(reverse("list"))
         # Manually add htmx attribute check support
         request.htmx = False  # type: ignore
 
-        response = product_list(request)
+        response = list_view(request)
 
         self.assertEqual(response.status_code, 200)
         # Check if full template content is there (base.html stuff)
@@ -74,10 +74,10 @@ class ProductListViewTests(TestCase):
 
     def test_product_list_view_htmx(self):
         """HTMX GET request should render the partial template."""
-        request = self.factory.get(reverse("product_list"))
+        request = self.factory.get(reverse("list"))
         request.htmx = True  # type: ignore
 
-        response = product_list(request)
+        response = list_view(request)
 
         self.assertEqual(response.status_code, 200)
         # Should NOT contain full html structure
@@ -87,10 +87,10 @@ class ProductListViewTests(TestCase):
 
     def test_product_filtering_search(self):
         """Test filtering by search query."""
-        request = self.factory.get(reverse("product_list"), {"search": "Protein A"})
+        request = self.factory.get(reverse("list"), {"search": "Protein A"})
         request.htmx = False  # type: ignore
 
-        response = product_list(request)
+        response = list_view(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Protein A")
@@ -98,10 +98,10 @@ class ProductListViewTests(TestCase):
 
     def test_product_filtering_brand(self):
         """Test filtering by brand."""
-        request = self.factory.get(reverse("product_list"), {"brand": "Brand B"})
+        request = self.factory.get(reverse("list"), {"brand": "Brand B"})
         request.htmx = False  # type: ignore
 
-        response = product_list(request)
+        response = list_view(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Protein A")

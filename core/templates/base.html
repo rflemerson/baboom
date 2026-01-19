@@ -43,7 +43,7 @@
     {% include "core/partials/header.html" %}
 
     <div class="container mx-auto px-4 flex-1 flex flex-col">
-      {% component "product_list" filter_obj=filter request=request page_obj=page_obj per_page=per_page %}{% endcomponent %}
+      {% component "list" filter_obj=filter request=request page_obj=page_obj per_page=per_page %}{% endcomponent %}
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.15.0/cdn.js"
             integrity="sha512-nHfCQtLDRfNgzsuMx2O2Joo3+xM8antMOBxo9GodZry1h33+lWa2Dd3a/lkVY4fHJK1CAkFcUrz2jilsaZFWeQ=="

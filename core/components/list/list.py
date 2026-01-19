@@ -1,7 +1,7 @@
 from django_components import component
 
 
-@component.register("product_list")
+@component.register("list")
 class ProductList(component.Component):
     template_name = "list.html"
 

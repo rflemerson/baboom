@@ -14,7 +14,7 @@ DEFAULT_PER_PAGE = 12
 PER_PAGE_OPTIONS = [12, 24, 48]
 
 
-def product_list(request: HttpRequest) -> HttpResponse:
+def list_view(request: HttpRequest) -> HttpResponse:
     products_qs = product_list_with_stats()
     product_filter = ProductFilter(request.GET, queryset=products_qs)
 
@@ -95,4 +95,4 @@ def subscribe_alerts(request: HttpRequest) -> HttpResponse:
                 for err in field_errors:
                     messages.error(request, str(err))
 
-    return redirect("product_list")
+    return redirect("list")
