@@ -7,6 +7,7 @@
       <select class="select select-bordered select-sm w-20"
               hx-get="{% url 'product_list' %}"
               hx-target="#product-list"
+              hx-select="#product-list"
               hx-include="[name='search'], [name='brand'], [name='ordering']"
               name="per_page">
         <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
@@ -26,6 +27,7 @@
           <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
              hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
              hx-target="#product-list"
+             hx-select="#product-list"
              class="join-item btn btn-sm">
             <i class="fas fa-chevron-left"></i>
           </a>
@@ -41,6 +43,7 @@
             <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
                hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
                hx-target="#product-list"
+               hx-select="#product-list"
                class="join-item btn btn-sm">{{ num }}</a>
           {% endif %}
         {% endfor %}
@@ -48,6 +51,7 @@
           <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
              hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
              hx-target="#product-list"
+             hx-select="#product-list"
              class="join-item btn btn-sm">
             <i class="fas fa-chevron-right"></i>
           </a>

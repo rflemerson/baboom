@@ -1,7 +1,0 @@
-{% extends "base.html" %}
-
-{% load component_tags %}
-
-{% block content %}
-  {% component "product_list" filter_obj=filter request=request page_obj=page_obj per_page=per_page %}{% endcomponent %}
-{% endblock content %}

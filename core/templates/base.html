@@ -1,13 +1,11 @@
 <!DOCTYPE html>
-{% load django_htmx i18n %}
+{% load django_htmx i18n static component_tags %}
 
 <html lang="{{ LANGUAGE_CODE }}">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Baboom</title>
-    {% load static %}
-
     <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
     <link rel="icon"
           type="image/png"
@@ -45,8 +43,7 @@
     {% include "core/partials/header.html" %}
 
     <div class="container mx-auto px-4 flex-1 flex flex-col">
-      {% block content %}
-      {% endblock content %}
+      {% component "product_list" filter_obj=filter request=request page_obj=page_obj per_page=per_page %}{% endcomponent %}
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.15.0/cdn.js"
             integrity="sha512-nHfCQtLDRfNgzsuMx2O2Joo3+xM8antMOBxo9GodZry1h33+lWa2Dd3a/lkVY4fHJK1CAkFcUrz2jilsaZFWeQ=="

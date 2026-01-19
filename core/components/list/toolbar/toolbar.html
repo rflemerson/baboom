@@ -3,6 +3,7 @@
 <div class="sticky top-0 z-40 navbar bg-base-100 shadow-sm rounded-box mb-6 gap-4 p-2">
   <form hx-get="{% url 'product_list' %}"
         hx-target="#product-list"
+        hx-select="#product-list"
         hx-trigger="submit"
         hx-include="[name='sort_by'][data-fallback], [name='sort_dir'][data-fallback]"
         class="flex justify-between items-center w-full gap-4">
