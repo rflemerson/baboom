@@ -21,7 +21,7 @@
       <i class="fas fa-sliders-h"></i> {% trans "Filters" %}
     </label>
     <div class="flex items-center gap-2 flex-nowrap justify-end flex-1 min-w-0">
-      <div class="flex shrink-0 items-center justify-end"
+      <div class="hidden md:flex shrink-0 items-center justify-end"
            x-data="{ open: {{ component_request.GET.search|yesno:'true,false' }} }"
            @click.outside="if(open) { if($refs.searchInput.value.trim()) { $el.closest('form').requestSubmit(); } else { open = false; } }"
            @keydown.escape="if(open) { if(!$refs.searchInput.value.trim()) open = false }">
@@ -83,7 +83,7 @@
           <i class="fas fa-arrow-down-wide-short"></i>
         </a>
       </div>
-      <div class="join shrink-0 border border-base-300 rounded-lg"
+      <div class="hidden md:flex join shrink-0 border border-base-300 rounded-lg"
            x-data="{ view: localStorage.getItem('viewMode') || 'list' }"
            x-init="$dispatch('view-changed', { view: view })">
         <button type="button"
@@ -102,7 +102,7 @@
         </button>
       </div>
       <a href="{% url 'list' %}"
-         class="btn btn-ghost btn-sm btn-square rounded-lg border border-base-300 opacity-70 shrink-0"
+         class="hidden md:flex btn btn-ghost btn-sm btn-square rounded-lg border border-base-300 opacity-70 shrink-0"
          title="{% trans "Clear filters" %}">
         <i class="fas fa-times"></i>
       </a>
