@@ -17,3 +17,8 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+# Django Components: Reload server on component file changes (dev only)
+COMPONENTS = {
+    "reload_on_file_change": True,
+}
