@@ -5,7 +5,9 @@
     <div class="flex items-center gap-2 text-sm text-base-content/70">
       <span>{% trans "Show" %}</span>
       <select class="select select-bordered select-sm w-20"
-              {% if component_request.htmx %}hx-get="{{ component_request.path }}" hx-target="#product-list" hx-include="[name='search'], [name='brand'], [name='ordering']"{% else %}onchange="window.location.href='?per_page='+this.value+'&'+new URLSearchParams(window.location.search).toString().replace(/per_page=\d+&?/g, '')"{% endif %}
+              hx-get="{% url 'product_list' %}"
+              hx-target="#product-list"
+              hx-include="[name='search'], [name='brand'], [name='ordering']"
               name="per_page">
         <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
         <option value="24" {% if per_page == 24 %}selected{% endif %}>24</option>
@@ -20,35 +22,39 @@
     </div>
     {% if page_obj.has_other_pages %}
       <div class="join">
-        {# Previous Page #}
         {% if page_obj.has_previous %}
           <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-             {% if component_request.htmx %}hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" hx-target="#product-list"{% endif %}
+             hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+             hx-target="#product-list"
              class="join-item btn btn-sm">
             <i class="fas fa-chevron-left"></i>
           </a>
         {% else %}
-          <span class="join-item btn btn-sm btn-disabled"><i class="fas fa-chevron-left"></i></span>
+          <span class="join-item btn btn-sm btn-disabled">
+            <i class="fas fa-chevron-left"></i>
+          </span>
         {% endif %}
-        {# Page Numbers #}
         {% for num in page_obj.paginator.page_range %}
           {% if page_obj.number == num %}
             <span class="join-item btn btn-sm btn-primary">{{ num }}</span>
           {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
             <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
-               {% if component_request.htmx %}hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}" hx-target="#product-list"{% endif %}
+               hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
+               hx-target="#product-list"
                class="join-item btn btn-sm">{{ num }}</a>
           {% endif %}
         {% endfor %}
-        {# Next Page #}
         {% if page_obj.has_next %}
           <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-             {% if component_request.htmx %}hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" hx-target="#product-list"{% endif %}
+             hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+             hx-target="#product-list"
              class="join-item btn btn-sm">
             <i class="fas fa-chevron-right"></i>
           </a>
         {% else %}
-          <span class="join-item btn btn-sm btn-disabled"><i class="fas fa-chevron-right"></i></span>
+          <span class="join-item btn btn-sm btn-disabled">
+            <i class="fas fa-chevron-right"></i>
+          </span>
         {% endif %}
       </div>
     {% endif %}
