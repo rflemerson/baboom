@@ -1,9 +1,9 @@
 from django_components import component
 
 
-@component.register("product_list_v2")
+@component.register("product_list")
 class ProductList(component.Component):
-    template_name = "product_list_v3.html"
+    template_name = "list.html"
 
     def get_context_data(self, filter_obj, request, page_obj=None, per_page=None):
         return {
