@@ -103,20 +103,59 @@ def subscribe_alerts(request: HttpRequest) -> HttpResponse:
 
     return redirect("product_list")
 
+
 def components_playground(request: HttpRequest) -> HttpResponse:
     """
     View for testing and developing components in isolation.
     """
-    if not request.user.is_staff:
-        # Simple protection, or just allow in DEBUG mode
-        if not settings.DEBUG:
-            raise Http404
+    if not request.user.is_staff and not settings.DEBUG:
+        raise Http404
 
     # Get some sample data for testing
     from .selectors import product_list_with_stats
+
     sample_product = product_list_with_stats().first()
-    
+
+    # Handle playground message triggers
+    msg_type = request.GET.get("msg")
+    if msg_type == "success":
+        messages.success(request, "Operação realizada com sucesso! (Success)")
+    elif msg_type == "error":
+        messages.error(request, "Algo deu errado. Tente novamente. (Error)")
+    elif msg_type == "info":
+        messages.info(request, "Apenas para sua informação. (Info)")
+    elif msg_type == "warning":
+        messages.warning(request, "Atenção: verifique os dados. (Warning)")
+
+    # We don't need to pass 'messages' manually if it's in context_processors,
+    # BUT component expects 'alert_messages'.
+    # We can retrieve it from storage or rely on context processor if we render with RequestContext.
+    # The render() function does use RequestContext.
+    # So 'messages' will be available in the template.
+
+    # Instantiate filter for QuickFilters component
+    from .filters import ProductFilter
+
+    queryset = product_list_with_stats()
+    product_filter = ProductFilter(request.GET, queryset=queryset)
+
+    # Pagination Logic
+    DEFAULT_PER_PAGE = 12
+    PER_PAGE_OPTIONS = [12, 24, 48]
+    try:
+        per_page = int(request.GET.get("per_page", DEFAULT_PER_PAGE))
+        if per_page not in PER_PAGE_OPTIONS:
+            per_page = DEFAULT_PER_PAGE
+    except (ValueError, TypeError):
+        per_page = DEFAULT_PER_PAGE
+
+    paginator = Paginator(product_filter.qs, per_page)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
     context = {
         "product": sample_product,
+        "filter": product_filter,
+        "page_obj": page_obj,
+        "per_page": per_page,
     }
     return render(request, "core/playground.html", context)

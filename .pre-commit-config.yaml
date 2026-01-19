@@ -23,12 +23,14 @@ repos:
     rev: v1.36.4
     hooks:
       - id: djlint-reformat-django
+        exclude: core/components/list/pagination/pagination.html
       - id: djlint-django
 
   - repo: https://github.com/rtts/djhtml
     rev: 3.0.10
     hooks:
       - id: djhtml
+        exclude: core/components/list/pagination/pagination.html
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
@@ -49,6 +51,7 @@ repos:
           "celery",
           "django-celery-results",
           "django-celery-beat",
+          "django-components",
         ]
         args: ["--config-file", "pyproject.toml"]
 

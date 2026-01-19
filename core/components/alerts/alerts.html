@@ -1,0 +1,16 @@
+{% if alert_messages %}
+  <div class="toast toast-top toast-end z-[100]">
+    {% for message in alert_messages %}
+      <div class="alert alert-{{ message.tags }} shadow-lg"
+           x-data="{ show: true }"
+           x-show="show"
+           x-transition.duration.500ms
+           x-init="setTimeout(() => show = false, 5000)">
+        <span>{{ message }}</span>
+        <button @click="show = false" class="btn btn-ghost btn-xs btn-circle">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
