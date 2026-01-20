@@ -1,18 +1,6 @@
 {% load widget_tweaks i18n %}
 
 <div class="drawer-side z-50" x-data>
-  <style>
-    /* Force override for select focus border */
-    .no-focus-outline:focus,
-    .no-focus-outline:active,
-    .no-focus-outline:focus-visible {
-      outline: 2px solid transparent !important;
-      outline-offset: 2px !important;
-      box-shadow: none !important;
-      border-width: 1px !important;
-      border-color: #d1d5db !important;
-    }
-  </style>
   <label for="filter-drawer"
          aria-label="{% trans "close sidebar" %}"
          class="drawer-overlay"></label>
@@ -29,28 +17,28 @@
           <label class="label">
             <span class="label-text">{% trans "Search" %}</span>
           </label>
-          {% render_field filter.form.search class="input input-bordered w-full focus:outline-none focus:ring-0 focus:border-base-300" %}
+          {% render_field filter.form.search class="input w-full" %}
         </div>
         <div class="form-control">
           <label class="label">
             <span class="label-text">{% trans "Brand" %}</span>
           </label>
-          {% render_field filter.form.brand class="select select-bordered w-full focus:outline-none focus:ring-0 no-focus-outline" %}
+          {% render_field filter.form.brand class="select w-full" %}
         </div>
         <div class="form-control">
           <label class="label">
             <span class="label-text">{% trans "Category" %}</span>
           </label>
-          {% render_field filter.form.category class="select select-bordered w-full focus:outline-none focus:ring-0 no-focus-outline" %}
+          {% render_field filter.form.category class="select w-full" %}
         </div>
         <div class="form-control">
           <label class="label">
             <span class="label-text">{% trans "Price Range" %} (R$)</span>
           </label>
           <div class="flex items-center gap-2">
-            {% render_field filter.form.price_min class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
+            {% render_field filter.form.price_min class="input input-sm flex-1" %}
             <span class="text-base-content/60">—</span>
-            {% render_field filter.form.price_max class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
+            {% render_field filter.form.price_max class="input input-sm flex-1" %}
           </div>
         </div>
         <div class="form-control">
@@ -58,9 +46,9 @@
             <span class="label-text">{% trans "Protein Concentration" %} (%)</span>
           </label>
           <div class="flex items-center gap-2">
-            {% render_field filter.form.concentration_min class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
+            {% render_field filter.form.concentration_min class="input input-sm flex-1" %}
             <span class="text-base-content/60">—</span>
-            {% render_field filter.form.concentration_max class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
+            {% render_field filter.form.concentration_max class="input input-sm flex-1" %}
           </div>
         </div>
       </form>
