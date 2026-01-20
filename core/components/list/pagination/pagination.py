@@ -5,9 +5,13 @@ from django_components import component
 class Pagination(component.Component):
     template_name = "pagination.html"
 
-    def get_context_data(self, page_obj, component_request=None, per_page=None):
+    def get_context_data(self, page_obj, per_page=None, query_params=None):
+        # Build query string from params, excluding 'page'
+        params = query_params or {}
+        query_parts = [f"{k}={v[0]}" for k, v in params.items() if k != "page" and v]
+        query_string = "&".join(query_parts)
         return {
             "page_obj": page_obj,
-            "component_request": component_request,
             "per_page": per_page,
+            "query_string": query_string,
         }

@@ -22,7 +22,7 @@
     </label>
     <div class="flex items-center gap-2 flex-nowrap justify-end flex-1 min-w-0">
       <div class="hidden md:flex shrink-0 items-center justify-end"
-           x-data="{ open: {{ component_request.GET.search|yesno:'true,false' }} }"
+           x-data="{ open: {{ search|yesno:'true,false' }} }"
            @click.outside="if(open) { if($refs.searchInput.value.trim()) { $el.closest('form').requestSubmit(); } else { open = false; } }"
            @keydown.escape="if(open) { if(!$refs.searchInput.value.trim()) open = false }">
         {# Input Group #}
@@ -65,19 +65,19 @@
             class="dropdown-content menu bg-base-100 rounded-box z-50 w-40 p-2 shadow-lg border border-base-300 mt-1">
           {% for key, label, is_active in filter.sort_choices %}
             <li>
-              <a href="?sort_by={{ key }}&sort_dir={{ filter.current_sort_dir }}{% if component_request.GET.search %}&search={{ component_request.GET.search }}{% endif %}"
+              <a href="?sort_by={{ key }}&sort_dir={{ filter.current_sort_dir }}{% if search %}&search={{ search }}{% endif %}"
                  {% if is_active %}class="active"{% endif %}>{{ label }}</a>
             </li>
           {% endfor %}
         </ul>
       </div>
       <div class="join shrink-0 border border-base-300 rounded-lg">
-        <a href="?sort_by={{ filter.current_sort_key }}&sort_dir=asc{% if component_request.GET.search %}&search={{ component_request.GET.search }}{% endif %}"
+        <a href="?sort_by={{ filter.current_sort_key }}&sort_dir=asc{% if search %}&search={{ search }}{% endif %}"
            class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'asc' %}btn-active{% endif %}"
            title="{% trans "Low to High" %}">
           <i class="fas fa-arrow-up-short-wide"></i>
         </a>
-        <a href="?sort_by={{ filter.current_sort_key }}&sort_dir=desc{% if component_request.GET.search %}&search={{ component_request.GET.search }}{% endif %}"
+        <a href="?sort_by={{ filter.current_sort_key }}&sort_dir=desc{% if search %}&search={{ search }}{% endif %}"
            class="btn btn-ghost btn-sm join-item {% if filter.current_sort_dir == 'desc' %}btn-active{% endif %}"
            title="{% trans "High to Low" %}">
           <i class="fas fa-arrow-down-wide-short"></i>

@@ -5,8 +5,7 @@ from django_components import component
 class FilterDrawer(component.Component):
     template_name = "drawer.html"
 
-    def get_context_data(self, filter_obj, request):
+    def get_context_data(self, filter_obj):
         return {
             "filter": filter_obj,
-            "component_request": request,
         }

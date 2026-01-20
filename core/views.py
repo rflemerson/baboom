@@ -33,6 +33,7 @@ def list_view(request: HttpRequest) -> HttpResponse:
         "products": page_obj,
         "page_obj": page_obj,
         "per_page": per_page,
+        "query_params": dict(request.GET),  # Explicit params for components
     }
 
     return render(request, "base.html", context)

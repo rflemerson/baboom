@@ -24,8 +24,8 @@
     {% if page_obj.has_other_pages %}
       <div class="join">
         {% if page_obj.has_previous %}
-          <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-             hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+          <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}"
+             hx-get="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}"
              hx-target="#list"
              hx-select="#list"
              class="join-item btn btn-sm">
@@ -40,16 +40,16 @@
           {% if page_obj.number == num %}
             <span class="join-item btn btn-sm btn-primary">{{ num }}</span>
           {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
-               hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
+            <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ num }}"
+               hx-get="?{% if query_string %}{{ query_string }}&{% endif %}page={{ num }}"
                hx-target="#list"
                hx-select="#list"
                class="join-item btn btn-sm">{{ num }}</a>
           {% endif %}
         {% endfor %}
         {% if page_obj.has_next %}
-          <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-             hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+          <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}"
+             hx-get="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}"
              hx-target="#list"
              hx-select="#list"
              class="join-item btn btn-sm">

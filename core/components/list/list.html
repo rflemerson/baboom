@@ -4,7 +4,7 @@
   <input id="filter-drawer" type="checkbox" class="drawer-toggle" />
   <div class="drawer-content flex-1 flex flex-col pb-6">
     {# Toolbar (includes Filters Button) #}
-    {% component "list.toolbar" filter_obj=filter request=component_request %}{% endcomponent %}
+    {% component "list.toolbar" filter_obj=filter query_params=query_params %}{% endcomponent %}
     {# List (Grid/List) #}
     <div id="list"
          class="flex-1"
@@ -28,9 +28,9 @@
         </div>
       {% endfor %}
       {# Pagination #}
-      {% component "list.pagination" page_obj=page_obj component_request=component_request per_page=per_page %}{% endcomponent %}
+      {% component "list.pagination" page_obj=page_obj per_page=per_page query_params=query_params %}{% endcomponent %}
     </div>
   </div>
   {# Drawer Side must be sibling to drawer-content #}
-  {% component "list.filters.drawer" filter_obj=filter request=component_request %}{% endcomponent %}
+  {% component "list.filters.drawer" filter_obj=filter %}{% endcomponent %}
 </div>
