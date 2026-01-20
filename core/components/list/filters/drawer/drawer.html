@@ -50,6 +50,19 @@
             </div>
           </div>
         </div>
+        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
+          <input type="checkbox" checked />
+          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
+            <i class="fas fa-dollar-sign h-5 w-5"></i> {% trans "Price Range" %}
+          </div>
+          <div class="collapse-content px-0">
+            <div class="flex items-center gap-2">
+              {% render_field filter.form.price_min class="input input-bordered input-sm w-full" %}
+              <span class="text-base-content/60">—</span>
+              {% render_field filter.form.price_max class="input input-bordered input-sm w-full" %}
+            </div>
+          </div>
+        </div>
       </form>
     </div>
     <div class="border-t border-base-200 px-4 py-4 bg-base-200 mt-auto">

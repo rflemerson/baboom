@@ -60,10 +60,22 @@ class ProductFilter(django_filters.FilterSet):
         widget=forms.CheckboxSelectMultiple(),
         conjoined=False,  # OR logic: show products with ANY selected tag
     )
+    price_min = django_filters.NumberFilter(
+        field_name="last_price",
+        lookup_expr="gte",
+        label=_("Min Price"),
+        widget=forms.NumberInput(attrs={"placeholder": _("Min")}),
+    )
+    price_max = django_filters.NumberFilter(
+        field_name="last_price",
+        lookup_expr="lte",
+        label=_("Max Price"),
+        widget=forms.NumberInput(attrs={"placeholder": _("Max")}),
+    )
 
     class Meta:
         model = Product
-        fields = ["search", "brand", "category", "tags"]
+        fields = ["search", "brand", "category", "tags", "price_min", "price_max"]
 
     def filter_queryset(self, queryset: QuerySet[Product]) -> QuerySet[Product]:
         queryset = super().filter_queryset(queryset)
