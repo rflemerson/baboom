@@ -3,7 +3,7 @@ from django import forms
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
-from .models import Category, Product
+from .models import Product
 
 
 class ProductFilter(django_filters.FilterSet):
@@ -45,16 +45,7 @@ class ProductFilter(django_filters.FilterSet):
         label=_("Search"),
         widget=forms.TextInput(attrs={"placeholder": _("Search...")}),
     )
-    brand = django_filters.AllValuesFilter(
-        field_name="brand__name",
-        empty_label=_("All Brands"),
-        widget=forms.Select(),
-    )
-    category = django_filters.ModelChoiceFilter(
-        queryset=Category.objects.all(),
-        empty_label=_("All Categories"),
-        widget=forms.Select(),
-    )
+
     price_min = django_filters.NumberFilter(
         field_name="last_price",
         lookup_expr="gte",
@@ -96,8 +87,6 @@ class ProductFilter(django_filters.FilterSet):
         model = Product
         fields = [
             "search",
-            "brand",
-            "category",
             "price_min",
             "price_max",
             "price_per_gram_min",
@@ -126,5 +115,8 @@ class ProductFilter(django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value)
             | Q(brand__name__icontains=value)
+            | Q(category__name__icontains=value)
+            | Q(tags__name__icontains=value)
+            | Q(nutrition_profiles__flavors__name__icontains=value)
             | Q(description__icontains=value)
-        )
+        ).distinct()
