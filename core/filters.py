@@ -3,7 +3,7 @@ from django import forms
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
-from .models import Product
+from .models import Category, Product
 
 
 class ProductFilter(django_filters.FilterSet):
@@ -50,10 +50,15 @@ class ProductFilter(django_filters.FilterSet):
         empty_label=_("All Brands"),
         widget=forms.Select(),
     )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.all(),
+        empty_label=_("All Categories"),
+        widget=forms.Select(),
+    )
 
     class Meta:
         model = Product
-        fields = ["search", "brand"]
+        fields = ["search", "brand", "category"]
 
     def filter_queryset(self, queryset: QuerySet[Product]) -> QuerySet[Product]:
         queryset = super().filter_queryset(queryset)
