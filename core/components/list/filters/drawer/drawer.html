@@ -43,6 +43,16 @@
         </div>
         <div class="form-control">
           <label class="label">
+            <span class="label-text">{% trans "Price/g Range" %} (R$)</span>
+          </label>
+          <div class="flex items-center gap-2">
+            {% render_field filter.form.price_per_gram_min class="input input-sm flex-1" %}
+            <span class="text-base-content/60">—</span>
+            {% render_field filter.form.price_per_gram_max class="input input-sm flex-1" %}
+          </div>
+        </div>
+        <div class="form-control">
+          <label class="label">
             <span class="label-text">{% trans "Protein Concentration" %} (%)</span>
           </label>
           <div class="flex items-center gap-2">

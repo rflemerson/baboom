@@ -67,6 +67,18 @@ class ProductFilter(django_filters.FilterSet):
         label=_("Max Price"),
         widget=forms.NumberInput(attrs={"placeholder": _("Max")}),
     )
+    price_per_gram_min = django_filters.NumberFilter(
+        field_name="price_per_gram",
+        lookup_expr="gte",
+        label=_("Min Price/g"),
+        widget=forms.NumberInput(attrs={"placeholder": _("Min")}),
+    )
+    price_per_gram_max = django_filters.NumberFilter(
+        field_name="price_per_gram",
+        lookup_expr="lte",
+        label=_("Max Price/g"),
+        widget=forms.NumberInput(attrs={"placeholder": _("Max")}),
+    )
     concentration_min = django_filters.NumberFilter(
         field_name="concentration",
         lookup_expr="gte",
@@ -88,6 +100,8 @@ class ProductFilter(django_filters.FilterSet):
             "category",
             "price_min",
             "price_max",
+            "price_per_gram_min",
+            "price_per_gram_max",
             "concentration_min",
             "concentration_max",
         ]
