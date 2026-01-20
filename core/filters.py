@@ -3,7 +3,7 @@ from django import forms
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
-from .models import Category, Product, Tag
+from .models import Category, Product
 
 
 class ProductFilter(django_filters.FilterSet):
@@ -55,11 +55,6 @@ class ProductFilter(django_filters.FilterSet):
         empty_label=_("All Categories"),
         widget=forms.Select(),
     )
-    tags = django_filters.ModelMultipleChoiceFilter(
-        queryset=Tag.objects.all(),
-        widget=forms.CheckboxSelectMultiple(),
-        conjoined=False,  # OR logic: show products with ANY selected tag
-    )
     price_min = django_filters.NumberFilter(
         field_name="last_price",
         lookup_expr="gte",
@@ -91,7 +86,6 @@ class ProductFilter(django_filters.FilterSet):
             "search",
             "brand",
             "category",
-            "tags",
             "price_min",
             "price_max",
             "concentration_min",

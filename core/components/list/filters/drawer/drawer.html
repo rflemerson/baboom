@@ -1,6 +1,18 @@
 {% load widget_tweaks i18n %}
 
 <div class="drawer-side z-50" x-data>
+  <style>
+    /* Force override for select focus border */
+    .no-focus-outline:focus,
+    .no-focus-outline:active,
+    .no-focus-outline:focus-visible {
+      outline: 2px solid transparent !important;
+      outline-offset: 2px !important;
+      box-shadow: none !important;
+      border-width: 1px !important;
+      border-color: #d1d5db !important;
+    }
+  </style>
   <label for="filter-drawer"
          aria-label="{% trans "close sidebar" %}"
          class="drawer-overlay"></label>
@@ -12,68 +24,43 @@
       </label>
     </div>
     <div class="flex-1 overflow-y-auto p-4">
-      <form id="filter-form" hx-get="?" hx-target="#list" class="space-y-6">
-        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
-            <i class="fas fa-search h-5 w-5"></i> {% trans "Search" %}
-          </div>
-          <div class="collapse-content px-0">{% render_field filter.form.search class="input input-bordered w-full" %}</div>
+      <form id="filter-form" hx-get="?" hx-target="#list" class="space-y-4">
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">{% trans "Search" %}</span>
+          </label>
+          {% render_field filter.form.search class="input input-bordered w-full focus:outline-none focus:ring-0 focus:border-base-300" %}
         </div>
-        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
-            <i class="fas fa-store h-5 w-5"></i> {% trans "Brand" %}
-          </div>
-          <div class="collapse-content px-0">{% render_field filter.form.brand class="select select-bordered w-full" %}</div>
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">{% trans "Brand" %}</span>
+          </label>
+          {% render_field filter.form.brand class="select select-bordered w-full focus:outline-none focus:ring-0 no-focus-outline" %}
         </div>
-        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
-            <i class="fas fa-layer-group h-5 w-5"></i> {% trans "Category" %}
-          </div>
-          <div class="collapse-content px-0">{% render_field filter.form.category class="select select-bordered w-full" %}</div>
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">{% trans "Category" %}</span>
+          </label>
+          {% render_field filter.form.category class="select select-bordered w-full focus:outline-none focus:ring-0 no-focus-outline" %}
         </div>
-        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
-            <i class="fas fa-tags h-5 w-5"></i> {% trans "Tags" %}
-          </div>
-          <div class="collapse-content px-0">
-            <div class="flex flex-wrap gap-2">
-              {% for checkbox in filter.form.tags %}
-                <label class="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg border border-base-300 hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/10">
-                  {{ checkbox.tag }}
-                  <span class="text-sm">{{ checkbox.choice_label }}</span>
-                </label>
-              {% endfor %}
-            </div>
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">{% trans "Price Range" %} (R$)</span>
+          </label>
+          <div class="flex items-center gap-2">
+            {% render_field filter.form.price_min class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
+            <span class="text-base-content/60">—</span>
+            {% render_field filter.form.price_max class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
           </div>
         </div>
-        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
-            <i class="fas fa-dollar-sign h-5 w-5"></i> {% trans "Price Range" %}
-          </div>
-          <div class="collapse-content px-0">
-            <div class="flex items-center gap-2">
-              {% render_field filter.form.price_min class="input input-bordered input-sm w-full" %}
-              <span class="text-base-content/60">—</span>
-              {% render_field filter.form.price_max class="input input-bordered input-sm w-full" %}
-            </div>
-          </div>
-        </div>
-        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
-            <i class="fas fa-percent h-5 w-5"></i> {% trans "Protein Concentration" %}
-          </div>
-          <div class="collapse-content px-0">
-            <div class="flex items-center gap-2">
-              {% render_field filter.form.concentration_min class="input input-bordered input-sm w-full" %}
-              <span class="text-base-content/60">—</span>
-              {% render_field filter.form.concentration_max class="input input-bordered input-sm w-full" %}
-            </div>
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">{% trans "Protein Concentration" %} (%)</span>
+          </label>
+          <div class="flex items-center gap-2">
+            {% render_field filter.form.concentration_min class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
+            <span class="text-base-content/60">—</span>
+            {% render_field filter.form.concentration_max class="input input-bordered input-sm flex-1 focus:outline-none focus:ring-0 focus:border-base-300" %}
           </div>
         </div>
       </form>
