@@ -34,6 +34,22 @@
           </div>
           <div class="collapse-content px-0">{% render_field filter.form.category class="select select-bordered w-full" %}</div>
         </div>
+        <div class="collapse collapse-arrow border-b border-base-200 rounded-none">
+          <input type="checkbox" checked />
+          <div class="collapse-title text-sm font-medium text-base-content flex items-center gap-2 p-0 min-h-0 py-4">
+            <i class="fas fa-tags h-5 w-5"></i> {% trans "Tags" %}
+          </div>
+          <div class="collapse-content px-0">
+            <div class="flex flex-wrap gap-2">
+              {% for checkbox in filter.form.tags %}
+                <label class="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg border border-base-300 hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/10">
+                  {{ checkbox.tag }}
+                  <span class="text-sm">{{ checkbox.choice_label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
       </form>
     </div>
     <div class="border-t border-base-200 px-4 py-4 bg-base-200 mt-auto">
