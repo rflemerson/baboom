@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 
 from .filters import ProductFilter
 from .forms import AlertSubscriptionForm
-from .selectors import product_list_with_stats
+from .selectors import list_with_stats
 from .services import alert_subscriber_create
 
 DEFAULT_PER_PAGE = 12
@@ -15,7 +15,7 @@ PER_PAGE_OPTIONS = [12, 24, 48]
 
 
 def list_view(request: HttpRequest) -> HttpResponse:
-    products_qs = product_list_with_stats()
+    products_qs = list_with_stats()
     product_filter = ProductFilter(request.GET, queryset=products_qs)
 
     try:

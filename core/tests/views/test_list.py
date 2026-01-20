@@ -14,7 +14,7 @@ from core.models import (
 from core.views import list_view
 
 
-class ProductListViewTests(TestCase):
+class ListViewTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
 

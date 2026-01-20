@@ -13,7 +13,7 @@ from django.db.models.functions import Cast
 from .models import NutritionFacts, Product, ProductPriceHistory
 
 
-def product_list_with_stats() -> QuerySet[Product]:
+def list_with_stats() -> QuerySet[Product]:
     """
     Returns a Product QuerySet annotated with:
     - last_price

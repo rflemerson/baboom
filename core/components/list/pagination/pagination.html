@@ -5,9 +5,9 @@
     <div class="flex items-center gap-2 text-sm text-base-content/70">
       <span>{% trans "Show" %}</span>
       <select class="select select-bordered select-sm w-20"
-              hx-get="{% url 'list' %}"
-              hx-target="#product-list"
-              hx-select="#product-list"
+              hx-get="?"
+              hx-target="#list"
+              hx-select="#list"
               hx-include="[name='search'], [name='brand'], [name='ordering']"
               name="per_page">
         <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
@@ -26,8 +26,8 @@
         {% if page_obj.has_previous %}
           <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
              hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-             hx-target="#product-list"
-             hx-select="#product-list"
+             hx-target="#list"
+             hx-select="#list"
              class="join-item btn btn-sm">
             <i class="fas fa-chevron-left"></i>
           </a>
@@ -42,16 +42,16 @@
           {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
             <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
                hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
-               hx-target="#product-list"
-               hx-select="#product-list"
+               hx-target="#list"
+               hx-select="#list"
                class="join-item btn btn-sm">{{ num }}</a>
           {% endif %}
         {% endfor %}
         {% if page_obj.has_next %}
           <a href="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
              hx-get="?{% for key, value in component_request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-             hx-target="#product-list"
-             hx-select="#product-list"
+             hx-target="#list"
+             hx-select="#list"
              class="join-item btn btn-sm">
             <i class="fas fa-chevron-right"></i>
           </a>

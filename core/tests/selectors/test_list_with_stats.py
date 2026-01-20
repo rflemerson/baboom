@@ -12,7 +12,7 @@ from core.models import (
     ProductStore,
     Store,
 )
-from core.selectors import product_list_with_stats
+from core.selectors import list_with_stats
 
 
 class ProductStatsTest(TestCase):
@@ -59,7 +59,7 @@ class ProductStatsTest(TestCase):
         - Price per gram of protein (R$ 100 / 800g = R$ 0.125)
         """
         # Act
-        p: Any = product_list_with_stats().first()
+        p: Any = list_with_stats().first()
 
         # Assert
         if p is None:
@@ -84,7 +84,7 @@ class ProductStatsTest(TestCase):
         p2 = Product.objects.create(name="No Price Whey", brand=self.brand, weight=500)
 
         # Act
-        qs = product_list_with_stats().filter(pk=p2.pk)
+        qs = list_with_stats().filter(pk=p2.pk)
         result: Any = qs.first()
 
         # Assert
