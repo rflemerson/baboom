@@ -72,10 +72,31 @@ class ProductFilter(django_filters.FilterSet):
         label=_("Max Price"),
         widget=forms.NumberInput(attrs={"placeholder": _("Max")}),
     )
+    concentration_min = django_filters.NumberFilter(
+        field_name="concentration",
+        lookup_expr="gte",
+        label=_("Min Concentration"),
+        widget=forms.NumberInput(attrs={"placeholder": _("Min %")}),
+    )
+    concentration_max = django_filters.NumberFilter(
+        field_name="concentration",
+        lookup_expr="lte",
+        label=_("Max Concentration"),
+        widget=forms.NumberInput(attrs={"placeholder": _("Max %")}),
+    )
 
     class Meta:
         model = Product
-        fields = ["search", "brand", "category", "tags", "price_min", "price_max"]
+        fields = [
+            "search",
+            "brand",
+            "category",
+            "tags",
+            "price_min",
+            "price_max",
+            "concentration_min",
+            "concentration_max",
+        ]
 
     def filter_queryset(self, queryset: QuerySet[Product]) -> QuerySet[Product]:
         queryset = super().filter_queryset(queryset)
