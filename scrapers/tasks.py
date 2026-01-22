@@ -80,8 +80,19 @@ def scrape_darklab_monitor():
 def scrape_dux_monitor():
     from .spiders.dux import DuxSpider
 
-    logger.info("Starting Dux Nutrition Monitor Task")
+    logger.info("Starting Dux Monitor Task")
     spider = DuxSpider()
     items = spider.crawl()
     saved_count = len(items)
     return f"Dux Monitor: Saved/Updated {saved_count} items."
+
+
+@shared_task
+def scrape_soldiers_monitor():
+    from .spiders.soldiers import SoldiersSpider
+
+    logger.info("Starting Soldiers Nutrition Monitor Task")
+    spider = SoldiersSpider()
+    items = spider.crawl()
+    saved_count = len(items)
+    return f"Soldiers Monitor: Saved/Updated {saved_count} items."
