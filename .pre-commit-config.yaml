@@ -50,6 +50,8 @@ repos:
           "django-celery-results",
           "django-celery-beat",
           "django-components",
+          "strawberry-graphql-django",
+          "strawberry-graphql",
         ]
         args: ["--config-file", "pyproject.toml"]
 

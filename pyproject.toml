@@ -14,7 +14,7 @@ dependencies = [
   "psycopg",
   "requests",
   "Pillow",
-  "django",
+  "django>=6.0",
   "django-filter",
   "django-simple-history",
   "django-treebeard",
@@ -25,13 +25,14 @@ dependencies = [
   "celery",
   "playwright",
   "beautifulsoup4",
-
   "lxml",
   "urllib3",
   "curl_cffi",
   "django-celery-results",
   "django-celery-beat",
   "django-components",
+  "strawberry-graphql-django",
+  "strawberry-graphql",
 ]
 
 [project.urls]

@@ -32,6 +32,9 @@ INSTALLED_APPS += ["widget_tweaks"]
 # Django Components
 INSTALLED_APPS += ["django_components"]
 
+# Strawberry GraphQL
+INSTALLED_APPS += ["strawberry.django"]
+
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
