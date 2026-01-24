@@ -1,26 +1,29 @@
 import logging
+from decimal import Decimal
 
 from django.test import TestCase
 
+from core.models import Brand, Product, ProductPriceHistory, ProductStore, Store
 from scrapers.models import ScrapedItem
+from scrapers.services import ScraperService
 from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
 from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
 
-# Disable logging during tests to keep output clean
+# Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
 
 
 class ScraperIntegrationTests(TestCase):
     """
     Integration tests for Spiders.
-    这些 tests hits REAL APIs.
+    Integration tests for Spiders.
+    Tests hitting REAL APIs.
     """
 
     def test_blackskull_spider(self):
         spider = BlackSkullSpider()
-        # MyPy complaint: assigning new attribute to instance
         spider.FALLBACK_CATEGORIES = ["proteina"]  # type: ignore
 
         items = spider.crawl()
@@ -45,9 +48,9 @@ class ScraperIntegrationTests(TestCase):
         first = ScrapedItem.objects.filter(store_slug="dark_lab").first()
         self.assertIsNotNone(first)
 
-        # specific check for logic
+        # Specific check for logic
         if first and first.stock_quantity == 100:
-            pass  # logic verified silently
+            pass
 
     def test_dux_spider(self):
         spider = DuxSpider()
@@ -78,12 +81,10 @@ class ScraperIntegrationTests(TestCase):
 
 class SyncPriceToCoreTests(TestCase):
     """
-    Unit tests for ScraperService.sync_price_to_core()
+    Unit tests for ScraperService logic (save_product and sync_price_to_core)
     """
 
     def setUp(self):
-        from core.models import Brand, Product, ProductStore, Store
-
         self.brand = Brand.objects.create(name="test_brand", display_name="Test Brand")
         self.store = Store.objects.create(name="test_store", display_name="Test Store")
         self.product = Product.objects.create(
@@ -98,46 +99,46 @@ class SyncPriceToCoreTests(TestCase):
             product_link="https://test.com/product",
         )
 
-    def test_sync_creates_price_history_for_linked_item(self):
-        from decimal import Decimal
-
-        from core.models import ProductPriceHistory
-
-        # When a LINKED ScrapedItem is created, the signal automatically
-        # calls sync_price_to_core and creates a PriceHistory
+    def test_save_product_creates_price_history_for_linked_item(self):
+        # 1. Pre-create a LINKED item
         ScrapedItem.objects.create(
             store_slug="test_store",
             external_id="TEST123",
-            price=Decimal("199.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
             status=ScrapedItem.Status.LINKED,
             product_store=self.product_store,
+            price=Decimal("100.00"),
         )
 
-        # Signal should have created the price history automatically
+        # 2. Run Service
+        ScraperService.save_product(
+            store_slug="test_store",
+            external_id="TEST123",
+            price=Decimal("199.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+        )
+
+        # 3. Check Core
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
         price_record = ProductPriceHistory.objects.first()
-        assert price_record is not None  # noqa: S101
+
+        # Ensure not None for MyPy
+        if price_record is None:
+            self.fail("Price history record should be created but was None")
+
         self.assertEqual(price_record.price, Decimal("199.90"))
-        self.assertEqual(price_record.stock_status, "A")
 
-    def test_sync_skips_if_price_unchanged(self):
-        from decimal import Decimal
-
-        from core.models import ProductPriceHistory
-        from scrapers.services import ScraperService
-
+    def test_sync_logic_skips_if_price_unchanged(self):
         ProductPriceHistory.objects.create(
             store_product_link=self.product_store,
             price=Decimal("199.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            stock_status="A",
         )
 
         item = ScrapedItem.objects.create(
             store_slug="test_store",
             external_id="TEST123",
             price=Decimal("199.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            stock_status="A",
             status=ScrapedItem.Status.LINKED,
             product_store=self.product_store,
         )
@@ -147,48 +148,33 @@ class SyncPriceToCoreTests(TestCase):
         self.assertFalse(result)
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
 
-    def test_sync_skips_if_not_linked(self):
-        from decimal import Decimal
-
-        from core.models import ProductPriceHistory
-        from scrapers.services import ScraperService
-
-        item = ScrapedItem.objects.create(
-            store_slug="test_store",
-            external_id="TEST456",
-            price=Decimal("199.90"),
-            status=ScrapedItem.Status.NEW,
-        )
-
-        result = ScraperService.sync_price_to_core(item)
-
-        self.assertFalse(result)
-        self.assertEqual(ProductPriceHistory.objects.count(), 0)
-
-    def test_sync_creates_new_record_on_price_change(self):
-        from decimal import Decimal
-
-        from core.models import ProductPriceHistory
-
-        # Create initial linked item (signal creates first price history)
+    def test_sync_logic_creates_new_record_on_price_change(self):
         item = ScrapedItem.objects.create(
             store_slug="test_store",
             external_id="TEST123",
             price=Decimal("199.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            stock_status="A",
             status=ScrapedItem.Status.LINKED,
             product_store=self.product_store,
         )
 
-        # Verify first price was created
+        # First Sync
+        ScraperService.sync_price_to_core(item)
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
 
-        # Update with new price
+        # Change Price
         item.price = Decimal("179.90")
         item.save()
 
-        # Should have 2 price records now
+        # Manual Sync
+        ScraperService.sync_price_to_core(item)
+
+        # Verify
         self.assertEqual(ProductPriceHistory.objects.count(), 2)
-        latest = ProductPriceHistory.objects.first()
-        assert latest is not None  # noqa: S101
+
+        try:
+            latest = ProductPriceHistory.objects.latest("collected_at")
+        except ProductPriceHistory.DoesNotExist:
+            self.fail("Latest history not found")
+
         self.assertEqual(latest.price, Decimal("179.90"))

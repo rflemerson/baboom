@@ -1,36 +1,13 @@
-{% load i18n component_tags %}
+{% load component_tags %}
 
 <div class="drawer drawer-end flex-1 flex flex-col">
   <input id="filter-drawer" type="checkbox" class="drawer-toggle" />
   <div class="drawer-content flex-1 flex flex-col pb-6">
-    {# Toolbar (includes Filters Button) #}
+    {# Toolbar #}
     {% component "list.toolbar" filter_obj=filter query_params=query_params %}{% endcomponent %}
-    {# List (Grid/List) #}
-    <div id="list"
-         class="flex-1"
-         x-data="{ viewMode: localStorage.getItem('viewMode') || 'list' }"
-         @view-changed.window="viewMode = $event.detail.view"
-         :class="viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'flex flex-col gap-4'">
-      {% for product in page_obj %}
-        {# Grid View Card #}
-        <div x-show="viewMode === 'grid'" x-cloak class="h-full">
-          {% component "list.card_grid" product=product %}{% endcomponent %}
-        </div>
-        {# List View Row #}
-        <div x-show="viewMode === 'list'" x-cloak class="w-full">
-          {% component "list.card_list" product=product %}{% endcomponent %}
-        </div>
-      {% empty %}
-        <div class="flex flex-col items-center justify-center flex-1 text-center py-12 bg-base-100 rounded-lg border border-base-200 border-dashed col-span-full">
-          <i class="fas fa-box-open text-6xl text-base-content/20 mb-4"></i>
-          <h3 class="text-lg font-medium text-base-content">{% trans "No products found" %}</h3>
-          <p class="mt-2 text-sm text-base-content/60">{% trans "Try adjusting your search or filters." %}</p>
-        </div>
-      {% endfor %}
-      {# Pagination #}
-      {% component "list.pagination" page_obj=page_obj per_page=per_page query_params=query_params %}{% endcomponent %}
-    </div>
+    {# results #}
+    {% component "list.results" page_obj=page_obj per_page=per_page query_params=query_params %}{% endcomponent %}
   </div>
-  {# Drawer Side must be sibling to drawer-content #}
+  {# Drawer Side #}
   {% component "list.filters.drawer" filter_obj=filter %}{% endcomponent %}
 </div>

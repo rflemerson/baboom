@@ -7,8 +7,9 @@ from django.db.models import (
     QuerySet,
     Subquery,
     URLField,
+    Value,
 )
-from django.db.models.functions import Cast
+from django.db.models.functions import Cast, NullIf
 
 from .models import NutritionFacts, Product, ProductPriceHistory
 
@@ -28,6 +29,12 @@ def list_with_stats() -> QuerySet[Product]:
     nutrition_info = NutritionFacts.objects.filter(
         product_profiles__product=OuterRef("pk")
     ).values("proteins", "serving_size_grams")[:1]
+
+    # 1. Protect serving size against zero
+    serving_safe = NullIf(F("serving_size_val"), Value(0))
+
+    # 2. Protect Total Protein against zero (for protein/g calculation)
+    protein_safe = NullIf(F("total_protein"), Value(0))
 
     return (
         Product.objects.select_related("brand", "category")
@@ -56,13 +63,13 @@ def list_with_stats() -> QuerySet[Product]:
                     F("weight")
                     * Cast(F("per_serving_protein"), output_field=FloatField())
                 )
-                / Cast(F("serving_size_val"), output_field=FloatField()),
+                / Cast(serving_safe, output_field=FloatField()),
                 output_field=DecimalField(max_digits=10, decimal_places=2),
             ),
             concentration=ExpressionWrapper(
                 (
                     Cast(F("per_serving_protein"), output_field=FloatField())
-                    / Cast(F("serving_size_val"), output_field=FloatField())
+                    / Cast(serving_safe, output_field=FloatField())
                 )
                 * 100,
                 output_field=DecimalField(max_digits=5, decimal_places=1),
@@ -70,7 +77,7 @@ def list_with_stats() -> QuerySet[Product]:
         )
         .annotate(
             price_per_gram=ExpressionWrapper(
-                F("last_price") / F("total_protein"),
+                F("last_price") / Cast(protein_safe, output_field=FloatField()),
                 output_field=DecimalField(max_digits=10, decimal_places=2),
             ),
         )

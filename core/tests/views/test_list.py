@@ -1,6 +1,7 @@
 from decimal import Decimal
+from typing import cast
 
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from core.models import (
@@ -11,9 +12,21 @@ from core.models import (
     ProductStore,
     Store,
 )
-from core.views import list_view
+
+# 2. Importar HtmxHttpRequest da sua view
+from core.views import HtmxHttpRequest, list_view
 
 
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+)
 class ListViewTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -61,13 +74,11 @@ class ListViewTests(TestCase):
     def test_product_list_view_standard(self):
         """Standard GET request should render the full template."""
         request = self.factory.get(reverse("list"))
-        # Manually add htmx attribute check support
         request.htmx = False  # type: ignore
 
-        response = list_view(request)
+        response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)
-        # Check if full template content is there (base.html stuff)
         self.assertContains(response, "<html")
         self.assertContains(response, "Protein A")
         self.assertContains(response, "Protein B")
@@ -77,7 +88,8 @@ class ListViewTests(TestCase):
         request = self.factory.get(reverse("list"))
         request.htmx = True  # type: ignore
 
-        response = list_view(request)
+        # 3. Usar cast() aqui também
+        response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)
         # Should NOT contain full html structure
@@ -90,7 +102,8 @@ class ListViewTests(TestCase):
         request = self.factory.get(reverse("list"), {"search": "Protein A"})
         request.htmx = False  # type: ignore
 
-        response = list_view(request)
+        # 3. Usar cast()
+        response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Protein A")
@@ -101,7 +114,8 @@ class ListViewTests(TestCase):
         request = self.factory.get(reverse("list"), {"brand": "Brand B"})
         request.htmx = False  # type: ignore
 
-        response = list_view(request)
+        # 3. Usar cast()
+        response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Protein A")

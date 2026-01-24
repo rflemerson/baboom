@@ -46,7 +46,6 @@ class ProductPriceHistoryInline(nested_admin.NestedTabularInline):
 
 class ProductStoreInline(nested_admin.NestedTabularInline):
     model = ProductStore
-    inlines = [ProductPriceHistoryInline]
     extra = 0
     min_num = 1
     fields = (

@@ -1,6 +1,6 @@
 import django_filters
 from django import forms
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from .models import Product
@@ -46,6 +46,12 @@ class ProductFilter(django_filters.FilterSet):
         widget=forms.TextInput(attrs={"placeholder": _("Search...")}),
     )
 
+    brand = django_filters.CharFilter(
+        field_name="brand__name",
+        lookup_expr="icontains",
+        label=_("Brand"),
+    )
+
     price_min = django_filters.NumberFilter(
         field_name="last_price",
         lookup_expr="gte",
@@ -87,6 +93,7 @@ class ProductFilter(django_filters.FilterSet):
         model = Product
         fields = [
             "search",
+            "brand",
             "price_min",
             "price_max",
             "price_per_gram_min",
@@ -107,6 +114,17 @@ class ProductFilter(django_filters.FilterSet):
             sort_dir = "asc"
 
         prefix = "-" if sort_dir == "desc" else ""
+
+        if sort_by in [
+            "price_per_gram",
+            "last_price",
+            "concentration",
+            "total_protein",
+        ]:
+            if prefix == "-":
+                return queryset.order_by(F(sort_by).desc(nulls_last=True))
+            return queryset.order_by(F(sort_by).asc(nulls_last=True))
+
         return queryset.order_by(f"{prefix}{sort_by}")
 
     def filter_search(self, queryset, name, value):

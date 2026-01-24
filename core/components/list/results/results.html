@@ -1,0 +1,25 @@
+{% load i18n component_tags %}
+
+<div id="list"
+     class="flex-1"
+     x-data="{ viewMode: localStorage.getItem('viewMode') || 'list' }"
+     @view-changed.window="viewMode = $event.detail.view"
+     :class="viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'flex flex-col gap-4'">
+  {% for product in page_obj %}
+    {# Grid View #}
+    <div x-show="viewMode === 'grid'" x-cloak class="h-full">
+      {% component "list.card_grid" product=product %}{% endcomponent %}
+    </div>
+    {# List View #}
+    <div x-show="viewMode === 'list'" x-cloak class="w-full">
+      {% component "list.card_list" product=product %}{% endcomponent %}
+    </div>
+  {% empty %}
+    {# Estado Vazio #}
+    <div class="col-span-full py-12 text-center border-dashed border border-base-200 rounded-lg">
+      <p>{% trans "No products found" %}</p>
+    </div>
+  {% endfor %}
+  {# Paginação #}
+  {% component "list.pagination" page_obj=page_obj per_page=per_page query_params=query_params %}{% endcomponent %}
+</div>

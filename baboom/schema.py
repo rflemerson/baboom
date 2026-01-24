@@ -1,10 +1,11 @@
-from decimal import Decimal
+from __future__ import annotations
+
 from enum import Enum
 
 import strawberry
-from django.db import IntegrityError, transaction
 from strawberry import auto
 
+from baboom.utils import ValidationError, format_graphql_errors
 from core.models import (
     Brand,
     Category,
@@ -136,6 +137,7 @@ class ProductType:
     is_published: auto
     created_at: auto
     updated_at: auto
+    last_enriched_at: auto
     brand: BrandType
     category: CategoryType | None
     tags: list[TagType]
@@ -186,28 +188,43 @@ class ProductStoreInput:
     stock_status: StockStatusEnum = StockStatusEnum.AVAILABLE
 
 
-@strawberry.input
+@strawberry.input(description="Input for creating a new product with all related data")
 class ProductInput:
-    name: str
-    weight: int
-    brand_name: str
-    category_name: str | None = None
-    ean: str | None = None
-    description: str | None = ""
-    packaging: PackagingEnum = PackagingEnum.CONTAINER
-    is_published: bool = False
-    tags: list[str] | None = None
-    stores: list[ProductStoreInput] | None = None
-    nutrition: list[ProductNutritionInput] | None = None
+    name: str = strawberry.field(description="Product display name")
+    weight: int = strawberry.field(description="Weight in grams")
+    brand_name: str = strawberry.field(
+        description="Brand name (auto-created if not exists)"
+    )
+    category_name: str | None = strawberry.field(
+        default=None, description="Category name (auto-created as root node)"
+    )
+    ean: str | None = strawberry.field(
+        default=None, description="Barcode (must be unique)"
+    )
+    description: str | None = strawberry.field(
+        default="", description="Marketing description"
+    )
+    packaging: PackagingEnum = strawberry.field(
+        default=PackagingEnum.CONTAINER, description="Packaging type"
+    )
+    is_published: bool = strawberry.field(
+        default=False, description="Visible on public site"
+    )
+    tags: list[str] | None = strawberry.field(
+        default=None, description="Tag names (auto-created)"
+    )
+    stores: list[ProductStoreInput] | None = strawberry.field(
+        default=None, description="Store links with prices"
+    )
+    nutrition: list[ProductNutritionInput] | None = strawberry.field(
+        default=None, description="Nutrition profiles per flavor"
+    )
 
 
 # --- EXCEPTIONS ---
 
 
-@strawberry.type
-class ValidationError:
-    field: str
-    message: str
+# --- EXCEPTIONS ---
 
 
 @strawberry.type
@@ -223,138 +240,138 @@ class ProductResult:
 class Mutation:
     @strawberry.mutation
     def create_product(self, data: ProductInput) -> ProductResult:
-        errors: list[ValidationError] = []
+        from django.core.exceptions import ValidationError as DjangoValidationError
 
-        # Validate EAN uniqueness
-        if data.ean and Product.objects.filter(ean=data.ean).exists():
-            errors.append(ValidationError(field="ean", message="EAN already exists"))
+        from core.services import product_create
 
-        # Validate unique constraint (brand + name + weight)
-        brand_exists = Brand.objects.filter(name=data.brand_name).first()
-        if (
-            brand_exists
-            and Product.objects.filter(
-                brand=brand_exists, name=data.name, weight=data.weight
-            ).exists()
-        ):
-            errors.append(
-                ValidationError(
-                    field="name",
-                    message="Product with this brand, name, and weight already exists",
+        # Convert inputs for service
+        stores_data = []
+        if data.stores:
+            for s in data.stores:
+                stores_data.append(
+                    {
+                        "store_name": s.store_name,
+                        "product_link": s.product_link,
+                        "price": s.price,
+                        "external_id": s.external_id,
+                        "affiliate_link": s.affiliate_link,
+                        "stock_status": s.stock_status.value,
+                    }
                 )
-            )
 
-        if errors:
-            return ProductResult(errors=errors)
+        nutrition_data = []
+        if data.nutrition:
+            for n in data.nutrition:
+                facts = n.nutrition_facts
+                micronutrients_data = []
+                if facts.micronutrients:
+                    for m in facts.micronutrients:
+                        micronutrients_data.append(
+                            {
+                                "name": m.name,
+                                "value": m.value,
+                                "unit": m.unit,
+                            }
+                        )
+
+                nutrition_data.append(
+                    {
+                        "flavor_names": n.flavor_names,
+                        "nutrition_facts": {
+                            "description": facts.description,
+                            "serving_size_grams": facts.serving_size_grams,
+                            "energy_kcal": facts.energy_kcal,
+                            "proteins": facts.proteins,
+                            "carbohydrates": facts.carbohydrates,
+                            "total_sugars": facts.total_sugars,
+                            "added_sugars": facts.added_sugars,
+                            "total_fats": facts.total_fats,
+                            "saturated_fats": facts.saturated_fats,
+                            "trans_fats": facts.trans_fats,
+                            "dietary_fiber": facts.dietary_fiber,
+                            "sodium": facts.sodium,
+                            "micronutrients": micronutrients_data,
+                        },
+                    }
+                )
 
         try:
-            with transaction.atomic():
-                # 1. Brand
-                brand, _ = Brand.objects.get_or_create(
-                    name=input.brand_name,
-                    defaults={"display_name": input.brand_name},
-                )
-
-                # 2. Category
-                category = None
-                if input.category_name:
-                    category = Category.objects.filter(name=input.category_name).first()
-                    if not category:
-                        category = Category.add_root(name=input.category_name)
-
-                # 3. Product
-                product = Product.objects.create(
-                    name=input.name,
-                    weight=input.weight,
-                    brand=brand,
-                    category=category,
-                    ean=input.ean,
-                    description=input.description,
-                    packaging=input.packaging.value,
-                    is_published=input.is_published,
-                )
-
-                # 4. Tags
-                if input.tags:
-                    tag_objects = []
-                    for tag_name in input.tags:
-                        tag = Tag.objects.filter(name=tag_name).first()
-                        if not tag:
-                            tag = Tag.add_root(name=tag_name)
-                        tag_objects.append(tag)
-                    product.tags.set(tag_objects)
-
-                # 5. Stores & Prices
-                if input.stores:
-                    for store_input in input.stores:
-                        store, _ = Store.objects.get_or_create(
-                            name=store_input.store_name,
-                            defaults={"display_name": store_input.store_name},
-                        )
-
-                        product_store = ProductStore.objects.create(
-                            product=product,
-                            store=store,
-                            external_id=store_input.external_id,
-                            product_link=store_input.product_link,
-                            affiliate_link=store_input.affiliate_link,
-                        )
-
-                        ProductPriceHistory.objects.create(
-                            store_product_link=product_store,
-                            price=Decimal(str(store_input.price)),
-                            stock_status=store_input.stock_status.value,
-                        )
-
-                # 6. Nutrition Profiles
-                if input.nutrition:
-                    for nutr_input in input.nutrition:
-                        facts_input = nutr_input.nutrition_facts
-                        facts = NutritionFacts.objects.create(
-                            description=facts_input.description,
-                            serving_size_grams=facts_input.serving_size_grams,
-                            energy_kcal=facts_input.energy_kcal,
-                            proteins=Decimal(str(facts_input.proteins)),
-                            carbohydrates=Decimal(str(facts_input.carbohydrates)),
-                            total_sugars=Decimal(str(facts_input.total_sugars)),
-                            added_sugars=Decimal(str(facts_input.added_sugars)),
-                            total_fats=Decimal(str(facts_input.total_fats)),
-                            saturated_fats=Decimal(str(facts_input.saturated_fats)),
-                            trans_fats=Decimal(str(facts_input.trans_fats)),
-                            dietary_fiber=Decimal(str(facts_input.dietary_fiber)),
-                            sodium=facts_input.sodium,
-                        )
-
-                        # Bulk create micronutrients
-                        if facts_input.micronutrients:
-                            micros = [
-                                Micronutrient(
-                                    nutrition_facts=facts,
-                                    name=m.name,
-                                    value=Decimal(str(m.value)),
-                                    unit=m.unit,
-                                )
-                                for m in facts_input.micronutrients
-                            ]
-                            Micronutrient.objects.bulk_create(micros)
-
-                        profile = ProductNutrition.objects.create(
-                            product=product, nutrition_facts=facts
-                        )
-
-                        if nutr_input.flavor_names:
-                            flavor_objects = []
-                            for flav_name in nutr_input.flavor_names:
-                                flavor, _ = Flavor.objects.get_or_create(name=flav_name)
-                                flavor_objects.append(flavor)
-                            profile.flavors.set(flavor_objects)
-
-                return ProductResult(product=product)
-
-        except IntegrityError as e:
-            return ProductResult(
-                errors=[ValidationError(field="unknown", message=str(e))]
+            product = product_create(
+                name=data.name,
+                weight=data.weight,
+                brand_name=data.brand_name,
+                category_name=data.category_name,
+                ean=data.ean,
+                description=data.description,
+                packaging=data.packaging.value,
+                is_published=data.is_published,
+                tags=data.tags,
+                stores=stores_data,
+                nutrition=nutrition_data,
             )
+            return ProductResult(product=product)
+
+        except DjangoValidationError as e:
+            return ProductResult(errors=format_graphql_errors(e))
+
+    @strawberry.mutation(
+        description="Update product content/metadata only. Does NOT touch prices."
+    )
+    def update_product_content(
+        self, product_id: int, data: ProductContentUpdateInput
+    ) -> ProductResult:
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from core.services import product_update_content
+
+        """
+        Updates product metadata (description, category, tags) without modifying price data.
+        Mutation used for product enrichment.
+        Prices are managed by scrapers; content is managed by enrichment.
+        """
+        product = Product.objects.filter(id=product_id).first()
+
+        if not product:
+            return ProductResult(
+                errors=[
+                    ValidationError(field="product_id", message="Product not found")
+                ]
+            )
+
+        try:
+            updated_product = product_update_content(
+                product=product,
+                name=data.name,
+                description=data.description,
+                category_name=data.category_name,
+                packaging=data.packaging.value if data.packaging else None,
+                tags=data.tags,
+            )
+            return ProductResult(product=updated_product)
+
+        except DjangoValidationError as e:
+            return ProductResult(errors=format_graphql_errors(e))
+
+
+@strawberry.input(
+    description="Input for updating product content only (no price changes)"
+)
+class ProductContentUpdateInput:
+    name: str | None = strawberry.field(
+        default=None, description="New product name (optional)"
+    )
+    description: str | None = strawberry.field(
+        default=None, description="New description (optional)"
+    )
+    category_name: str | None = strawberry.field(
+        default=None, description="New category name (optional, empty string to clear)"
+    )
+    packaging: PackagingEnum | None = strawberry.field(
+        default=None, description="New packaging type (optional)"
+    )
+    tags: list[str] | None = strawberry.field(
+        default=None, description="Replace all tags with these (optional)"
+    )
 
 
 # --- QUERIES ---

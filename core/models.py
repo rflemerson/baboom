@@ -1,5 +1,8 @@
+import hashlib
 import logging
+from typing import Any
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -170,6 +173,16 @@ class Product(BaseModel):
         help_text=_("If checked, this product will be visible on the public website."),
     )
 
+    last_enriched_at = models.DateTimeField(
+        _("Last Enriched By LLM"),
+        null=True,
+        blank=True,
+        help_text=_("Timestamp of last content update by LLM agent"),
+    )
+
+    # Product change history
+    history = HistoricalRecords()
+
     class Meta:
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
@@ -188,6 +201,35 @@ class Product(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.brand.name} - {self.name} ({self.weight}g)"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+
+        # 1. Validate EAN uniqueness (excluding self)
+        if self.ean:
+            qs = Product.objects.filter(ean=self.ean)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError(
+                    {"ean": _("Product with this EAN already exists.")}
+                )
+
+        # 2. Validate Brand + Name + Weight uniqueness (excluding self)
+        if self.brand_id and self.name and self.weight:
+            qs = Product.objects.filter(
+                brand_id=self.brand_id, name=self.name, weight=self.weight
+            )
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError(
+                    _("Product with this brand, name, and weight already exists.")
+                )
 
 
 class ProductStore(BaseModel):
@@ -280,11 +322,6 @@ class ProductPriceHistory(models.Model):
         auto_now_add=True,
     )
 
-    history = HistoricalRecords(
-        verbose_name=_("Version History"),
-        excluded_fields=["history"],
-    )
-
     class Meta:
         ordering = ["-collected_at"]
         get_latest_by = "collected_at"
@@ -333,7 +370,18 @@ class NutritionFacts(BaseModel):
     dietary_fiber = models.DecimalField(
         _("Dietary Fiber (g)"), max_digits=5, decimal_places=1, default=0
     )
-    sodium = models.PositiveIntegerField(_("Sodium (mg)"), default=0)
+    sodium = models.DecimalField(
+        _("Sodium (mg)"), max_digits=10, decimal_places=2, default=0
+    )
+
+    content_hash = models.CharField(
+        _("Content Hash"),
+        max_length=64,
+        unique=True,
+        db_index=True,
+        blank=True,
+        help_text=_("Auto-computed hash of nutritional values for deduplication"),
+    )
 
     class Meta:
         verbose_name = _("Nutrition Facts")
@@ -341,6 +389,72 @@ class NutritionFacts(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.description or 'Generic Nutrition Facts'}"
+
+    def save(self, *args, **kwargs):
+        # Automatically generate hash using centralized logic.
+        # If micronutrients are not passed (e.g. admin), generate hash only from macros.
+        if not self.content_hash:
+            self.content_hash = self.generate_hash(source=self)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def generate_hash(
+        cls, source: Any, micronutrients: list[dict[str, Any]] | None = None
+    ) -> str:
+        """
+        Single Source of Truth for Nutritional Hashing.
+        Generates deterministic hash based on Macros and (optionally) Micros.
+
+        Args:
+            source: Can be a NutritionFacts instance OR a dictionary (from Service).
+            micronutrients: List of dictionaries [{'name': '...', 'value': ...}, ...].
+                            Required if 'source' is dict, or to complement the hash.
+        """
+
+        # 1. Strict formatting function (Resolves 24 vs 24.00)
+        def fmt(val: Any) -> str:
+            try:
+                # Convert to float first to handle decimals/strings
+                # Format with 2 fixed decimal places
+                return f"{float(val):.2f}"
+            except (ValueError, TypeError):
+                return "0.00"
+
+        # 2. Helper to extract value whether it is Dict or Object
+        def get_val(key: str) -> Any:
+            if isinstance(source, dict):
+                return source.get(key)
+            return getattr(source, key, None)
+
+        # 3. Macro List (Order matters!)
+        parts = [
+            fmt(get_val("serving_size_grams")),
+            fmt(get_val("energy_kcal")),
+            fmt(get_val("proteins")),
+            fmt(get_val("carbohydrates")),
+            fmt(get_val("total_sugars")),
+            fmt(get_val("added_sugars")),
+            fmt(get_val("total_fats")),
+            fmt(get_val("saturated_fats")),
+            fmt(get_val("trans_fats")),
+            fmt(get_val("dietary_fiber")),
+            fmt(get_val("sodium")),
+        ]
+
+        # 4. Add Micronutrients (if provided)
+        if micronutrients:
+            # Sort by name to ensure determinism
+            micros_sorted = sorted(micronutrients, key=lambda x: x["name"])
+            for m in micros_sorted:
+                # Supports both dict and Micronutrient object (future case)
+                name = m.get("name") if isinstance(m, dict) else m.name
+                val = m.get("value") if isinstance(m, dict) else m.value
+                unit = m.get("unit", "mg") if isinstance(m, dict) else m.unit
+
+                parts.append(f"{name}:{fmt(val)}:{unit}")
+
+        raw_string = "|".join(parts)
+        return hashlib.sha256(raw_string.encode()).hexdigest()
 
 
 class Micronutrient(BaseModel):

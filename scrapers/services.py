@@ -27,6 +27,7 @@ class ScraperService:
         pid: str = "",
         category: str = "",
     ) -> ScrapedItem | None:
+        # 1. Save raw data (staging)
         obj, created = ScrapedItem.objects.update_or_create(
             store_slug=store_slug,
             external_id=external_id,
@@ -46,50 +47,49 @@ class ScraperService:
         action = "Created" if created else "Updated"
         logger.debug(f"{action} item {external_id} for {store_slug}")
 
+        # 2. Sync logic
+        if obj.status == ScrapedItem.Status.LINKED:
+            ScraperService.sync_price_to_core(obj)
+
         return obj
 
     @staticmethod
     def sync_price_to_core(scraped_item: ScrapedItem) -> bool:
         """
         Syncs price/stock from a LINKED ScrapedItem to ProductPriceHistory.
-
-        Only creates a new record if:
-        1. Item status is LINKED
-        2. Price OR stock changed since the last record
-
-        Returns:
-            True if a new record was created, False otherwise
         """
-        if scraped_item.status != ScrapedItem.Status.LINKED:
-            logger.debug(f"Item {scraped_item} not LINKED, skipping sync")
-            return False
-
-        if not scraped_item.product_store:
-            logger.warning(f"Item {scraped_item} is LINKED but has no product_store")
+        if not scraped_item.product_store_id:
             return False
 
         if scraped_item.price is None:
-            logger.warning(f"Item {scraped_item} has no price, skipping sync")
             return False
 
-        last_price = scraped_item.product_store.price_history.first()
+        product_store = scraped_item.product_store
+        if product_store is None:
+            return False
 
-        price_changed = last_price is None or last_price.price != scraped_item.price
+        last_history = product_store.price_history.values(
+            "price", "stock_status"
+        ).first()
+
+        price_changed = (
+            last_history is None or last_history["price"] != scraped_item.price
+        )
         stock_changed = (
-            last_price is None or last_price.stock_status != scraped_item.stock_status
+            last_history is None
+            or last_history["stock_status"] != scraped_item.stock_status
         )
 
         if not price_changed and not stock_changed:
-            logger.debug(f"No price/stock change for {scraped_item}, skipping sync")
             return False
 
         ProductPriceHistory.objects.create(
-            store_product_link=scraped_item.product_store,
+            store_product_link=product_store,
             price=scraped_item.price,
             stock_status=scraped_item.stock_status,
         )
+
         logger.info(
-            f"Created PriceHistory for {scraped_item.product_store}: "
-            f"R${scraped_item.price} ({scraped_item.get_stock_status_display()})"
+            f"Synced Price for {scraped_item.store_slug}: R${scraped_item.price}"
         )
         return True

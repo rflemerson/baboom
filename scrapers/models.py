@@ -2,8 +2,6 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from simple_history.models import HistoricalRecords
 
-from core.models import ProductStore
-
 
 class ScrapedItem(models.Model):
     class Status(models.TextChoices):
@@ -93,8 +91,9 @@ class ScrapedItem(models.Model):
         db_index=True,
     )
 
+    # Lazy reference to avoid circular imports
     product_store = models.ForeignKey(
-        ProductStore,
+        "core.ProductStore",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
