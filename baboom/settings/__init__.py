@@ -1,9 +1,17 @@
+import importlib
 import os
+import pkgutil
+from pathlib import Path
 
-from .apps.celery import *
-from .apps.logging import *
-from .apps.project import *
 from .base import *
+
+apps_folder = Path(__file__).parent / "apps"
+
+for _, name, _ in pkgutil.iter_modules([str(apps_folder)]):
+    module = importlib.import_module(f".apps.{name}", package=__package__)
+    globals().update({k: v for k, v in vars(module).items() if k.isupper()})
+
+del apps_folder, name, module, pkgutil, importlib, Path
 
 env_name = os.getenv("DJANGO_ENV", "development")
 
