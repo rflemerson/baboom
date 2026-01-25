@@ -1,0 +1,42 @@
+from typing import cast
+
+import strawberry
+
+from core.models import Product
+
+from .types import ProductType
+
+
+@strawberry.type
+class CoreQuery:
+    @strawberry.field
+    def products(self, limit: int = 50, offset: int = 0) -> list[ProductType]:
+        qs = (
+            Product.objects.select_related("brand", "category")
+            .prefetch_related(
+                "tags",
+                "store_links__store",
+                "store_links__price_history",
+                "nutrition_profiles__nutrition_facts__micronutrients",
+                "nutrition_profiles__flavors",
+            )
+            .all()[offset : offset + limit]
+        )
+        # O cast é necessário pois o Strawberry faz a conversão Model -> Type magicamente
+        return cast(list[ProductType], qs)
+
+    @strawberry.field
+    def product(self, product_id: int) -> ProductType | None:
+        obj = (
+            Product.objects.select_related("brand", "category")
+            .prefetch_related(
+                "tags",
+                "store_links__store",
+                "store_links__price_history",
+                "nutrition_profiles__nutrition_facts__micronutrients",
+                "nutrition_profiles__flavors",
+            )
+            .filter(id=product_id)
+            .first()
+        )
+        return cast(ProductType | None, obj)
