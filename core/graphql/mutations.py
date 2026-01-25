@@ -5,8 +5,9 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 
 from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.models import Product
+from core.models import Product, ProductStore
 from core.services import product_create, product_update_content
+from scrapers.models import ScrapedItem
 
 from .inputs import ProductContentUpdateInput, ProductInput
 from .types import ProductResult, ProductType
@@ -76,6 +77,28 @@ class CoreMutation:
                 stores=stores_data,
                 nutrition=nutrition_data,
             )
+
+            if data.origin_scraped_item_id:
+                try:
+                    item = ScrapedItem.objects.get(id=data.origin_scraped_item_id)
+
+                    linked_store = ProductStore.objects.filter(
+                        product=product, product_link=item.product_link
+                    ).first()
+
+                    if not linked_store:
+                        linked_store = ProductStore.objects.filter(
+                            product=product
+                        ).first()
+
+                    if linked_store:
+                        item.product_store = linked_store
+                        item.status = ScrapedItem.Status.LINKED
+                        item.save()
+
+                except ScrapedItem.DoesNotExist:
+                    pass
+
             return ProductResult(product=cast(ProductType, product))
 
         except DjangoValidationError as e:

@@ -2,6 +2,7 @@ import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.graphql.schema import CoreMutation, CoreQuery
+from scrapers.graphql.schema import ScrapersMutation
 
 
 @strawberry.type
@@ -16,6 +17,7 @@ class Query(
 @strawberry.type
 class Mutation(
     CoreMutation,
+    ScrapersMutation,
 ):
     pass
 

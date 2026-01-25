@@ -47,8 +47,7 @@ class ScraperService:
         action = "Created" if created else "Updated"
         logger.debug(f"{action} item {external_id} for {store_slug}")
 
-        # 2. Sync logic
-        if obj.status == ScrapedItem.Status.LINKED:
+        if obj.product_store_id:
             ScraperService.sync_price_to_core(obj)
 
         return obj

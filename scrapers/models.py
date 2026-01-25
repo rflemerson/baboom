@@ -6,7 +6,11 @@ from simple_history.models import HistoricalRecords
 class ScrapedItem(models.Model):
     class Status(models.TextChoices):
         NEW = "new", _("New")
+        PROCESSING = "processing", _("Processing")
         LINKED = "linked", _("Linked")
+        ERROR = "error", _("Error (Retry)")
+        DISCARDED = "discarded", _("Discarded (Junk)")
+        REVIEW = "review", _("Needs Review")
         IGNORED = "ignored", _("Ignored")
 
     class StockStatus(models.TextChoices):
@@ -90,6 +94,10 @@ class ScrapedItem(models.Model):
         default=Status.NEW,
         db_index=True,
     )
+
+    error_count = models.IntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error_log = models.TextField(blank=True)
 
     # Lazy reference to avoid circular imports
     product_store = models.ForeignKey(
