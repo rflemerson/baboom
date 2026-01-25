@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import secrets
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -412,22 +413,21 @@ class NutritionFacts(BaseModel):
                             Required if 'source' is dict, or to complement the hash.
         """
 
-        # 1. Strict formatting function (Resolves 24 vs 24.00)
         def fmt(val: Any) -> str:
             try:
-                # Convert to float first to handle decimals/strings
-                # Format with 2 fixed decimal places
-                return f"{float(val):.2f}"
-            except (ValueError, TypeError):
+                if val is None:
+                    return "0.00"
+
+                d = Decimal(str(val))
+                return f"{d:.2f}"
+            except (ValueError, TypeError, InvalidOperation):
                 return "0.00"
 
-        # 2. Helper to extract value whether it is Dict or Object
         def get_val(key: str) -> Any:
             if isinstance(source, dict):
                 return source.get(key)
             return getattr(source, key, None)
 
-        # 3. Macro List (Order matters!)
         parts = [
             fmt(get_val("serving_size_grams")),
             fmt(get_val("energy_kcal")),
@@ -442,12 +442,9 @@ class NutritionFacts(BaseModel):
             fmt(get_val("sodium")),
         ]
 
-        # 4. Add Micronutrients (if provided)
         if micronutrients:
-            # Sort by name to ensure determinism
             micros_sorted = sorted(micronutrients, key=lambda x: x["name"])
             for m in micros_sorted:
-                # Supports both dict and Micronutrient object (future case)
                 name = m.get("name") if isinstance(m, dict) else m.name
                 val = m.get("value") if isinstance(m, dict) else m.value
                 unit = m.get("unit", "mg") if isinstance(m, dict) else m.unit
