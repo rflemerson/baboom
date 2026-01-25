@@ -52,9 +52,9 @@ STORAGES = {
 }
 
 # i18n: Supported languages
-LANGUAGE_CODE = "pt-BR"
+LANGUAGE_CODE = "pt-br"
 LANGUAGES = [
-    ("pt-BR", "Português (Brasil)"),
+    ("pt-br", "Português (Brasil)"),
 ]
 LOCALE_PATHS = [BASE_DIR / "locale"]
 

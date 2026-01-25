@@ -1,0 +1,20 @@
+# Django
+DJANGO_ENV=production
+DJANGO_SECRET_KEY=3^xgw!wb*_kog^vn4b(y%7yqgm3vpopaf5t)x002@k!1+llega
+DJANGO_ALLOWED_HOSTS=baboom.com.br,www.baboom.com.br
+# PostgreSQL
+DB_NAME=baboom
+DB_USER=baboom
+DB_PASS=I7zoVNvlEUNS8sHuK01fvDXl1M241U8n
+DB_HOST=db
+DB_PORT=5432
+
+# RabbitMQ
+RABBITMQ_USER=baboom_broker
+RABBITMQ_PASS=dHPupaBNU42q2fLvDlI7kZNbivQVGf_L
+
+# Celery
+CELERY_RESULT_BACKEND=rpc://
+
+# Playwright (Optional)
+PLAYWRIGHT_CDP_URL=http://host.docker.internal:9222
