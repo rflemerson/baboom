@@ -1,7 +1,6 @@
 services:
   web:
     build: .
-    container_name: baboom
     restart: always
     expose:
       - "8000"

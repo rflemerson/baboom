@@ -41,8 +41,7 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 RUN python manage.py compilemessages --ignore=.venv || true
-RUN python manage.py collectstatic --noinput --clear
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 3 --access-logfile - baboom.wsgi:application"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput --clear && python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 3 --access-logfile - baboom.wsgi:application"]
