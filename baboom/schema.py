@@ -1,5 +1,6 @@
 import strawberry
 
+from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.graphql.schema import CoreMutation, CoreQuery
 
 
@@ -7,7 +8,7 @@ from core.graphql.schema import CoreMutation, CoreQuery
 class Query(
     CoreQuery,
 ):
-    @strawberry.field
+    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def hello(self) -> str:
         return "Baboom GraphQL API is Online"
 

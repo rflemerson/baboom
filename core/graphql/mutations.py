@@ -4,6 +4,7 @@ import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from baboom.utils import format_graphql_errors
+from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Product
 from core.services import product_create, product_update_content
 
@@ -13,7 +14,7 @@ from .types import ProductResult, ProductType
 
 @strawberry.type
 class CoreMutation:
-    @strawberry.mutation
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def create_product(self, data: ProductInput) -> ProductResult:
         stores_data = []
         if data.stores:
@@ -80,7 +81,7 @@ class CoreMutation:
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
 
-    @strawberry.mutation
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def update_product_content(
         self, product_id: int, data: ProductContentUpdateInput
     ) -> ProductResult:

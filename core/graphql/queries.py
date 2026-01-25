@@ -2,6 +2,7 @@ from typing import cast
 
 import strawberry
 
+from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Product
 
 from .types import ProductType
@@ -9,7 +10,7 @@ from .types import ProductType
 
 @strawberry.type
 class CoreQuery:
-    @strawberry.field
+    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def products(self, limit: int = 50, offset: int = 0) -> list[ProductType]:
         qs = (
             Product.objects.select_related("brand", "category")
@@ -25,7 +26,7 @@ class CoreQuery:
         # O cast é necessário pois o Strawberry faz a conversão Model -> Type magicamente
         return cast(list[ProductType], qs)
 
-    @strawberry.field
+    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def product(self, product_id: int) -> ProductType | None:
         obj = (
             Product.objects.select_related("brand", "category")

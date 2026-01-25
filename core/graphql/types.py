@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import strawberry
 from strawberry import auto
 from strawberry.django import type as django_type

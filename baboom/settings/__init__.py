@@ -11,7 +11,6 @@ from .apps.project import *
 # 1. Start with the Pure Django Base Settings
 from .base import *
 
-# 4. Apply Environment Specific Overrides (Dev vs Prod)
 env_name = os.getenv("DJANGO_ENV", "development")
 
 if env_name == "production":

@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import secrets
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -548,3 +549,25 @@ class AlertSubscriber(BaseModel):
 
     def __str__(self) -> str:
         return self.email
+
+
+class APIKey(BaseModel):
+    name = models.CharField(
+        _("Client Name"), max_length=100, help_text=_("Who is this key for?")
+    )
+    key = models.CharField(
+        _("API Key"), max_length=64, unique=True, db_index=True, editable=False
+    )
+    is_active = models.BooleanField(_("Active"), default=True)
+
+    class Meta:
+        verbose_name = _("API Key")
+        verbose_name_plural = _("API Keys")
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.key[:8]}...)"
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)

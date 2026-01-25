@@ -6,6 +6,7 @@ from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
 from .models import (
+    APIKey,
     Brand,
     Category,
     Flavor,
@@ -177,3 +178,11 @@ class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
     search_fields = ("description",)
     inlines = [MicronutrientInline]
     list_per_page = 20
+
+
+@admin.register(APIKey)
+class APIKeyAdmin(admin.ModelAdmin):
+    list_display = ("name", "key", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    readonly_fields = ("key", "created_at", "updated_at")
