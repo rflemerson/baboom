@@ -25,41 +25,41 @@ msgstr "Filtros"
 
 #: core/components/list/filters/drawer/drawer.html:5
 msgid "close sidebar"
-msgstr ""
+msgstr "fechar barra lateral"
 
 #: core/components/list/filters/drawer/drawer.html:18
 #: core/components/list/toolbar/toolbar.html:53 core/filters.py:45
 msgid "Search"
-msgstr ""
+msgstr "Buscar"
 
 #: core/components/list/filters/drawer/drawer.html:24
 msgid "Price Range"
-msgstr ""
+msgstr "Faixa de Preço"
 
 #: core/components/list/filters/drawer/drawer.html:34
 msgid "Price/g Range"
-msgstr ""
+msgstr "Faixa de Preço/g"
 
 #: core/components/list/filters/drawer/drawer.html:44
 msgid "Protein Concentration"
-msgstr ""
+msgstr "Concentração de Proteína"
 
 #: core/components/list/filters/drawer/drawer.html:57
 #: core/components/list/toolbar/toolbar.html:41
 msgid "Clear"
-msgstr ""
+msgstr "Limpar"
 
 #: core/components/list/filters/drawer/drawer.html:62
 msgid "Apply"
-msgstr ""
+msgstr "Aplicar"
 
 #: core/components/list/pagination/pagination.html:6
 msgid "Show"
-msgstr ""
+msgstr "Mostrar"
 
 #: core/components/list/pagination/pagination.html:17
 msgid "per page"
-msgstr ""
+msgstr "por página"
 
 #: core/components/list/pagination/pagination.html:20
 #, python-format
@@ -68,604 +68,607 @@ msgid ""
 "        Showing %(start)s - %(end)s of %(total)s\n"
 "      "
 msgstr ""
+"\n"
+"        Exibindo %(start)s - %(end)s de %(total)s\n"
+"      "
 
 #: core/components/list/price_tag/price_tag.html:18
 msgid "Buy Now"
-msgstr ""
+msgstr "Comprar Agora"
 
 #: core/components/list/results/results.html:20
 msgid "No products found"
-msgstr ""
+msgstr "Nenhum produto encontrado"
 
 #: core/components/list/toolbar/toolbar.html:44 core/filters.py:46
 msgid "Search..."
-msgstr ""
+msgstr "Buscar..."
 
 #: core/components/list/toolbar/toolbar.html:77 core/filters.py:17
 msgid "Low to High"
-msgstr ""
+msgstr "Menor para Maior"
 
 #: core/components/list/toolbar/toolbar.html:82 core/filters.py:18
 msgid "High to Low"
-msgstr ""
+msgstr "Maior para Menor"
 
 #: core/components/list/toolbar/toolbar.html:93
 msgid "List view"
-msgstr ""
+msgstr "Visualização em lista"
 
 #: core/components/list/toolbar/toolbar.html:100
 msgid "Grid view"
-msgstr ""
+msgstr "Visualização em grade"
 
 #: core/components/list/toolbar/toolbar.html:106
 msgid "Clear filters"
-msgstr ""
+msgstr "Limpar filtros"
 
 #: core/filters.py:11 core/filters.py:31
 msgid "Price/g"
-msgstr ""
+msgstr "Preço/g"
 
 #: core/filters.py:12
 msgid "Price"
-msgstr ""
+msgstr "Preço"
 
 #: core/filters.py:13
 msgid "Protein"
-msgstr ""
+msgstr "Proteína"
 
 #: core/filters.py:14
 msgid "Concentration"
-msgstr ""
+msgstr "Concentração"
 
 #: core/filters.py:52 core/models.py:39 core/models.py:126
 msgid "Brand"
-msgstr ""
+msgstr "Marca"
 
 #: core/filters.py:58
 msgid "Min Price"
-msgstr ""
+msgstr "Preço Mín"
 
 #: core/filters.py:59 core/filters.py:71
 msgid "Min"
-msgstr ""
+msgstr "Mín"
 
 #: core/filters.py:64
 msgid "Max Price"
-msgstr ""
+msgstr "Preço Máx"
 
 #: core/filters.py:65 core/filters.py:77
 msgid "Max"
-msgstr ""
+msgstr "Máx"
 
 #: core/filters.py:70
 msgid "Min Price/g"
-msgstr ""
+msgstr "Preço/g Mín"
 
 #: core/filters.py:76
 msgid "Max Price/g"
-msgstr ""
+msgstr "Preço/g Máx"
 
 #: core/filters.py:82
 msgid "Min Concentration"
-msgstr ""
+msgstr "Concentração Mín"
 
 #: core/filters.py:83
 msgid "Min %"
-msgstr ""
+msgstr "% Mín"
 
 #: core/filters.py:88
 msgid "Max Concentration"
-msgstr ""
+msgstr "Concentração Máx"
 
 #: core/filters.py:89
 msgid "Max %"
-msgstr ""
+msgstr "% Máx"
 
 #: core/forms.py:9
 msgid "Please enter a valid email address."
-msgstr ""
+msgstr "Por favor, insira um endereço de e-mail válido."
 
 #: core/forms.py:13
 msgid "your@email.com"
-msgstr ""
+msgstr "seu@email.com"
 
 #: core/forms.py:21
 msgid "This email is already subscribed."
-msgstr ""
+msgstr "Este e-mail já está inscrito."
 
 #: core/models.py:18
 msgid "Created At"
-msgstr ""
+msgstr "Criado em"
 
 #: core/models.py:23
 msgid "Updated At"
-msgstr ""
+msgstr "Atualizado em"
 
 #: core/models.py:32 core/models.py:48 core/models.py:64 core/models.py:80
 #: core/models.py:98
 msgid "Name"
-msgstr ""
+msgstr "Nome"
 
 #: core/models.py:33 core/models.py:49
 msgid "Display Name"
-msgstr ""
+msgstr "Nome de Exibição"
 
 #: core/models.py:35 core/models.py:51 core/models.py:66 core/models.py:83
 #: core/models.py:105 core/models.py:128
 msgid "Description"
-msgstr ""
+msgstr "Descrição"
 
 #: core/models.py:35
 msgid "Brand description"
-msgstr ""
+msgstr "Descrição da marca"
 
 #: core/models.py:40
 msgid "Brands"
-msgstr ""
+msgstr "Marcas"
 
 #: core/models.py:51
 msgid "Store description"
-msgstr ""
+msgstr "Descrição da loja"
 
 #: core/models.py:55
 msgid "Store"
-msgstr ""
+msgstr "Loja"
 
 #: core/models.py:56
 msgid "Stores"
-msgstr ""
+msgstr "Lojas"
 
 #: core/models.py:66
 msgid "Flavor description"
-msgstr ""
+msgstr "Descrição do sabor"
 
 #: core/models.py:70
 msgid "Flavor"
-msgstr ""
+msgstr "Sabor"
 
 #: core/models.py:71 core/models.py:522
 msgid "Flavors"
-msgstr ""
+msgstr "Sabores"
 
 #: core/models.py:80
 msgid "Unique tag name"
-msgstr ""
+msgstr "Nome único da tag"
 
 #: core/models.py:83
 msgid "Tag description"
-msgstr ""
+msgstr "Descrição da tag"
 
 #: core/models.py:89
 msgid "Tag"
-msgstr ""
+msgstr "Tag"
 
 #: core/models.py:90
 msgid "Tags"
-msgstr ""
+msgstr "Tags"
 
 #: core/models.py:101
 msgid "Unique category name"
-msgstr ""
+msgstr "Nome único da categoria"
 
 #: core/models.py:105
 msgid "Category description"
-msgstr ""
+msgstr "Descrição da categoria"
 
 #: core/models.py:111
 msgid "Category"
-msgstr ""
+msgstr "Categoria"
 
 #: core/models.py:112
 msgid "Categories"
-msgstr ""
+msgstr "Categorias"
 
 #: core/models.py:120
 msgid "Refill Package"
-msgstr ""
+msgstr "Refil"
 
 #: core/models.py:121
 msgid "Container Package"
-msgstr ""
+msgstr "Pote"
 
 #: core/models.py:122
 msgid "Bar"
-msgstr ""
+msgstr "Barra"
 
 #: core/models.py:123
 msgid "Other"
-msgstr ""
+msgstr "Outro"
 
 #: core/models.py:125
 msgid "Product Name"
-msgstr ""
+msgstr "Nome do Produto"
 
 #: core/models.py:128
 msgid "Marketing description"
-msgstr ""
+msgstr "Descrição de marketing"
 
 #: core/models.py:132
 msgid "Weight (grams)"
-msgstr ""
+msgstr "Peso (gramas)"
 
 #: core/models.py:132
 msgid "Total product weight in grams"
-msgstr ""
+msgstr "Peso total do produto em gramas"
 
 #: core/models.py:136
 msgid "EAN/GTIN"
-msgstr ""
+msgstr "EAN/GTIN"
 
 #: core/models.py:142
 msgid "European Article Number / Global Trade Item Number"
-msgstr ""
+msgstr "Número de Artigo Europeu / Número Global de Item Comercial"
 
 #: core/models.py:146
 msgid "Packaging Type"
-msgstr ""
+msgstr "Tipo de Embalagem"
 
 #: core/models.py:157
 msgid "Product Category"
-msgstr ""
+msgstr "Categoria do Produto"
 
 #: core/models.py:163
 msgid "Available In Stores"
-msgstr ""
+msgstr "Disponível nas Lojas"
 
 #: core/models.py:168
 msgid "Product Tags"
-msgstr ""
+msgstr "Tags do Produto"
 
 #: core/models.py:172
 msgid "Published"
-msgstr ""
+msgstr "Publicado"
 
 #: core/models.py:174
 msgid "If checked, this product will be visible on the public website."
-msgstr ""
+msgstr "Se marcado, este produto será visível no site público."
 
 #: core/models.py:178
 msgid "Last Enriched By LLM"
-msgstr ""
+msgstr "Última Enriquecida por LLM"
 
 #: core/models.py:181
 msgid "Timestamp of last content update by LLM agent"
-msgstr ""
+msgstr "Data/hora da última atualização de conteúdo pelo agente LLM"
 
 #: core/models.py:188
 msgid "Product"
-msgstr ""
+msgstr "Produto"
 
 #: core/models.py:189
 msgid "Products"
-msgstr ""
+msgstr "Produtos"
 
 #: core/models.py:220
 msgid "Product with this EAN already exists."
-msgstr ""
+msgstr "Um produto com este EAN já existe."
 
 #: core/models.py:232
 msgid "Product with this brand, name, and weight already exists."
-msgstr ""
+msgstr "Já existe um produto com esta marca, nome e peso."
 
 #: core/models.py:240
 msgid "Related Product"
-msgstr ""
+msgstr "Produto Relacionado"
 
 #: core/models.py:247
 msgid "Associated Store"
-msgstr ""
+msgstr "Loja Associada"
 
 #: core/models.py:251
 msgid "Store Product ID"
-msgstr ""
+msgstr "ID do Produto na Loja"
 
 #: core/models.py:253
 msgid "Unique identifier in store system (e.g., SKU)"
-msgstr ""
+msgstr "Identificador único no sistema da loja (ex: SKU)"
 
 #: core/models.py:258
 msgid "Store Product URL"
-msgstr ""
+msgstr "URL do Produto na Loja"
 
 #: core/models.py:259
 msgid "Direct URL to product page in the store"
-msgstr ""
+msgstr "URL direta para a página do produto na loja"
 
 #: core/models.py:263
 msgid "Affiliate Tracking URL"
-msgstr ""
+msgstr "URL de Rastreamento de Afiliado"
 
 #: core/models.py:264
 msgid "URL with affiliate tracking parameters"
-msgstr ""
+msgstr "URL com parâmetros de rastreamento de afiliado"
 
 #: core/models.py:270 core/models.py:304
 msgid "Store Product Link"
-msgstr ""
+msgstr "Link do Produto na Loja"
 
 #: core/models.py:271
 msgid "Store Product Links"
-msgstr ""
+msgstr "Links dos Produtos na Loja"
 
 #: core/models.py:297 scrapers/models.py:13
 msgid "Available"
-msgstr ""
+msgstr "Disponível"
 
 #: core/models.py:298 scrapers/models.py:14
 msgid "Last Units"
-msgstr ""
+msgstr "Últimas Unidades"
 
 #: core/models.py:299 scrapers/models.py:15
 msgid "Out of Stock"
-msgstr ""
+msgstr "Sem Estoque"
 
 #: core/models.py:309
 msgid "Current Price"
-msgstr ""
+msgstr "Preço Atual"
 
 #: core/models.py:315
 msgid "Inventory Status"
-msgstr ""
+msgstr "Status do Estoque"
 
 #: core/models.py:322
 msgid "Collection Timestamp"
-msgstr ""
+msgstr "Data/Hora da Coleta"
 
 #: core/models.py:329
 msgid "Price Tracking Record"
-msgstr ""
+msgstr "Registro de Rastreamento de Preço"
 
 #: core/models.py:330
 msgid "Price Tracking Records"
-msgstr ""
+msgstr "Registros de Rastreamento de Preço"
 
 #: core/models.py:344
 msgid "Internal Label"
-msgstr ""
+msgstr "Rótulo Interno"
 
 #: core/models.py:348
 msgid ""
 "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin."
-msgstr ""
+msgstr "Ex: 'Saborizada' ou 'Natural' - ajuda a identificar esta tabela na admin."
 
 #: core/models.py:352
 msgid "Serving Size (g)"
-msgstr ""
+msgstr "Porção (g)"
 
 #: core/models.py:353
 msgid "Energy (kcal)"
-msgstr ""
+msgstr "Energia (kcal)"
 
 #: core/models.py:354
 msgid "Proteins (g)"
-msgstr ""
+msgstr "Proteínas (g)"
 
 #: core/models.py:355
 msgid "Carbs (g)"
-msgstr ""
+msgstr "Carboidratos (g)"
 
 #: core/models.py:357
 msgid "Total Sugars (g)"
-msgstr ""
+msgstr "Açúcares Totais (g)"
 
 #: core/models.py:360
 msgid "Added Sugars (g)"
-msgstr ""
+msgstr "Açúcares Adicionados (g)"
 
 #: core/models.py:363
 msgid "Total Fats (g)"
-msgstr ""
+msgstr "Gorduras Totais (g)"
 
 #: core/models.py:366
 msgid "Saturated Fats (g)"
-msgstr ""
+msgstr "Gorduras Saturadas (g)"
 
 #: core/models.py:369
 msgid "Trans Fats (g)"
-msgstr ""
+msgstr "Gorduras Trans (g)"
 
 #: core/models.py:372
 msgid "Dietary Fiber (g)"
-msgstr ""
+msgstr "Fibra Alimentar (g)"
 
 #: core/models.py:375
 msgid "Sodium (mg)"
-msgstr ""
+msgstr "Sódio (mg)"
 
 #: core/models.py:379
 msgid "Content Hash"
-msgstr ""
+msgstr "Hash de Conteúdo"
 
 #: core/models.py:384
 msgid "Auto-computed hash of nutritional values for deduplication"
-msgstr ""
+msgstr "Hash auto-calculado de valores nutricionais para deduplicação"
 
 #: core/models.py:388 core/models.py:389 core/models.py:516
 msgid "Nutrition Facts"
-msgstr ""
+msgstr "Tabela Nutricional"
 
 #: core/models.py:474
 msgid "Nutrient Name"
-msgstr ""
+msgstr "Nome do Nutriente"
 
 #: core/models.py:476
 msgid "e.g., Vitamin C, Iron"
-msgstr ""
+msgstr "ex: Vitamina C, Ferro"
 
 #: core/models.py:480
 msgid "Quantity"
-msgstr ""
+msgstr "Quantidade"
 
 #: core/models.py:486
 msgid "Unit"
-msgstr ""
+msgstr "Unidade"
 
 #: core/models.py:493
 msgid "Micronutrient"
-msgstr ""
+msgstr "Micronutriente"
 
 #: core/models.py:494
 msgid "Micronutrients"
-msgstr ""
+msgstr "Micronutrientes"
 
 #: core/models.py:509
 msgid "Base Product"
-msgstr ""
+msgstr "Produto Base"
 
 #: core/models.py:527
 msgid "Product Nutrition Profile"
-msgstr ""
+msgstr "Perfil Nutricional do Produto"
 
 #: core/models.py:528
 msgid "Product Nutrition Profiles"
-msgstr ""
+msgstr "Perfis Nutricionais do Produto"
 
 #: core/models.py:543 core/templates/core/partials/alerts/form.html:14
 msgid "Email"
-msgstr ""
+msgstr "E-mail"
 
 #: core/models.py:544 core/models.py:561
 msgid "Active"
-msgstr ""
+msgstr "Ativo"
 
 #: core/models.py:547
 msgid "Alert Subscriber"
-msgstr ""
+msgstr "Assinante de Alerta"
 
 #: core/models.py:548
 msgid "Alert Subscribers"
-msgstr ""
+msgstr "Assinantes de Alerta"
 
 #: core/models.py:556
 msgid "Client Name"
-msgstr ""
+msgstr "Nome do Cliente"
 
 #: core/models.py:556
 msgid "Who is this key for?"
-msgstr ""
+msgstr "Para quem é esta chave?"
 
 #: core/models.py:559 core/models.py:564
 msgid "API Key"
-msgstr ""
+msgstr "Chave de API"
 
 #: core/models.py:565
 msgid "API Keys"
-msgstr ""
+msgstr "Chaves de API"
 
 #: core/services.py:64
 msgid "A product with this EAN already exists."
-msgstr ""
+msgstr "Um produto com este EAN já existe."
 
 #: core/templates/core/partials/alerts/duplicate.html:7
 msgid "Already Subscribed"
-msgstr ""
+msgstr "Já Inscrito"
 
 #: core/templates/core/partials/alerts/duplicate.html:9
 msgid "The email"
-msgstr ""
+msgstr "O e-mail"
 
 #: core/templates/core/partials/alerts/duplicate.html:9
 msgid "is already in our database."
-msgstr ""
+msgstr "já está em nosso banco de dados."
 
 #: core/templates/core/partials/alerts/duplicate.html:12
 #: core/templates/core/partials/alerts/success.html:12
 msgid "Close"
-msgstr ""
+msgstr "Fechar"
 
 #: core/templates/core/partials/alerts/duplicate.html:16
 msgid "Use another email"
-msgstr ""
+msgstr "Usar outro e-mail"
 
 #: core/templates/core/partials/alerts/form.html:4
 #: core/templates/core/partials/header.html:43
 msgid "Alerts"
-msgstr ""
+msgstr "Alertas"
 
 #: core/templates/core/partials/alerts/form.html:5
 msgid "Enter your email to receive notifications."
-msgstr ""
+msgstr "Insira seu e-mail para receber notificações."
 
 #: core/templates/core/partials/alerts/form.html:26
 msgid "Cancel"
-msgstr ""
+msgstr "Cancelar"
 
 #: core/templates/core/partials/alerts/form.html:27
 msgid "Subscribe"
-msgstr ""
+msgstr "Inscrever-se"
 
 #: core/templates/core/partials/alerts/success.html:7
 msgid "You're Subscribed!"
-msgstr ""
+msgstr "Você está Inscrito!"
 
 #: core/templates/core/partials/alerts/success.html:9
 msgid "We've added"
-msgstr ""
+msgstr "Nós adicionamos"
 
 #: core/templates/core/partials/alerts/success.html:9
 msgid "to our list. You'll be the first to know about price drops!"
-msgstr ""
+msgstr "à nossa lista. Você será o primeiro a saber sobre quedas de preço!"
 
 #: core/templates/core/partials/alerts/success.html:16
 msgid "Subscribe another email"
-msgstr ""
+msgstr "Inscrever outro e-mail"
 
 #: core/views.py:82
 msgid "You're subscribed! We'll notify you when prices drop."
-msgstr ""
+msgstr "Você está inscrito! Nós o notificaremos quando os preços caírem."
 
 #: core/views.py:101
 msgid "Invalid input."
-msgstr ""
+msgstr "Entrada inválida."
 
 #: scrapers/admin.py:17
 msgid "Please select only one item to create a product from."
-msgstr ""
+msgstr "Por favor, selecione apenas um item para criar um produto."
 
 #: scrapers/models.py:8
 msgid "New"
-msgstr ""
+msgstr "Novo"
 
 #: scrapers/models.py:9
 msgid "Linked"
-msgstr ""
+msgstr "Vinculado"
 
 #: scrapers/models.py:10
 msgid "Ignored"
-msgstr ""
+msgstr "Ignorado"
 
 #: scrapers/models.py:20
 msgid "Store identifier"
-msgstr ""
+msgstr "Identificador da loja"
 
 #: scrapers/models.py:26
 msgid "Unique ID from Store"
-msgstr ""
+msgstr "ID Único da Loja"
 
 #: scrapers/models.py:32
 msgid "URL to product page"
-msgstr ""
+msgstr "URL para página do produto"
 
 #: scrapers/models.py:38
 msgid "Name extracted from source"
-msgstr ""
+msgstr "Nome extraído da fonte"
 
 #: scrapers/models.py:44
 msgid "Category/Department extracted from source"
-msgstr ""
+msgstr "Categoria/Departamento extraído da fonte"
 
 #: scrapers/models.py:57
 msgid "Available quantity in stock"
-msgstr ""
+msgstr "Quantidade disponível em estoque"
 
 #: scrapers/models.py:70
 msgid "Product ID extracted from source"
-msgstr ""
+msgstr "ID do Produto extraído da fonte"
 
 #: scrapers/models.py:77
 msgid "EAN/GTIN extracted from source"
-msgstr ""
+msgstr "EAN/GTIN extraído da fonte"
 
 #: scrapers/models.py:84
 msgid "SKU extracted from source"
-msgstr ""
+msgstr "SKU extraído da fonte"
