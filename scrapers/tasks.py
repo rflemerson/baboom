@@ -1,5 +1,10 @@
+from datetime import timedelta
+
 from celery import shared_task
 from celery.utils.log import get_task_logger
+from django.utils import timezone
+
+from .models import ScrapedItem
 
 logger = get_task_logger(__name__)
 
@@ -96,3 +101,26 @@ def scrape_soldiers_monitor():
     items = spider.crawl()
     saved_count = len(items)
     return f"Soldiers Monitor: Saved/Updated {saved_count} items."
+
+
+@shared_task
+def release_stuck_items():
+    """
+    Cleaner: Unlocks items that have been in PROCESSING for too long
+    (e.g., agent died or timed out without reporting).
+    """
+    timeout = timezone.now() - timedelta(minutes=60)
+
+    stuck_items = ScrapedItem.objects.filter(
+        status=ScrapedItem.Status.PROCESSING, last_attempt_at__lt=timeout
+    )
+
+    count = stuck_items.count()
+    if count > 0:
+        stuck_items.update(
+            status=ScrapedItem.Status.ERROR,
+            last_error_log="System: Timeout - Agent stopped responding (Zombie Task).",
+        )
+        return f"Cleaned up {count} stuck items."
+
+    return "No stuck items found."
