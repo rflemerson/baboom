@@ -1,8 +1,11 @@
+import logging
 import typing
 
 from strawberry.permission import BasePermission
 
 from core.models import APIKey
+
+logger = logging.getLogger(__name__)
 
 
 class IsAuthenticatedWithAPIKey(BasePermission):
@@ -21,4 +24,5 @@ class IsAuthenticatedWithAPIKey(BasePermission):
             APIKey.objects.get(key=key, is_active=True)
             return True
         except APIKey.DoesNotExist:
+            logger.warning(f"Tentativa de acesso com API Key inválida: {key[:8]}...")
             return False

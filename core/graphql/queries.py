@@ -23,7 +23,6 @@ class CoreQuery:
             )
             .all()[offset : offset + limit]
         )
-        # O cast é necessário pois o Strawberry faz a conversão Model -> Type magicamente
         return cast(list[ProductType], qs)
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
