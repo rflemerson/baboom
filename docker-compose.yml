@@ -18,6 +18,20 @@ services:
       - DB_PORT=${DB_PORT}
       - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s 
+
+    deploy:
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+
     depends_on:
       db:
         condition: service_healthy

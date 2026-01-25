@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
     gettext \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser
