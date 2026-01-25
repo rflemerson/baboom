@@ -52,6 +52,7 @@ repos:
           "django-components",
           "strawberry-graphql-django",
           "strawberry-graphql",
+          "psycopg",
         ]
         args: ["--config-file", "pyproject.toml"]
 

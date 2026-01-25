@@ -1,6 +1,5 @@
-from baboom.django.base import INSTALLED_APPS
-
-from .env import env
+from baboom.settings.base import INSTALLED_APPS
+from baboom.settings.env import env
 
 # Celery Configuration
 INSTALLED_APPS += ["django_celery_results", "django_celery_beat"]

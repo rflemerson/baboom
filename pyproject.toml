@@ -85,12 +85,11 @@ ignore = ["E501", "RUF012"]
 
 [tool.ruff.lint.per-file-ignores]
 "baboom/settings/__init__.py" = ["F403", "F405"]
-
 "core/models.py" = ["DJ001"]
 
 
 [tool.mypy]
-plugins = ["mypy_django_plugin.main"]
+plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin"]
 check_untyped_defs = true
 ignore_missing_imports = true
 

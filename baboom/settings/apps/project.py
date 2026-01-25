@@ -1,4 +1,5 @@
-from baboom.django.base import BASE_DIR, INSTALLED_APPS, MIDDLEWARE
+from baboom.settings.base import INSTALLED_APPS, MIDDLEWARE
+from baboom.settings.env import BASE_DIR
 
 # Project apps
 INSTALLED_APPS += ["core", "scrapers"]
