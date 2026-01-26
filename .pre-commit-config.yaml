@@ -53,6 +53,11 @@ repos:
           "strawberry-graphql-django",
           "strawberry-graphql",
           "psycopg",
+          "pydantic",
+          "pydantic-ai",
+          "prefect",
+          "extruct",
+          "w3lib",
         ]
         args: ["--config-file", "pyproject.toml"]
 

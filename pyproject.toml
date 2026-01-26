@@ -33,6 +33,13 @@ dependencies = [
   "django-components",
   "strawberry-graphql-django",
   "strawberry-graphql",
+  "extruct",
+  "w3lib",
+  "pydantic-ai",
+  "logfire",
+  "prefect",
+  "pydantic",
+  "python-dotenv",
 ]
 
 [project.urls]
@@ -89,7 +96,7 @@ ignore = ["E501", "RUF012"]
 
 
 [tool.mypy]
-plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin"]
+plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin", "pydantic.mypy"]
 check_untyped_defs = true
 ignore_missing_imports = true
 

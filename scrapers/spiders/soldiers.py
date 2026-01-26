@@ -40,7 +40,7 @@ class SoldiersSpider(BaseSpider):
 
                 for a_tag in headers:
                     href = a_tag.get("href")
-                    if href and self.BASE_URL in href:
+                    if href and isinstance(href, str) and self.BASE_URL in href:
                         slug = href.replace(f"{self.BASE_URL}/", "").strip("/")
                         # Filter out common non-product pages
                         if slug and not any(
@@ -88,8 +88,8 @@ class SoldiersSpider(BaseSpider):
                 new_links = 0
                 for item in items:
                     a_tag = item.select_one("a.produto-sobrepor")
-                    if a_tag and a_tag.get("href"):
-                        href = a_tag.get("href")
+                    href = a_tag.get("href") if a_tag else None
+                    if href and isinstance(href, str):
                         full_url = urljoin(self.BASE_URL, href)
                         if full_url not in product_links:
                             product_links.append(full_url)
