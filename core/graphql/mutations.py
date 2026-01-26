@@ -1,3 +1,4 @@
+import logging
 from typing import cast
 
 import strawberry
@@ -8,9 +9,12 @@ from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Product, ProductStore
 from core.services import product_create, product_update_content
 from scrapers.models import ScrapedItem
+from scrapers.services import ScraperService
 
 from .inputs import ProductContentUpdateInput, ProductInput
 from .types import ProductResult, ProductType
+
+logger = logging.getLogger(__name__)
 
 
 @strawberry.type
@@ -95,6 +99,9 @@ class CoreMutation:
                         item.product_store = linked_store
                         item.status = ScrapedItem.Status.LINKED
                         item.save()
+
+                        # 4. Sync initial price/stock from ScrapedItem to PriceHistory immediately
+                        ScraperService.sync_price_to_core(item)
 
                 except ScrapedItem.DoesNotExist:
                     pass

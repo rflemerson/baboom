@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from .models import (
@@ -103,9 +104,10 @@ def product_create(
             # 5. Stores & Prices
             if stores:
                 for store_data in stores:
+                    # Lookup by display_name to avoid unique constraint issues with slugs
                     store, _created = Store.objects.get_or_create(
-                        name=store_data["store_name"],
-                        defaults={"display_name": store_data["store_name"]},
+                        display_name=store_data["store_name"],
+                        defaults={"name": slugify(store_data["store_name"])},
                     )
 
                     product_store = ProductStore.objects.create(

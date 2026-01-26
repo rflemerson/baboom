@@ -138,15 +138,13 @@ def upload_product_task(
                 {
                     "storeName": store_name or raw_data.brand_name,
                     "productLink": url,
-                    "price": float(raw_data.price or 0),
+                    "price": float(raw_data.price or 0.0),
                     "externalId": external_id or "",
                     "stockStatus": stock_map.get(
                         raw_data.stock_status or "A", "AVAILABLE"
                     ),
                 }
-            ]
-            if raw_data.price
-            else [],
+            ],
             "nutrition": [
                 {
                     "nutritionFacts": n.nutrition_facts.model_dump(
