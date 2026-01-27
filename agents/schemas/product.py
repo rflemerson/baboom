@@ -25,14 +25,20 @@ class ScrapedProductData(BaseModel):
     name: str
     brand_name: str
     weight: int = Field(..., description="Weight in grams")
-    category_name: str | None = Field(None, description="Category name")
+    category_name: str | None = Field(None, description="Category name (legacy)")
+    category_path: list[str] = Field(
+        default_factory=list, description="Hierarchical category path"
+    )
     ean: str | None = None
     description: str | None = None
     image_url: str | None = (
         None  # Note: Keep for reference, but check if API accepts it
     )
     nutrition: list[ProductNutritionProfile] | None = None
-    tags: list[str] = Field(default_factory=list, description="List of tags")
+    tags: list[str] = Field(default_factory=list, description="List of tags (legacy)")
+    tag_paths: list[list[str]] = Field(
+        default_factory=list, description="List of hierarchical tag paths"
+    )
     packaging: str = Field(
         "CONTAINER", description="Packaging type: CONTAINER, REFILL, BAR, OTHER"
     )

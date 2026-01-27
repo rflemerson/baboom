@@ -3,9 +3,9 @@ from typing import cast
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.models import Product
+from core.models import Category, Product, Tag
 
-from .types import ProductType
+from .types import CategoryType, ProductType, TagType
 
 
 @strawberry.type
@@ -40,3 +40,11 @@ class CoreQuery:
             .first()
         )
         return cast(ProductType | None, obj)
+
+    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
+    def categories(self) -> list[CategoryType]:
+        return cast(list[CategoryType], Category.objects.all())
+
+    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
+    def tags(self) -> list[TagType]:
+        return cast(list[TagType], Tag.objects.all())

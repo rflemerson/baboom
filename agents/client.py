@@ -45,8 +45,21 @@ class AgentClient:
             raise
 
     def ping(self):
-        query = "query { hello }"
+        query = "query { __typename }"
         return self._send(query)
+
+    def get_taxonomy(self):
+        query = """
+        query {
+            categories { name }
+            tags { name }
+        }
+        """
+        data = self._send(query)
+        result = data.get("data", {})
+        categories = [c["name"] for c in result.get("categories", [])]
+        tags = [t["name"] for t in result.get("tags", [])]
+        return categories, tags
 
     def checkout_work(self):
         mutation = """
@@ -94,4 +107,8 @@ class AgentClient:
         }
         """
         data = self._send(mutation, {"data": product_input})
-        return data.get("data", {}).get("createProduct")
+        result = data.get("data", {}).get("createProduct")
+        if result and result.get("errors"):
+            logger.error(f"Product creation failed: {result['errors']}")
+            raise Exception(f"Product creation failed: {result['errors']}")
+        return result

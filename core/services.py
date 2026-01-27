@@ -47,12 +47,12 @@ def product_create(
     name: str,
     weight: int,
     brand_name: str,
-    category_name: str | None = None,
+    category_name: str | list[str] | None = None,
     ean: str | None = None,
     description: str | None = "",
     packaging: str = "CONTAINER",
     is_published: bool = False,
-    tags: list[str] | None = None,
+    tags: list[str] | list[list[str]] | None = None,
     stores: list[dict[str, Any]] | None = None,
     nutrition: list[dict[str, Any]] | None = None,
 ) -> Product:
@@ -72,12 +72,23 @@ def product_create(
                 defaults={"display_name": brand_name},
             )
 
-            # 2. Category
+            # 2. Category (Hierarchical)
             category = None
             if category_name:
-                category = Category.objects.filter(name=category_name).first()
-                if not category:
-                    category = Category.add_root(name=category_name)
+                # Support both string and list for backward compatibility/flexibility
+                category_path = (
+                    [category_name] if isinstance(category_name, str) else category_name
+                )
+
+                parent = None
+                for cat_part in category_path:
+                    category = Category.objects.filter(name=cat_part).first()
+                    if not category:
+                        if parent:
+                            category = parent.add_child(name=cat_part)
+                        else:
+                            category = Category.add_root(name=cat_part)
+                    parent = category
 
             # 3. Product
             product = Product.objects.create(
@@ -91,14 +102,28 @@ def product_create(
                 is_published=is_published,
             )
 
-            # 4. Tags
+            # 4. Tags (Hierarchical Paths)
             if tags:
                 tag_objects = []
-                for tag_name in tags:
-                    tag = Tag.objects.filter(name=tag_name).first()
-                    if not tag:
-                        tag = Tag.add_root(name=tag_name)
-                    tag_objects.append(tag)
+                # tags can be a list of strings (legacy) or a list of lists (new hierarchy)
+                for tag_entry in tags:
+                    tag_path = [tag_entry] if isinstance(tag_entry, str) else tag_entry
+
+                    parent = None
+                    last_tag = None
+                    for tag_part in tag_path:
+                        tag = Tag.objects.filter(name=tag_part).first()
+                        if not tag:
+                            if parent:
+                                tag = parent.add_child(name=tag_part)
+                            else:
+                                tag = Tag.add_root(name=tag_part)
+                        parent = tag
+                        last_tag = tag
+
+                    if last_tag:
+                        tag_objects.append(last_tag)
+
                 product.tags.set(tag_objects)
 
             # 5. Stores & Prices

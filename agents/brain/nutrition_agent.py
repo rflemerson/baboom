@@ -16,11 +16,19 @@ model_name = os.getenv("LLM_MODEL", "google-gla:gemini-1.5-flash")
 nutrition_agent = Agent(
     model_name,
     output_type=NutritionFacts,
-    system_prompt="Você é um especialista em nutrição. Extraia os fatos nutricionais de imagens com precisão absoluta. Retorne os valores por PORÇÃO.",
+    system_prompt="""Você é um especialista em nutrição e rotulagem de suplementos.
+Extraia os fatos nutricionais de imagens com precisão absoluta.
+
+REGRAS:
+1. Valores por PORÇÃO: Sempre retorne os valores referentes a uma única porção.
+2. Identificação de SABORES: Procure no rótulo por nomes de sabores (ex: Baunilha, Morango, Chocolate, Cookies & Cream) e retorne-os no campo 'flavor_names'.
+3. Se houver múltiplos sabores na mesma imagem, liste todos.""",
 )
 
 
-def run_nutrition_extraction(storage_path: str) -> list[ProductNutritionProfile]:
+def run_nutrition_extraction(
+    storage_path: str, context: str = ""
+) -> list[ProductNutritionProfile]:
     """
     Runs the agent to extract nutrition data from an image file in storage.
     storage_path is expected to be "bucket/key".
@@ -41,14 +49,22 @@ def run_nutrition_extraction(storage_path: str) -> list[ProductNutritionProfile]
 
         logger.info(f"Sending image from storage to PydanticAI Agent ({model_name})...")
 
+        prompt = "Extraia a tabela nutricional e identifique os sabores presentes nesta imagem. Use os valores por porção."
+        if context:
+            prompt += f"\nCONTEXTO ADICIONAL (Nome do arquivo/Alt text/URL): {context}"
+
         result = nutrition_agent.run_sync(
             [
-                "Extraia a tabela nutricional desta imagem. Use os valores por porção.",
+                prompt,
                 BinaryContent(data=image_data, media_type="image/jpeg"),
             ]
         )
-        # Wrap the single facts object into the expected list of profiles
-        return [ProductNutritionProfile(nutrition_facts=result.output, flavor_names=[])]
+        # The result.output is now NutritionFacts, which includes flavor_names
+        return [
+            ProductNutritionProfile(
+                nutrition_facts=result.output, flavor_names=result.output.flavor_names
+            )
+        ]
     except Exception as e:
         logger.error(f"Agent execution failed: {e}")
         return []

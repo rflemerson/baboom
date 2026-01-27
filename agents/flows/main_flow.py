@@ -59,21 +59,42 @@ def extract_nutrition_data(storage_context_path: str) -> list[ProductNutritionPr
     image_key = top_candidate["file"]
     storage_image_path = f"{bucket}/{image_key}"
 
+    # Build context from metadata and URL to help with flavor/variant identification
+    context_parts = []
+    if "url" in top_candidate:
+        context_parts.append(f"URL: {top_candidate['url']}")
+    if "metadata" in top_candidate:
+        meta = top_candidate["metadata"]
+        if meta.get("alt"):
+            context_parts.append(f"Alt Text: {meta['alt']}")
+        if meta.get("title"):
+            context_parts.append(f"Title: {meta['title']}")
+
+    context_str = "\n".join(context_parts)
     logger.info(
         f"Extracting nutrition from {storage_image_path} (Score: {top_candidate['score']})"
     )
 
-    return run_nutrition_extraction(storage_image_path)
+    return run_nutrition_extraction(storage_image_path, context=context_str)
 
 
-@task
-def enrich_metadata_task(raw_data: RawScrapedData) -> ProductMetadata:
+@task(name="enrich_metadata_task", retries=2, retry_delay_seconds=30)
+def enrich_metadata_task(
+    raw_data: RawScrapedData,
+    existing_categories: list[str] | None = None,
+    existing_tags: list[str] | None = None,
+) -> ProductMetadata:
     """
-    Calls Metadata Agent to enrich raw data with category, weight, and tags.
+    Calls Metadata Agent to enrich raw data with hierarchical category and tags.
     """
     logger = get_run_logger()
     logger.info(f"Enriching metadata for: {raw_data.name}")
-    return run_metadata_extraction(raw_data.name, raw_data.description or "")
+    return run_metadata_extraction(
+        raw_data.name,
+        raw_data.description or "",
+        existing_categories=existing_categories,
+        existing_tags=existing_tags,
+    )
 
 
 @task(retries=3, retry_delay_seconds=30)
@@ -103,8 +124,8 @@ def upload_product_task(
             origin_scraped_item_id=item_id,
             weight=ai_metadata.weight_grams or 0,
             packaging=ai_metadata.packaging or "CONTAINER",
-            category_name=ai_metadata.category or "General",
-            tags=ai_metadata.tags or [],
+            category_path=ai_metadata.category_hierarchy or [],
+            tag_paths=ai_metadata.tags_hierarchy or [],
         )
 
         logger.info(
@@ -148,14 +169,15 @@ def upload_product_task(
             "nutrition": [
                 {
                     "nutritionFacts": n.nutrition_facts.model_dump(
-                        exclude_none=True, by_alias=True
+                        exclude={"flavor_names"}, exclude_none=True, by_alias=True
                     ),
-                    "flavorNames": n.flavor_names,
+                    "flavorNames": n.nutrition_facts.flavor_names,
                 }
                 for n in (final_product.nutrition or [])
             ],
-            "tags": final_product.tags,
-            "isPublished": False,
+            "categoryPath": final_product.category_path,
+            "tagPaths": [{"path": tp} for tp in final_product.tag_paths],
+            "isPublished": True,
         }
 
         client.create_product(payload)
@@ -180,10 +202,13 @@ def product_ingestion_flow():
     logger.info(f"Processing Item {item['id']}: {item['productLink']}")
 
     try:
-        # 1. Download HTML and images to storage
+        # Step 0: Fetch Taxonomy Context
+        existing_categories, existing_tags = client.get_taxonomy()
+
+        # Step 1: Download HTML and images to storage
         html_storage_path = download_product_assets(item["id"], item["productLink"])
 
-        # 2. Extract raw metadata from HTML in storage
+        # Step 2: Extract raw metadata from HTML in storage
         raw_metadata_dict = extract_metadata_task(
             html_storage_path, item["productLink"]
         )
@@ -195,8 +220,10 @@ def product_ingestion_flow():
             stock_status=item.get("stockStatus"),
         )
 
-        # 3. AI Enrichment (Text Agent)
-        ai_metadata = enrich_metadata_task(raw_scraped_data)
+        # Step 3: AI Enrichment (Text Agent)
+        ai_metadata = enrich_metadata_task(
+            raw_scraped_data, existing_categories, existing_tags
+        )
 
         # 4. AI Nutrition Extraction (Vision Agent)
         nutrition = extract_nutrition_data(html_storage_path)

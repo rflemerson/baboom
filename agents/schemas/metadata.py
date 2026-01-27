@@ -15,9 +15,11 @@ class ProductMetadata(BaseModel):
     packaging: str = Field(
         "CONTAINER", description="Packaging type: CONTAINER, REFILL, BAR, OTHER"
     )
-    category: str = Field(
-        "General", description="Product category: Whey Protein, Creatina, BCAA, etc."
+    category_hierarchy: list[str] = Field(
+        default_factory=list,
+        description="Hierarchical category path: ['Proteína', 'Whey', 'Concentrado']",
     )
-    tags: list[str] = Field(
-        default_factory=list, description="Relevant tags based on product description"
+    tags_hierarchy: list[list[str]] = Field(
+        default_factory=list,
+        description="List of hierarchical tag paths: [['Proteína', 'Whey'], ['Suplemento']]",
     )

@@ -25,6 +25,9 @@ class NutritionFacts(BaseModel):
     trans_fats: float = Field(0.0, description="Trans fats in grams")
     dietary_fiber: float = Field(0.0, description="Dietary fiber in grams")
     sodium: int = Field(0, description="Sodium in mg")
+    flavor_names: list[str] = Field(
+        default_factory=list, description="Flavors identified on this specific label"
+    )
     micronutrients: list[MicronutrientItem] | None = None
 
 

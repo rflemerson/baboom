@@ -4,6 +4,11 @@ from .enums import PackagingEnum, StockStatusEnum
 
 
 @strawberry.input
+class TagPathInput:
+    path: list[str]
+
+
+@strawberry.input
 class MicronutrientInput:
     name: str
     value: float
@@ -51,7 +56,10 @@ class ProductInput:
         description="Brand name (auto-created if not exists)"
     )
     category_name: str | None = strawberry.field(
-        default=None, description="Category name"
+        default=None, description="Deprecated: Use category_path"
+    )
+    category_path: list[str] | None = strawberry.field(
+        default=None, description="Hierarchical category path"
     )
     ean: str | None = strawberry.field(default=None, description="Barcode")
     description: str | None = strawberry.field(
@@ -63,7 +71,12 @@ class ProductInput:
     is_published: bool = strawberry.field(
         default=False, description="Visible on public site"
     )
-    tags: list[str] | None = strawberry.field(default=None, description="Tag names")
+    tags: list[str] | None = strawberry.field(
+        default=None, description="Deprecated: Use tag_paths"
+    )
+    tag_paths: list[TagPathInput] | None = strawberry.field(
+        default=None, description="Hierarchical tag paths"
+    )
     stores: list[ProductStoreInput] | None = strawberry.field(
         default=None, description="Store links"
     )
@@ -82,5 +95,7 @@ class ProductContentUpdateInput:
     name: str | None = None
     description: str | None = None
     category_name: str | None = None
+    category_path: list[str] | None = None
     packaging: PackagingEnum | None = None
     tags: list[str] | None = None
+    tag_paths: list[TagPathInput] | None = None

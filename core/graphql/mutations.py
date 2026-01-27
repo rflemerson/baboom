@@ -68,16 +68,23 @@ class CoreMutation:
                 )
 
         try:
+            # Prepare tags from paths if provided, else use legacy
+            tags_to_use: list[str] | list[list[str]] | None = None
+            if data.tag_paths:
+                tags_to_use = [tp.path for tp in data.tag_paths]
+            elif data.tags:
+                tags_to_use = data.tags
+
             product = product_create(
                 name=data.name,
                 weight=data.weight,
                 brand_name=data.brand_name,
-                category_name=data.category_name,
+                category_name=data.category_path or data.category_name,
                 ean=data.ean,
                 description=data.description,
                 packaging=data.packaging.value,
                 is_published=data.is_published,
-                tags=data.tags,
+                tags=tags_to_use,
                 stores=stores_data,
                 nutrition=nutrition_data,
             )
