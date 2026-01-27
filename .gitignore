@@ -3,6 +3,7 @@
 
 # Agents temp folder
 agents/tmp/
+temp/
 .vscode
 
 ### Tailwind CSS ###

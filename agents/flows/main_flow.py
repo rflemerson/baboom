@@ -2,10 +2,9 @@ import json
 
 from prefect import flow, get_run_logger, task
 
-from ..brain.metadata_agent import run_metadata_extraction
-from ..brain.nutrition_agent import run_nutrition_extraction
+from ..brain.product_agent import run_product_analysis
 from ..client import AgentClient
-from ..schemas.metadata import ProductMetadata
+from ..schemas.analysis import ProductAnalysisResult
 from ..schemas.nutrition import ProductNutritionProfile
 from ..schemas.product import RawScrapedData, ScrapedProductData
 from ..storage import get_storage
@@ -24,74 +23,50 @@ def extract_metadata_task(html_storage_path: str, url: str) -> dict:
     return service.extract_metadata(html_storage_path, url)
 
 
-@task
-def extract_nutrition_data(storage_context_path: str) -> list[ProductNutritionProfile]:
-    """
-    storage_context_path is the bucket/key to the HTML or base folder.
-    """
-    logger = get_run_logger()
-    storage = get_storage()
-
-    try:
-        bucket, _ = storage_context_path.split("/", 1)
-    except ValueError:
-        logger.error(f"Invalid storage context path: {storage_context_path}")
-        return []
-
-    candidates_key = "candidates.json"
-
-    if not storage.exists(bucket, candidates_key):
-        logger.warning(f"No {candidates_key} found in storage for bucket {bucket}.")
-        return []
-
-    try:
-        candidates_data = storage.download(bucket, candidates_key)
-        candidates = json.loads(candidates_data.decode("utf-8"))
-    except Exception as e:
-        logger.error(f"Failed to load candidates from storage: {e}")
-        return []
-
-    if not candidates:
-        logger.warning("No image candidates found.")
-        return []
-
-    top_candidate = candidates[0]
-    image_key = top_candidate["file"]
-    storage_image_path = f"{bucket}/{image_key}"
-
-    # Build context from metadata and URL to help with flavor/variant identification
-    context_parts = []
-    if "url" in top_candidate:
-        context_parts.append(f"URL: {top_candidate['url']}")
-    if "metadata" in top_candidate:
-        meta = top_candidate["metadata"]
-        if meta.get("alt"):
-            context_parts.append(f"Alt Text: {meta['alt']}")
-        if meta.get("title"):
-            context_parts.append(f"Title: {meta['title']}")
-
-    context_str = "\n".join(context_parts)
-    logger.info(
-        f"Extracting nutrition from {storage_image_path} (Score: {top_candidate['score']})"
-    )
-
-    return run_nutrition_extraction(storage_image_path, context=context_str)
-
-
-@task(name="enrich_metadata_task", retries=2, retry_delay_seconds=30)
-def enrich_metadata_task(
+@task(name="analyze_product_task", retries=2, retry_delay_seconds=30)
+def analyze_product_task(
     raw_data: RawScrapedData,
+    storage_base_path: str,
     existing_categories: list[str] | None = None,
     existing_tags: list[str] | None = None,
-) -> ProductMetadata:
+) -> ProductAnalysisResult:
     """
-    Calls Metadata Agent to enrich raw data with hierarchical category and tags.
+    Calls the unified ProductAnalysisAgent to extract hierarchy, metadata, nutrition, and flavors
+    using both text and images.
     """
     logger = get_run_logger()
-    logger.info(f"Enriching metadata for: {raw_data.name}")
-    return run_metadata_extraction(
-        raw_data.name,
-        raw_data.description or "",
+    logger.info(f"Analyzing product: {raw_data.name}")
+
+    # 1. Gather images
+    storage = get_storage()
+    try:
+        bucket, _ = storage_base_path.split("/", 1)
+        candidates_key = "candidates.json"
+
+        image_paths = []
+        if storage.exists(bucket, candidates_key):
+            candidates_data = storage.download(bucket, candidates_key)
+            candidates = json.loads(candidates_data.decode("utf-8"))
+
+            # Use top 3 images for analysis to give context (front, nutrition, back)
+            # Filter for images with reasonable score
+            valid_candidates = [c for c in candidates if c["score"] > 0]
+            # Sort by score descending
+            valid_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+            # Take top 3
+            for c in valid_candidates[:3]:
+                image_paths.append(f"{bucket}/{c['file']}")
+
+    except Exception as e:
+        logger.warning(f"Failed to load image candidates: {e}")
+        image_paths = []
+
+    # 2. Call Agent
+    return run_product_analysis(
+        name=raw_data.name,
+        description=raw_data.description or "",
+        image_paths=image_paths,
         existing_categories=existing_categories,
         existing_tags=existing_tags,
     )
@@ -102,8 +77,7 @@ def upload_product_task(
     item_id: int,
     url: str,
     raw_data: RawScrapedData,
-    ai_metadata: ProductMetadata,
-    nutrition_data: list[ProductNutritionProfile],
+    analysis_result: ProductAnalysisResult,
     store_name: str | None = None,
     external_id: str | None = None,
 ) -> None:
@@ -114,18 +88,29 @@ def upload_product_task(
     client = AgentClient()
 
     try:
+        # Convert Analysis Result to Nutrition Profile format
+        nutrition_profiles = []
+        if analysis_result.nutrition_facts:
+            # Inject identified flavors into the nutrition facts wrapper if valid
+            nutrition_profiles.append(
+                ProductNutritionProfile(
+                    nutrition_facts=analysis_result.nutrition_facts,
+                    flavor_names=analysis_result.flavor_names,
+                )
+            )
+
         final_product = ScrapedProductData(
             name=raw_data.name,
             brand_name=raw_data.brand_name,
             ean=raw_data.ean,
             description=raw_data.description,
             image_url=raw_data.image_url,
-            nutrition=nutrition_data,
+            nutrition=nutrition_profiles,
             origin_scraped_item_id=item_id,
-            weight=ai_metadata.weight_grams or 0,
-            packaging=ai_metadata.packaging or "CONTAINER",
-            category_path=ai_metadata.category_hierarchy or [],
-            tag_paths=ai_metadata.tags_hierarchy or [],
+            weight=analysis_result.weight_grams or 0,
+            packaging=analysis_result.packaging or "CONTAINER",
+            category_path=analysis_result.category_hierarchy or [],
+            tag_paths=analysis_result.tags_hierarchy or [],
         )
 
         logger.info(
@@ -171,7 +156,7 @@ def upload_product_task(
                     "nutritionFacts": n.nutrition_facts.model_dump(
                         exclude={"flavor_names"}, exclude_none=True, by_alias=True
                     ),
-                    "flavorNames": n.nutrition_facts.flavor_names,
+                    "flavorNames": n.flavor_names,
                 }
                 for n in (final_product.nutrition or [])
             ],
@@ -194,54 +179,50 @@ def product_ingestion_flow():
     client = AgentClient()
 
     logger.info("Checking for work...")
-    item = client.checkout_work()
-    if not item:
+    work = client.checkout_work()
+    if not work:
         logger.info("Queue empty. Finished.")
         return
 
-    logger.info(f"Processing Item {item['id']}: {item['productLink']}")
+    logger.info(f"Processing Item {work['id']}: {work['productLink']}")
 
     try:
         # Step 0: Fetch Taxonomy Context
         existing_categories, existing_tags = client.get_taxonomy()
 
         # Step 1: Download HTML and images to storage
-        html_storage_path = download_product_assets(item["id"], item["productLink"])
+        html_storage_path = download_product_assets(work["id"], work["productLink"])
 
         # Step 2: Extract raw metadata from HTML in storage
         raw_metadata_dict = extract_metadata_task(
-            html_storage_path, item["productLink"]
+            html_storage_path, work["productLink"]
         )
         service = ScraperService()
         raw_scraped_data = service.consolidate(
             raw_metadata_dict,
-            brand_name_override=item.get("storeName"),
-            price=item.get("price"),
-            stock_status=item.get("stockStatus"),
+            brand_name_override=work.get("storeName"),
+            price=work.get("price"),
+            stock_status=work.get("stockStatus"),
         )
 
-        # Step 3: AI Enrichment (Text Agent)
-        ai_metadata = enrich_metadata_task(
-            raw_scraped_data, existing_categories, existing_tags
+        # Step 3: Unified AI Analysis (Multimodal)
+        analysis_result = analyze_product_task(
+            raw_scraped_data, html_storage_path, existing_categories, existing_tags
         )
 
-        # 4. AI Nutrition Extraction (Vision Agent)
-        nutrition = extract_nutrition_data(html_storage_path)
-
-        # 5. Final Upload
+        # Step 4: Final Upload
         upload_product_task(
-            item["id"],
-            item["productLink"],
+            work["id"],
+            work["productLink"],
             raw_scraped_data,
-            ai_metadata,
-            nutrition,
-            store_name=item.get("storeName"),
-            external_id=item.get("externalId"),
+            analysis_result,
+            store_name=work.get("storeName"),
+            external_id=work.get("externalId"),
         )
 
     except Exception as e:
-        logger.error(f"Flow failed for item {item['id']}: {e}")
-        client.report_error(item["id"], str(e), is_fatal=True)
+        logger.error(f"Flow failed for item {work['id']}: {e}")
+        client.report_error(work["id"], str(e), is_fatal=True)
 
 
 if __name__ == "__main__":
