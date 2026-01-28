@@ -2,7 +2,8 @@ import json
 
 from prefect import flow, get_run_logger, task
 
-from ..brain.product_agent import run_product_analysis
+from ..brain.groq_agent import run_groq_json_extraction
+from ..brain.raw_extraction_agent import run_raw_extraction
 from ..client import AgentClient
 from ..schemas.analysis import ProductAnalysisResult
 from ..schemas.nutrition import ProductNutritionProfile
@@ -39,37 +40,36 @@ def analyze_product_task(
 
     # 1. Gather images
     storage = get_storage()
+    image_paths = []
     try:
         bucket, _ = storage_base_path.split("/", 1)
         candidates_key = "candidates.json"
 
-        image_paths = []
         if storage.exists(bucket, candidates_key):
             candidates_data = storage.download(bucket, candidates_key)
             candidates = json.loads(candidates_data.decode("utf-8"))
 
-            # Use top 3 images for analysis to give context (front, nutrition, back)
-            # Filter for images with reasonable score
+            # Use top 10 images for best vision coverage
             valid_candidates = [c for c in candidates if c["score"] > 0]
-            # Sort by score descending
             valid_candidates.sort(key=lambda x: x["score"], reverse=True)
 
-            # Take top 3
-            for c in valid_candidates[:3]:
+            for c in valid_candidates[:10]:
                 image_paths.append(f"{bucket}/{c['file']}")
 
     except Exception as e:
         logger.warning(f"Failed to load image candidates: {e}")
-        image_paths = []
 
-    # 2. Call Agent
-    return run_product_analysis(
+    # 2. Stage 1: Raw Extraction (Gemma 3)
+    logger.info(f"Stage 1: Running Gemma-3-27b on {len(image_paths)} images")
+    raw_text = run_raw_extraction(
         name=raw_data.name,
         description=raw_data.description or "",
         image_paths=image_paths,
-        existing_categories=existing_categories,
-        existing_tags=existing_tags,
     )
+
+    # 3. Stage 2: Structured Extraction (Groq)
+    logger.info("Stage 2: Running Groq JSON Extraction")
+    return run_groq_json_extraction(raw_text)
 
 
 @task(retries=3, retry_delay_seconds=30)
