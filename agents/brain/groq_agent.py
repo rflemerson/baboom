@@ -23,18 +23,22 @@ You will receive a RAW TEXT REPORT describing a product (extracted from images/t
 Your job is to CONVERT this text into a VALID JSON object matching the schema.
 
 RULES:
-1. Extract 'category_hierarchy' based on the product type.
-   - Example: ["Suplementos", "Proteínas", "Whey Protein", "Blend"]
+1. Extract 'category_hierarchy' following the hierarchical tree from the report.
+   - For PROTEINS, the format MUST be: ["Proteína", <Origem>, <Tipo>, <Processo>]
+   - Example 1: ["Proteína", "Animal", "Whey", "Concentrado"]
+   - Example 2: ["Proteína", "Vegetal", "Ervilha", "Isolado"]
 2. Extract 'tags_hierarchy' from keywords.
-   - Example: [["Marca", "Black Skull"], ["Tipo", "Whey"], ["Característica", "Isolado"]]
+   - Example: [["Marca", "Black Skull"], ["Destaque", "Zero Açúcar"], ["Objetivo", "Massa Muscular"]]
    - MUST be a list of lists of STRINGS. do NOT use numbers.
-3. Extract 'nutrition_facts' precisely.
-   - For 'flavor_names' inside nutrition, use EMPTY LIST [] if none, known. NEVER use null.
-   - Convert units if needed (keep standard).
+3. Extract 'nutrition_facts' PRECISELY as reported.
+   - Include ALL macronutrients (energy in kcal AND kj, proteins, fats, carbs, sugars, fiber, sodium).
+   - For 'micronutrients' list, use objects with { "name": str, "value": float, "unit": str }.
+   - For 'flavor_names' inside nutrition, use EMPTY LIST [] if none. NEVER use null.
 4. Extract 'flavor_names' (Root field).
-   - If multiple flavors are listed (e.g. "Available in Chocolate, Strawberry"), list them ALL.
+   - If multiple flavors are listed in the report, list them ALL here.
 
-OUTPUT STRICT JSON only. Do not wrap in markdown blocks if not supported.""",
+CRITICAL: You must provide ALL fields in a SINGLE tool call. Do not split the output.
+OUTPUT STRICT JSON only. """,
     )
 
 

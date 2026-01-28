@@ -40,21 +40,26 @@ SEUS TÓPICOS DEVEM SER:
    - Tipo de Embalagem (Pote, Refil, Saco, Barra)
    - Marca/Fabricante
 
-3. CATEGORIZAÇÃO (Inferred)
-   - Qual a categoria principal? (Whey, Creatina, Pré-treino, etc)
-   - Palavras-chave/Tags relevantes (Isolado, Hidrolisado, Zero Açúcar, Sem Glúten)
+3. CATEGORIZAÇÃO (Inferred Hierarchy)
+   - Extraia a categoria seguindo uma árvore lógica.
+   - Para PROTEÍNAS, use obrigatoriamente: ["Proteína", <Origem: Animal/Vegetal>, <Tipo: Whey/Caseína/Soja/etc>, <Processo: Isolado/Concentrado/Hidrolisado/Blend>]
+   - Exemplo 1: ["Proteína", "Animal", "Whey", "Isolado"]
+   - Exemplo 2: ["Proteína", "Vegetal", "Ervilha", "Concentrado"]
+   - Para outros produtos, siga lógica similar (ex: ["Aminoácido", "Creatina", "Monohidratada"]).
 
 4. SABORES DISPONÍVEIS
    - Liste todos os sabores que você vê na imagem ou texto.
 
 5. TABELA NUTRICIONAL COMPLETA
-   - Porção de referência (ex: 30g, 2 scoops)
-   - Valor Energético (kcal)
-   - Carboidratos (g)
-   - Proteínas (g)
-   - Gorduras Totais, Saturadas, Trans (g)
-   - Sódio (mg)
-   - Outros nutrientes visíveis (Vitaminas, Minerais, Aminoácidos)
+   - Extraia TODOS os campos obrigatórios da legislação brasileira:
+     - Porção de referência (ex: 30g, 2 scoops)
+     - Valor Energético (kcal e kJ)
+     - Carboidratos (g) e Açúcares (Totais/Adicionados)
+     - Proteínas (g)
+     - Gorduras Totais, Saturadas, Trans (g)
+     - Fibra Alimentar (g)
+     - Sódio (mg)
+   - Além disso, liste TODOS os Micronutrientes, Vitaminas, Minerais e Aminoácidos visíveis.
 
 6. INGREDIENTES E ALÉRGICOS
    - Lista de ingredientes (se legível)

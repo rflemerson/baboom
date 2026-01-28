@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import json
 import logging
-import os
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
@@ -98,16 +97,23 @@ class ScraperService:
                     continue
 
                 content = img_resp.content
+                # Determine extension and save
+                ext = urljoin(img_url, "").split("?")[0].split(".")[-1].lower()
+                if ext == "svg":
+                    continue
+
+                if not ext or len(ext) > 5:
+                    ext = "jpg"
+
                 score, width, height = self._calculate_image_score(
                     img, img_url, content
                 )
 
-                # Determine extension and save
-                ext = os.path.splitext(img_url)[1].split("?")[0]
-                if not ext or len(ext) > 5:
-                    ext = ".jpg"
+                # Skip small images
+                if width < 200 or height < 200:
+                    continue
 
-                image_key = f"images/image_{i}{ext}"
+                image_key = f"images/image_{i}.{ext}"
                 self.storage.upload(
                     bucket, image_key, content, content_type="image/jpeg"
                 )

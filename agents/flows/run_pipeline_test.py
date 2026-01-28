@@ -105,7 +105,7 @@ def test_pipeline_full(item_ids=None):
             images_dir = os.path.join(item_dir, "images")
             os.makedirs(images_dir, exist_ok=True)
 
-            for c in valid[:3]:
+            for c in valid[:10]:
                 storage_path = c["file"]
                 full_storage_key = storage_path
 

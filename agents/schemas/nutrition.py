@@ -15,6 +15,7 @@ class NutritionFacts(BaseModel):
 
     serving_size_grams: int = Field(0, description="Serving size in grams")
     energy_kcal: int = Field(0, description="Energy in Kcal")
+    energy_kj: int = Field(0, description="Energy in kJ")
     proteins: float = Field(0.0, description="Proteins in grams")
     carbohydrates: float = Field(0.0, description="Carbohydrates in grams")
     total_fats: float = Field(0.0, description="Total fats in grams")
