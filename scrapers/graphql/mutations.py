@@ -15,29 +15,37 @@ from .types import ScrapedItemType
 @strawberry.type
 class ScrapersMutation:
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def checkout_scraped_item(self) -> ScrapedItemType | None:
+    def checkout_scraped_item(
+        self, force: bool = False, target_item_id: int | None = None
+    ) -> ScrapedItemType | None:
         """
         Reserves an item for the Agent to process.
         Retrieves NEW items or ERROR items that have 'rested' for 30min (retry threshold).
+        If 'force' is True, also allows checkout of items in LINKED or REVIEW status.
+        If 'target_item_id' is provided, only that specific item will be checked out.
         """
         now = timezone.now()
         retry_threshold = now - timedelta(minutes=30)
 
         with transaction.atomic():
-            item = (
-                ScrapedItem.objects.select_for_update(skip_locked=True)
-                .filter(
-                    Q(status=ScrapedItem.Status.NEW)
-                    | Q(
-                        status=ScrapedItem.Status.ERROR,
-                        error_count__lt=3,
-                        last_attempt_at__lt=retry_threshold,
-                    ),
-                    product_link__startswith="http",
+            base_query = ScrapedItem.objects.select_for_update(skip_locked=True)
+
+            if target_item_id:
+                query = base_query.filter(id=target_item_id)
+            else:
+                q_filters = Q(status=ScrapedItem.Status.NEW) | Q(
+                    status=ScrapedItem.Status.ERROR,
+                    error_count__lt=3,
+                    last_attempt_at__lt=retry_threshold,
                 )
-                .order_by("updated_at")
-                .first()
-            )
+                if force:
+                    q_filters |= Q(status=ScrapedItem.Status.LINKED) | Q(
+                        status=ScrapedItem.Status.REVIEW
+                    )
+
+                query = base_query.filter(q_filters, product_link__startswith="http")
+
+            item = query.order_by("updated_at").first()
 
             if item:
                 item.status = ScrapedItem.Status.PROCESSING

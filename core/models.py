@@ -350,7 +350,9 @@ class NutritionFacts(BaseModel):
         ),
     )
 
-    serving_size_grams = models.PositiveSmallIntegerField(_("Serving Size (g)"))
+    serving_size_grams = models.DecimalField(
+        _("Serving Size (g)"), max_digits=6, decimal_places=2
+    )
     energy_kcal = models.PositiveSmallIntegerField(_("Energy (kcal)"))
     proteins = models.DecimalField(_("Proteins (g)"), max_digits=5, decimal_places=1)
     carbohydrates = models.DecimalField(_("Carbs (g)"), max_digits=5, decimal_places=1)

@@ -12,6 +12,10 @@ class ProductAnalysisResult(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
+    name: str | None = Field(
+        None, description="Corrected product name if scraper failed"
+    )
+
     # Metadata Fields
     weight_grams: int | None = Field(
         None, description="Product weight in grams extracted from text/image"

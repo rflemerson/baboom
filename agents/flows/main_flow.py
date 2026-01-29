@@ -1,4 +1,5 @@
 import json
+import logging
 
 from prefect import flow, get_run_logger, task
 
@@ -11,68 +12,94 @@ from ..schemas.product import RawScrapedData, ScrapedProductData
 from ..storage import get_storage
 from ..tools.scraper import ScraperService
 
+logger = logging.getLogger(__name__)
 
-@task(retries=3, retry_delay_seconds=10)
-def download_product_assets(item_id: int, url: str) -> str:
+
+@task(name="scraper_task", retries=3, retry_delay_seconds=10)
+def scraper_task(
+    item_id: int,
+    url: str,
+    store_name: str | None = None,
+    price: float | None = None,
+    stock_status: str | None = None,
+) -> tuple[RawScrapedData, str]:
+    """
+    Downloads assets and extracts initial metadata using ScraperService.
+    """
     service = ScraperService()
-    return service.download_assets(item_id, url)
 
+    # Download HTML and images
+    storage_path = service.download_assets(item_id, url)
 
-@task
-def extract_metadata_task(html_storage_path: str, url: str) -> dict:
-    service = ScraperService()
-    return service.extract_metadata(html_storage_path, url)
+    # Extract metadata
+    metadata = service.extract_metadata(storage_path, url)
+
+    # Consolidate into RawScrapedData
+    raw_data = service.consolidate(
+        metadata,
+        brand_name_override=store_name,
+        price=price,
+        stock_status=stock_status,
+    )
+
+    return raw_data, storage_path
 
 
 @task(name="analyze_product_task", retries=2, retry_delay_seconds=30)
 def analyze_product_task(
     raw_data: RawScrapedData,
     storage_base_path: str,
-    existing_categories: list[str] | None = None,
-    existing_tags: list[str] | None = None,
+    gemma_model: str | None = None,
+    groq_model: str | None = None,
+    raw_prompt: str | None = None,
+    structured_prompt: str | None = None,
+    skip_images: bool = False,
 ) -> ProductAnalysisResult:
     """
-    Calls the unified ProductAnalysisAgent to extract hierarchy, metadata, nutrition, and flavors
-    using both text and images.
+    Orchestrates the AI-driven analysis of the product using multimodal inputs.
     """
     logger = get_run_logger()
     logger.info(f"Analyzing product: {raw_data.name}")
 
-    # 1. Gather images
-    storage = get_storage()
     image_paths = []
-    try:
-        bucket, _ = storage_base_path.split("/", 1)
-        candidates_key = "candidates.json"
+    if not skip_images:
+        storage = get_storage()
+        try:
+            bucket, _ = storage_base_path.split("/", 1)
+            candidates_key = "candidates.json"
 
-        if storage.exists(bucket, candidates_key):
-            candidates_data = storage.download(bucket, candidates_key)
-            candidates = json.loads(candidates_data.decode("utf-8"))
+            if storage.exists(bucket, candidates_key):
+                candidates_data = storage.download(bucket, candidates_key)
+                candidates = json.loads(candidates_data.decode("utf-8"))
 
-            # Use top 10 images for best vision coverage
-            valid_candidates = [c for c in candidates if c["score"] > 0]
-            valid_candidates.sort(key=lambda x: x["score"], reverse=True)
+                # Use top 10 relevant images for analysis
+                valid_candidates = [c for c in candidates if c["score"] > 0]
+                valid_candidates.sort(key=lambda x: x["score"], reverse=True)
 
-            for c in valid_candidates[:10]:
-                image_paths.append(f"{bucket}/{c['file']}")
+                for c in valid_candidates[:10]:
+                    image_paths.append(f"{bucket}/{c['file']}")
 
-    except Exception as e:
-        logger.warning(f"Failed to load image candidates: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to load image candidates: {e}")
 
-    # 2. Stage 1: Raw Extraction (Gemma 3)
-    logger.info(f"Stage 1: Running Gemma-3-27b on {len(image_paths)} images")
+    # Stage 1: Raw visual/text extraction
+    logger.info(f"Stage 1: Raw extraction on {len(image_paths)} images")
     raw_text = run_raw_extraction(
         name=raw_data.name,
         description=raw_data.description or "",
         image_paths=image_paths,
+        prompt=raw_prompt,
+        model_name=gemma_model,
     )
 
-    # 3. Stage 2: Structured Extraction (Groq)
-    logger.info("Stage 2: Running Groq JSON Extraction")
-    return run_groq_json_extraction(raw_text)
+    # Stage 2: Structured JSON normalization
+    logger.info("Stage 2: Structured JSON Extraction")
+    return run_groq_json_extraction(
+        raw_text, prompt=structured_prompt, model_name=groq_model
+    )
 
 
-@task(retries=3, retry_delay_seconds=30)
+@task(name="upload_product_task", retries=3, retry_delay_seconds=30)
 def upload_product_task(
     item_id: int,
     url: str,
@@ -82,16 +109,14 @@ def upload_product_task(
     external_id: str | None = None,
 ) -> None:
     """
-    Final consolidation and upload to the database via GraphQL.
+    Uploads the validated product analysis to the Baboom database.
     """
     logger = get_run_logger()
     client = AgentClient()
 
     try:
-        # Convert Analysis Result to Nutrition Profile format
         nutrition_profiles = []
         if analysis_result.nutrition_facts:
-            # Inject identified flavors into the nutrition facts wrapper if valid
             nutrition_profiles.append(
                 ProductNutritionProfile(
                     nutrition_facts=analysis_result.nutrition_facts,
@@ -100,7 +125,7 @@ def upload_product_task(
             )
 
         final_product = ScrapedProductData(
-            name=raw_data.name,
+            name=analysis_result.name or raw_data.name,
             brand_name=raw_data.brand_name,
             ean=raw_data.ean,
             description=raw_data.description,
@@ -113,32 +138,17 @@ def upload_product_task(
             tag_paths=analysis_result.tags_hierarchy or [],
         )
 
-        logger.info(
-            f"Uploading Product: {final_product.name} ({final_product.weight}g)"
-        )
+        logger.info(f"Uploading Product: {final_product.name}")
 
-        # Prepare payload with correct field names for GraphQL Input
-        packaging_map = {
-            "REFILL": "REFILL",
-            "CONTAINER": "CONTAINER",
-            "BAR": "BAR",
-            "OTHER": "OTHER",
-        }
-        stock_map = {
-            "A": "AVAILABLE",
-            "L": "LAST_UNITS",
-            "O": "OUT_OF_STOCK",
-        }
+        stock_map = {"A": "AVAILABLE", "L": "LAST_UNITS", "O": "OUT_OF_STOCK"}
 
-        # Prepare payload with correct field names for GraphQL Input
         payload = {
             "name": final_product.name,
             "brandName": final_product.brand_name,
             "weight": int(final_product.weight),
-            "categoryName": final_product.category_name,
             "ean": final_product.ean,
             "description": final_product.description,
-            "packaging": packaging_map.get(final_product.packaging, "CONTAINER"),
+            "packaging": final_product.packaging,
             "originScrapedItemId": int(final_product.origin_scraped_item_id),
             "stores": [
                 {
@@ -166,63 +176,91 @@ def upload_product_task(
         }
 
         client.create_product(payload)
-        logger.info("Product created successfully!")
-
     except Exception as e:
-        logger.error(f"Failed to upload: {e}")
+        logger.error(f"Upload failed: {e}")
         raise
 
 
 @flow(name="Baboom Product Ingestion")
-def product_ingestion_flow():
+def product_ingestion_flow(
+    batch_size: int = 1,
+    gemma_model: str | None = None,
+    groq_model: str | None = None,
+    dry_run: bool = False,
+    force_update: bool = False,
+    skip_images: bool = False,
+    skip_metadata: bool = False,
+    raw_prompt: str | None = None,
+    structured_prompt: str | None = None,
+    target_item_id: int | None = None,
+):
+    """
+    Main flow for processing scraped items through the AI pipeline.
+    """
     logger = get_run_logger()
     client = AgentClient()
+    processed_count = 0
 
-    logger.info("Checking for work...")
-    work = client.checkout_work()
-    if not work:
-        logger.info("Queue empty. Finished.")
-        return
+    while processed_count < batch_size:
+        logger.info(f"Checking for work ({processed_count + 1}/{batch_size})...")
+        work = client.checkout_work(force=force_update, target_item_id=target_item_id)
 
-    logger.info(f"Processing Item {work['id']}: {work['productLink']}")
+        if not work:
+            logger.info("No more work items found.")
+            break
 
-    try:
-        # Step 0: Fetch Taxonomy Context
-        existing_categories, existing_tags = client.get_taxonomy()
+        item_id = work["id"]
+        logger.info(f"Processing Item {item_id}: {work['productLink']}")
 
-        # Step 1: Download HTML and images to storage
-        html_storage_path = download_product_assets(work["id"], work["productLink"])
+        try:
+            # Step 1 & 2: Scrape and Consolidate
+            raw_scraped_data, storage_path = scraper_task(
+                item_id=item_id,
+                url=work["productLink"],
+                store_name=work.get("storeSlug"),
+                price=work.get("price"),
+                stock_status=work.get("stockStatus"),
+            )
 
-        # Step 2: Extract raw metadata from HTML in storage
-        raw_metadata_dict = extract_metadata_task(
-            html_storage_path, work["productLink"]
-        )
-        service = ScraperService()
-        raw_scraped_data = service.consolidate(
-            raw_metadata_dict,
-            brand_name_override=work.get("storeName"),
-            price=work.get("price"),
-            stock_status=work.get("stockStatus"),
-        )
+            if skip_metadata:
+                logger.info("Metadata extraction skipped by user.")
 
-        # Step 3: Unified AI Analysis (Multimodal)
-        analysis_result = analyze_product_task(
-            raw_scraped_data, html_storage_path, existing_categories, existing_tags
-        )
+            # Step 3: AI Analysis (Multimodal)
+            analysis_result = analyze_product_task(
+                raw_data=raw_scraped_data,
+                storage_base_path=storage_path,
+                gemma_model=gemma_model,
+                groq_model=groq_model,
+                raw_prompt=raw_prompt,
+                structured_prompt=structured_prompt,
+                skip_images=skip_images,
+            )
 
-        # Step 4: Final Upload
-        upload_product_task(
-            work["id"],
-            work["productLink"],
-            raw_scraped_data,
-            analysis_result,
-            store_name=work.get("storeName"),
-            external_id=work.get("externalId"),
-        )
+            # Step 4: Final Upload
+            if dry_run:
+                logger.info(
+                    f"[DRY RUN] Ingestion of '{analysis_result.name}' simulated successfully."
+                )
+            else:
+                upload_product_task(
+                    item_id=item_id,
+                    url=work["productLink"],
+                    raw_data=raw_scraped_data,
+                    analysis_result=analysis_result,
+                    store_name=work.get("storeName"),
+                    external_id=work.get("externalId"),
+                )
 
-    except Exception as e:
-        logger.error(f"Flow failed for item {work['id']}: {e}")
-        client.report_error(work["id"], str(e), is_fatal=True)
+            processed_count += 1
+            if target_item_id:
+                break
+
+        except Exception as e:
+            logger.error(f"Flow failed for item {item_id}: {e}")
+            client.report_error(item_id, str(e), is_fatal=True)
+            processed_count += 1
+
+    logger.info(f"Batch completed. Total items processed: {processed_count}")
 
 
 if __name__ == "__main__":

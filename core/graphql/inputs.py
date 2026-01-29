@@ -17,7 +17,7 @@ class MicronutrientInput:
 
 @strawberry.input
 class NutritionFactsInput:
-    serving_size_grams: int
+    serving_size_grams: float
     energy_kcal: int
     proteins: float
     carbohydrates: float
@@ -28,7 +28,7 @@ class NutritionFactsInput:
     saturated_fats: float = 0.0
     trans_fats: float = 0.0
     dietary_fiber: float = 0.0
-    sodium: int = 0
+    sodium: float = 0.0
     micronutrients: list[MicronutrientInput] | None = None
 
 

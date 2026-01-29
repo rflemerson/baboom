@@ -73,8 +73,28 @@ class ScraperService:
         self, html_content: str, base_url: str, bucket: str
     ) -> list[dict]:
         soup = BeautifulSoup(html_content, "html.parser")
-        images = soup.find_all("img")
         candidates = []
+
+        # 1. Collect all potential image sources
+        sources = []
+
+        # Regular <img> tags
+        for img in soup.find_all("img"):
+            src = img.get("src")
+            if src:
+                sources.append((src, img))
+
+        # OpenGraph images (often contain gallery images)
+        for meta in soup.find_all("meta", property="og:image"):
+            src = meta.get("content")
+            if src:
+                sources.append((src, meta))
+
+        # Preloaded images
+        for link in soup.find_all("link", attrs={"rel": "preload", "as": "image"}):
+            src = link.get("href")
+            if src:
+                sources.append((src, link))
 
         def _get_attr(tag: Tag, name: str) -> str:
             val = tag.get(name, "")
@@ -82,15 +102,16 @@ class ScraperService:
                 return " ".join(val)
             return str(val) if val else ""
 
-        for i, img in enumerate(images):
-            if not isinstance(img, Tag):
-                continue
-
-            src = img.get("src")
+        seen_urls = set()
+        for i, (src, tag) in enumerate(sources):
             if not src or not isinstance(src, str):
                 continue
 
             img_url = urljoin(base_url, src)
+            if img_url in seen_urls:
+                continue
+            seen_urls.add(img_url)
+
             try:
                 img_resp = requests.get(img_url, headers=self.headers, timeout=10)
                 if img_resp.status_code != 200:
@@ -106,7 +127,7 @@ class ScraperService:
                     ext = "jpg"
 
                 score, width, height = self._calculate_image_score(
-                    img, img_url, content
+                    tag, img_url, content
                 )
 
                 # Skip small images

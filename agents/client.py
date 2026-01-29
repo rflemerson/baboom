@@ -61,10 +61,10 @@ class AgentClient:
         tags = [t["name"] for t in result.get("tags", [])]
         return categories, tags
 
-    def checkout_work(self):
+    def checkout_work(self, force: bool = False, target_item_id: int | None = None):
         mutation = """
-        mutation {
-            checkoutScrapedItem {
+        mutation($force: Boolean, $targetItemId: Int) {
+            checkoutScrapedItem(force: $force, targetItemId: $targetItemId) {
                 id
                 productLink
                 storeSlug
@@ -75,7 +75,7 @@ class AgentClient:
             }
         }
         """
-        data = self._send(mutation)
+        data = self._send(mutation, {"force": force, "targetItemId": target_item_id})
         return data.get("data", {}).get("checkoutScrapedItem")
 
     def report_error(self, item_id, message, is_fatal=False):

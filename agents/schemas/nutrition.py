@@ -13,9 +13,8 @@ class MicronutrientItem(BaseModel):
 class NutritionFacts(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-    serving_size_grams: int = Field(0, description="Serving size in grams")
+    serving_size_grams: float = Field(0.0, description="Serving size in grams")
     energy_kcal: int = Field(0, description="Energy in Kcal")
-    energy_kj: int = Field(0, description="Energy in kJ")
     proteins: float = Field(0.0, description="Proteins in grams")
     carbohydrates: float = Field(0.0, description="Carbohydrates in grams")
     total_fats: float = Field(0.0, description="Total fats in grams")
@@ -25,7 +24,7 @@ class NutritionFacts(BaseModel):
     saturated_fats: float = Field(0.0, description="Saturated fats in grams")
     trans_fats: float = Field(0.0, description="Trans fats in grams")
     dietary_fiber: float = Field(0.0, description="Dietary fiber in grams")
-    sodium: int = Field(0, description="Sodium in mg")
+    sodium: float = Field(0.0, description="Sodium in mg")
     flavor_names: list[str] = Field(
         default_factory=list, description="Flavors identified on this specific label"
     )

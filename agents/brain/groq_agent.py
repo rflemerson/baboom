@@ -1,4 +1,5 @@
 import logging
+import os
 
 from pydantic_ai import Agent
 from pydantic_ai.models.groq import GroqModel
@@ -7,48 +8,42 @@ from ..schemas.analysis import ProductAnalysisResult
 
 logger = logging.getLogger(__name__)
 
-# Llama 3.3 70B Versatile (128k context, nice for JSON)
-MODEL_NAME = "llama-3.3-70b-versatile"
+# Default model if not specified in flow
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 
-def get_groq_agent():
-    model = GroqModel(MODEL_NAME)
+def _get_default_prompt():
+    prompt_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "prompts", "groq_extraction.md"
+    )
+    if os.path.exists(prompt_path):
+        with open(prompt_path) as f:
+            return f.read()
+    return "Convert the following text to structured JSON."
+
+
+def get_groq_agent(model_name: str, prompt: str):
+    model = GroqModel(model_name)
 
     return Agent(
         model,
         output_type=ProductAnalysisResult,
-        system_prompt="""OBJECTIVE:
-You are a Data Extraction Expert.
-You will receive a RAW TEXT REPORT describing a product (extracted from images/text).
-Your job is to CONVERT this text into a VALID JSON object matching the schema.
-
-RULES:
-1. Extract 'category_hierarchy' following the hierarchical tree from the report.
-   - For PROTEINS, the format MUST be: ["Proteína", <Origem>, <Tipo>, <Processo>]
-   - Example 1: ["Proteína", "Animal", "Whey", "Concentrado"]
-   - Example 2: ["Proteína", "Vegetal", "Ervilha", "Isolado"]
-2. Extract 'tags_hierarchy' from keywords.
-   - Example: [["Marca", "Black Skull"], ["Destaque", "Zero Açúcar"], ["Objetivo", "Massa Muscular"]]
-   - MUST be a list of lists of STRINGS. do NOT use numbers.
-3. Extract 'nutrition_facts' PRECISELY as reported.
-   - Include ALL macronutrients (energy in kcal AND kj, proteins, fats, carbs, sugars, fiber, sodium).
-   - For 'micronutrients' list, use objects with { "name": str, "value": float, "unit": str }.
-   - For 'flavor_names' inside nutrition, use EMPTY LIST [] if none. NEVER use null.
-4. Extract 'flavor_names' (Root field).
-   - If multiple flavors are listed in the report, list them ALL here.
-
-CRITICAL: You must provide ALL fields in a SINGLE tool call. Do not split the output.
-OUTPUT STRICT JSON only. """,
+        system_prompt=prompt,
     )
 
 
-def run_groq_json_extraction(raw_text: str) -> ProductAnalysisResult:
+def run_groq_json_extraction(
+    raw_text: str, prompt: str | None = None, model_name: str | None = None
+) -> ProductAnalysisResult:
     """
-    Runs Groq (Llama 3.3) to convert raw text -> JSON Schema.
+    Runs Groq to convert raw text -> JSON Schema.
     """
-    logger.info(f"Running Groq ({MODEL_NAME}) on {len(raw_text)} chars of text...")
+    model_name = model_name or DEFAULT_MODEL
+    instructions = prompt or _get_default_prompt()
 
-    agent = get_groq_agent()
+    logger.info(f"Running Groq ({model_name}) on {len(raw_text)} chars of text...")
+
+    agent = get_groq_agent(model_name, instructions)
 
     try:
         result = agent.run_sync(raw_text)
