@@ -10,8 +10,11 @@ from .types import CategoryType, ProductType, TagType
 
 @strawberry.type
 class CoreQuery:
+    """GraphQL queries for core module."""
+
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def products(self, limit: int = 50, offset: int = 0) -> list[ProductType]:
+        """List products with pagination."""
         qs = (
             Product.objects.select_related("brand", "category")
             .prefetch_related(
@@ -27,6 +30,7 @@ class CoreQuery:
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def product(self, product_id: int) -> ProductType | None:
+        """Get single product by ID."""
         obj = (
             Product.objects.select_related("brand", "category")
             .prefetch_related(
@@ -43,8 +47,10 @@ class CoreQuery:
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def categories(self) -> list[CategoryType]:
+        """List all categories."""
         return cast(list[CategoryType], Category.objects.all())
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def tags(self) -> list[TagType]:
+        """List all tags."""
         return cast(list[TagType], Tag.objects.all())

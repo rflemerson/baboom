@@ -3,11 +3,14 @@ from django_components import component
 
 @component.register("list")
 class List(component.Component):
+    """Main list component."""
+
     template_name = "list.html"
 
     def get_context_data(
         self, filter_obj, page_obj=None, per_page=None, query_params=None
     ):
+        """Prepare complete list context."""
         return {
             "filter": filter_obj,
             "page_obj": page_obj,

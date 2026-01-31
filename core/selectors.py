@@ -16,7 +16,9 @@ from .models import NutritionFacts, Product, ProductPriceHistory
 
 def list_with_stats() -> QuerySet[Product]:
     """
-    Returns a Product QuerySet annotated with:
+    Returns a Product QuerySet annotated with statistics.
+
+    Annotations:
     - last_price
     - external_link
     - nutrition info

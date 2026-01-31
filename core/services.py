@@ -30,9 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def alert_subscriber_create(*, email: str) -> AlertSubscriber:
-    """
-    Creates a new alert subscriber.
-    """
+    """Create a new alert subscriber."""
     subscriber = AlertSubscriber(email=email)
     subscriber.full_clean()
     subscriber.save()
@@ -42,7 +40,7 @@ def alert_subscriber_create(*, email: str) -> AlertSubscriber:
     return subscriber
 
 
-def product_create(
+def product_create(  # noqa: PLR0913
     *,
     name: str,
     weight: int,
@@ -57,8 +55,10 @@ def product_create(
     nutrition: list[dict[str, Any]] | None = None,
 ) -> Product:
     """
-    Creates a product with all related data (nested creation).
-    Raises ValidationError if business rules are violated.
+    Create a product with all related data (nested creation).
+
+    Raises:
+        ValidationError: If business rules are violated (e.g. duplicate EAN).
     """
     if ean and Product.objects.filter(ean=ean).exists():
         raise ValidationError({"ean": _("A product with this EAN already exists.")})
@@ -71,23 +71,8 @@ def product_create(
                 defaults={"display_name": brand_name},
             )
 
-            # 2. Category (Hierarchical)
-            category = None
-            if category_name:
-                # Support both string and list for backward compatibility/flexibility
-                category_path = (
-                    [category_name] if isinstance(category_name, str) else category_name
-                )
-
-                parent = None
-                for cat_part in category_path:
-                    category = Category.objects.filter(name=cat_part).first()
-                    if not category:
-                        if parent:
-                            category = parent.add_child(name=cat_part)
-                        else:
-                            category = Category.add_root(name=cat_part)
-                    parent = category
+            # 2. Category
+            category = _resolve_category(category_name)
 
             # 3. Product
             product = Product.objects.create(
@@ -101,52 +86,14 @@ def product_create(
                 is_published=is_published,
             )
 
-            # 4. Tags (Hierarchical Paths)
+            # 4. Tags
             if tags:
-                tag_objects = []
-                # tags can be a list of strings (legacy) or a list of lists (new hierarchy)
-                for tag_entry in tags:
-                    tag_path = [tag_entry] if isinstance(tag_entry, str) else tag_entry
-
-                    parent = None
-                    last_tag = None
-                    for tag_part in tag_path:
-                        tag = Tag.objects.filter(name=tag_part).first()
-                        if not tag:
-                            if parent:
-                                tag = parent.add_child(name=tag_part)
-                            else:
-                                tag = Tag.add_root(name=tag_part)
-                        parent = tag
-                        last_tag = tag
-
-                    if last_tag:
-                        tag_objects.append(last_tag)
-
+                tag_objects = _resolve_tags(tags)
                 product.tags.set(tag_objects)
 
             # 5. Stores & Prices
             if stores:
-                for store_data in stores:
-                    # Lookup by display_name to avoid unique constraint issues with slugs
-                    store, _created = Store.objects.get_or_create(
-                        display_name=store_data["store_name"],
-                        defaults={"name": slugify(store_data["store_name"])},
-                    )
-
-                    product_store = ProductStore.objects.create(
-                        product=product,
-                        store=store,
-                        external_id=store_data.get("external_id", ""),
-                        product_link=store_data["product_link"],
-                        affiliate_link=store_data.get("affiliate_link"),
-                    )
-
-                    ProductPriceHistory.objects.create(
-                        store_product_link=product_store,
-                        price=Decimal(str(store_data["price"])),
-                        stock_status=store_data.get("stock_status", "A"),
-                    )
+                _create_store_entries(product, stores)
 
             # 6. Nutrition Profiles
             if nutrition:
@@ -158,6 +105,75 @@ def product_create(
         raise ValidationError({"unknown": str(e)}) from e
 
 
+def _resolve_category(category_name: str | list[str] | None) -> Category | None:
+    """Resolve category from name string or path list."""
+    if not category_name:
+        return None
+
+    # Support both string and list for backward compatibility/flexibility
+    category_path = [category_name] if isinstance(category_name, str) else category_name
+
+    category = None
+    parent = None
+    for cat_part in category_path:
+        category = Category.objects.filter(name=cat_part).first()
+        if not category:
+            if parent:
+                category = parent.add_child(name=cat_part)
+            else:
+                category = Category.add_root(name=cat_part)
+        parent = category
+    return category
+
+
+def _resolve_tags(tags: list[str] | list[list[str]]) -> list[Tag]:
+    """Resolve list of tags (simple or hierarchical) to Tag objects."""
+    tag_objects = []
+    # tags can be a list of strings (legacy) or a list of lists (new hierarchy)
+    for tag_entry in tags:
+        tag_path = [tag_entry] if isinstance(tag_entry, str) else tag_entry
+
+        parent = None
+        last_tag = None
+        for tag_part in tag_path:
+            tag = Tag.objects.filter(name=tag_part).first()
+            if not tag:
+                if parent:
+                    tag = parent.add_child(name=tag_part)
+                else:
+                    tag = Tag.add_root(name=tag_part)
+            parent = tag
+            last_tag = tag
+
+        if last_tag:
+            tag_objects.append(last_tag)
+    return tag_objects
+
+
+def _create_store_entries(product: Product, stores: list[dict[str, Any]]) -> None:
+    """Create Store, ProductStore link, and PriceHistory."""
+    for store_data in stores:
+        # Lookup by display_name to avoid unique constraint issues with slugs
+        store, _created = Store.objects.get_or_create(
+            display_name=store_data["store_name"],
+            defaults={"name": slugify(store_data["store_name"])},
+        )
+
+        product_store = ProductStore.objects.create(
+            product=product,
+            store=store,
+            external_id=store_data.get("external_id", ""),
+            product_link=store_data["product_link"],
+            affiliate_link=store_data.get("affiliate_link", ""),
+        )
+
+        ProductPriceHistory.objects.create(
+            store_product_link=product_store,
+            price=Decimal(str(store_data["price"])),
+            stock_status=store_data.get("stock_status", "A"),
+        )
+
+
 def product_update_content(
     *,
     product: Product,
@@ -167,9 +183,7 @@ def product_update_content(
     packaging: str | None = None,
     tags: list[str] | None = None,
 ) -> Product:
-    """
-    Updates product metadata (description, category, tags) without modifying price data.
-    """
+    """Updates product metadata (description, category, tags) without modifying price data."""
     try:
         with transaction.atomic():
             # Update basic fields if provided
@@ -215,8 +229,9 @@ def _handle_nutrition_creation(
     product: Product, nutrition_list: list[dict[str, Any]]
 ) -> None:
     """
-    Handles the complex logic of creating/linking nutrition profiles, facts,
-    micronutrients, and flavors to a product.
+    Handle the complex logic of creating/linking nutrition profiles.
+
+    Creates facts, micronutrients, and flavors.
     """
     for nutr_data in nutrition_list:
         facts_data = nutr_data["nutrition_facts"]

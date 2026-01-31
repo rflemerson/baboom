@@ -21,6 +21,8 @@ PER_PAGE_OPTIONS = [12, 24, 48]
 # Definimos uma classe apenas para Tipagem que extende HttpRequest
 # e diz ao MyPy que existe um atributo .htmx
 class HtmxHttpRequest(HttpRequest):
+    """Type hint wrapper for HttpRequest with HtmxDetails."""
+
     htmx: HtmxDetails
 
 
@@ -28,6 +30,7 @@ class HtmxHttpRequest(HttpRequest):
 
 
 def list_view(request: HtmxHttpRequest) -> HttpResponse:
+    """Render the main product list view (full page or HTMX partial)."""
     products_qs = list_with_stats()
     product_filter = ProductFilter(request.GET, queryset=products_qs)
 
@@ -57,6 +60,7 @@ def list_view(request: HtmxHttpRequest) -> HttpResponse:
 
 
 def subscribe_alerts(request: HttpRequest) -> HttpResponse:
+    """Handle email subscription for price alerts."""
     # Aqui usamos getattr, então HttpRequest padrão funciona sem erro de tipagem
     is_htmx = getattr(request, "htmx", False)
 

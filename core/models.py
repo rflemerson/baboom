@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class BaseModel(models.Model):
+    """Base abstract model with timestamps."""
+
     created_at = models.DateTimeField(
         _("Created At"),
         db_index=True,
@@ -26,10 +28,14 @@ class BaseModel(models.Model):
     )
 
     class Meta:
+        """Meta options."""
+
         abstract = True
 
 
 class Brand(BaseModel):
+    """Brand definition."""
+
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
@@ -37,15 +43,20 @@ class Brand(BaseModel):
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Brand")
         verbose_name_plural = _("Brands")
         ordering = ["name"]
 
     def __str__(self) -> str:
+        """Return display name."""
         return self.display_name
 
 
 class Store(BaseModel):
+    """Store definition."""
+
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
@@ -53,30 +64,40 @@ class Store(BaseModel):
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Store")
         verbose_name_plural = _("Stores")
         ordering = ["name"]
 
     def __str__(self) -> str:
+        """Return display name."""
         return self.display_name
 
 
 class Flavor(BaseModel):
+    """Flavor definition for nutrition profiles."""
+
     name = models.CharField(_("Name"), max_length=100, unique=True)
     description = models.TextField(
         _("Description"), blank=True, help_text=_("Flavor description")
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Flavor")
         verbose_name_plural = _("Flavors")
         ordering = ["name"]
 
     def __str__(self) -> str:
+        """Return name."""
         return self.name
 
 
 class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
+    """Hierarchical tag model."""
+
     name: models.CharField = models.CharField(
         _("Name"), max_length=100, unique=True, help_text=_("Unique tag name")
     )
@@ -87,14 +108,19 @@ class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
     node_order_by = ["name"]
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Tag")
         verbose_name_plural = _("Tags")
 
     def __str__(self) -> str:
+        """Return name."""
         return self.name
 
 
 class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
+    """Hierarchical category model."""
+
     name: models.CharField = models.CharField(
         _("Name"),
         max_length=100,
@@ -109,15 +135,22 @@ class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
     node_order_by = ["name"]
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Category")
         verbose_name_plural = _("Categories")
 
     def __str__(self):
+        """Return name."""
         return self.name
 
 
 class Product(BaseModel):
+    """Main product model."""
+
     class Packaging(models.TextChoices):
+        """Packaging types."""
+
         REFILL = "REFILL", _("Refill Package")
         CONTAINER = "CONTAINER", _("Container Package")
         BAR = "BAR", _("Bar")
@@ -186,6 +219,8 @@ class Product(BaseModel):
     history = HistoricalRecords()
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ["brand__name", "name"]
@@ -202,13 +237,16 @@ class Product(BaseModel):
         ]
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.brand.name} - {self.name} ({self.weight}g)"
 
     def save(self, *args, **kwargs):
+        """Validate rules on save."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean(self):
+        """Validate business rules."""
         super().clean()
 
         # 1. Validate EAN uniqueness (excluding self)
@@ -235,6 +273,8 @@ class Product(BaseModel):
 
 
 class ProductStore(BaseModel):
+    """Link between Product and Store."""
+
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -268,6 +308,8 @@ class ProductStore(BaseModel):
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Store Product Link")
         verbose_name_plural = _("Store Product Links")
         ordering = ["store__name", "product__name"]
@@ -290,11 +332,16 @@ class ProductStore(BaseModel):
         ]
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.store.name} -> {self.product.name}"
 
 
 class ProductPriceHistory(models.Model):
+    """Historical price record."""
+
     class StockStatus(models.TextChoices):
+        """Stock availability status."""
+
         AVAILABLE = "A", _("Available")
         LAST_UNITS = "L", _("Last Units")
         OUT_OF_STOCK = "O", _("Out of Stock")
@@ -325,6 +372,8 @@ class ProductPriceHistory(models.Model):
     )
 
     class Meta:
+        """Meta options."""
+
         ordering = ["-collected_at"]
         get_latest_by = "collected_at"
         verbose_name = _("Price Tracking Record")
@@ -337,10 +386,13 @@ class ProductPriceHistory(models.Model):
         ]
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.store_product_link} | R${self.price} @ {self.collected_at:%d/%m %H:%M}"
 
 
 class NutritionFacts(BaseModel):
+    """Nutritional information model."""
+
     description = models.CharField(
         _("Internal Label"),
         max_length=200,
@@ -388,13 +440,17 @@ class NutritionFacts(BaseModel):
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Nutrition Facts")
         verbose_name_plural = _("Nutrition Facts")
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.description or 'Generic Nutrition Facts'}"
 
     def save(self, *args, **kwargs):
+        """Save instance with hash generation."""
         # Automatically generate hash using centralized logic.
         # If micronutrients are not passed (e.g. admin), generate hash only from macros.
         if not self.content_hash:
@@ -407,6 +463,7 @@ class NutritionFacts(BaseModel):
     ) -> str:
         """
         Single Source of Truth for Nutritional Hashing.
+
         Generates deterministic hash based on Macros and (optionally) Micros.
 
         Args:
@@ -458,7 +515,11 @@ class NutritionFacts(BaseModel):
 
 
 class Micronutrient(BaseModel):
+    """Micronutrient (vitamin/mineral) definition."""
+
     class Units(models.TextChoices):
+        """Supported units of measurement."""
+
         GRAM = "g", "g"
         MILLIGRAM = "mg", "mg"
         MICROGRAM = "mcg", "mcg"
@@ -489,6 +550,8 @@ class Micronutrient(BaseModel):
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Micronutrient")
         verbose_name_plural = _("Micronutrients")
         constraints = [
@@ -498,10 +561,13 @@ class Micronutrient(BaseModel):
         ]
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.name}: {self.value}{self.unit}"
 
 
 class ProductNutrition(BaseModel):
+    """Links distinct nutrition profiles to a product."""
+
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -523,6 +589,8 @@ class ProductNutrition(BaseModel):
     )
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Product Nutrition Profile")
         verbose_name_plural = _("Product Nutrition Profiles")
         constraints = [
@@ -533,6 +601,7 @@ class ProductNutrition(BaseModel):
         ]
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.product.name} - {self.nutrition_facts}"
 
 
@@ -543,14 +612,19 @@ class AlertSubscriber(BaseModel):
     is_active = models.BooleanField(_("Active"), default=True)
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("Alert Subscriber")
         verbose_name_plural = _("Alert Subscribers")
 
     def __str__(self) -> str:
+        """Return email address."""
         return self.email
 
 
 class APIKey(BaseModel):
+    """API Key for external client access."""
+
     name = models.CharField(
         _("Client Name"), max_length=100, help_text=_("Who is this key for?")
     )
@@ -560,13 +634,17 @@ class APIKey(BaseModel):
     is_active = models.BooleanField(_("Active"), default=True)
 
     class Meta:
+        """Meta options."""
+
         verbose_name = _("API Key")
         verbose_name_plural = _("API Keys")
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"{self.name} ({self.key[:8]}...)"
 
     def save(self, *args, **kwargs):
+        """Generate key on save if missing."""
         if not self.key:
             self.key = secrets.token_urlsafe(32)
         super().save(*args, **kwargs)

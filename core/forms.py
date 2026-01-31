@@ -5,6 +5,8 @@ from .models import AlertSubscriber
 
 
 class AlertSubscriptionForm(forms.ModelForm):
+    """Form for email alert subscription."""
+
     email = forms.EmailField(
         error_messages={"invalid": _("Please enter a valid email address.")},
         widget=forms.TextInput(
@@ -16,6 +18,8 @@ class AlertSubscriptionForm(forms.ModelForm):
     )
 
     class Meta:
+        """Meta options."""
+
         model = AlertSubscriber
         fields = ["email"]
         error_messages = {"email": {"unique": _("This email is already subscribed.")}}

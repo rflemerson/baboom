@@ -1,9 +1,10 @@
 import logging
-from typing import cast
+from typing import Any, cast
 
 import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
 
+from baboom.utils import ValidationError as GqlValidationError
 from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Product, ProductStore
@@ -11,7 +12,12 @@ from core.services import product_create, product_update_content
 from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
 
-from .inputs import ProductContentUpdateInput, ProductInput
+from .inputs import (
+    ProductContentUpdateInput,
+    ProductInput,
+    ProductNutritionInput,
+    ProductStoreInput,
+)
 from .types import ProductResult, ProductType
 
 logger = logging.getLogger(__name__)
@@ -19,53 +25,15 @@ logger = logging.getLogger(__name__)
 
 @strawberry.type
 class CoreMutation:
+    """Core mutations."""
+
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def create_product(self, data: ProductInput) -> ProductResult:
-        stores_data = []
-        if data.stores:
-            for s in data.stores:
-                stores_data.append(
-                    {
-                        "store_name": s.store_name,
-                        "product_link": s.product_link,
-                        "price": s.price,
-                        "external_id": s.external_id,
-                        "affiliate_link": s.affiliate_link,
-                        "stock_status": s.stock_status.value,
-                    }
-                )
-
-        nutrition_data = []
-        if data.nutrition:
-            for n in data.nutrition:
-                facts = n.nutrition_facts
-                micronutrients_data = []
-                if facts.micronutrients:
-                    for m in facts.micronutrients:
-                        micronutrients_data.append(
-                            {"name": m.name, "value": m.value, "unit": m.unit}
-                        )
-
-                nutrition_data.append(
-                    {
-                        "flavor_names": n.flavor_names,
-                        "nutrition_facts": {
-                            "description": facts.description,
-                            "serving_size_grams": facts.serving_size_grams,
-                            "energy_kcal": facts.energy_kcal,
-                            "proteins": facts.proteins,
-                            "carbohydrates": facts.carbohydrates,
-                            "total_sugars": facts.total_sugars,
-                            "added_sugars": facts.added_sugars,
-                            "total_fats": facts.total_fats,
-                            "saturated_fats": facts.saturated_fats,
-                            "trans_fats": facts.trans_fats,
-                            "dietary_fiber": facts.dietary_fiber,
-                            "sodium": facts.sodium,
-                            "micronutrients": micronutrients_data,
-                        },
-                    }
-                )
+        """Create a new product with all related data."""
+        stores_data = self._map_store_data(data.stores) if data.stores else []
+        nutrition_data = (
+            self._map_nutrition_data(data.nutrition) if data.nutrition else []
+        )
 
         try:
             # Prepare tags from paths if provided, else use legacy
@@ -122,10 +90,9 @@ class CoreMutation:
     def update_product_content(
         self, product_id: int, data: ProductContentUpdateInput
     ) -> ProductResult:
+        """Update product content (LLM enrichment)."""
         product = Product.objects.filter(id=product_id).first()
         if not product:
-            from baboom.utils import ValidationError as GqlValidationError
-
             return ProductResult(
                 errors=[
                     GqlValidationError(field="product_id", message="Product not found")
@@ -145,3 +112,51 @@ class CoreMutation:
 
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
+
+    def _map_store_data(self, stores: list[ProductStoreInput]) -> list[dict[str, Any]]:
+        return [
+            {
+                "store_name": s.store_name,
+                "product_link": s.product_link,
+                "price": s.price,
+                "external_id": s.external_id,
+                "affiliate_link": s.affiliate_link,
+                "stock_status": s.stock_status.value,
+            }
+            for s in stores
+        ]
+
+    def _map_nutrition_data(
+        self, nutrition: list[ProductNutritionInput]
+    ) -> list[dict[str, Any]]:
+        result = []
+        for n in nutrition:
+            facts = n.nutrition_facts
+            micronutrients_data = []
+            if facts.micronutrients:
+                for m in facts.micronutrients:
+                    micronutrients_data.append(
+                        {"name": m.name, "value": m.value, "unit": m.unit}
+                    )
+
+            result.append(
+                {
+                    "flavor_names": n.flavor_names,
+                    "nutrition_facts": {
+                        "description": facts.description,
+                        "serving_size_grams": facts.serving_size_grams,
+                        "energy_kcal": facts.energy_kcal,
+                        "proteins": facts.proteins,
+                        "carbohydrates": facts.carbohydrates,
+                        "total_sugars": facts.total_sugars,
+                        "added_sugars": facts.added_sugars,
+                        "total_fats": facts.total_fats,
+                        "saturated_fats": facts.saturated_fats,
+                        "trans_fats": facts.trans_fats,
+                        "dietary_fiber": facts.dietary_fiber,
+                        "sodium": facts.sodium,
+                        "micronutrients": micronutrients_data,
+                    },
+                }
+            )
+        return result

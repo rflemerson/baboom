@@ -3,6 +3,8 @@ from django_components import component
 
 @component.register("list.price_tag")
 class PriceTag(component.Component):
+    """Price tag component."""
+
     template_name = "price_tag.html"
 
     def get_context_data(
@@ -13,6 +15,7 @@ class PriceTag(component.Component):
         total_protein=None,
         external_link="#",
     ):
+        """Prepare price data context."""
         return {
             "price": price,
             "unit_price": unit_price,

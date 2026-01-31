@@ -22,6 +22,8 @@ from core.models import (
 
 @django_type(Brand)
 class BrandType:
+    """Brand GraphQL type."""
+
     id: auto
     name: auto
     display_name: auto
@@ -29,6 +31,8 @@ class BrandType:
 
 @django_type(Store)
 class StoreType:
+    """Store GraphQL type."""
+
     id: auto
     name: auto
     display_name: auto
@@ -36,6 +40,8 @@ class StoreType:
 
 @django_type(Category)
 class CategoryType:
+    """Category GraphQL type."""
+
     id: auto
     name: auto
     description: auto
@@ -43,18 +49,24 @@ class CategoryType:
 
 @django_type(Tag)
 class TagType:
+    """Tag GraphQL type."""
+
     id: auto
     name: auto
 
 
 @django_type(Flavor)
 class FlavorType:
+    """Flavor GraphQL type."""
+
     id: auto
     name: auto
 
 
 @django_type(Micronutrient)
 class MicronutrientType:
+    """Micronutrient GraphQL type."""
+
     id: auto
     name: auto
     value: auto
@@ -63,6 +75,8 @@ class MicronutrientType:
 
 @django_type(NutritionFacts)
 class NutritionFactsType:
+    """Nutrition Facts GraphQL type."""
+
     id: auto
     description: auto
     serving_size_grams: auto
@@ -81,6 +95,8 @@ class NutritionFactsType:
 
 @django_type(ProductNutrition)
 class ProductNutritionType:
+    """Product Nutrition Profile GraphQL type."""
+
     id: auto
     product: ProductType
     nutrition_facts: NutritionFactsType
@@ -89,6 +105,8 @@ class ProductNutritionType:
 
 @django_type(ProductPriceHistory)
 class ProductPriceHistoryType:
+    """Product Price History GraphQL type."""
+
     id: auto
     price: auto
     stock_status: auto
@@ -97,6 +115,8 @@ class ProductPriceHistoryType:
 
 @django_type(ProductStore)
 class ProductStoreType:
+    """Product Store Link GraphQL type."""
+
     id: auto
     store: StoreType
     external_id: auto
@@ -107,6 +127,8 @@ class ProductStoreType:
 
 @django_type(Product)
 class ProductType:
+    """Product GraphQL type."""
+
     id: auto
     name: auto
     weight: auto
@@ -126,5 +148,7 @@ class ProductType:
 
 @strawberry.type
 class ProductResult:
+    """Result type for Product mutations."""
+
     product: ProductType | None = None
     errors: list[ValidationError] | None = None

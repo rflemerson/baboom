@@ -7,6 +7,8 @@ from .models import Product
 
 
 class ProductFilter(django_filters.FilterSet):
+    """Filter set for Products."""
+
     SORT_CHOICES = (
         ("price_per_gram", _("Price/g")),
         ("last_price", _("Price")),
@@ -90,6 +92,8 @@ class ProductFilter(django_filters.FilterSet):
     )
 
     class Meta:
+        """Meta options."""
+
         model = Product
         fields = [
             "search",
@@ -103,6 +107,7 @@ class ProductFilter(django_filters.FilterSet):
         ]
 
     def filter_queryset(self, queryset: QuerySet[Product]) -> QuerySet[Product]:
+        """Apply filters and sorting."""
         queryset = super().filter_queryset(queryset)
 
         sort_by = self.data.get("sort_by", "price_per_gram")
@@ -128,6 +133,7 @@ class ProductFilter(django_filters.FilterSet):
         return queryset.order_by(f"{prefix}{sort_by}")
 
     def filter_search(self, queryset, name, value):
+        """Filter by search query."""
         if not value:
             return queryset
         return queryset.filter(

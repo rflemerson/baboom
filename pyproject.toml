@@ -122,7 +122,6 @@ convention = "google"
 "*/tests.py" = ["D"]
 "*/tests/*.py" = ["D"]
 "scrapers/*" = ["D", "C90", "PL", "N", "PLC0415"]
-"core/*" = ["D", "C90", "PL", "N"]
 "baboom/*" = ["D", "C90", "PL", "N"]
 "manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
 

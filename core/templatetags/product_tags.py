@@ -11,18 +11,18 @@ def tag_classes(tag_name: str | None) -> str:
 
     tag_name = tag_name.lower()
 
-    if "whey" in tag_name:
-        return "badge-primary"
-    if "pea" in tag_name:
-        return "badge-success"
-    if "soy" in tag_name:
-        return "badge-warning"
-    if "rice" in tag_name:
-        return "badge-accent"
-    if "hemp" in tag_name:
-        return "badge-secondary"
-    if "plant" in tag_name:
-        return "badge-success"
+    modifiers = {
+        "whey": "badge-primary",
+        "pea": "badge-success",
+        "soy": "badge-warning",
+        "rice": "badge-accent",
+        "hemp": "badge-secondary",
+        "plant": "badge-success",
+    }
+
+    for key, value in modifiers.items():
+        if key in tag_name:
+            return value
 
     return "badge-neutral"
 

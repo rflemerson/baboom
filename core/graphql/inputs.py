@@ -5,11 +5,15 @@ from .enums import PackagingEnum, StockStatusEnum
 
 @strawberry.input
 class TagPathInput:
+    """Input for hierarchical tag path."""
+
     path: list[str]
 
 
 @strawberry.input
 class MicronutrientInput:
+    """Input for micronutrient value."""
+
     name: str
     value: float
     unit: str = "mg"
@@ -17,6 +21,8 @@ class MicronutrientInput:
 
 @strawberry.input
 class NutritionFactsInput:
+    """Input for nutrition facts."""
+
     serving_size_grams: float
     energy_kcal: int
     proteins: float
@@ -34,12 +40,16 @@ class NutritionFactsInput:
 
 @strawberry.input
 class ProductNutritionInput:
+    """Input for product nutrition profile."""
+
     nutrition_facts: NutritionFactsInput
     flavor_names: list[str] | None = None
 
 
 @strawberry.input
 class ProductStoreInput:
+    """Input for store product link."""
+
     store_name: str
     product_link: str
     price: float
@@ -50,6 +60,8 @@ class ProductStoreInput:
 
 @strawberry.input(description="Input for creating a new product with all related data")
 class ProductInput:
+    """Input for product creation."""
+
     name: str = strawberry.field(description="Product display name")
     weight: int = strawberry.field(description="Weight in grams")
     brand_name: str = strawberry.field(
@@ -92,6 +104,8 @@ class ProductInput:
 
 @strawberry.input(description="Input for updating product content only")
 class ProductContentUpdateInput:
+    """Input for product content update."""
+
     name: str | None = None
     description: str | None = None
     category_name: str | None = None
