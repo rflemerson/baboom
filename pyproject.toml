@@ -77,12 +77,25 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    "E", "W", "F", "I", "UP", "DJ", "B", "S", "C4", "SIM", "RET", "ERA", "T20", "RUF", "A",
-    # --- Code Smells & Style ---
-    "C90",  # McCabe complexity
-    "PL",   # Pylint
-    "N",    # PEP8 Naming
-    "D",    # Pydocstyle
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "DJ",  # django specific
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "ERA", # eradicate (commented code)
+    "T20", # flake8-print
+    "RUF", # ruff-specific rules
+    "A",   # flake8-builtins
+    "C90", # mccabe complexity
+    "PL",  # pylint
+    "N",   # pep8-naming
+    "D",   # pydocstyle
 ]
 ignore = [
     "E501",    # Line length
@@ -106,15 +119,12 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "baboom/settings/__init__.py" = ["F403", "F405"]
-"core/models.py" = ["DJ001"]
 "*/tests.py" = ["D"]
 "*/tests/*.py" = ["D"]
 "scrapers/*" = ["D", "C90", "PL", "N", "PLC0415"]
 "core/*" = ["D", "C90", "PL", "N"]
 "baboom/*" = ["D", "C90", "PL", "N"]
 "manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
-"agents/assets.py" = []
-"agents/tools/scraper.py" = []
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin", "pydantic.mypy"]
