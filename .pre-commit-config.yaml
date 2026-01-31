@@ -13,6 +13,7 @@ repos:
     hooks:
       - id: interrogate
         args: [-vv]
+        exclude: ^(core|scrapers|baboom|manage.py|tests)/
 
   - repo: https://github.com/adamchainz/django-upgrade
     rev: 1.29.1

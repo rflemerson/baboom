@@ -264,7 +264,7 @@ class ProductStore(BaseModel):
         _("Affiliate Tracking URL"),
         help_text=_("URL with affiliate tracking parameters"),
         blank=True,
-        null=True,
+        default="",
     )
 
     class Meta:
