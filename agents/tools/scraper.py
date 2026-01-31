@@ -35,17 +35,14 @@ class ScraperService:
         bucket = str(item_id)
 
         try:
-            # 1. Download HTML
             html_content = self._download_html(url)
             html_key = "source.html"
             self.storage.upload(
                 bucket, html_key, html_content.encode("utf-8"), content_type="text/html"
             )
 
-            # 2. Process and download images
             candidates = self._process_images(html_content, url, bucket)
 
-            # 3. Save Candidates Manifest
             manifest_key = "candidates.json"
             self.storage.upload(
                 bucket,
@@ -103,6 +100,8 @@ class ScraperService:
             return str(val) if val else ""
 
         seen_urls = set()
+        seen_hashes = set()
+
         for i, (src, tag) in enumerate(sources):
             if not src or not isinstance(src, str):
                 continue
@@ -118,6 +117,19 @@ class ScraperService:
                     continue
 
                 content = img_resp.content
+
+                # Perceptual hash for de-duplication (prevent different sizes of same image)
+                try:
+                    p_hash = self._compute_phash(content)
+                    if p_hash in seen_hashes:
+                        logger.debug(
+                            f"Skipping duplicate image (hash match): {img_url}"
+                        )
+                        continue
+                    seen_hashes.add(p_hash)
+                except Exception as e:
+                    logger.debug(f"Hash computation failed for {img_url}: {e}")
+
                 # Determine extension and save
                 ext = urljoin(img_url, "").split("?")[0].split(".")[-1].lower()
                 if ext == "svg":
@@ -146,8 +158,8 @@ class ScraperService:
                         "score": score,
                         "dimensions": [width, height],
                         "metadata": {
-                            "alt": _get_attr(img, "alt"),
-                            "id": _get_attr(img, "id"),
+                            "alt": _get_attr(tag, "alt"),
+                            "id": _get_attr(tag, "id"),
                         },
                     }
                 )
@@ -157,6 +169,20 @@ class ScraperService:
         # Sort candidates by score descending
         candidates.sort(key=lambda x: int(str(x["score"])), reverse=True)
         return candidates
+
+    def _compute_phash(self, content: bytes) -> str:
+        """
+        Computes a simple 8x8 perceptual hash to identify visually similar images.
+        """
+        img = (
+            Image.open(io.BytesIO(content))
+            .convert("L")
+            .resize((8, 8), Image.Resampling.LANCZOS)
+        )
+        pixels = list(img.getdata())
+        avg = sum(pixels) / 64
+        bits = "".join("1" if p > avg else "0" for p in pixels)
+        return hex(int(bits, 2))[2:].zfill(16)
 
     def _calculate_image_score(
         self, img_tag: Tag, img_url: str, content: bytes
@@ -175,11 +201,20 @@ class ScraperService:
         img_class = _get_attr("class").lower()
         src_lower = img_url.lower()
 
-        # High confidence matches
-        if "tabela" in alt_text and "nutricional" in alt_text:
+        # High confidence matches (Nutrition Tables)
+        nutrition_keywords = [
+            "tabela",
+            "nutricional",
+            "nutrition",
+            "facts",
+            "label",
+            "tabela_nutricional",
+        ]
+        if any(kw in alt_text for kw in nutrition_keywords) and (
+            "info" in alt_text or "tabela" in alt_text
+        ):
             score += 50
-        if "nutrition" in alt_text and "facts" in alt_text:
-            score += 50
+
         if "tabela" in img_id or "nutri" in img_id:
             score += 30
 
@@ -192,6 +227,9 @@ class ScraperService:
             "facts",
             "info",
             "tab",
+            "ingredientes",
+            "composição",
+            "ingrediente",
         ]
         for kw in keywords:
             if kw in alt_text:
@@ -203,7 +241,7 @@ class ScraperService:
             if kw in img_class:
                 score += 5
 
-        # Dimension Check
+        # Dimension and Aspect Ratio Check
         width, height = 0, 0
         try:
             with Image.open(io.BytesIO(content)) as im:
@@ -212,6 +250,15 @@ class ScraperService:
                     score -= 50
                 elif width > 300 and height > 300:
                     score += 10
+
+                # Aspect Ratio heuristics
+                aspect_ratio = width / height if height > 0 else 1
+                # Nutrition tables are often vertical or square-ish
+                if 0.5 <= aspect_ratio <= 1.2:
+                    score += 15
+                # Extreme banners are usually not useful
+                if aspect_ratio > 3.0 or aspect_ratio < 0.2:
+                    score -= 40
         except Exception as e:
             logger.debug(f"Could not check dimensions for {img_url}: {e}")
 

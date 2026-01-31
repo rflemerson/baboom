@@ -28,13 +28,10 @@ def scraper_task(
     """
     service = ScraperService()
 
-    # Download HTML and images
     storage_path = service.download_assets(item_id, url)
 
-    # Extract metadata
     metadata = service.extract_metadata(storage_path, url)
 
-    # Consolidate into RawScrapedData
     raw_data = service.consolidate(
         metadata,
         brand_name_override=store_name,
@@ -78,12 +75,11 @@ def analyze_product_task(
 
                 for c in valid_candidates[:10]:
                     image_paths.append(f"{bucket}/{c['file']}")
+                    logger.info(f"  Selected Image: {c['file']} (Score: {c['score']})")
 
         except Exception as e:
             logger.warning(f"Failed to load image candidates: {e}")
 
-    # Stage 1: Raw visual/text extraction
-    logger.info(f"Stage 1: Raw extraction on {len(image_paths)} images")
     raw_text = run_raw_extraction(
         name=raw_data.name,
         description=raw_data.description or "",
@@ -92,7 +88,6 @@ def analyze_product_task(
         model_name=gemma_model,
     )
 
-    # Stage 2: Structured JSON normalization
     logger.info("Stage 2: Structured JSON Extraction")
     return run_groq_json_extraction(
         raw_text, prompt=structured_prompt, model_name=groq_model
@@ -213,7 +208,6 @@ def product_ingestion_flow(
         logger.info(f"Processing Item {item_id}: {work['productLink']}")
 
         try:
-            # Step 1 & 2: Scrape and Consolidate
             raw_scraped_data, storage_path = scraper_task(
                 item_id=item_id,
                 url=work["productLink"],
@@ -225,7 +219,6 @@ def product_ingestion_flow(
             if skip_metadata:
                 logger.info("Metadata extraction skipped by user.")
 
-            # Step 3: AI Analysis (Multimodal)
             analysis_result = analyze_product_task(
                 raw_data=raw_scraped_data,
                 storage_base_path=storage_path,
@@ -236,7 +229,6 @@ def product_ingestion_flow(
                 skip_images=skip_images,
             )
 
-            # Step 4: Final Upload
             if dry_run:
                 logger.info(
                     f"[DRY RUN] Ingestion of '{analysis_result.name}' simulated successfully."

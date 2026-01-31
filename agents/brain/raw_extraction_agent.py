@@ -37,7 +37,6 @@ def run_raw_extraction(
 
     agent = Agent(model_name)
 
-    # Prepare Inputs - Instructions first
     user_content: list[str | BinaryContent] = [
         instructions
         + f"\n\n---\nProduct Name: {name}\nDescription: {description or ''}"
