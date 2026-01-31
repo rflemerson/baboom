@@ -10,7 +10,14 @@ RULES:
 - nutrition_facts: Extract macro and micronutrients precisely. Use 0 for missing numeric values.
 - flavor_names: List all identified flavors (e.g., ["Baunilha", "Chocolate"]).
 
+- packaging: MUST be one of ["CONTAINER", "REFILL", "BAR", "OTHER"]. 
+  - Use "REFILL" for bags, pouches, or refis.
+  - Use "CONTAINER" for tubs, jars, or bottles.
+  - Use "BAR" for protein bars.
+  - Use "OTHER" if unsure.
+
 CRITICAL:
 - You must provide ALL fields in a SINGLE tool call.
 - Do NOT wrap the JSON in markdown blocks.
 - Do NOT provide the output as a list of fields; provide a single object with all fields.
+- ONLY use the enums specified for 'packaging'. No variations allowed.
