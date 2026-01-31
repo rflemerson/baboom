@@ -12,10 +12,11 @@ from bs4 import BeautifulSoup, Tag
 from PIL import Image
 from w3lib.html import get_base_url
 
+from ..schemas.product import RawScrapedData
 from ..storage import get_storage
 
 if TYPE_CHECKING:
-    from ..schemas.product import RawScrapedData
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -74,35 +75,11 @@ class ScraperService:
     ) -> list[dict]:
         """Extract and score images from HTML."""
         soup = BeautifulSoup(html_content, "html.parser")
+        sources = self._extract_image_sources(soup)
+
         candidates = []
-
-        sources = []
-
-        for img in soup.find_all("img"):
-            src = img.get("src")
-            if src:
-                sources.append((src, img))
-
-        # OpenGraph images (often contain gallery images)
-        for meta in soup.find_all("meta", property="og:image"):
-            src = meta.get("content")
-            if src:
-                sources.append((src, meta))
-
-        # Preloaded images
-        for link in soup.find_all("link", attrs={"rel": "preload", "as": "image"}):
-            src = link.get("href")
-            if src:
-                sources.append((src, link))
-
-        def _get_attr(tag: Tag, name: str) -> str:
-            val = tag.get(name, "")
-            if isinstance(val, list):
-                return " ".join(val)
-            return str(val) if val else ""
-
         seen_urls = set()
-        seen_hashes = set()
+        seen_hashes: set[str] = set()
 
         for i, (src, tag) in enumerate(sources):
             if not src or not isinstance(src, str):
@@ -113,64 +90,97 @@ class ScraperService:
                 continue
             seen_urls.add(img_url)
 
-            try:
-                img_resp = requests.get(img_url, headers=self.headers, timeout=10)
-                if img_resp.status_code != 200:
-                    continue
-
-                content = img_resp.content
-
-                # Perceptual hash for de-duplication (prevent different sizes of same image)
-                try:
-                    p_hash = self._compute_phash(content)
-                    if p_hash in seen_hashes:
-                        logger.debug(
-                            f"Skipping duplicate image (hash match): {img_url}"
-                        )
-                        continue
-                    seen_hashes.add(p_hash)
-                except Exception as e:
-                    logger.debug(f"Hash computation failed for {img_url}: {e}")
-
-                # Determine extension and save
-                ext = urljoin(img_url, "").split("?")[0].split(".")[-1].lower()
-                if ext == "svg":
-                    continue
-
-                if not ext or len(ext) > 5:
-                    ext = "jpg"
-
-                score, width, height = self._calculate_image_score(
-                    tag, img_url, content
-                )
-
-                # Skip small images
-                if width < 200 or height < 200:
-                    continue
-
-                image_key = f"images/image_{i}.{ext}"
-                self.storage.upload(
-                    bucket, image_key, content, content_type="image/jpeg"
-                )
-
-                candidates.append(
-                    {
-                        "file": image_key,
-                        "url": img_url,
-                        "score": score,
-                        "dimensions": [width, height],
-                        "metadata": {
-                            "alt": _get_attr(tag, "alt"),
-                            "id": _get_attr(tag, "id"),
-                        },
-                    }
-                )
-            except Exception as e:
-                logger.debug(f"Failed to process image {img_url}: {e}")
+            candidate = self._process_single_candidate(
+                i, img_url, tag, bucket, seen_hashes
+            )
+            if candidate:
+                candidates.append(candidate)
 
         # Sort candidates by score descending
         candidates.sort(key=lambda x: int(str(x["score"])), reverse=True)
         return candidates
+
+    def _extract_image_sources(self, soup: BeautifulSoup) -> list[tuple[str, Tag]]:
+        sources = []
+        for img in soup.find_all("img"):
+            src = img.get("src")
+            if src and isinstance(src, str):
+                sources.append((src, img))
+
+        # OpenGraph images
+        for meta in soup.find_all("meta", property="og:image"):
+            src = meta.get("content")
+            if src and isinstance(src, str):
+                sources.append((src, meta))
+
+        # Preloaded images
+        for link in soup.find_all("link", attrs={"rel": "preload", "as": "image"}):
+            src = link.get("href")
+            if src and isinstance(src, str):
+                sources.append((src, link))
+        return sources
+
+    def _process_single_candidate(
+        self, index: int, img_url: str, tag: Tag, bucket: str, seen_hashes: set
+    ) -> dict | None:
+        try:
+            img_resp = requests.get(img_url, headers=self.headers, timeout=10)
+            if img_resp.status_code != 200:
+                return None
+
+            content = img_resp.content
+
+            # De-duplication check
+            if not self._check_hash(content, img_url, seen_hashes):
+                return None
+
+            # Extension check
+            ext = urljoin(img_url, "").split("?")[0].split(".")[-1].lower()
+            if ext == "svg":
+                return None
+            if not ext or len(ext) > 5:
+                ext = "jpg"
+
+            score, width, height = self._calculate_image_score(tag, img_url, content)
+
+            # Skip small images
+            if width < 200 or height < 200:
+                return None
+
+            image_key = f"images/image_{index}.{ext}"
+            self.storage.upload(bucket, image_key, content, content_type="image/jpeg")
+
+            return {
+                "file": image_key,
+                "url": img_url,
+                "score": score,
+                "dimensions": [width, height],
+                "metadata": {
+                    "alt": self._get_attr(tag, "alt"),
+                    "id": self._get_attr(tag, "id"),
+                },
+            }
+        except Exception as e:
+            logger.debug(f"Failed to process image {img_url}: {e}")
+            return None
+
+    def _check_hash(self, content: bytes, img_url: str, seen_hashes: set) -> bool:
+        try:
+            p_hash = self._compute_phash(content)
+            if p_hash in seen_hashes:
+                logger.debug(f"Skipping duplicate image (hash match): {img_url}")
+                return False
+            seen_hashes.add(p_hash)
+            return True
+        except Exception as e:
+            logger.debug(f"Hash computation failed for {img_url}: {e}")
+            return True
+
+    def _get_attr(self, tag: Tag, name: str) -> str:
+        val = tag.get(name, "")
+        if isinstance(val, list):
+            return " ".join(val)
+        return str(val) if val else ""
 
     def _compute_phash(self, content: bytes) -> str:
         """Computes a simple 8x8 perceptual hash to identify visually similar images."""
@@ -189,17 +199,23 @@ class ScraperService:
     ) -> tuple[int, int, int]:
         """Calculate relevance score for an image."""
         score = 0
+        score += self._score_by_keywords(img_tag, img_url)
+        width, height = 0, 0
+        try:
+            with Image.open(io.BytesIO(content)) as im:
+                width, height = im.size
+                score += self._score_by_dimensions(width, height)
+        except Exception as e:
+            logger.debug(f"Could not check dimensions for {img_url}: {e}")
 
-        def _get_attr(name: str) -> str:
-            val = img_tag.get(name, "")
-            if isinstance(val, list):
-                return " ".join(val)
-            return str(val) if val else ""
+        return score, width, height
 
-        alt_text = _get_attr("alt").lower()
-        title_text = _get_attr("title").lower()
-        img_id = _get_attr("id").lower()
-        img_class = _get_attr("class").lower()
+    def _score_by_keywords(self, img_tag: Tag, img_url: str) -> int:
+        score = 0
+        alt_text = self._get_attr(img_tag, "alt").lower()
+        title_text = self._get_attr(img_tag, "title").lower()
+        img_id = self._get_attr(img_tag, "id").lower()
+        img_class = self._get_attr(img_tag, "class").lower()
         src_lower = img_url.lower()
 
         nutrition_keywords = [
@@ -218,7 +234,6 @@ class ScraperService:
         if "tabela" in img_id or "nutri" in img_id:
             score += 30
 
-        # General keywords
         keywords = [
             "tabela",
             "nutricional",
@@ -240,29 +255,21 @@ class ScraperService:
                 score += 5
             if kw in img_class:
                 score += 5
+        return score
 
-        # Dimension and Aspect Ratio Check
-        width, height = 0, 0
-        try:
-            with Image.open(io.BytesIO(content)) as im:
-                width, height = im.size
-                if width < 100 or height < 100:
-                    score -= 50
-                elif width > 300 and height > 300:
-                    score += 10
+    def _score_by_dimensions(self, width: int, height: int) -> int:
+        score = 0
+        if width < 100 or height < 100:
+            score -= 50
+        elif width > 300 and height > 300:
+            score += 10
 
-                # Aspect Ratio heuristics
-                aspect_ratio = width / height if height > 0 else 1
-                # Nutrition tables are often vertical or square-ish
-                if 0.5 <= aspect_ratio <= 1.2:
-                    score += 15
-                # Extreme banners are usually not useful
-                if aspect_ratio > 3.0 or aspect_ratio < 0.2:
-                    score -= 40
-        except Exception as e:
-            logger.debug(f"Could not check dimensions for {img_url}: {e}")
-
-        return score, width, height
+        aspect_ratio = width / height if height > 0 else 1
+        if 0.5 <= aspect_ratio <= 1.2:
+            score += 15
+        if aspect_ratio > 3.0 or aspect_ratio < 0.2:
+            score -= 40
+        return score
 
     def extract_metadata(self, html_storage_path: str, url: str) -> dict:
         """Extracts metadata using extruct from HTML in storage."""
@@ -272,7 +279,6 @@ class ScraperService:
             base_url = get_base_url(html_content, url)
             data = extruct.extract(html_content, base_url=base_url)
 
-            # Save to storage
             self.storage.upload(
                 bucket,
                 "data.json",
@@ -293,8 +299,6 @@ class ScraperService:
         stock_status: str | None = "A",
     ) -> RawScrapedData:
         """Consolidates raw extracted metadata into a simple data structure."""
-        from ..schemas.product import RawScrapedData
-
         product_info = self._extract_product_info(metadata)
 
         name = (

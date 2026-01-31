@@ -12,6 +12,8 @@ from .schemas.product import RawScrapedData
 
 # Configuração para rodar um item específico
 class ItemConfig(Config):
+    """Configuration for running a specific item."""
+
     item_id: int
     url: str
     store_slug: str = "unknown"
@@ -27,6 +29,7 @@ def downloaded_assets(
 ):
     """
     Baixa o HTML e as imagens para a pasta local temp/{id}.
+
     Retorna o caminho do bucket no storage.
     """
     service = scraper.get_service()
@@ -59,9 +62,7 @@ def scraped_metadata(
     client: AgentClientResource,
     downloaded_assets: str,
 ) -> RawScrapedData:
-    """
-    Lê o HTML baixado e extrai JSON-LD/OpenGraph.
-    """
+    """Lê o HTML baixado e extrai JSON-LD/OpenGraph."""
     service = scraper.get_service()
     api = client.get_client()
 
@@ -95,9 +96,7 @@ def ocr_extraction(
     scraped_metadata: RawScrapedData,
     downloaded_assets: str,
 ) -> str:
-    """
-    Usa o Gemma 3 para ler as imagens baixadas.
-    """
+    """Usa o Gemma 3 para ler as imagens baixadas."""
     store = storage.get_storage()
     api = client.get_client()
 
@@ -147,9 +146,7 @@ def product_analysis(
     client: AgentClientResource,
     ocr_extraction: str,
 ) -> dict:
-    """
-    Usa o Llama 3 (Groq) para estruturar o texto em JSON.
-    """
+    """Usa o Llama 3 (Groq) para estruturar o texto em JSON."""
     api = client.get_client()
 
     try:
@@ -172,9 +169,7 @@ def upload_to_api(
     product_analysis: dict,
     scraped_metadata: RawScrapedData,
 ):
-    """
-    Envia o produto pronto para a API do Baboom.
-    """
+    """Envia o produto pronto para a API do Baboom."""
     api = client.get_client()
 
     context.log.info(f"🚀 Enviando {scraped_metadata.name} para o Banco de Dados...")

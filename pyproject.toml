@@ -113,8 +113,8 @@ convention = "google"
 "core/*" = ["D", "C90", "PL", "N"]
 "baboom/*" = ["D", "C90", "PL", "N"]
 "manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
-"agents/assets.py" = ["D"]
-"agents/tools/scraper.py" = ["C901", "PLR0912", "PLR0915", "PLC0415"]
+"agents/assets.py" = []
+"agents/tools/scraper.py" = []
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin", "pydantic.mypy"]
