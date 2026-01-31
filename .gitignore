@@ -2,6 +2,12 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=django
 
 # Agents temp folder
+.tmp*
+dagster_home/
+dagster.yaml
+workspace.yaml
+*.db
+history/
 agents/tmp/
 temp/
 .vscode

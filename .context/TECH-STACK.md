@@ -37,6 +37,7 @@ Tools configured in `.pre-commit-config.yaml` and `pyproject.toml`.
 - **Security (Safety):** *
 - **Testing:** `factory-boy`
 
-## Automation & Environment
-- **Environment Manager:** Nix (via `.idx/dev.nix`).
+## Automation & Orchestration
+- **Workflow Engine:** Dagster
+- **Environment Manager:** Nix (via `.idx/dev.nix`)
 - **QA:** Scripts for verification before commit.

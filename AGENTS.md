@@ -27,7 +27,16 @@ It is **YOUR RESPONSIBILITY** to keep `AGENTS.md` and its imports alive.
 
 You are the guardian of this project's "Brain". Keep it sharp.
 
-## 3. Commit Protocol
+## 3. Workflow Commands
+```bash
+# Workflow
+Test: python manage.py test
+Lint: pre-commit run --all-files
+Run: python manage.py runserver
+Orchestration: PYTHONPATH=. dagster dev -m agents.definitions
+```
+
+## 4. Commit Protocol
 **NEVER**, under any circumstances, commit code without **EXPLICIT** user authorization.
 -   Always ask for permission before running `git commit`.
 -   Even if you are fixing a small error or amending a previous commit, **ASK FIRST**.

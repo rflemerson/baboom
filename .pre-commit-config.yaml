@@ -55,7 +55,6 @@ repos:
           "psycopg",
           "pydantic",
           "pydantic-ai",
-          "prefect",
           "extruct",
           "w3lib",
         ]

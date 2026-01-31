@@ -37,9 +37,10 @@ dependencies = [
   "w3lib",
   "pydantic-ai",
   "logfire",
-  "prefect",
   "pydantic",
   "python-dotenv",
+  "dagster",
+  "dagster-webserver",
 ]
 
 [project.urls]
