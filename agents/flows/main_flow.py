@@ -1,5 +1,15 @@
 import json
 import logging
+import os
+from enum import Enum
+
+import django
+
+# Optional: Initialize Django if running standalone
+if __name__ == "__main__":
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "baboom.settings")
+    if not os.environ.get("DJANGO_SETTINGS_SKIP_SETUP"):
+        django.setup()
 
 from prefect import flow, get_run_logger, task
 
@@ -13,6 +23,13 @@ from ..storage import get_storage
 from ..tools.scraper import ScraperService
 
 logger = logging.getLogger(__name__)
+
+
+class PipelineStep(str, Enum):
+    DOWNLOAD = "download"  # Download assets and basic metadata
+    ANALYZE = "analyze"  # Run AI analysis (Gemma + Groq)
+    UPLOAD = "upload"  # Upload result to database
+    FULL = "full"  # All steps
 
 
 @task(name="scraper_task", retries=3, retry_delay_seconds=10)
@@ -188,9 +205,11 @@ def product_ingestion_flow(
     raw_prompt: str | None = None,
     structured_prompt: str | None = None,
     target_item_id: int | None = None,
+    step: PipelineStep = PipelineStep.FULL,
 ):
     """
     Main flow for processing scraped items through the AI pipeline.
+    Supports granular execution via the 'step' parameter.
     """
     logger = get_run_logger()
     client = AgentClient()
@@ -208,40 +227,68 @@ def product_ingestion_flow(
         logger.info(f"Processing Item {item_id}: {work['productLink']}")
 
         try:
-            raw_scraped_data, storage_path = scraper_task(
-                item_id=item_id,
-                url=work["productLink"],
-                store_name=work.get("storeSlug"),
-                price=work.get("price"),
-                stock_status=work.get("stockStatus"),
-            )
+            raw_scraped_data = None
+            storage_path = None
+            # Step 1: Download & Initial Metadata
+            if step in [PipelineStep.DOWNLOAD, PipelineStep.FULL]:
+                raw_scraped_data, storage_path = scraper_task(
+                    item_id=item_id,
+                    url=work["productLink"],
+                    store_name=work.get("storeSlug"),
+                    price=work.get("price"),
+                    stock_status=work.get("stockStatus"),
+                )
+            else:
+                # Reconstruct storage path if skipping download
+                storage_path = f"{item_id}/source.html"
+                service = ScraperService()
+                metadata = service.extract_metadata(storage_path, work["productLink"])
+                raw_scraped_data = service.consolidate(
+                    metadata,
+                    brand_name_override=work.get("storeSlug"),
+                    price=work.get("price"),
+                    stock_status=work.get("stockStatus"),
+                )
 
             if skip_metadata:
                 logger.info("Metadata extraction skipped by user.")
 
-            analysis_result = analyze_product_task(
-                raw_data=raw_scraped_data,
-                storage_base_path=storage_path,
-                gemma_model=gemma_model,
-                groq_model=groq_model,
-                raw_prompt=raw_prompt,
-                structured_prompt=structured_prompt,
-                skip_images=skip_images,
-            )
-
-            if dry_run:
-                logger.info(
-                    f"[DRY RUN] Ingestion of '{analysis_result.name}' simulated successfully."
-                )
-            else:
-                upload_product_task(
-                    item_id=item_id,
-                    url=work["productLink"],
+            # Step 2: AI Analysis
+            analysis_result = None
+            if step in [PipelineStep.ANALYZE, PipelineStep.FULL]:
+                analysis_result = analyze_product_task(
                     raw_data=raw_scraped_data,
-                    analysis_result=analysis_result,
-                    store_name=work.get("storeName"),
-                    external_id=work.get("externalId"),
+                    storage_base_path=storage_path,
+                    gemma_model=gemma_model,
+                    groq_model=groq_model,
+                    raw_prompt=raw_prompt,
+                    structured_prompt=structured_prompt,
+                    skip_images=skip_images,
                 )
+
+            # Step 3: Final Upload
+            if step in [PipelineStep.UPLOAD, PipelineStep.FULL]:
+                if not analysis_result:
+                    # Attempt to load previous analysis if only running upload
+                    # (In production we usually run FULL, this is for debug/test)
+                    logger.warning(
+                        "Upload step requires analysis_result. Run ANALYZE first."
+                    )
+                    continue
+
+                if dry_run:
+                    logger.info(
+                        f"[DRY RUN] Ingestion of '{analysis_result.name}' simulated successfully."
+                    )
+                else:
+                    upload_product_task(
+                        item_id=item_id,
+                        url=work["productLink"],
+                        raw_data=raw_scraped_data,
+                        analysis_result=analysis_result,
+                        store_name=work.get("storeName"),
+                        external_id=work.get("externalId"),
+                    )
 
             processed_count += 1
             if target_item_id:

@@ -72,10 +72,8 @@ class ScraperService:
         soup = BeautifulSoup(html_content, "html.parser")
         candidates = []
 
-        # 1. Collect all potential image sources
         sources = []
 
-        # Regular <img> tags
         for img in soup.find_all("img"):
             src = img.get("src")
             if src:
@@ -201,7 +199,6 @@ class ScraperService:
         img_class = _get_attr("class").lower()
         src_lower = img_url.lower()
 
-        # High confidence matches (Nutrition Tables)
         nutrition_keywords = [
             "tabela",
             "nutricional",
