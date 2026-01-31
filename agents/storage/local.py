@@ -5,9 +5,7 @@ from .base import StorageBackend
 
 
 class LocalStorageBackend(StorageBackend):
-    """
-    Storage backend that uses the local filesystem.
-    """
+    """Storage backend that uses the local filesystem."""
 
     def __init__(self, base_path: str | None = None):
         if base_path is None:
@@ -23,12 +21,14 @@ class LocalStorageBackend(StorageBackend):
     def upload(
         self, bucket: str, key: str, data: bytes, content_type: str | None = None
     ) -> str:
+        """Upload data to local storage."""
         path = self._get_full_path(bucket, key)
         with open(path, "wb") as f:
             f.write(data)
         return path
 
     def download(self, bucket: str, key: str) -> bytes:
+        """Download data from local storage."""
         path = self._get_full_path(bucket, key)
         if not os.path.exists(path):
             raise FileNotFoundError(f"File not found: {path}")
@@ -36,13 +36,16 @@ class LocalStorageBackend(StorageBackend):
             return f.read()
 
     def exists(self, bucket: str, key: str) -> bool:
+        """Check if file exists locally."""
         path = self._get_full_path(bucket, key)
         return os.path.exists(path)
 
     def delete(self, bucket: str, key: str) -> None:
+        """Delete file from local storage."""
         path = self._get_full_path(bucket, key)
         if os.path.exists(path):
             os.remove(path)
 
     def get_url(self, bucket: str, key: str) -> str:
+        """Get local file URL."""
         return f"file://{self._get_full_path(bucket, key)}"

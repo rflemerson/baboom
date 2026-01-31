@@ -23,6 +23,7 @@ def _get_default_prompt():
 
 
 def get_groq_agent(model_name: str, prompt: str):
+    """Factory to create a configured Groq Agent."""
     model = GroqModel(model_name)
 
     return Agent(
@@ -35,9 +36,7 @@ def get_groq_agent(model_name: str, prompt: str):
 def run_groq_json_extraction(
     raw_text: str, prompt: str | None = None, model_name: str | None = None
 ) -> ProductAnalysisResult:
-    """
-    Runs Groq to convert raw text -> JSON Schema.
-    """
+    """Runs Groq to convert raw text -> JSON Schema."""
     model_name = model_name or DEFAULT_MODEL
     instructions = prompt or _get_default_prompt()
 

@@ -1,12 +1,18 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.11
+    rev: v0.14.14
     hooks:
       - id: ruff
         args: [ --fix ]
         exclude: ^\.ai/|^docs/
       - id: ruff-format
         exclude: ^\.ai/|^docs/
+
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.7.0
+    hooks:
+      - id: interrogate
+        args: [-vv]
 
   - repo: https://github.com/adamchainz/django-upgrade
     rev: 1.29.1

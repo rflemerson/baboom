@@ -7,6 +7,7 @@ from .nutrition import NutritionFacts
 class ProductAnalysisResult(BaseModel):
     """
     Unified product analysis result from multimodal LLM.
+
     Combines fields from Metadata and Nutrition for a single pass extraction.
     """
 

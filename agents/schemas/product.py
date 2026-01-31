@@ -4,9 +4,7 @@ from .nutrition import ProductNutritionProfile
 
 
 class RawScrapedData(BaseModel):
-    """
-    Data extracted directly from the HTML without AI enrichment.
-    """
+    """Data extracted directly from the HTML without AI enrichment."""
 
     name: str
     brand_name: str
@@ -18,9 +16,7 @@ class RawScrapedData(BaseModel):
 
 
 class ScrapedProductData(BaseModel):
-    """
-    Consolidated payload to be returned by variables for the GraphQL Mutation
-    """
+    """Consolidated payload to be returned by variables for the GraphQL Mutation."""
 
     name: str
     brand_name: str

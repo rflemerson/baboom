@@ -59,6 +59,10 @@ dev = [
   "vulture",
   "safety",
   "factory-boy",
+  "pytest",
+  "pytest-django",
+  "pytest-asyncio",
+  "pytest-sugar",
 ]
 
 [tool.ruff]
@@ -73,28 +77,44 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "UP",  # pyupgrade
-    "DJ",  # django specific
-    "B",   # flake8-bugbear
-    "S",   # flake8-bandit (security)
-    "C4",  # flake8-comprehensions
-    "SIM", # flake8-simplify
-    "RET", # flake8-return
-    "ERA", # eradicate (commented code)
-    "T20", # flake8-print
-    "RUF", # ruff-specific rules
-    "A",   # flake8-builtins
+    "E", "W", "F", "I", "UP", "DJ", "B", "S", "C4", "SIM", "RET", "ERA", "T20", "RUF", "A",
+    # --- Code Smells & Style ---
+    "C90",  # McCabe complexity
+    "PL",   # Pylint
+    "N",    # PEP8 Naming
+    "D",    # Pydocstyle
 ]
-ignore = ["E501", "RUF012"]
+ignore = [
+    "E501",    # Line length
+    "RUF012",  # Pydantic ClassVar
+    "PLR2004", # Magic values
+    "ISC001",  # Formatter conflict
+    # Docstrings ignores
+    "D100", "D104", "D107", "D203", "D212",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.pylint]
+max-args = 8
+max-branches = 15
+max-statements = 60
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "baboom/settings/__init__.py" = ["F403", "F405"]
 "core/models.py" = ["DJ001"]
-
+"*/tests.py" = ["D"]
+"*/tests/*.py" = ["D"]
+"scrapers/*" = ["D", "C90", "PL", "N", "PLC0415"]
+"core/*" = ["D", "C90", "PL", "N"]
+"baboom/*" = ["D", "C90", "PL", "N"]
+"manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
+"agents/assets.py" = ["D"]
+"agents/tools/scraper.py" = ["C901", "PLR0912", "PLR0915", "PLC0415"]
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin", "pydantic.mypy"]
@@ -123,6 +143,35 @@ ignore = ["DEP002"]
 [tool.vulture]
 paths = ["core", "scrapers", "baboom"]
 exclude = ["*/migrations/*", ".venv/", "docs/", "*/settings/*"]
-ignore_decorators = ["@admin.register", "@receiver", "@app.task", "@task", "@shared_task"]
+ignore_decorators = [
+    "@admin.register",
+    "@receiver",
+    "@app.task",
+    "@task",
+    "@shared_task",
+    "@asset",
+    "@op",
+    "@job",
+    "@sensor",
+    "@schedule",
+    "@repository"
+]
 ignore_names = ["Meta", "get_*", "clean_*", "save_*", "form_valid", "form_invalid", "dispatch", "get_queryset", "get_context_data", "setUp", "tearDown", "test_*", "sender", "args", "cls"]
 min_confidence = 80
+
+[tool.interrogate]
+ignore-init-module = true
+ignore-init-method = true
+ignore-magic = true
+ignore-semiprivate = true
+ignore-private = true
+ignore-nested-functions = true
+fail-under = 70
+exclude = ["setup.py", "docs", "build", "tests", "migrations", "temp", "tmp", "scrapers", "core", "baboom", "manage.py"]
+verbose = 2
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "baboom.settings"
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+addopts = "--reuse-db --nomigrations"
+asyncio_mode = "auto"

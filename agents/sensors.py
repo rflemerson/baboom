@@ -9,9 +9,7 @@ from .resources import AgentClientResource
     default_status=DefaultSensorStatus.RUNNING,
 )
 def work_queue_sensor(context, client: AgentClientResource):
-    """
-    Polling na API para ver se tem item novo para processar.
-    """
+    """Polling na API para ver se tem item novo para processar."""
     api = client.get_client()
 
     # Checa trabalho (sem force, pega o próximo da fila)

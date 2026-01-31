@@ -3,6 +3,8 @@ from pydantic.alias_generators import to_camel
 
 
 class MicronutrientItem(BaseModel):
+    """Micronutrient (vitamin/mineral) data."""
+
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     name: str
@@ -11,6 +13,8 @@ class MicronutrientItem(BaseModel):
 
 
 class NutritionFacts(BaseModel):
+    """Structured nutrition table data."""
+
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     serving_size_grams: float = Field(0.0, description="Serving size in grams")
@@ -32,5 +36,7 @@ class NutritionFacts(BaseModel):
 
 
 class ProductNutritionProfile(BaseModel):
+    """Complete nutritional profile of a product."""
+
     nutrition_facts: NutritionFacts
     flavor_names: list[str] | None = None

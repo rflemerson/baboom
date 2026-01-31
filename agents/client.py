@@ -7,9 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentClient:
-    """
-    Pure Python HTTP Client. Knows nothing about Django.
-    """
+    """Pure Python HTTP Client. Knows nothing about Django."""
 
     def __init__(self):
         # Read settings directly from OS Environment
@@ -45,10 +43,12 @@ class AgentClient:
             raise
 
     def ping(self):
+        """Check API connectivity."""
         query = "query { __typename }"
         return self._send(query)
 
     def get_taxonomy(self):
+        """Fetch categories and tags from the API."""
         query = """
         query {
             categories { name }
@@ -62,6 +62,7 @@ class AgentClient:
         return categories, tags
 
     def checkout_work(self, force: bool = False, target_item_id: int | None = None):
+        """Checkout a ScrapedItem for processing."""
         mutation = """
         mutation($force: Boolean, $targetItemId: Int) {
             checkoutScrapedItem(force: $force, targetItemId: $targetItemId) {
@@ -79,6 +80,7 @@ class AgentClient:
         return data.get("data", {}).get("checkoutScrapedItem")
 
     def report_error(self, item_id, message, is_fatal=False):
+        """Report a processing error back to the API."""
         mutation = """
         mutation($itemId: Int!, $message: String!, $isFatal: Boolean!) {
             reportScrapedItemError(itemId: $itemId, message: $message, isFatal: $isFatal)
@@ -90,6 +92,7 @@ class AgentClient:
         )
 
     def discard_item(self, item_id, reason):
+        """Mark an item as discarded."""
         mutation = """
         mutation($itemId: Int!, $reason: String!) {
             discardScrapedItem(itemId: $itemId, reason: $reason)
@@ -98,6 +101,7 @@ class AgentClient:
         self._send(mutation, {"itemId": int(item_id), "reason": reason})
 
     def create_product(self, product_input):
+        """Create a new Product via the API."""
         mutation = """
         mutation($data: ProductInput!) {
             createProduct(data: $data) {

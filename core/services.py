@@ -60,7 +60,6 @@ def product_create(
     Creates a product with all related data (nested creation).
     Raises ValidationError if business rules are violated.
     """
-
     if ean and Product.objects.filter(ean=ean).exists():
         raise ValidationError({"ean": _("A product with this EAN already exists.")})
 

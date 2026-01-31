@@ -26,10 +26,8 @@ def run_raw_extraction(
     prompt: str | None = None,
     model_name: str | None = None,
 ) -> str:
-    """
-    Runs a multimodal agent (default Gemma 3) to extract raw text data.
-    """
-    from ..storage import get_storage
+    """Runs a multimodal agent (default Gemma 3) to extract raw text data."""
+    from ..storage import get_storage  # noqa: PLC0415
 
     storage = get_storage()
     model_name = model_name or DEFAULT_MODEL

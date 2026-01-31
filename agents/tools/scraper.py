@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ScraperService:
+    """Service to download and process web assets."""
+
     def __init__(self):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -30,6 +32,7 @@ class ScraperService:
     def download_assets(self, item_id: int, url: str) -> str:
         """
         Downloads HTML and images to the storage backend.
+
         Returns the storage path/key to the saved HTML file.
         """
         bucket = str(item_id)
@@ -69,6 +72,7 @@ class ScraperService:
     def _process_images(
         self, html_content: str, base_url: str, bucket: str
     ) -> list[dict]:
+        """Extract and score images from HTML."""
         soup = BeautifulSoup(html_content, "html.parser")
         candidates = []
 
@@ -169,9 +173,7 @@ class ScraperService:
         return candidates
 
     def _compute_phash(self, content: bytes) -> str:
-        """
-        Computes a simple 8x8 perceptual hash to identify visually similar images.
-        """
+        """Computes a simple 8x8 perceptual hash to identify visually similar images."""
         img = (
             Image.open(io.BytesIO(content))
             .convert("L")
@@ -185,6 +187,7 @@ class ScraperService:
     def _calculate_image_score(
         self, img_tag: Tag, img_url: str, content: bytes
     ) -> tuple[int, int, int]:
+        """Calculate relevance score for an image."""
         score = 0
 
         def _get_attr(name: str) -> str:
@@ -262,9 +265,7 @@ class ScraperService:
         return score, width, height
 
     def extract_metadata(self, html_storage_path: str, url: str) -> dict:
-        """
-        Extracts metadata using extruct from HTML in storage.
-        """
+        """Extracts metadata using extruct from HTML in storage."""
         bucket, key = html_storage_path.split("/", 1)
         try:
             html_content = self.storage.download(bucket, key).decode("utf-8")
@@ -291,9 +292,7 @@ class ScraperService:
         price: float | None = None,
         stock_status: str | None = "A",
     ) -> RawScrapedData:
-        """
-        Consolidates raw extracted metadata into a simple data structure.
-        """
+        """Consolidates raw extracted metadata into a simple data structure."""
         from ..schemas.product import RawScrapedData
 
         product_info = self._extract_product_info(metadata)
