@@ -4,7 +4,11 @@ from simple_history.models import HistoricalRecords
 
 
 class ScrapedItem(models.Model):
+    """Product data scraped from external sources."""
+
     class Status(models.TextChoices):
+        """Status of the scraped item in the pipeline."""
+
         NEW = "new", _("New")
         PROCESSING = "processing", _("Processing")
         LINKED = "linked", _("Linked")
@@ -14,6 +18,8 @@ class ScrapedItem(models.Model):
         IGNORED = "ignored", _("Ignored")
 
     class StockStatus(models.TextChoices):
+        """Stock availability status."""
+
         AVAILABLE = "A", _("Available")
         LAST_UNITS = "L", _("Last Units")
         OUT_OF_STOCK = "O", _("Out of Stock")
@@ -114,6 +120,8 @@ class ScrapedItem(models.Model):
     history = HistoricalRecords()
 
     class Meta:
+        """Meta options."""
+
         constraints = [
             models.UniqueConstraint(
                 fields=["store_slug", "external_id"],
@@ -126,10 +134,13 @@ class ScrapedItem(models.Model):
         ]
 
     def __str__(self):
+        """Return string representation."""
         return f"[{self.store_slug}] {self.external_id} - {self.get_stock_status_display()}"
 
 
 class OpenFoodFactsData(models.Model):
+    """Enriched data from Open Food Facts API."""
+
     ean = models.CharField(
         "EAN",
         max_length=14,
@@ -149,8 +160,11 @@ class OpenFoodFactsData(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        """Meta options."""
+
         verbose_name = "Open Food Facts Data"
         verbose_name_plural = "Open Food Facts Data"
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"OFF Data for {self.ean}"

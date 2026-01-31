@@ -14,12 +14,15 @@ from .types import ScrapedItemType
 
 @strawberry.type
 class ScrapersMutation:
+    """Mutations for scraper management."""
+
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def checkout_scraped_item(
         self, force: bool = False, target_item_id: int | None = None
     ) -> ScrapedItemType | None:
         """
         Reserves an item for the Agent to process.
+
         Retrieves NEW items or ERROR items that have 'rested' for 30min (retry threshold).
         If 'force' is True, also allows checkout of items in LINKED or REVIEW status.
         If 'target_item_id' is provided, only that specific item will be checked out.
@@ -59,6 +62,7 @@ class ScrapersMutation:
     def report_scraped_item_error(
         self, item_id: int, message: str, is_fatal: bool = False
     ) -> bool:
+        """Report an error for a scraped item."""
         try:
             item = ScrapedItem.objects.get(id=item_id)
 
@@ -81,9 +85,7 @@ class ScrapersMutation:
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def discard_scraped_item(self, item_id: int, reason: str) -> bool:
-        """
-        Agent marks item as DISCARDED (e.g., it is a T-shirt, not a supplement).
-        """
+        """Agent marks item as DISCARDED (e.g., T-shirt, not supplement)."""
         try:
             item = ScrapedItem.objects.get(id=item_id)
             item.status = ScrapedItem.Status.DISCARDED

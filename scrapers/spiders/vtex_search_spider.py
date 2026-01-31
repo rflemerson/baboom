@@ -3,6 +3,7 @@ from typing import Any
 
 import requests
 
+from ..models import ScrapedItem
 from ..services import ScraperService
 from .base_spider import BaseSpider
 
@@ -10,9 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class VtexSearchSpider(BaseSpider):
-    """
-    Base Spider for VTEX Legacy / Search API stores.
-    """
+    """Base Spider for VTEX Legacy / Search API stores."""
 
     BRAND_NAME = ""
     STORE_SLUG = ""
@@ -51,6 +50,7 @@ class VtexSearchSpider(BaseSpider):
             return []
 
     def crawl(self) -> list[Any]:
+        """Crawl products from API."""
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
 
         categories = self._fetch_categories()
@@ -122,70 +122,39 @@ class VtexSearchSpider(BaseSpider):
 
     def _process_and_save(self, item: dict, category: str) -> Any | None:
         try:
-            pid = item.get("productId")
-            name = item.get("productName")
-
-            link_text = item.get("linkText")
-            url = f"{self.BASE_URL}/{link_text}/p" if link_text else ""
-
             skus = item.get("items", [])
             if not skus:
                 return None
 
-            first_sku = None
-            for sku_chem in skus:
-                sellers_chem = sku_chem.get("sellers", [])
-                for seller in sellers_chem:
-                    if seller.get("sellerDefault"):
-                        first_sku = sku_chem
-                        break
-                if first_sku:
-                    break
-
+            first_sku = self._extract_first_sku(skus)
             if not first_sku:
-                first_sku = skus[0]
+                return None
 
-            sellers = first_sku.get("sellers", [])
-            active_seller = None
-
-            for seller in sellers:
-                if seller.get("sellerDefault"):
-                    active_seller = seller
-                    break
-
-            if not active_seller and sellers:
-                active_seller = sellers[0]
-
+            active_seller = self._select_active_seller(first_sku)
             if not active_seller:
                 return None
+
+            comm_offer = active_seller.get("commertialOffer", {})
+            price = comm_offer.get("Price")
+            if price is None:
+                return None
+
+            pid = item.get("productId")
+            name = item.get("productName")
+            link_text = item.get("linkText")
+            url = f"{self.BASE_URL}/{link_text}/p" if link_text else ""
 
             ean = first_sku.get("ean", "")
             sku_code = first_sku.get("itemId", "")
 
-            comm_offer = active_seller.get("commertialOffer", {})
-            price = comm_offer.get("Price")
+            stock_quantity = self._parse_stock(comm_offer.get("AvailableQuantity"))
+            stock_status = (
+                ScrapedItem.StockStatus.AVAILABLE
+                if stock_quantity > 0
+                else ScrapedItem.StockStatus.OUT_OF_STOCK
+            )
 
-            stock_quantity = comm_offer.get("AvailableQuantity")
-            try:
-                stock_quantity = (
-                    int(stock_quantity) if stock_quantity is not None else 0
-                )
-            except (ValueError, TypeError):
-                stock_quantity = 0
-
-            from ..models import ScrapedItem
-
-            if stock_quantity > 0:
-                stock_status = ScrapedItem.StockStatus.AVAILABLE
-            else:
-                stock_status = ScrapedItem.StockStatus.OUT_OF_STOCK
-
-            if price is None:
-                return None
-
-            store_slug = self.STORE_SLUG
-            if not store_slug:
-                store_slug = self.BRAND_NAME.lower().replace(" ", "_")
+            store_slug = self.STORE_SLUG or self.BRAND_NAME.lower().replace(" ", "_")
 
             return ScraperService.save_product(
                 store_slug=store_slug,
@@ -203,3 +172,27 @@ class VtexSearchSpider(BaseSpider):
         except Exception as e:
             logger.debug(f"Item parse error: {e}")
             return None
+
+    def _extract_first_sku(self, skus: list[dict]) -> dict | None:
+        """Find the first valid SKU with a default seller."""
+        for sku_chem in skus:
+            sellers_chem = sku_chem.get("sellers", [])
+            for seller in sellers_chem:
+                if seller.get("sellerDefault"):
+                    return sku_chem
+        return skus[0] if skus else None
+
+    def _select_active_seller(self, sku: dict) -> dict | None:
+        """Select the active seller for the SKU."""
+        sellers = sku.get("sellers", [])
+        for seller in sellers:
+            if seller.get("sellerDefault"):
+                return seller
+        return sellers[0] if sellers else None
+
+    def _parse_stock(self, quantity: Any) -> int:
+        """Parse stock quantity to integer."""
+        try:
+            return int(quantity) if quantity is not None else 0
+        except (ValueError, TypeError):
+            return 0

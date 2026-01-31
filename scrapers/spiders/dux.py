@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 class DuxSpider(VtexSearchSpider):
+    """Spider for Dux Nutrition."""
+
     BRAND_NAME = "Dux Nutrition"
     STORE_SLUG = "dux_nutrition"
     BASE_URL = "https://www.duxhumanhealth.com"

@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 class MaxTitaniumSpider(VtexSearchSpider):
+    """Spider for Max Titanium."""
+
     BRAND_NAME = "Max Titanium"
     STORE_SLUG = "max_titanium"
     BASE_URL = "https://www.maxtitanium.com.br"

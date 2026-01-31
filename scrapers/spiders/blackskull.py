@@ -5,6 +5,7 @@ from typing import Any
 
 import requests
 
+from ..models import ScrapedItem
 from ..services import ScraperService
 from .base_spider import BaseSpider
 
@@ -12,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class BlackSkullSpider(BaseSpider):
+    """Spider for Black Skull (VTEX GraphQL)."""
+
     BRAND_NAME = "Black Skull"
     STORE_SLUG = "black_skull"
     BASE_URL = "https://www.blackskullusa.com.br"
@@ -55,9 +58,9 @@ class BlackSkullSpider(BaseSpider):
             return []
 
     def crawl(self) -> list[Any]:
+        """Crawl products from API."""
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
         all_products = []
-        processed_ids = set()
 
         categories = self._fetch_categories()
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
@@ -69,116 +72,135 @@ class BlackSkullSpider(BaseSpider):
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
         for category in categories:
-            logger.info(f"Crawling Category: {category}")
-            start = 0
-            step = 50
-
-            while True:
-                end = start + step - 1
-
-                variables_dict = {
-                    "hideUnavailableItems": False,
-                    "category": category,
-                    "specificationFilters": [],
-                    "orderBy": "OrderByScoreDESC",
-                    "from": start,
-                    "to": end,
-                    "shippingOptions": [],
-                    "variant": "",
-                    "advertisementOptions": {
-                        "showSponsored": False,
-                        "sponsoredCount": 0,
-                        "repeatSponsoredProducts": False,
-                        "advertisementPlacement": "home_shelf",
-                    },
-                }
-
-                vars_json = json.dumps(variables_dict, separators=(",", ":"))
-                vars_b64 = base64.b64encode(vars_json.encode("utf-8")).decode("utf-8")
-
-                extensions_dict = {
-                    "persistedQuery": {
-                        "version": 1,
-                        "sha256Hash": self.QUERY_HASH,
-                        "sender": "vtex.store-resources@0.x",
-                        "provider": "vtex.search-graphql@0.x",
-                    },
-                    "variables": vars_b64,
-                }
-                extensions_json = json.dumps(extensions_dict, separators=(",", ":"))
-
-                params = {
-                    "workspace": "master",
-                    "maxAge": "short",
-                    "appsEtag": "remove",
-                    "domain": "store",
-                    "locale": "pt-BR",
-                    "operationName": "Products",
-                    "variables": "{}",
-                    "extensions": extensions_json,
-                }
-
-                try:
-                    response = requests.get(
-                        self.API_ENDPOINT,
-                        params=params,
-                        headers=self.get_headers(),
-                        timeout=30,
-                    )
-
-                    if response.status_code != 200:
-                        logger.error(f"GraphQL Error: {response.text[:200]}")
-                        break
-
-                    data = response.json()
-                    if "errors" in data:
-                        logger.error(f"GraphQL Body Errors: {data['errors']}")
-                        break
-
-                    products_list = []
-
-                    p_search = data.get("data", {}).get("productSearch")
-                    if p_search and isinstance(p_search, dict):
-                        products_list = p_search.get("products", [])
-
-                    if not products_list:
-                        p_direct = data.get("data", {}).get("products")
-                        if isinstance(p_direct, list):
-                            products_list = p_direct
-                        elif isinstance(p_direct, dict):
-                            products_list = p_direct.get("products", [])
-
-                    if not products_list:
-                        break
-
-                    items_in_page = 0
-                    for item in products_list:
-                        try:
-                            item_id = str(item.get("productId"))
-                            if item_id in processed_ids:
-                                continue
-
-                            processed_ids.add(item_id)
-
-                            saved_obj = self._process_and_save(item, category)
-                            if saved_obj:
-                                all_products.append(saved_obj)
-                                items_in_page += 1
-                        except Exception as e:
-                            logger.debug(f"Skipping item: {e}")
-
-                    if len(products_list) < step:
-                        break
-
-                    start += step
-                    self.sleep_random(0.5, 1.5)
-
-                except Exception as e:
-                    logger.error(f"Crawl error for {category}: {e}")
-                    break
+            products = self._crawl_category(category)
+            all_products.extend(products)
 
         logger.info(f"Crawl finished. Total products: {len(all_products)}")
         return all_products
+
+    def _crawl_category(self, category: str) -> list[Any]:
+        """Crawl a single category."""
+        logger.info(f"Crawling Category: {category}")
+        products = []
+        processed_ids = set()
+        start = 0
+        step = 50
+
+        while True:
+            end = start + step - 1
+            data = self._fetch_graphql_data(category, start, end)
+
+            if not data:
+                break
+
+            items = self._parse_graphql_response(data)
+            if not items:
+                break
+
+            items_in_page = 0
+            for item in items:
+                try:
+                    item_id = str(item.get("productId"))
+                    if item_id in processed_ids:
+                        continue
+
+                    processed_ids.add(item_id)
+                    saved_obj = self._process_and_save(item, category)
+                    if saved_obj:
+                        products.append(saved_obj)
+                        items_in_page += 1
+                except Exception as e:
+                    logger.debug(f"Skipping item: {e}")
+
+            if len(items) < step:
+                break
+
+            start += step
+            self.sleep_random(0.5, 1.5)
+
+        return products
+
+    def _fetch_graphql_data(self, category: str, start: int, end: int) -> dict | None:
+        """Execute GraphQL query."""
+        variables_dict = {
+            "hideUnavailableItems": False,
+            "category": category,
+            "specificationFilters": [],
+            "orderBy": "OrderByScoreDESC",
+            "from": start,
+            "to": end,
+            "shippingOptions": [],
+            "variant": "",
+            "advertisementOptions": {
+                "showSponsored": False,
+                "sponsoredCount": 0,
+                "repeatSponsoredProducts": False,
+                "advertisementPlacement": "home_shelf",
+            },
+        }
+
+        vars_json = json.dumps(variables_dict, separators=(",", ":"))
+        vars_b64 = base64.b64encode(vars_json.encode("utf-8")).decode("utf-8")
+
+        extensions_dict = {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": self.QUERY_HASH,
+                "sender": "vtex.store-resources@0.x",
+                "provider": "vtex.search-graphql@0.x",
+            },
+            "variables": vars_b64,
+        }
+        extensions_json = json.dumps(extensions_dict, separators=(",", ":"))
+
+        params = {
+            "workspace": "master",
+            "maxAge": "short",
+            "appsEtag": "remove",
+            "domain": "store",
+            "locale": "pt-BR",
+            "operationName": "Products",
+            "variables": "{}",
+            "extensions": extensions_json,
+        }
+
+        try:
+            response = requests.get(
+                self.API_ENDPOINT,
+                params=params,
+                headers=self.get_headers(),
+                timeout=30,
+            )
+
+            if response.status_code != 200:
+                logger.error(f"GraphQL Error: {response.text[:200]}")
+                return None
+
+            data = response.json()
+            if "errors" in data:
+                logger.error(f"GraphQL Body Errors: {data['errors']}")
+                return None
+
+            return data
+        except Exception as e:
+            logger.error(f"Crawl error for {category}: {e}")
+            return None
+
+    def _parse_graphql_response(self, data: dict) -> list[dict]:
+        """Extract product list from GraphQL response."""
+        products_list = []
+        p_search = data.get("data", {}).get("productSearch")
+        if p_search and isinstance(p_search, dict):
+            products_list = p_search.get("products", [])
+
+        if not products_list:
+            p_direct = data.get("data", {}).get("products")
+            if isinstance(p_direct, list):
+                products_list = p_direct
+            elif isinstance(p_direct, dict):
+                products_list = p_direct.get("products", [])
+
+        return products_list
 
     def _process_and_save(self, item: dict, category_name: str) -> Any | None:
         try:
@@ -215,8 +237,6 @@ class BlackSkullSpider(BaseSpider):
                 )
             except (ValueError, TypeError):
                 stock_quantity = 0
-
-            from ..models import ScrapedItem
 
             if stock_quantity > 0:
                 stock_status = ScrapedItem.StockStatus.AVAILABLE

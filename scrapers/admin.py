@@ -10,6 +10,7 @@ from .models import OpenFoodFactsData, ScrapedItem
 
 @admin.action(description="Create/Merge Product from selected item")
 def create_product_from_scraped_item(modeladmin, request, queryset):
+    """Admin action to create products from scraped items."""
     if queryset.count() > 1:
         modeladmin.message_user(
             request,
@@ -50,6 +51,8 @@ def reset_to_new(modeladmin, request, queryset):
 
 @admin.register(ScrapedItem)
 class ScrapedItemAdmin(SimpleHistoryAdmin):
+    """Admin for scraped items."""
+
     list_display = [
         "id",
         "store_slug",
@@ -74,11 +77,14 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
 
     @admin.display(description="Name")
     def name_summary(self, obj):
+        """Truncate name for display."""
         return (obj.name[:40] + "...") if obj.name and len(obj.name) > 40 else obj.name
 
 
 @admin.register(OpenFoodFactsData)
 class OpenFoodFactsDataAdmin(admin.ModelAdmin):
+    """Admin for Open Food Facts Data."""
+
     list_display = ["ean", "updated_at", "created_at"]
     search_fields = ["ean"]
     readonly_fields = ["created_at", "updated_at"]

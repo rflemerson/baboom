@@ -11,9 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class ScraperService:
+    """Service for handling scraped data."""
+
     @staticmethod
     @transaction.atomic
-    def save_product(
+    def save_product(  # noqa: PLR0913
         store_slug: str,
         external_id: str,
         *,
@@ -27,6 +29,7 @@ class ScraperService:
         pid: str = "",
         category: str = "",
     ) -> ScrapedItem | None:
+        """Create or update a ScrapedItem."""
         # 1. Save raw data (staging)
         obj, created = ScrapedItem.objects.update_or_create(
             store_slug=store_slug,
@@ -54,9 +57,7 @@ class ScraperService:
 
     @staticmethod
     def sync_price_to_core(scraped_item: ScrapedItem) -> bool:
-        """
-        Syncs price/stock from a LINKED ScrapedItem to ProductPriceHistory.
-        """
+        """Syncs price/stock from a LINKED ScrapedItem to ProductPriceHistory."""
         if not scraped_item.product_store_id:
             return False
 

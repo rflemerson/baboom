@@ -5,17 +5,21 @@ from celery.utils.log import get_task_logger
 from django.utils import timezone
 
 from .models import ScrapedItem
+from .spiders.blackskull import BlackSkullSpider
+from .spiders.dark_lab import DarkLabSpider
+from .spiders.dux import DuxSpider
+from .spiders.growth import GrowthSpider
+from .spiders.integral_medica import IntegralMedicaSpider
+from .spiders.max_titanium import MaxTitaniumSpider
+from .spiders.probiotica import ProbioticaSpider
+from .spiders.soldiers import SoldiersSpider
 
 logger = get_task_logger(__name__)
 
 
 @shared_task
 def scrape_growth_monitor():
-    """
-    Task to scrape Growth Supplements via API (Wap.Store)
-    """
-    from .spiders.growth import GrowthSpider
-
+    """Scrape Growth Supplements via API."""
     logger.info("Starting Growth Monitor Task (API)")
     spider = GrowthSpider()
     items = spider.crawl()
@@ -25,11 +29,7 @@ def scrape_growth_monitor():
 
 @shared_task
 def scrape_blackskull_monitor():
-    """
-    Task to scrape Black Skull via API (VTEX GraphQL)
-    """
-    from .spiders.blackskull import BlackSkullSpider
-
+    """Scrape Black Skull via API."""
     logger.info("Starting Black Skull Monitor Task (API)")
     spider = BlackSkullSpider()
     items = spider.crawl()
@@ -39,8 +39,7 @@ def scrape_blackskull_monitor():
 
 @shared_task
 def scrape_integral_monitor():
-    from .spiders.integral_medica import IntegralMedicaSpider
-
+    """Scrape Integral Medica."""
     logger.info("Starting Integral Medica Monitor Task")
     spider = IntegralMedicaSpider()
     items = spider.crawl()
@@ -50,8 +49,7 @@ def scrape_integral_monitor():
 
 @shared_task
 def scrape_maxtitanium_monitor():
-    from .spiders.max_titanium import MaxTitaniumSpider
-
+    """Scrape Max Titanium."""
     logger.info("Starting Max Titanium Monitor Task")
     spider = MaxTitaniumSpider()
     items = spider.crawl()
@@ -61,8 +59,7 @@ def scrape_maxtitanium_monitor():
 
 @shared_task
 def scrape_probiotica_monitor():
-    from .spiders.probiotica import ProbioticaSpider
-
+    """Scrape Probiotica."""
     logger.info("Starting Probiotica Monitor Task")
     spider = ProbioticaSpider()
     items = spider.crawl()
@@ -72,8 +69,7 @@ def scrape_probiotica_monitor():
 
 @shared_task
 def scrape_darklab_monitor():
-    from .spiders.dark_lab import DarkLabSpider
-
+    """Scrape Dark Lab."""
     logger.info("Starting Dark Lab Monitor Task")
     spider = DarkLabSpider()
     items = spider.crawl()
@@ -83,8 +79,7 @@ def scrape_darklab_monitor():
 
 @shared_task
 def scrape_dux_monitor():
-    from .spiders.dux import DuxSpider
-
+    """Scrape Dux Nutrition."""
     logger.info("Starting Dux Monitor Task")
     spider = DuxSpider()
     items = spider.crawl()
@@ -94,8 +89,7 @@ def scrape_dux_monitor():
 
 @shared_task
 def scrape_soldiers_monitor():
-    from .spiders.soldiers import SoldiersSpider
-
+    """Scrape Soldiers Nutrition."""
     logger.info("Starting Soldiers Nutrition Monitor Task")
     spider = SoldiersSpider()
     items = spider.crawl()
@@ -106,6 +100,8 @@ def scrape_soldiers_monitor():
 @shared_task
 def release_stuck_items():
     """
+    Unlock items stuck in PROCESSING state.
+
     Cleaner: Unlocks items that have been in PROCESSING for too long
     (e.g., agent died or timed out without reporting).
     """

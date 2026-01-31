@@ -3,6 +3,7 @@ from typing import Any
 
 import requests
 
+from ..models import ScrapedItem
 from ..services import ScraperService
 from .base_spider import BaseSpider
 
@@ -10,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class DarkLabSpider(BaseSpider):
+    """Spider for Dark Lab (Shopify API)."""
+
     BRAND_NAME = "Dark Lab"
     STORE_SLUG = "dark_lab"
     BASE_URL = "https://www.darklabsuplementos.com.br"
@@ -30,6 +33,7 @@ class DarkLabSpider(BaseSpider):
     ]
 
     def get_headers(self) -> dict[str, str]:
+        """Get API headers."""
         return {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept": "application/json",
@@ -62,6 +66,7 @@ class DarkLabSpider(BaseSpider):
             return []
 
     def crawl(self) -> list[Any]:
+        """Crawl products from API."""
         logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
         all_products = []
         processed_ids = set()
@@ -162,8 +167,6 @@ class DarkLabSpider(BaseSpider):
                 stock_quantity = int(inventory_quantity)
             else:
                 stock_quantity = 100 if is_available else 0
-
-            from ..models import ScrapedItem
 
             if is_available:
                 stock_status = ScrapedItem.StockStatus.AVAILABLE

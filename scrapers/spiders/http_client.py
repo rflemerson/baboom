@@ -14,6 +14,7 @@ Usage:
         data = response.json()
 """
 
+import functools
 import logging
 from typing import Any
 
@@ -37,6 +38,7 @@ except ImportError:
 class HttpClient:
     """
     HTTP Client with automatic WAF bypass using TLS fingerprint impersonation.
+
     Falls back to standard requests if curl_cffi is not available.
     """
 
@@ -157,12 +159,9 @@ class HttpClient:
 
 
 # Singleton instance for convenience
-_default_client: HttpClient | None = None
 
 
+@functools.lru_cache(maxsize=1)
 def get_client() -> HttpClient:
     """Get or create the default HTTP client instance."""
-    global _default_client
-    if _default_client is None:
-        _default_client = HttpClient()
-    return _default_client
+    return HttpClient()

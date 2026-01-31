@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 class ProbioticaSpider(VtexSearchSpider):
+    """Spider for Probiótica."""
+
     BRAND_NAME = "Probiótica"
     STORE_SLUG = "probiotica"
     BASE_URL = "https://www.probiotica.com.br"

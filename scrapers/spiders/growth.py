@@ -3,6 +3,7 @@ from typing import Any
 
 import urllib3
 
+from ..models import ScrapedItem
 from ..services import ScraperService
 from .base_spider import BaseSpider
 from .http_client import HttpClient
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class GrowthSpider(BaseSpider):
+    """Spider for Growth Supplements (Wap.Store API)."""
+
     BRAND_NAME = "Growth Supplements"
     STORE_SLUG = "growth"
     BASE_URL = "https://www.gsuplementos.com.br"
@@ -37,6 +40,7 @@ class GrowthSpider(BaseSpider):
         self.http_client = HttpClient(timeout=30)
 
     def get_headers(self) -> dict[str, str]:
+        """Get API headers."""
         return {
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -99,6 +103,7 @@ class GrowthSpider(BaseSpider):
             return []
 
     def crawl(self) -> list[Any]:
+        """Crawl products from API."""
         logger.info(f"Starting crawl for {self.BRAND_NAME}")
 
         categories = self._fetch_categories()
@@ -111,69 +116,71 @@ class GrowthSpider(BaseSpider):
         logger.info(f"Categories to crawl: {len(categories)}")
 
         all_products = []
-        processed_ids = set()
-
         for category_path in categories:
-            logger.info(f"Crawling: {category_path}")
-
-            offset = 0
-            limit = 30  # API max is usually 30
-
-            while True:
-                params = {"url": category_path, "offset": offset, "limit": limit}
-
-                try:
-                    resp = self.http_client.get(
-                        self.API_LISTING,
-                        params=params,
-                        headers=self.get_headers(),
-                        verify=False,
-                    )
-
-                    if resp is None or resp.status_code != 200:
-                        logger.debug(
-                            f"Category {category_path} ended or failed: {resp.status_code if resp else 'No response'}"
-                        )
-                        break
-
-                    data = resp.json()
-                    products_list = []
-
-                    # Valid keys checked via research: data['conteudo']['produtos']
-                    if "conteudo" in data and "produtos" in data["conteudo"]:
-                        products_list = data["conteudo"]["produtos"]
-                    elif "data" in data and "list" in data["data"]:
-                        products_list = data["data"]["list"]
-
-                    if not products_list:
-                        break
-
-                    items_in_page = 0
-                    for item in products_list:
-                        item_id = str(item.get("id"))
-                        if item_id in processed_ids:
-                            continue
-
-                        processed_ids.add(item_id)
-
-                        saved_obj = self._process_and_save(item, category_path)
-                        if saved_obj:
-                            all_products.append(saved_obj)
-                            items_in_page += 1
-
-                    if len(products_list) < limit:
-                        # End of category
-                        break
-
-                    offset += limit
-                    self.sleep_random(1, 2)
-
-                except Exception as e:
-                    logger.error(f"Error crawling {category_path}: {e}")
-                    break
+            products = self._crawl_category(category_path)
+            all_products.extend(products)
 
         logger.info(f"Crawl finished. Total products: {len(all_products)}")
         return all_products
+
+    def _crawl_category(self, category_path: str) -> list[Any]:
+        """Crawl a single category."""
+        logger.info(f"Crawling: {category_path}")
+        products = []
+        processed_ids = set()
+        offset = 0
+        limit = 30
+
+        while True:
+            params = {"url": category_path, "offset": offset, "limit": limit}
+            try:
+                resp = self.http_client.get(
+                    self.API_LISTING,
+                    params=params,
+                    headers=self.get_headers(),
+                    verify=False,
+                )
+
+                if resp is None or resp.status_code != 200:
+                    break
+
+                data = resp.json()
+                products_list = self._extract_products_list(data)
+
+                if not products_list:
+                    break
+
+                items_in_page = 0
+                for item in products_list:
+                    item_id = str(item.get("id"))
+                    if item_id in processed_ids:
+                        continue
+
+                    processed_ids.add(item_id)
+                    saved_obj = self._process_and_save(item, category_path)
+                    if saved_obj:
+                        products.append(saved_obj)
+                        items_in_page += 1
+
+                if len(products_list) < limit:
+                    break
+
+                offset += limit
+                self.sleep_random(1, 2)
+
+            except Exception as e:
+                logger.error(f"Error crawling {category_path}: {e}")
+                break
+
+        return products
+
+    def _extract_products_list(self, data: dict) -> list[dict]:
+        """Extract product list from response."""
+        if "conteudo" in data and "produtos" in data["conteudo"]:
+            return data["conteudo"]["produtos"]
+        if "data" in data and "list" in data["data"]:
+            return data["data"]["list"]
+        return []
 
     def _process_and_save(self, item: dict, category: str) -> Any | None:
         try:
@@ -206,8 +213,6 @@ class GrowthSpider(BaseSpider):
                 stock_quantity = int(stock_quantity)
             except (ValueError, TypeError):
                 stock_quantity = 0
-
-            from ..models import ScrapedItem
 
             if stock_quantity > 0:
                 stock_status = ScrapedItem.StockStatus.AVAILABLE

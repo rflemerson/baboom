@@ -121,7 +121,6 @@ convention = "google"
 "baboom/settings/__init__.py" = ["F403", "F405"]
 "*/tests.py" = ["D"]
 "*/tests/*.py" = ["D"]
-"scrapers/*" = ["D", "C90", "PL", "N", "PLC0415"]
 "baboom/*" = ["D", "C90", "PL", "N"]
 "manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
 
@@ -176,7 +175,7 @@ ignore-semiprivate = true
 ignore-private = true
 ignore-nested-functions = true
 fail-under = 70
-exclude = ["setup.py", "docs", "build", "tests", "migrations", "temp", "tmp", "scrapers", "core", "baboom", "manage.py"]
+exclude = ["setup.py", "docs", "build", "tests", "migrations", "temp", "tmp", "core", "baboom", "manage.py"]
 verbose = 2
 
 [tool.pytest.ini_options]

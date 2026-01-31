@@ -6,6 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
+from ..models import ScrapedItem
 from ..services import ScraperService
 from .base_spider import BaseSpider
 
@@ -13,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class SoldiersSpider(BaseSpider):
+    """Spider for Soldiers Nutrition."""
+
     BRAND_NAME = "Soldiers Nutrition"
     STORE_SLUG = "soldiers_nutrition"
     BASE_URL = "https://www.soldiersnutrition.com.br"
@@ -27,6 +30,7 @@ class SoldiersSpider(BaseSpider):
     ]
 
     def _discover_categories(self) -> list[str]:
+        """Discover categories from homepage navigation."""
         logger.info("Discovering categories from homepage...")
         categories = set()
         try:
@@ -62,6 +66,7 @@ class SoldiersSpider(BaseSpider):
         return list(categories) if categories else self.FALLBACK_CATEGORIES
 
     def _fetch_product_links(self, category_slug: str) -> list[str]:
+        """Fetch all product links for a category."""
         product_links = []
         page_num = 1
 
@@ -110,6 +115,7 @@ class SoldiersSpider(BaseSpider):
         return product_links
 
     def crawl(self) -> list[Any]:
+        """Crawl products using Playwright."""
         logger.info(f"Starting Browser Crawl for {self.BRAND_NAME}...")
         all_products = []
         raw_items: list[dict[str, Any]] = []
@@ -166,6 +172,7 @@ class SoldiersSpider(BaseSpider):
         return all_products
 
     def _scrape_product_page(self, page, url: str) -> dict | None:
+        """Extract product data from page using DataLayer."""
         try:
             logger.debug(f"Navigating to {url}")
             page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -219,6 +226,7 @@ class SoldiersSpider(BaseSpider):
             return None
 
     def _process_and_save(self, data: dict, category_name: str, url: str) -> Any | None:
+        """Process extracted data and save product."""
         try:
             pid = data.get("item_id")
             sku = data.get("item_sku")
@@ -233,8 +241,6 @@ class SoldiersSpider(BaseSpider):
                 return None
 
             dom_available = data.get("dom_stock_available", True)
-
-            from ..models import ScrapedItem
 
             stock_status = (
                 ScrapedItem.StockStatus.AVAILABLE

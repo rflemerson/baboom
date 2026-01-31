@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 class IntegralMedicaSpider(VtexSearchSpider):
+    """Spider for IntegralMedica."""
+
     BRAND_NAME = "Integralmedica"
     STORE_SLUG = "integral_medica"
     BASE_URL = "https://www.integralmedica.com.br"

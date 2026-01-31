@@ -4,6 +4,8 @@ from time import sleep
 
 
 class BaseSpider:
+    """Base class for all spiders."""
+
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
@@ -11,6 +13,7 @@ class BaseSpider:
     ]
 
     def get_headers(self):
+        """Get default headers."""
         return {
             "User-Agent": self.user_agents[0],  # Simple rotation logic for now
             "Accept-Language": "en-US,en;q=0.9",
@@ -19,14 +22,13 @@ class BaseSpider:
     logger = logging.getLogger(__name__)
 
     def sleep_random(self, min_seconds=1, max_seconds=3):
+        """Sleep for a random duration."""
         sleep(uniform(min_seconds, max_seconds))  # noqa: S311
 
     def check_category_discrepancy(
         self, dynamic_categories: list[str], fallback_categories: list[str]
     ):
-        """
-        Compare dynamic categories with fallback categories and log warnings if there are discrepancies.
-        """
+        """Compare dynamic categories with fallback categories and log warnings."""
         if not dynamic_categories or not fallback_categories:
             return
 
