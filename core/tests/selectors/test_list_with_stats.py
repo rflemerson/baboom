@@ -20,18 +20,15 @@ class ProductStatsTest(TestCase):
 
     def setUp(self):
         """Set up test data."""
-        # 1. Setup Base Data
         self.brand = Brand.objects.create(name="Test Brand", display_name="Test Brand")
         self.store = Store.objects.create(name="Test Store", display_name="Test Store")
 
-        # 2. Create Product (1kg = 1000g)
         self.product = Product.objects.create(
             name="Whey Protein",
             brand=self.brand,
             weight=1000,
         )
 
-        # 3. Create Nutrition Facts
         # Scenario: 30g serving has 24g protein (80% concentration)
         self.nutrition = NutritionFacts.objects.create(
             serving_size_grams=30,
@@ -45,7 +42,6 @@ class ProductStatsTest(TestCase):
             product=self.product, nutrition_facts=self.nutrition
         )
 
-        # 4. Create Price
         # Price: R$ 100.00
         self.link = ProductStore.objects.create(
             product=self.product, store=self.store, product_link="http://example.com"
@@ -69,17 +65,13 @@ class ProductStatsTest(TestCase):
         if p is None:
             self.fail("Product not found")
 
-        # 1. Concentration: (24g / 30g) * 100 = 80.0%
         self.assertEqual(p.concentration, Decimal("80.0"))
 
-        # 2. Total Protein: (1000g weight * 24g prot) / 30g serving = 800g
         self.assertEqual(p.total_protein, Decimal("800.00"))
 
-        # 3. Price per Gram Protein: R$ 100.00 / 800g = R$ 0.125
         # Note: Database might round depending on precision, checking 2 places
         self.assertEqual(round(p.price_per_gram, 3), Decimal("0.125"))
 
-        # 4. Link Check
         self.assertEqual(p.external_link, "http://example.com")
 
     def test_missing_price_handling(self):

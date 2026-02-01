@@ -249,7 +249,6 @@ class Product(BaseModel):
         """Validate business rules."""
         super().clean()
 
-        # 1. Validate EAN uniqueness (excluding self)
         if self.ean:
             qs = Product.objects.filter(ean=self.ean)
             if self.pk:
@@ -259,7 +258,6 @@ class Product(BaseModel):
                     {"ean": _("Product with this EAN already exists.")}
                 )
 
-        # 2. Validate Brand + Name + Weight uniqueness (excluding self)
         if self.brand_id and self.name and self.weight:
             qs = Product.objects.filter(
                 brand_id=self.brand_id, name=self.name, weight=self.weight

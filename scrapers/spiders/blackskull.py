@@ -7,6 +7,7 @@ import requests
 
 from ..models import ScrapedItem
 from ..services import ScraperService
+from ..types import ProductIngestionInput
 from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
@@ -66,8 +67,8 @@ class BlackSkullSpider(BaseSpider):
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
-            logger.info("No dynamic categories found, using fallback.")
-            categories = self.FALLBACK_CATEGORIES
+            logger.info("No dynamic categories found, using fallback/config.")
+            categories = self.categories_to_crawl or self.FALLBACK_CATEGORIES
 
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
@@ -249,7 +250,7 @@ class BlackSkullSpider(BaseSpider):
             ean = first_sku.get("ean", "")
             sku = first_sku.get("itemId", "")
 
-            return ScraperService.save_product(
+            input_data = ProductIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=str(pid),
                 url=url,
@@ -262,6 +263,8 @@ class BlackSkullSpider(BaseSpider):
                 pid=str(pid),
                 category=category_name,
             )
+
+            return ScraperService.save_product(input_data)
 
         except Exception as e:
             logger.debug(f"Item parse error: {e}")

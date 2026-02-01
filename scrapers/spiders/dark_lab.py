@@ -5,6 +5,7 @@ import requests
 
 from ..models import ScrapedItem
 from ..services import ScraperService
+from ..types import ProductIngestionInput
 from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
@@ -75,8 +76,8 @@ class DarkLabSpider(BaseSpider):
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
-            logger.info("No dynamic categories found, using fallback.")
-            categories = self.FALLBACK_CATEGORIES
+            logger.info("No dynamic categories found, using fallback/config.")
+            categories = self.categories_to_crawl or self.FALLBACK_CATEGORIES
 
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
@@ -180,7 +181,7 @@ class DarkLabSpider(BaseSpider):
             if not price:
                 return None
 
-            return ScraperService.save_product(
+            input_data = ProductIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=pid,
                 url=url,
@@ -193,6 +194,7 @@ class DarkLabSpider(BaseSpider):
                 pid=pid,
                 category=category,
             )
+            return ScraperService.save_product(input_data)
 
         except Exception as e:
             logger.warning(f"Item parse error: {e}")

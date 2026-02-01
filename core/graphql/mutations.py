@@ -9,6 +9,7 @@ from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Product, ProductStore
 from core.services import product_create, product_update_content
+from core.types import ProductCreateInput
 from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
 
@@ -43,7 +44,7 @@ class CoreMutation:
             elif data.tags:
                 tags_to_use = data.tags
 
-            product = product_create(
+            input_data = ProductCreateInput(
                 name=data.name,
                 weight=data.weight,
                 brand_name=data.brand_name,
@@ -56,6 +57,8 @@ class CoreMutation:
                 stores=stores_data,
                 nutrition=nutrition_data,
             )
+
+            product = product_create(data=input_data)
 
             if data.origin_scraped_item_id:
                 try:

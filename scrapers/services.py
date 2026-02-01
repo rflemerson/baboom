@@ -1,11 +1,11 @@
 import logging
-from decimal import Decimal
 
 from django.db import transaction
 
 from core.models import ProductPriceHistory
 
 from .models import ScrapedItem
+from .types import ProductIngestionInput
 
 logger = logging.getLogger(__name__)
 
@@ -15,40 +15,26 @@ class ScraperService:
 
     @staticmethod
     @transaction.atomic
-    def save_product(  # noqa: PLR0913
-        store_slug: str,
-        external_id: str,
-        *,
-        url: str = "",
-        name: str = "",
-        price: str | float | Decimal | None = None,
-        stock_quantity: int | None = None,
-        stock_status: ScrapedItem.StockStatus = ScrapedItem.StockStatus.AVAILABLE,
-        ean: str = "",
-        sku: str = "",
-        pid: str = "",
-        category: str = "",
-    ) -> ScrapedItem | None:
+    def save_product(data: ProductIngestionInput) -> ScrapedItem | None:
         """Create or update a ScrapedItem."""
-        # 1. Save raw data (staging)
         obj, created = ScrapedItem.objects.update_or_create(
-            store_slug=store_slug,
-            external_id=external_id,
+            store_slug=data.store_slug,
+            external_id=data.external_id,
             defaults={
-                "product_link": url,
-                "name": name,
-                "price": price,
-                "stock_quantity": stock_quantity,
-                "stock_status": stock_status,
-                "ean": ean,
-                "sku": sku,
-                "pid": pid,
-                "category": category,
+                "product_link": data.url,
+                "name": data.name,
+                "price": data.price,
+                "stock_quantity": data.stock_quantity,
+                "stock_status": data.stock_status,
+                "ean": data.ean,
+                "sku": data.sku,
+                "pid": data.pid,
+                "category": data.category,
             },
         )
 
         action = "Created" if created else "Updated"
-        logger.debug(f"{action} item {external_id} for {store_slug}")
+        logger.debug(f"{action} item {data.external_id} for {data.store_slug}")
 
         if obj.product_store_id:
             ScraperService.sync_price_to_core(obj)

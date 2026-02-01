@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -12,8 +12,6 @@ from core.models import (
     ProductStore,
     Store,
 )
-
-# 2. Import HtmxHttpRequest from your view
 from core.views import HtmxHttpRequest, list_view
 
 
@@ -77,9 +75,10 @@ class ListViewTests(TestCase):
     def test_product_list_view_standard(self):
         """Standard GET request should render the full template."""
         request = self.factory.get(reverse("list"))
-        request.htmx = False  # type: ignore
+        htmx_request = cast(HtmxHttpRequest, request)
+        htmx_request.htmx = cast(Any, False)
 
-        response = list_view(cast(HtmxHttpRequest, request))
+        response = list_view(htmx_request)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "<html")
@@ -89,10 +88,10 @@ class ListViewTests(TestCase):
     def test_product_list_view_htmx(self):
         """HTMX GET request should render the partial template."""
         request = self.factory.get(reverse("list"))
-        request.htmx = True  # type: ignore
+        htmx_request = cast(HtmxHttpRequest, request)
+        htmx_request.htmx = cast(Any, True)
 
-        # 3. Use cast() here as well
-        response = list_view(cast(HtmxHttpRequest, request))
+        response = list_view(htmx_request)
 
         self.assertEqual(response.status_code, 200)
         # Should NOT contain full html structure
@@ -103,10 +102,10 @@ class ListViewTests(TestCase):
     def test_product_filtering_search(self):
         """Test filtering by search query."""
         request = self.factory.get(reverse("list"), {"search": "Protein A"})
-        request.htmx = False  # type: ignore
+        htmx_request = cast(HtmxHttpRequest, request)
+        htmx_request.htmx = cast(Any, False)
 
-        # 3. Use cast()
-        response = list_view(cast(HtmxHttpRequest, request))
+        response = list_view(htmx_request)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Protein A")
@@ -115,10 +114,10 @@ class ListViewTests(TestCase):
     def test_product_filtering_brand(self):
         """Test filtering by brand."""
         request = self.factory.get(reverse("list"), {"brand": "Brand B"})
-        request.htmx = False  # type: ignore
+        htmx_request = cast(HtmxHttpRequest, request)
+        htmx_request.htmx = cast(Any, False)
 
-        # 3. Use cast()
-        response = list_view(cast(HtmxHttpRequest, request))
+        response = list_view(htmx_request)
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Protein A")

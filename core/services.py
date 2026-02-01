@@ -25,6 +25,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from .models import AlertSubscriber
+    from .types import ProductCreateInput
 
 logger = logging.getLogger(__name__)
 
@@ -40,64 +41,51 @@ def alert_subscriber_create(*, email: str) -> AlertSubscriber:
     return subscriber
 
 
-def product_create(  # noqa: PLR0913
-    *,
-    name: str,
-    weight: int,
-    brand_name: str,
-    category_name: str | list[str] | None = None,
-    ean: str | None = None,
-    description: str | None = "",
-    packaging: str = "CONTAINER",
-    is_published: bool = False,
-    tags: list[str] | list[list[str]] | None = None,
-    stores: list[dict[str, Any]] | None = None,
-    nutrition: list[dict[str, Any]] | None = None,
-) -> Product:
+def product_create(data: ProductCreateInput) -> Product:
     """
     Create a product with all related data (nested creation).
 
     Raises:
         ValidationError: If business rules are violated (e.g. duplicate EAN).
     """
-    if ean and Product.objects.filter(ean=ean).exists():
+    if data.ean and Product.objects.filter(ean=data.ean).exists():
         raise ValidationError({"ean": _("A product with this EAN already exists.")})
 
     try:
         with transaction.atomic():
             # 1. Brand
             brand, _created = Brand.objects.get_or_create(
-                name=brand_name,
-                defaults={"display_name": brand_name},
+                name=data.brand_name,
+                defaults={"display_name": data.brand_name},
             )
 
             # 2. Category
-            category = _resolve_category(category_name)
+            category = _resolve_category(data.category_name)
 
             # 3. Product
             product = Product.objects.create(
-                name=name,
-                weight=weight,
+                name=data.name,
+                weight=data.weight,
                 brand=brand,
                 category=category,
-                ean=ean,
-                description=description or "",
-                packaging=packaging,
-                is_published=is_published,
+                ean=data.ean,
+                description=data.description or "",
+                packaging=data.packaging,
+                is_published=data.is_published,
             )
 
             # 4. Tags
-            if tags:
-                tag_objects = _resolve_tags(tags)
+            if data.tags:
+                tag_objects = _resolve_tags(data.tags)
                 product.tags.set(tag_objects)
 
             # 5. Stores & Prices
-            if stores:
-                _create_store_entries(product, stores)
+            if data.stores:
+                _create_store_entries(product, data.stores)
 
             # 6. Nutrition Profiles
-            if nutrition:
-                _handle_nutrition_creation(product, nutrition)
+            if data.nutrition:
+                _handle_nutrition_creation(product, data.nutrition)
 
             return product
 

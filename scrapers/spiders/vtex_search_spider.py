@@ -5,6 +5,7 @@ import requests
 
 from ..models import ScrapedItem
 from ..services import ScraperService
+from ..types import ProductIngestionInput
 from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
@@ -57,8 +58,8 @@ class VtexSearchSpider(BaseSpider):
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
-            logger.info("Using Fallback Categories.")
-            categories = self.FALLBACK_CATEGORIES
+            logger.info("Using Fallback/Config Categories.")
+            categories = self.categories_to_crawl or self.FALLBACK_CATEGORIES
 
         logger.info(f"Discovered {len(categories)} categories to crawl.")
 
@@ -156,7 +157,7 @@ class VtexSearchSpider(BaseSpider):
 
             store_slug = self.STORE_SLUG or self.BRAND_NAME.lower().replace(" ", "_")
 
-            return ScraperService.save_product(
+            input_data = ProductIngestionInput(
                 store_slug=store_slug,
                 external_id=str(pid),
                 url=url,
@@ -169,6 +170,7 @@ class VtexSearchSpider(BaseSpider):
                 pid=str(pid),
                 category=category,
             )
+            return ScraperService.save_product(input_data)
         except Exception as e:
             logger.debug(f"Item parse error: {e}")
             return None

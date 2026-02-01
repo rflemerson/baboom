@@ -10,6 +10,7 @@ from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
 from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
+from scrapers.types import ProductIngestionInput
 
 # Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
@@ -24,8 +25,7 @@ class ScraperIntegrationTests(TestCase):
 
     def test_blackskull_spider(self):
         """Test BlackSkull spider execution."""
-        spider = BlackSkullSpider()
-        spider.FALLBACK_CATEGORIES = ["proteina"]  # type: ignore
+        spider = BlackSkullSpider(categories=["proteina"])
 
         items = spider.crawl()
 
@@ -39,8 +39,7 @@ class ScraperIntegrationTests(TestCase):
 
     def test_darklab_spider(self):
         """Test DarkLab spider execution."""
-        spider = DarkLabSpider()
-        spider.FALLBACK_CATEGORIES = ["whey-protein"]  # type: ignore
+        spider = DarkLabSpider(categories=["whey-protein"])
 
         items = spider.crawl()
 
@@ -50,14 +49,12 @@ class ScraperIntegrationTests(TestCase):
         first = ScrapedItem.objects.filter(store_slug="dark_lab").first()
         self.assertIsNotNone(first)
 
-        # Specific check for logic
         if first and first.stock_quantity == 100:
             pass
 
     def test_dux_spider(self):
         """Test Dux spider execution."""
-        spider = DuxSpider()
-        spider.FALLBACK_CATEGORIES = ["proteinas"]  # type: ignore
+        spider = DuxSpider(categories=["proteinas"])
 
         items = spider.crawl()
 
@@ -71,8 +68,7 @@ class ScraperIntegrationTests(TestCase):
 
     def test_growth_spider(self):
         """Test Growth spider execution."""
-        spider = GrowthSpider()
-        spider.FALLBACK_CATEGORIES = ["/vegano/"]  # type: ignore
+        spider = GrowthSpider(categories=["/vegano/"])
 
         items = spider.crawl()
 
@@ -104,7 +100,6 @@ class SyncPriceToCoreTests(TestCase):
 
     def test_save_product_creates_price_history_for_linked_item(self):
         """Test that saving a product creates a price history record."""
-        # 1. Pre-create a LINKED item
         ScrapedItem.objects.create(
             store_slug="test_store",
             external_id="TEST123",
@@ -113,15 +108,14 @@ class SyncPriceToCoreTests(TestCase):
             price=Decimal("100.00"),
         )
 
-        # 2. Run Service
-        ScraperService.save_product(
+        input_data = ProductIngestionInput(
             store_slug="test_store",
             external_id="TEST123",
             price=Decimal("199.90"),
             stock_status=ScrapedItem.StockStatus.AVAILABLE,
         )
+        ScraperService.save_product(input_data)
 
-        # 3. Check Core
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
         price_record = ProductPriceHistory.objects.first()
 
@@ -164,18 +158,14 @@ class SyncPriceToCoreTests(TestCase):
             product_store=self.product_store,
         )
 
-        # First Sync
         ScraperService.sync_price_to_core(item)
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
 
-        # Change Price
         item.price = Decimal("179.90")
         item.save()
 
-        # Manual Sync
         ScraperService.sync_price_to_core(item)
 
-        # Verify
         self.assertEqual(ProductPriceHistory.objects.count(), 2)
 
         try:

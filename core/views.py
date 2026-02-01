@@ -61,7 +61,6 @@ def list_view(request: HtmxHttpRequest) -> HttpResponse:
 
 def subscribe_alerts(request: HttpRequest) -> HttpResponse:
     """Handle email subscription for price alerts."""
-    # Here we use getattr, so the standard HttpRequest works without a typing error
     is_htmx = getattr(request, "htmx", False)
 
     if request.method == "GET" and is_htmx:

@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 
 from ..models import ScrapedItem
 from ..services import ScraperService
+from ..types import ProductIngestionInput
 from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,11 @@ class SoldiersSpider(BaseSpider):
         except Exception as e:
             logger.error(f"Error discovering categories: {e}")
 
-        return list(categories) if categories else self.FALLBACK_CATEGORIES
+        return (
+            list(categories)
+            if categories
+            else (self.categories_to_crawl or self.FALLBACK_CATEGORIES)
+        )
 
     def _fetch_product_links(self, category_slug: str) -> list[str]:
         """Fetch all product links for a category."""
@@ -249,7 +254,7 @@ class SoldiersSpider(BaseSpider):
             )
             stock_quantity = 100 if dom_available else 0
 
-            return ScraperService.save_product(
+            input_data = ProductIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=str(pid),
                 url=url,
@@ -262,6 +267,7 @@ class SoldiersSpider(BaseSpider):
                 pid=str(pid),
                 category=category_name,
             )
+            return ScraperService.save_product(input_data)
 
         except Exception as e:
             logger.error(f"Error processing item for {url}: {e}")

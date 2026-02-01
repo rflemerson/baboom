@@ -5,6 +5,7 @@ import urllib3
 
 from ..models import ScrapedItem
 from ..services import ScraperService
+from ..types import ProductIngestionInput
 from .base_spider import BaseSpider
 from .http_client import HttpClient
 
@@ -36,7 +37,8 @@ class GrowthSpider(BaseSpider):
         "/vegano/",
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, categories: list[str] | None = None) -> None:
+        super().__init__(categories)
         self.http_client = HttpClient(timeout=30)
 
     def get_headers(self) -> dict[str, str]:
@@ -110,8 +112,8 @@ class GrowthSpider(BaseSpider):
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
 
         if not categories:
-            logger.info("Using fallback categories")
-            categories = self.FALLBACK_CATEGORIES
+            logger.info("Using fallback/config categories")
+            categories = self.categories_to_crawl or self.FALLBACK_CATEGORIES
 
         logger.info(f"Categories to crawl: {len(categories)}")
 
@@ -221,7 +223,7 @@ class GrowthSpider(BaseSpider):
 
             ean = item.get("ean") or item.get("gtin") or ""
 
-            return ScraperService.save_product(
+            input_data = ProductIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=external_id,
                 url=product_url,
@@ -234,6 +236,7 @@ class GrowthSpider(BaseSpider):
                 pid=external_id,
                 category=category,
             )
+            return ScraperService.save_product(input_data)
 
         except Exception as e:
             logger.error(f"Error processing item {item.get('id')}: {e}")

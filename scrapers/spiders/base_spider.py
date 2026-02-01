@@ -12,6 +12,12 @@ class BaseSpider:
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36",
     ]
 
+    FALLBACK_CATEGORIES: list[str] = []
+
+    def __init__(self, categories: list[str] | None = None) -> None:
+        """Initialize spider with optional category override."""
+        self.categories_to_crawl = categories
+
     def get_headers(self):
         """Get default headers."""
         return {
