@@ -166,7 +166,7 @@ ignore-magic = true
 ignore-semiprivate = true
 ignore-private = true
 ignore-nested-functions = true
-fail-under = 70
+fail-under = 90
 exclude = ["setup.py", "docs", "build", "tests", "migrations", "temp", "tmp"]
 verbose = 2
 
