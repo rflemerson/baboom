@@ -121,7 +121,6 @@ convention = "google"
 "baboom/settings/__init__.py" = ["F403", "F405"]
 "*/tests.py" = ["D"]
 "*/tests/*.py" = ["D"]
-"baboom/*" = ["D", "C90", "PL", "N"]
 "manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
 
 [tool.mypy]

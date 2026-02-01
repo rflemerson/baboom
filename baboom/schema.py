@@ -9,8 +9,11 @@ from scrapers.graphql.schema import ScrapersMutation
 class Query(
     CoreQuery,
 ):
+    """Root GraphQL Query."""
+
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def hello(self) -> str:
+        """Simple health check field."""
         return "Baboom GraphQL API is Online"
 
 
@@ -19,6 +22,8 @@ class Mutation(
     CoreMutation,
     ScrapersMutation,
 ):
+    """Root GraphQL Mutation."""
+
     pass
 
 

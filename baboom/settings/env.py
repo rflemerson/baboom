@@ -10,6 +10,7 @@ APPS_DIR = BASE_DIR / "baboom"
 
 
 def env_to_enum(enum_cls, value):
+    """Convert env string to Enum member."""
     for x in enum_cls:
         if x.value == value:
             return x
