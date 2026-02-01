@@ -145,8 +145,35 @@ class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
         return self.name
 
 
+class Nutrient(BaseModel):
+    """Normalized nutrient definition (Macro or Micro)."""
+
+    name = models.CharField(_("Name"), max_length=100, unique=True)
+    slug = models.SlugField(_("Slug"), max_length=100, unique=True)
+    is_macro = models.BooleanField(
+        _("Is Macro?"), default=False, help_text=_("Is this a macronutrient?")
+    )
+
+    class Meta:
+        """Meta options."""
+
+        verbose_name = _("Nutrient")
+        verbose_name_plural = _("Nutrients")
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        """Return name."""
+        return self.name
+
+
 class Product(BaseModel):
     """Main product model."""
+
+    class Type(models.TextChoices):
+        """Product types."""
+
+        SIMPLE = "SIMPLE", _("Simple Product")
+        COMBO = "COMBO", _("Combo/Kit")
 
     class Packaging(models.TextChoices):
         """Packaging types."""
@@ -155,6 +182,13 @@ class Product(BaseModel):
         CONTAINER = "CONTAINER", _("Container Package")
         BAR = "BAR", _("Bar")
         OTHER = "OTHER", _("Other")
+
+    type = models.CharField(
+        _("Product Type"),
+        max_length=20,
+        choices=Type.choices,
+        default=Type.SIMPLE,
+    )
 
     name = models.CharField(_("Product Name"), max_length=200)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name=_("Brand"))
@@ -200,6 +234,19 @@ class Product(BaseModel):
 
     tags: models.ManyToManyField = models.ManyToManyField(
         Tag, verbose_name=_("Product Tags"), blank=True
+    )
+
+    nutrient_sources: models.ManyToManyField = models.ManyToManyField(
+        Nutrient, verbose_name=_("Nutrient Sources"), blank=True
+    )
+
+    components: models.ManyToManyField = models.ManyToManyField(
+        "self",
+        through="ProductComponent",
+        symmetrical=False,
+        verbose_name=_("Components"),
+        blank=True,
+        help_text=_("If this is a Combo, list the products it contains."),
     )
 
     is_published = models.BooleanField(
@@ -268,6 +315,39 @@ class Product(BaseModel):
                 raise ValidationError(
                     _("Product with this brand, name, and weight already exists.")
                 )
+
+
+class ProductComponent(BaseModel):
+    """Link between a Combo Product (parent) and its components (children)."""
+
+    parent = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="component_links",
+        verbose_name=_("Parent Combo"),
+    )
+    component = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="parent_links",
+        verbose_name=_("Component Product"),
+    )
+    quantity = models.PositiveIntegerField(_("Quantity"), default=1)
+
+    class Meta:
+        """Meta options."""
+
+        verbose_name = _("Product Component")
+        verbose_name_plural = _("Product Components")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parent", "component"], name="unique_product_component"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return f"{self.parent.name} -> {self.quantity}x {self.component.name}"
 
 
 class ProductStore(BaseModel):

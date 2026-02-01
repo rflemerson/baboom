@@ -1,3 +1,5 @@
+"""Dagster assets for product ingestion pipeline."""
+
 import json
 
 from dagster import AssetExecutionContext, Config, MetadataValue, asset
@@ -213,6 +215,16 @@ def upload_to_api(
             "categoryPath": analysis_data.get("category_hierarchy") or [],
             "tagPaths": [
                 {"path": tp} for tp in (analysis_data.get("tags_hierarchy") or [])
+            ],
+            "isCombo": analysis_data.get("is_combo", False),
+            "components": [
+                {
+                    "name": c["name"],
+                    "quantity": c.get("quantity", 1),
+                    "weightHint": c.get("weight_hint"),
+                    "packagingHint": c.get("packaging_hint"),
+                }
+                for c in analysis_data.get("components", [])
             ],
             "isPublished": True,
         }

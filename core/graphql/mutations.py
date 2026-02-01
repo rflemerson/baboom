@@ -9,6 +9,7 @@ from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Product, ProductStore
 from core.services import product_create, product_update_content
+from core.types import ProductComponentInput as ProductComponentDTO
 from core.types import ProductCreateInput
 from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
@@ -56,6 +57,18 @@ class CoreMutation:
                 tags=tags_to_use,
                 stores=stores_data,
                 nutrition=nutrition_data,
+                is_combo=data.is_combo,
+                components=[
+                    ProductComponentDTO(
+                        name=c.name,
+                        quantity=c.quantity,
+                        weight_hint=c.weight_hint,
+                        packaging_hint=c.packaging_hint,
+                    )
+                    for c in data.components
+                ]
+                if data.components
+                else None,
             )
 
             product = product_create(data=input_data)

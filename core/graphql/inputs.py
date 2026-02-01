@@ -58,6 +58,16 @@ class ProductStoreInput:
     stock_status: StockStatusEnum = StockStatusEnum.AVAILABLE
 
 
+@strawberry.input
+class ProductComponentInput:
+    """Input for combo component."""
+
+    name: str
+    quantity: int = 1
+    weight_hint: int | None = None
+    packaging_hint: str | None = None
+
+
 @strawberry.input(description="Input for creating a new product with all related data")
 class ProductInput:
     """Input for product creation."""
@@ -99,6 +109,13 @@ class ProductInput:
     origin_scraped_item_id: int | None = strawberry.field(
         default=None,
         description="ID of the ScrapedItem that generated this product (to link/complete)",
+    )
+
+    is_combo: bool = strawberry.field(
+        default=False, description="Is this a combo/kit product?"
+    )
+    components: list[ProductComponentInput] | None = strawberry.field(
+        default=None, description="List of components if combo"
     )
 
 

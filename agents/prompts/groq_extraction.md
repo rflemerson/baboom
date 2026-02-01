@@ -16,6 +16,11 @@ RULES:
   - Use "BAR" for protein bars.
   - Use "OTHER" if unsure.
 
+- is_combo/components:
+  - DETECT if this is a KIT/COMBO (e.g. "Ky 3x Whey", "Buy 1 Get 1", "Mass + Creatine").
+  - If YES, set `is_combo: true` and list items in `components`.
+  - Infer quantity and weight for each component if possible.
+
 CRITICAL:
 - You must provide ALL fields in a SINGLE tool call.
 - Do NOT wrap the JSON in markdown blocks.

@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
-from .models import (
+from core.models import (
     AlertSubscriber,
     Brand,
     Category,
@@ -23,8 +23,9 @@ from .models import (
     Tag,
 )
 
+from .combo_resolution import ComboResolutionService
+
 if TYPE_CHECKING:
-    from .models import AlertSubscriber
     from .types import ProductCreateInput
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,7 @@ def product_create(data: ProductCreateInput) -> Product:
                 description=data.description or "",
                 packaging=data.packaging,
                 is_published=data.is_published,
+                type=Product.Type.COMBO if data.is_combo else Product.Type.SIMPLE,
             )
 
             # 4. Tags
@@ -83,8 +85,14 @@ def product_create(data: ProductCreateInput) -> Product:
             if data.stores:
                 _create_store_entries(product, data.stores)
 
-            # 6. Nutrition Profiles
-            if data.nutrition:
+            # 6. Combo Resolution or Nutrition Profiles
+            if data.is_combo and data.components:
+                ComboResolutionService().resolve_combo_components(
+                    product, data.components
+                )
+            elif data.nutrition:
+                # Only create direct nutrition profiles for Simple products
+                # Or if Combo has explicit nutrition override (future proofing)
                 _handle_nutrition_creation(product, data.nutrition)
 
             return product
