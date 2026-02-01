@@ -10,7 +10,7 @@ from .resources import AgentClientResource, ScraperServiceResource, StorageResou
 from .schemas.product import RawScrapedData
 
 
-# Configuração para rodar um item específico
+# --- CONFIG ---
 class ItemConfig(Config):
     """Configuration for running a specific item."""
 
@@ -19,7 +19,7 @@ class ItemConfig(Config):
     store_slug: str = "unknown"
 
 
-# --- ASSET 1: ARQUIVOS NO DISCO (HTML/Imagens) ---
+# --- ASSET 1: FILES ON DISK (HTML/Images) ---
 @asset
 def downloaded_assets(
     context: AssetExecutionContext,
@@ -28,20 +28,20 @@ def downloaded_assets(
     client: AgentClientResource,
 ):
     """
-    Baixa o HTML e as imagens para a pasta local temp/{id}.
+    Downloads HTML and images to local temp/{id} folder.
 
-    Retorna o caminho do bucket no storage.
+    Returns the bucket path in storage.
     """
     service = scraper.get_service()
     api = client.get_client()
 
-    context.log.info(f"📥 Baixando item {config.item_id} de {config.url}")
+    context.log.info(f"📥 Downloading item {config.item_id} from {config.url}")
 
     try:
-        # Sua lógica existente de download
+        # Existing download logic
         storage_path = service.download_assets(config.item_id, config.url)
 
-        # Dagster UI: Mostra o caminho e a URL como metadados clicáveis
+        # Dagster UI: Shows path and URL as clickable metadata
         context.add_output_metadata(
             {"path": storage_path, "url": MetadataValue.url(config.url)}
         )
@@ -53,7 +53,7 @@ def downloaded_assets(
         raise
 
 
-# --- ASSET 2: METADADOS BRUTOS (Extração Leve) ---
+# --- ASSET 2: RAW METADATA (Light Extraction) ---
 @asset
 def scraped_metadata(
     context: AssetExecutionContext,
@@ -62,21 +62,21 @@ def scraped_metadata(
     client: AgentClientResource,
     downloaded_assets: str,
 ) -> RawScrapedData:
-    """Lê o HTML baixado e extrai JSON-LD/OpenGraph."""
+    """Reads downloaded HTML and extracts JSON-LD/OpenGraph."""
     service = scraper.get_service()
     api = client.get_client()
 
-    # Usa o output do asset anterior (downloaded_assets)
+    # Uses output from previous asset (downloaded_assets)
     storage_path = downloaded_assets
 
     try:
-        context.log.info(f"🧬 Extraindo metadados de {storage_path}")
+        context.log.info(f"🧬 Extracting metadata from {storage_path}")
         meta_dict = service.extract_metadata(storage_path, config.url)
 
-        # Consolida
+        # Consolidate
         raw_data = service.consolidate(meta_dict, brand_name_override=config.store_slug)
 
-        # Dagster UI: Mostra o nome encontrado
+        # Dagster UI: Shows found name
         context.add_output_metadata({"product_name": raw_data.name})
 
         return raw_data
@@ -86,7 +86,7 @@ def scraped_metadata(
         raise
 
 
-# --- ASSET 3: OCR (Gemma / Visão) ---
+# --- ASSET 3: OCR (Gemma / Vision) ---
 @asset
 def ocr_extraction(
     context: AssetExecutionContext,
@@ -96,21 +96,21 @@ def ocr_extraction(
     scraped_metadata: RawScrapedData,
     downloaded_assets: str,
 ) -> str:
-    """Usa o Gemma 3 para ler as imagens baixadas."""
+    """Uses Gemma 3 to read downloaded images."""
     store = storage.get_storage()
     api = client.get_client()
 
     bucket, _ = downloaded_assets.split("/", 1)
 
     try:
-        # Lógica de carregar imagens (reusada do seu código)
+        # Image loading logic (reused from your code)
         candidates_key = "candidates.json"
         image_paths = []
 
         if store.exists(bucket, candidates_key):
             data = store.download(bucket, candidates_key)
             candidates = json.loads(data)
-            # Filtra Top 5
+            # Filter Top 5
             valid = sorted(
                 [c for c in candidates if c["score"] > 0],
                 key=lambda x: x["score"],
@@ -118,7 +118,7 @@ def ocr_extraction(
             )[:5]
             image_paths = [f"{bucket}/{c['file']}" for c in valid]
 
-        context.log.info(f"👁️ Rodando Gemma em {len(image_paths)} imagens...")
+        context.log.info(f"👁️ Running Gemma on {len(image_paths)} images...")
 
         raw_text = run_raw_extraction(
             name=scraped_metadata.name,
@@ -126,7 +126,7 @@ def ocr_extraction(
             image_paths=image_paths,
         )
 
-        # Dagster UI: Mostra prévia do texto
+        # Dagster UI: Shows text preview
         context.add_output_metadata(
             {"text_preview": MetadataValue.md(raw_text[:500] + "...")}
         )
@@ -138,7 +138,7 @@ def ocr_extraction(
         raise
 
 
-# --- ASSET 4: JSON FINAL (Groq) ---
+# --- ASSET 4: FINAL JSON (Groq) ---
 @asset
 def product_analysis(
     context: AssetExecutionContext,
@@ -146,11 +146,11 @@ def product_analysis(
     client: AgentClientResource,
     ocr_extraction: str,
 ) -> dict:
-    """Usa o Llama 3 (Groq) para estruturar o texto em JSON."""
+    """Uses Llama 3 (Groq) to structure text into JSON."""
     api = client.get_client()
 
     try:
-        context.log.info("🧠 Estruturando JSON com Groq...")
+        context.log.info("🧠 Structuring JSON with Groq...")
         result = run_groq_json_extraction(ocr_extraction)
 
         return result.model_dump(by_alias=True)
@@ -160,7 +160,7 @@ def product_analysis(
         raise
 
 
-# --- ASSET 5: UPLOAD (Finalização) ---
+# --- ASSET 5: UPLOAD (Finalization) ---
 @asset
 def upload_to_api(
     context: AssetExecutionContext,
@@ -169,10 +169,10 @@ def upload_to_api(
     product_analysis: dict,
     scraped_metadata: RawScrapedData,
 ):
-    """Envia o produto pronto para a API do Baboom."""
+    """Sends final product to Baboom API."""
     api = client.get_client()
 
-    context.log.info(f"🚀 Enviando {scraped_metadata.name} para o Banco de Dados...")
+    context.log.info(f"🚀 Sending {scraped_metadata.name} to Database...")
 
     try:
         # Reconstruct nutrition profile from raw analysis dict

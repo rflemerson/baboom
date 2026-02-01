@@ -16,7 +16,10 @@ from core.selectors import list_with_stats
 
 
 class ProductStatsTest(TestCase):
+    """Tests for list_with_stats selector logic."""
+
     def setUp(self):
+        """Set up test data."""
         # 1. Setup Base Data
         self.brand = Brand.objects.create(name="Test Brand", display_name="Test Brand")
         self.store = Store.objects.create(name="Test Store", display_name="Test Store")
@@ -53,7 +56,8 @@ class ProductStatsTest(TestCase):
 
     def test_protein_calculations(self):
         """
-        Verifies if with_stats() correctly calculates:
+        Verify if with_stats() correctly calculates derived fields.
+
         - Concentration (should be 80.0%)
         - Total Protein in package (Should be 800g for a 1kg package)
         - Price per gram of protein (R$ 100 / 800g = R$ 0.125)
@@ -79,7 +83,7 @@ class ProductStatsTest(TestCase):
         self.assertEqual(p.external_link, "http://example.com")
 
     def test_missing_price_handling(self):
-        """Ensure products without price don't crash the queryset"""
+        """Ensure products without price don't crash the queryset."""
         # Create a product without price
         p2 = Product.objects.create(name="No Price Whey", brand=self.brand, weight=500)
 

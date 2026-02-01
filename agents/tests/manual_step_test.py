@@ -26,12 +26,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_item_dir(item_id):
+    """Get temp directory for item."""
     path = f"temp/{item_id}"
     os.makedirs(path, exist_ok=True)
     return path
 
 
 def step_download(item_id):
+    """Run step 1: Download assets."""
     logger.info(f"--- STEP 1: DOWNLOAD & ASSET MIRRORING (Item {item_id}) ---")
     item = ScrapedItem.objects.get(id=item_id)
     service = ScraperService()
@@ -81,6 +83,7 @@ def step_download(item_id):
 
 
 def step_metadata(item_id):
+    """Run step 2: Extract metadata."""
     logger.info(f"--- STEP 2: METADATA EXTRACTION (Item {item_id}) ---")
     item_dir = get_item_dir(item_id)
     cand_path = os.path.join(item_dir, "candidates.json")
@@ -119,6 +122,7 @@ def step_metadata(item_id):
 
 
 def step_images(item_id):
+    """Run step 3: Filter images."""
     logger.info(f"--- STEP 3: IMAGE FILTERING & SELECTION (Item {item_id}) ---")
     item_dir = get_item_dir(item_id)
     cand_path = os.path.join(item_dir, "candidates.json")
@@ -141,6 +145,7 @@ def step_images(item_id):
 
 
 def step_raw(item_id):
+    """Run step 4: Raw extraction with Gemma."""
     logger.info(f"--- STEP 4: RAW EXTRACTION - GEMMA 3 (Item {item_id}) ---")
     item_dir = get_item_dir(item_id)
     cons_path = os.path.join(item_dir, "consolidated_scraped.json")
@@ -176,6 +181,7 @@ def step_raw(item_id):
 
 
 def step_structured(item_id):
+    """Run step 5: Structured extraction with Groq."""
     logger.info(f"--- STEP 5: STRUCTURED EXTRACTION - GROQ (Item {item_id}) ---")
     item_dir = get_item_dir(item_id)
     raw_path = os.path.join(item_dir, "raw_extraction.md")
@@ -199,6 +205,7 @@ def step_structured(item_id):
 
 
 def main():
+    """Run CLI."""
     parser = argparse.ArgumentParser(description="Structured Pipeline Testing")
     parser.add_argument(
         "step",

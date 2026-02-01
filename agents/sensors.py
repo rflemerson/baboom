@@ -9,19 +9,19 @@ from .resources import AgentClientResource
     default_status=DefaultSensorStatus.RUNNING,
 )
 def work_queue_sensor(context, client: AgentClientResource):
-    """Polling na API para ver se tem item novo para processar."""
+    """Poll API for new items to process."""
     api = client.get_client()
 
-    # Checa trabalho (sem force, pega o próximo da fila)
+    # Check for work (no force, get next in queue)
     work = api.checkout_work()
 
     if not work:
-        return SkipReason("Fila vazia. Dormindo...")
+        return SkipReason("Queue empty. Sleeping...")
 
     item_id = int(work["id"])
 
-    # Configuração para passar para os Assets
-    # No Dagster SDA (Software-Defined Assets), a configuração é passada por asset
+    # Configuration passed to Assets
+    # In Dagster SDA (Software-Defined Assets), config is passed per asset.
     run_config = {
         "ops": {
             "downloaded_assets": {

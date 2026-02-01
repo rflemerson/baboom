@@ -8,7 +8,10 @@ from core.models import APIKey
 
 
 class GraphQLSecurityTests(TestCase):
+    """Tests for GraphQL API security."""
+
     def setUp(self):
+        """Set up test environment."""
         self.factory = RequestFactory()
         self.api_key_obj = APIKey.objects.create(name="Test Client")
         self.valid_key = self.api_key_obj.key

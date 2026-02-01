@@ -17,7 +17,11 @@ from core.models import (
 
 
 class BrandFactory(DjangoModelFactory):
+    """Factory for Brand model."""
+
     class Meta:
+        """Meta class."""
+
         model = Brand
 
     name = factory.Sequence(lambda n: f"brand-{n}")
@@ -26,7 +30,11 @@ class BrandFactory(DjangoModelFactory):
 
 
 class StoreFactory(DjangoModelFactory):
+    """Factory for Store model."""
+
     class Meta:
+        """Meta class."""
+
         model = Store
 
     name = factory.Sequence(lambda n: f"store-{n}")
@@ -35,7 +43,11 @@ class StoreFactory(DjangoModelFactory):
 
 
 class FlavorFactory(DjangoModelFactory):
+    """Factory for Flavor model."""
+
     class Meta:
+        """Meta class."""
+
         model = Flavor
 
     name = factory.Sequence(lambda n: f"flavor-{n}")
@@ -43,7 +55,11 @@ class FlavorFactory(DjangoModelFactory):
 
 
 class TagFactory(DjangoModelFactory):
+    """Factory for Tag model."""
+
     class Meta:
+        """Meta class."""
+
         model = Tag
 
     name = factory.Sequence(lambda n: f"tag-{n}")
@@ -56,7 +72,11 @@ class TagFactory(DjangoModelFactory):
 
 
 class CategoryFactory(DjangoModelFactory):
+    """Factory for Category model."""
+
     class Meta:
+        """Meta class."""
+
         model = Category
 
     name = factory.Sequence(lambda n: f"category-{n}")
@@ -69,7 +89,11 @@ class CategoryFactory(DjangoModelFactory):
 
 
 class ProductFactory(DjangoModelFactory):
+    """Factory for Product model."""
+
     class Meta:
+        """Meta class."""
+
         model = Product
 
     name = factory.Sequence(lambda n: f"Product {n}")
@@ -80,7 +104,11 @@ class ProductFactory(DjangoModelFactory):
 
 
 class ProductStoreFactory(DjangoModelFactory):
+    """Factory for ProductStore model."""
+
     class Meta:
+        """Meta class."""
+
         model = ProductStore
 
     product = factory.SubFactory(ProductFactory)
@@ -89,7 +117,11 @@ class ProductStoreFactory(DjangoModelFactory):
 
 
 class ProductPriceHistoryFactory(DjangoModelFactory):
+    """Factory for ProductPriceHistory model."""
+
     class Meta:
+        """Meta class."""
+
         model = ProductPriceHistory
 
     store_product_link = factory.SubFactory(ProductStoreFactory)
@@ -97,7 +129,11 @@ class ProductPriceHistoryFactory(DjangoModelFactory):
 
 
 class NutritionFactsFactory(DjangoModelFactory):
+    """Factory for NutritionFacts model."""
+
     class Meta:
+        """Meta class."""
+
         model = NutritionFacts
 
     serving_size_grams = factory.Faker("random_int", min=20, max=50)
@@ -113,7 +149,11 @@ class NutritionFactsFactory(DjangoModelFactory):
 
 
 class ProductNutritionFactory(DjangoModelFactory):
+    """Factory for ProductNutrition model."""
+
     class Meta:
+        """Meta class."""
+
         model = ProductNutrition
 
     product = factory.SubFactory(ProductFactory)
@@ -121,7 +161,11 @@ class ProductNutritionFactory(DjangoModelFactory):
 
 
 class AlertSubscriberFactory(DjangoModelFactory):
+    """Factory for AlertSubscriber model."""
+
     class Meta:
+        """Meta class."""
+
         model = AlertSubscriber
 
     email = factory.Faker("email")

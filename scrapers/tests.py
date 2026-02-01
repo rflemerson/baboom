@@ -18,11 +18,12 @@ logging.getLogger("scrapers").setLevel(logging.CRITICAL)
 class ScraperIntegrationTests(TestCase):
     """
     Integration tests for Spiders.
-    Integration tests for Spiders.
+
     Tests hitting REAL APIs.
     """
 
     def test_blackskull_spider(self):
+        """Test BlackSkull spider execution."""
         spider = BlackSkullSpider()
         spider.FALLBACK_CATEGORIES = ["proteina"]  # type: ignore
 
@@ -37,6 +38,7 @@ class ScraperIntegrationTests(TestCase):
         self.assertIsNotNone(first)
 
     def test_darklab_spider(self):
+        """Test DarkLab spider execution."""
         spider = DarkLabSpider()
         spider.FALLBACK_CATEGORIES = ["whey-protein"]  # type: ignore
 
@@ -53,6 +55,7 @@ class ScraperIntegrationTests(TestCase):
             pass
 
     def test_dux_spider(self):
+        """Test Dux spider execution."""
         spider = DuxSpider()
         spider.FALLBACK_CATEGORIES = ["proteinas"]  # type: ignore
 
@@ -67,6 +70,7 @@ class ScraperIntegrationTests(TestCase):
         self.assertIsNotNone(first)
 
     def test_growth_spider(self):
+        """Test Growth spider execution."""
         spider = GrowthSpider()
         spider.FALLBACK_CATEGORIES = ["/vegano/"]  # type: ignore
 
@@ -80,11 +84,10 @@ class ScraperIntegrationTests(TestCase):
 
 
 class SyncPriceToCoreTests(TestCase):
-    """
-    Unit tests for ScraperService logic (save_product and sync_price_to_core)
-    """
+    """Unit tests for ScraperService logic (save_product and sync_price_to_core)."""
 
     def setUp(self):
+        """Set up test data."""
         self.brand = Brand.objects.create(name="test_brand", display_name="Test Brand")
         self.store = Store.objects.create(name="test_store", display_name="Test Store")
         self.product = Product.objects.create(
@@ -100,6 +103,7 @@ class SyncPriceToCoreTests(TestCase):
         )
 
     def test_save_product_creates_price_history_for_linked_item(self):
+        """Test that saving a product creates a price history record."""
         # 1. Pre-create a LINKED item
         ScrapedItem.objects.create(
             store_slug="test_store",
@@ -128,6 +132,7 @@ class SyncPriceToCoreTests(TestCase):
         self.assertEqual(price_record.price, Decimal("199.90"))
 
     def test_sync_logic_skips_if_price_unchanged(self):
+        """Test that sync skips if price is unchanged."""
         ProductPriceHistory.objects.create(
             store_product_link=self.product_store,
             price=Decimal("199.90"),
@@ -149,6 +154,7 @@ class SyncPriceToCoreTests(TestCase):
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
 
     def test_sync_logic_creates_new_record_on_price_change(self):
+        """Test that sync creates a new record on price change."""
         item = ScrapedItem.objects.create(
             store_slug="test_store",
             external_id="TEST123",

@@ -13,7 +13,7 @@ from core.models import (
     Store,
 )
 
-# 2. Importar HtmxHttpRequest da sua view
+# 2. Import HtmxHttpRequest from your view
 from core.views import HtmxHttpRequest, list_view
 
 
@@ -28,7 +28,10 @@ from core.views import HtmxHttpRequest, list_view
     }
 )
 class ListViewTests(TestCase):
+    """Tests for Product List View (Standard and HTMX)."""
+
     def setUp(self):
+        """Set up test data."""
         self.factory = RequestFactory()
 
         # Setup data
@@ -88,7 +91,7 @@ class ListViewTests(TestCase):
         request = self.factory.get(reverse("list"))
         request.htmx = True  # type: ignore
 
-        # 3. Usar cast() aqui também
+        # 3. Use cast() here as well
         response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)
@@ -102,7 +105,7 @@ class ListViewTests(TestCase):
         request = self.factory.get(reverse("list"), {"search": "Protein A"})
         request.htmx = False  # type: ignore
 
-        # 3. Usar cast()
+        # 3. Use cast()
         response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)
@@ -114,7 +117,7 @@ class ListViewTests(TestCase):
         request = self.factory.get(reverse("list"), {"brand": "Brand B"})
         request.htmx = False  # type: ignore
 
-        # 3. Usar cast()
+        # 3. Use cast()
         response = list_view(cast(HtmxHttpRequest, request))
 
         self.assertEqual(response.status_code, 200)

@@ -119,9 +119,6 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "baboom/settings/__init__.py" = ["F403", "F405"]
-"*/tests.py" = ["D"]
-"*/tests/*.py" = ["D"]
-"manage.py" = ["D", "C90", "PL", "N", "PLC0415"]
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin", "pydantic.mypy"]
@@ -130,10 +127,6 @@ ignore_missing_imports = true
 
 [tool.django-stubs]
 django_settings_module = "baboom.settings"
-
-[[tool.mypy.overrides]]
-module = ["baboom.*"]
-ignore_errors = true
 
 [tool.djlint]
 profile = "django"
@@ -174,7 +167,7 @@ ignore-semiprivate = true
 ignore-private = true
 ignore-nested-functions = true
 fail-under = 70
-exclude = ["setup.py", "docs", "build", "tests", "migrations", "temp", "tmp", "core", "baboom", "manage.py"]
+exclude = ["setup.py", "docs", "build", "tests", "migrations", "temp", "tmp"]
 verbose = 2
 
 [tool.pytest.ini_options]
