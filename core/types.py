@@ -1,11 +1,11 @@
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel
 
 from .models import Product
 
 
-@dataclass
-class ProductCreateInput:
+class ProductCreateInput(BaseModel):
     """DTO for product creation service."""
 
     name: str

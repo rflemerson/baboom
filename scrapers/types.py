@@ -1,11 +1,11 @@
-from dataclasses import dataclass
 from decimal import Decimal
+
+from pydantic import BaseModel
 
 from .models import ScrapedItem
 
 
-@dataclass
-class ProductIngestionInput:
+class ProductIngestionInput(BaseModel):
     """DTO for saving scraped products."""
 
     store_slug: str
