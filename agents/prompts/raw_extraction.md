@@ -12,6 +12,7 @@ SEUS TÓPICOS DEVEM SER:
    - Peso líquido (ex: 900g, 1.8kg)
    - Tipo de Embalagem (Pote, Refil, Saco, Barra)
    - Marca/Fabricante
+   - É UM KIT/COMBO? (Sim/Não). Se sim, descreva os itens (ex: "3x Whey 900g", "Leve 2 Pague 1").
 
 3. CATEGORIZAÇÃO (Inferred Hierarchy)
    - Extraia a categoria seguindo uma árvore lógica.

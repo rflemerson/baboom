@@ -7,7 +7,14 @@ RULES:
 - name: Identify the full product name clearly.
 - category_hierarchy: MUST follow: ["Proteína", <Origem>, <Tipo>, <Processo>] for proteins.
 - tags_hierarchy: A list of hierarchical tag paths. Example: [["Marca", "Black Skull"], ["Destaque", "Zero Açúcar"]]
+- tags_hierarchy: A list of hierarchical tag paths. Example: [["Marca", "Black Skull"], ["Destaque", "Zero Açúcar"]]
 - nutrition_facts: Extract macro and micronutrients precisely. Use 0 for missing numeric values.
+- nutrient_claims: List of KEY nutrient sources (slugs) identified from context (e.g. ['protein', 'creatine', 'vitamin-c', 'omega-3']).
+  - RULES:
+    - Open-ended: You can identify any significant nutrient source.
+    - Context Matters: A "Basic Whey" (40% protein) IS a 'protein' source.
+    - Purpose Matters: Pre-workouts with caffeine -> 'caffeine'.
+    - Do NOT tag trace amounts.
 - flavor_names: List all identified flavors (e.g., ["Baunilha", "Chocolate"]).
 
 - packaging: MUST be one of ["CONTAINER", "REFILL", "BAR", "OTHER"]. 

@@ -47,6 +47,11 @@ class ProductAnalysisResult(BaseModel):
     packaging: str = Field(
         "CONTAINER", description="Packaging type: CONTAINER, REFILL, BAR, OTHER"
     )
+    # Classification
+    nutrient_claims: list[str] = Field(
+        default_factory=list,
+        description="List of slugs for significant nutrient sources (e.g. ['protein', 'creatine', 'vitamin-c', 'omega-3'])",
+    )
     category_hierarchy: list[str] = Field(
         default_factory=list,
         description="Hierarchical category path: ['Proteína', 'Whey', 'Concentrado']",

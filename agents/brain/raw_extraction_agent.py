@@ -1,3 +1,5 @@
+"""Agent for Raw Text extraction using Vision models."""
+
 import logging
 import os
 

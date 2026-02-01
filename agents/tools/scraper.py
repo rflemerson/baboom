@@ -1,3 +1,5 @@
+"""Service for scraping and consolidating product data."""
+
 from __future__ import annotations
 
 import io
@@ -316,6 +318,7 @@ class ScraperService:
             or product_info.get("gtin13")
             or product_info.get("sku")
         )
+        category = product_info.get("category")
 
         return RawScrapedData(
             name=name,
@@ -325,6 +328,7 @@ class ScraperService:
             image_url=image_url,
             price=price,
             stock_status=stock_status,
+            category=category,
         )
 
     def _extract_product_info(self, metadata: dict) -> dict:

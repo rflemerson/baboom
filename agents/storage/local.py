@@ -1,3 +1,5 @@
+"""Local storage backend implementation."""
+
 import os
 import tempfile
 

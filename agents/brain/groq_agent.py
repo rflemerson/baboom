@@ -1,3 +1,5 @@
+"""Agent for Structured JSON extraction using Groq."""
+
 import logging
 import os
 
@@ -13,6 +15,7 @@ DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 
 def _get_default_prompt():
+    """Load the default extraction prompt."""
     prompt_path = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "prompts", "groq_extraction.md"
     )

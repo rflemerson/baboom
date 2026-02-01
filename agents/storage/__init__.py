@@ -1,3 +1,5 @@
+"""Storage backend factory."""
+
 from .base import StorageBackend
 from .local import LocalStorageBackend
 

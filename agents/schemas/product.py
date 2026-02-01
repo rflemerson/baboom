@@ -1,3 +1,5 @@
+"""Pydantic schemas for scraped product data."""
+
 from pydantic import BaseModel, Field
 
 from .nutrition import ProductNutritionProfile
@@ -13,6 +15,7 @@ class RawScrapedData(BaseModel):
     image_url: str | None = None
     price: float | None = None
     stock_status: str | None = "A"
+    category: str | None = None
 
 
 class ScrapedProductData(BaseModel):
@@ -35,7 +38,12 @@ class ScrapedProductData(BaseModel):
     tag_paths: list[list[str]] = Field(
         default_factory=list, description="List of hierarchical tag paths"
     )
+    nutrient_claims: list[str] = Field(default_factory=list)
     packaging: str = Field(
         "CONTAINER", description="Packaging type: CONTAINER, REFILL, BAR, OTHER"
+    )
+    is_combo: bool = False
+    components: list[dict] = Field(
+        default_factory=list, description="List of components (name, quantity, hints)"
     )
     origin_scraped_item_id: int
