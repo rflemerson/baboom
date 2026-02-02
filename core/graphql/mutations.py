@@ -32,9 +32,9 @@ class CoreMutation:
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def create_product(self, data: ProductInput) -> ProductResult:
         """Create a new product with all related data."""
-        stores_data = self._map_store_data(data.stores) if data.stores else []
+        stores_data = CoreMutation._map_store_data(data.stores) if data.stores else []
         nutrition_data = (
-            self._map_nutrition_data(data.nutrition) if data.nutrition else []
+            CoreMutation._map_nutrition_data(data.nutrition) if data.nutrition else []
         )
 
         try:
@@ -130,7 +130,8 @@ class CoreMutation:
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
 
-    def _map_store_data(self, stores: list[ProductStoreInput]) -> list[dict[str, Any]]:
+    @staticmethod
+    def _map_store_data(stores: list[ProductStoreInput]) -> list[dict[str, Any]]:
         return [
             {
                 "store_name": s.store_name,
@@ -143,8 +144,9 @@ class CoreMutation:
             for s in stores
         ]
 
+    @staticmethod
     def _map_nutrition_data(
-        self, nutrition: list[ProductNutritionInput]
+        nutrition: list[ProductNutritionInput],
     ) -> list[dict[str, Any]]:
         result = []
         for n in nutrition:

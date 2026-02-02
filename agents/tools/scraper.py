@@ -105,9 +105,12 @@ class ScraperService:
     def _extract_image_sources(self, soup: BeautifulSoup) -> list[tuple[str, Tag]]:
         sources = []
         for img in soup.find_all("img"):
-            src = img.get("src")
-            if src and isinstance(src, str):
-                sources.append((src, img))
+            # Check multiple src-like attributes used by lazy loaders
+            for attr in ["src", "data-src", "data-zoom", "data-lazy", "data-original"]:
+                src = img.get(attr)
+                if src and isinstance(src, str):
+                    sources.append((src, img))
+                    break  # Only take one per img tag
 
         # OpenGraph images
         for meta in soup.find_all("meta", property="og:image"):
@@ -115,12 +118,26 @@ class ScraperService:
             if src and isinstance(src, str):
                 sources.append((src, meta))
 
-        # Preloaded images
-        for link in soup.find_all("link", attrs={"rel": "preload", "as": "image"}):
-            src = link.get("href")
-            if src and isinstance(src, str):
-                sources.append((src, link))
+        # JSON-LD or Script embedded images
+        self._extract_json_ld_images(soup, sources)
+
         return sources
+
+    def _extract_json_ld_images(self, soup: BeautifulSoup, sources: list) -> None:
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                if not script.string:
+                    continue
+                data = json.loads(script.string)
+                if isinstance(data, dict) and "image" in data:
+                    imgs = data["image"]
+                    if isinstance(imgs, str):
+                        sources.append((imgs, script))
+                    elif isinstance(imgs, list):
+                        for img_url in imgs:
+                            sources.append((img_url, script))
+            except Exception as e:
+                logger.debug(f"JSON-LD parsing failed: {e}")
 
     def _process_single_candidate(
         self, index: int, img_url: str, tag: Tag, bucket: str, seen_hashes: set
@@ -227,14 +244,23 @@ class ScraperService:
             "facts",
             "label",
             "tabela_nutricional",
+            "informacao",
+            "ingredientes",
+            "composition",
+            "composicao",
+            "valor",
+            "energetico",
         ]
         if any(kw in alt_text for kw in nutrition_keywords) and (
-            "info" in alt_text or "tabela" in alt_text
+            any(k in alt_text for k in ["info", "tabela", "label", "rotulo", "facts"])
         ):
-            score += 50
+            score += 60
 
-        if "tabela" in img_id or "nutri" in img_id:
-            score += 30
+        if any(
+            kw in img_id or kw in img_class
+            for kw in ["nutri", "tabela", "label", "rotulo"]
+        ):
+            score += 40
 
         keywords = [
             "tabela",
@@ -281,6 +307,15 @@ class ScraperService:
             base_url = get_base_url(html_content, url)
             data = extruct.extract(html_content, base_url=base_url)
 
+            # Custom extraction for nutrition tables hidden in HTML
+            try:
+                soup = BeautifulSoup(html_content, "html.parser")
+                nutrition_text = self._extract_html_nutrition(soup)
+                if nutrition_text:
+                    data["custom_nutrition_text"] = nutrition_text
+            except Exception as e:
+                logger.warning(f"Failed to extract custom HTML nutrition: {e}")
+
             self.storage.upload(
                 bucket,
                 "data.json",
@@ -292,6 +327,22 @@ class ScraperService:
         except Exception as e:
             logger.error(f"Error extracting metadata from {html_storage_path}: {e}")
             raise
+
+    def _extract_html_nutrition(self, soup: BeautifulSoup) -> str:
+        """Extracts text from known nutrition table containers."""
+        try:
+            # Selector specific to Soldiers Nutrition / Vtex legacy
+            table = soup.select_one(".nutrition-info-table")
+            if table:
+                # Basic text extraction, preserving some structure
+                lines = []
+                for row in table.select("tr"):
+                    cols = [c.get_text(strip=True) for c in row.select("th, td")]
+                    lines.append(" | ".join(cols))
+                return "\n".join(lines)
+        except Exception as e:
+            logger.debug(f"HTML table extraction failed: {e}")
+        return ""
 
     def consolidate(
         self,
@@ -309,9 +360,17 @@ class ScraperService:
             or "Unknown Product"
         )
         brand_name = brand_name_override or self._extract_brand(product_info)
-        description = product_info.get("description") or metadata.get(
-            "opengraph", [{}]
-        )[0].get("og:description")
+
+        description = (
+            product_info.get("description")
+            or metadata.get("opengraph", [{}])[0].get("og:description")
+            or ""
+        )
+
+        # Append custom extracted nutrition text
+        if metadata.get("custom_nutrition_text"):
+            description += f"\n\n--- NUTRITION TABLE RAW TEXT ---\n{metadata['custom_nutrition_text']}\n--------------------------------"
+
         image_url = self._extract_image_url(product_info, metadata)
         ean = (
             product_info.get("gtin")

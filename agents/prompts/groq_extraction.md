@@ -1,35 +1,31 @@
-OBJECTIVE:
-You are a Data Extraction Expert.
-You will receive a RAW TEXT REPORT describing a product (extracted from images/text).
-Your job is to extract the product data and return it as a SINGLE structured object matching the schema.
+Analyze the following RAW TEXT REPORT (extracted from product images/description) and map it to the `ProductAnalysisResult` schema.
 
-RULES:
-- name: Identify the full product name clearly.
-- category_hierarchy: MUST follow: ["Proteína", <Origem>, <Tipo>, <Processo>] for proteins.
-- tags_hierarchy: A list of hierarchical tag paths. Example: [["Marca", "Black Skull"], ["Destaque", "Zero Açúcar"]]
-- tags_hierarchy: A list of hierarchical tag paths. Example: [["Marca", "Black Skull"], ["Destaque", "Zero Açúcar"]]
-- nutrition_facts: Extract macro and micronutrients precisely. Use 0 for missing numeric values.
-- nutrient_claims: List of KEY nutrient sources (slugs) identified from context (e.g. ['protein', 'creatine', 'vitamin-c', 'omega-3']).
-  - RULES:
-    - Open-ended: You can identify any significant nutrient source.
-    - Context Matters: A "Basic Whey" (40% protein) IS a 'protein' source.
-    - Purpose Matters: Pre-workouts with caffeine -> 'caffeine'.
-    - Do NOT tag trace amounts.
-- flavor_names: List all identified flavors (e.g., ["Baunilha", "Chocolate"]).
+Return a SINGLE valid JSON object.
 
-- packaging: MUST be one of ["CONTAINER", "REFILL", "BAR", "OTHER"]. 
-  - Use "REFILL" for bags, pouches, or refis.
-  - Use "CONTAINER" for tubs, jars, or bottles.
-  - Use "BAR" for protein bars.
-  - Use "OTHER" if unsure.
+### PRODUCT NAMING & CLASSIFICATION
+- **Name**: Extract the full, clean product name. Remove promotional slogans (e.g., "Melhor Preço").
+- **Category Hierarchy**: Must be a list of strings representing the path.
+  - Example: `["Proteína", "Animal", "Whey", "Concentrado"]`
+  - For Creatine: `["Energia", "Creatina", "Monohidratada"]`
+- **Packaging**: STRICTLY map to one of these enums:
+  - `CONTAINER`: For tubs, pots, jars, cans.
+  - `REFILL`: For pouches, bags, sachets.
+  - `BAR`: For protein bars.
+  - `OTHER`: Only if it doesn't fit above.
 
-- is_combo/components:
-  - DETECT if this is a KIT/COMBO (e.g. "Ky 3x Whey", "Buy 1 Get 1", "Mass + Creatine").
-  - If YES, set `is_combo: true` and list items in `components`.
-  - Infer quantity and weight for each component if possible.
+### NUTRITION DATA (CRITICAL)
+- **Nutrient Claims**: Identify key nutrient drivers as slugs: `['protein', 'creatina', 'caffeine', 'glutamine']`.
+- **Nutrition Facts**: Extract the TABLE values precisely.
+  - **Serving Size**: Must be in grams (g) or ml.
+  - **Macros**: Proteins, Carbs, Fats (Total, Saturated, Trans), Fiber, Sodium.
+  - **Micros**: Vitamins and Minerals if prominent.
+  - **Values**: Use `0` for implicitly missing values (e.g., "Does not contain saturated fat"). Use `null` only if the table is completely missing.
 
-CRITICAL:
-- You must provide ALL fields in a SINGLE tool call.
-- Do NOT wrap the JSON in markdown blocks.
-- Do NOT provide the output as a list of fields; provide a single object with all fields.
-- ONLY use the enums specified for 'packaging'. No variations allowed.
+### COMBO & COMPONENTS
+- **Is Combo**: Set to `true` if the item is a kit (e.g., "Kit 3x Whey", "Combo Mass").
+- **Components**: If likely a combo, list the individual items found (e.g., `[{"name": "Whey Protein", "quantity": 3}]`).
+
+### DATA INTEGRITY RULES
+1. **No Hallucinations**: Do not invent values. If a flavor is not listed, do not guess.
+2. **Numeric Parsing**: Convert text like "2,5g" to `2.5`. Ensure integers for KCAL and Sodium.
+3. **Array Fields**: Always return arrays for `flavor_names`, `nutrient_claims`, and `tags_hierarchy`, even if empty `[]`.

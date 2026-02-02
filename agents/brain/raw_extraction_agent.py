@@ -49,10 +49,25 @@ def run_raw_extraction(
             bucket, key = path.split("/", 1)
             if storage.exists(bucket, key):
                 img_data = storage.download(bucket, key)
-                user_content.append(
-                    BinaryContent(data=img_data, media_type="image/jpeg")
-                )
-                loaded_images += 1
+
+                # Detect media type from extension
+                file_extension = key.split(".")[-1].lower()
+                supported_formats = {
+                    "jpg": "image/jpeg",
+                    "jpeg": "image/jpeg",
+                    "png": "image/png",
+                    "webp": "image/webp",
+                }
+
+                if file_extension in supported_formats:
+                    user_content.append(
+                        BinaryContent(
+                            data=img_data, media_type=supported_formats[file_extension]
+                        )
+                    )
+                    loaded_images += 1
+                else:
+                    logger.debug(f"Skipping unsupported image format: {file_extension}")
         except Exception as e:
             logger.warning(f"Failed to load image for raw extraction {path}: {e}")
 

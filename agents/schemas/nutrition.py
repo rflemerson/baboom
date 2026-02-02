@@ -1,13 +1,13 @@
 """Pydantic schemas for nutrition data."""
 
+import pydantic
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
 
 
 class MicronutrientItem(BaseModel):
     """Micronutrient (vitamin/mineral) data."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True)
 
     name: str
     value: float
@@ -17,7 +17,7 @@ class MicronutrientItem(BaseModel):
 class NutritionFacts(BaseModel):
     """Structured nutrition table data."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True)
 
     serving_size_grams: float = Field(0.0, description="Serving size in grams")
     energy_kcal: int = Field(0, description="Energy in Kcal")
@@ -35,6 +35,14 @@ class NutritionFacts(BaseModel):
         default_factory=list, description="Flavors identified on this specific label"
     )
     micronutrients: list[MicronutrientItem] | None = None
+
+    @pydantic.field_validator("micronutrients", mode="before")
+    @classmethod
+    def parse_micros(cls, v):
+        """Handle 'null' string inputs from LLM."""
+        if v == "null" or v is None:
+            return []
+        return v
 
 
 class ProductNutritionProfile(BaseModel):

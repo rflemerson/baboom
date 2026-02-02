@@ -37,7 +37,8 @@ class EnrichmentService:
             sources.update(extra_claims)
 
         # Map heuristic sources to objects
-        if sources:
+        # Map heuristic sources to objects
+        if sources or nutrient_objects:
             # We fetch existing ones for heuristic claims (safety check)
             # OR we could just get_or_create all?
             # Let's stick to get_or_create for consistency if we trust the slug.

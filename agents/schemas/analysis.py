@@ -1,7 +1,6 @@
 """Schemas for LLM analysis results."""
 
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
 
 from .nutrition import NutritionFacts
 
@@ -26,7 +25,7 @@ class ProductAnalysisResult(BaseModel):
     Combines fields from Metadata and Nutrition for a single pass extraction.
     """
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True)
 
     name: str | None = Field(
         None, description="Corrected product name if scraper failed"
