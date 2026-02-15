@@ -1,9 +1,67 @@
 import logging
 import os
+import time
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+SCRAPED_ITEM_CHECKOUT_FIELDS = """
+id
+productLink
+sourcePageUrl
+sourcePageRawContent
+sourcePageContentType
+storeSlug
+storeName
+externalId
+price
+stockStatus
+"""
+
+SCRAPED_ITEM_DETAILS_FIELDS = """
+id
+name
+status
+storeSlug
+storeName
+externalId
+price
+stockStatus
+productLink
+sourcePageUrl
+sourcePageId
+sourcePageRawContent
+sourcePageContentType
+productStoreId
+linkedProductId
+"""
+
+SCRAPED_ITEM_MUTATION_FIELDS = """
+id
+name
+status
+storeSlug
+externalId
+sourcePageUrl
+sourcePageId
+productStoreId
+linkedProductId
+"""
+
+SCRAPED_ITEM_VARIANT_FIELDS = """
+id
+name
+status
+storeSlug
+externalId
+price
+stockStatus
+sourcePageUrl
+sourcePageId
+productStoreId
+linkedProductId
+"""
 
 
 class AgentClient:
@@ -21,26 +79,45 @@ class AgentClient:
             logger.warning("AGENTS_API_KEY is not defined. Requests may fail.")
 
     def _send(self, query, variables=None):
-        try:
-            # Timeout: 10s to connect, 120s to wait for response (LLMs take time)
-            response = requests.post(
-                self.url,
-                json={"query": query, "variables": variables},
-                headers=self.headers,
-                timeout=(10, 120),
-            )
-            response.raise_for_status()
-            data = response.json()
+        retries = max(1, int(os.environ.get("AGENTS_HTTP_RETRIES", "3")))
+        backoff = float(os.environ.get("AGENTS_HTTP_RETRY_BACKOFF", "0.6"))
+        last_exception: Exception | None = None
 
-            if "errors" in data:
-                # Log error but return data for caller decision
-                logger.error(f"GraphQL Error: {data['errors']}")
-                raise Exception(f"API Error: {data['errors'][0]['message']}")
+        for attempt in range(1, retries + 1):
+            try:
+                # Timeout: 10s to connect, 120s to wait for response (LLMs take time)
+                response = requests.post(
+                    self.url,
+                    json={"query": query, "variables": variables},
+                    headers=self.headers,
+                    timeout=(10, 120),
+                )
+                if response.status_code in {429, 500, 502, 503, 504}:
+                    if attempt < retries:
+                        time.sleep(backoff * attempt)
+                        continue
+                    response.raise_for_status()
 
-            return data
-        except Exception as e:
-            logger.error(f"Network Error ({self.url}): {e}")
-            raise
+                response.raise_for_status()
+                data = response.json()
+
+                if "errors" in data:
+                    logger.error(f"GraphQL Error: {data['errors']}")
+                    raise Exception(f"API Error: {data['errors'][0]['message']}")
+
+                return data
+            except Exception as e:
+                last_exception = e
+                if attempt < retries:
+                    time.sleep(backoff * attempt)
+                    continue
+                logger.error(f"Network Error ({self.url}): {e}")
+                raise
+
+        # Defensive fallback, should never happen due raise above.
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("Unexpected request flow")
 
     def ping(self):
         """Check API connectivity."""
@@ -63,20 +140,17 @@ class AgentClient:
 
     def checkout_work(self, force: bool = False, target_item_id: int | None = None):
         """Checkout a ScrapedItem for processing."""
-        mutation = """
+        mutation = (
+            """
         mutation($force: Boolean, $targetItemId: Int) {
             checkoutScrapedItem(force: $force, targetItemId: $targetItemId) {
-                id
-                productLink
-                sourcePageUrl
-                storeSlug
-                storeName
-                externalId
-                price
-                stockStatus
+        """
+            + SCRAPED_ITEM_CHECKOUT_FIELDS
+            + """
             }
         }
         """
+        )
         data = self._send(mutation, {"force": force, "targetItemId": target_item_id})
         return data.get("data", {}).get("checkoutScrapedItem")
 
@@ -125,44 +199,33 @@ class AgentClient:
 
     def get_scraped_item(self, item_id: int):
         """Fetch one scraped item snapshot for pipeline state decisions."""
-        query = """
+        query = (
+            """
         query($itemId: Int!) {
             scrapedItem(itemId: $itemId) {
-                id
-                name
-                status
-                storeSlug
-                storeName
-                externalId
-                price
-                stockStatus
-                productLink
-                sourcePageUrl
-                sourcePageId
-                productStoreId
-                linkedProductId
+        """
+            + SCRAPED_ITEM_DETAILS_FIELDS
+            + """
             }
         }
         """
+        )
         data = self._send(query, {"itemId": int(item_id)})
         return data.get("data", {}).get("scrapedItem")
 
     def ensure_source_page(self, item_id: int, url: str, store_slug: str):
         """Ensure source page exists and is linked to the scraped item."""
-        mutation = """
+        mutation = (
+            """
         mutation($itemId: Int!, $url: String!, $storeSlug: String!) {
             ensureScrapedItemSourcePage(itemId: $itemId, url: $url, storeSlug: $storeSlug) {
-                id
-                status
-                storeSlug
-                externalId
-                sourcePageUrl
-                sourcePageId
-                productStoreId
-                linkedProductId
+        """
+            + SCRAPED_ITEM_MUTATION_FIELDS
+            + """
             }
         }
         """
+        )
         data = self._send(
             mutation,
             {"itemId": int(item_id), "url": str(url), "storeSlug": str(store_slug)},
@@ -177,21 +240,17 @@ class AgentClient:
         store_slug: str | None = None,
     ):
         """Update mutable scraped item fields used by agents flow."""
-        mutation = """
+        mutation = (
+            """
         mutation($itemId: Int!, $name: String, $sourcePageUrl: String, $storeSlug: String) {
             updateScrapedItemData(itemId: $itemId, name: $name, sourcePageUrl: $sourcePageUrl, storeSlug: $storeSlug) {
-                id
-                name
-                status
-                storeSlug
-                externalId
-                sourcePageUrl
-                sourcePageId
-                productStoreId
-                linkedProductId
+        """
+            + SCRAPED_ITEM_MUTATION_FIELDS
+            + """
             }
         }
         """
+        )
         data = self._send(
             mutation,
             {
@@ -214,7 +273,8 @@ class AgentClient:
         stock_status: str | None = None,
     ):
         """Create or update a variant scraped item for multi-product pages."""
-        mutation = """
+        mutation = (
+            """
         mutation(
             $originItemId: Int!,
             $externalId: String!,
@@ -233,20 +293,13 @@ class AgentClient:
                 price: $price,
                 stockStatus: $stockStatus
             ) {
-                id
-                name
-                status
-                storeSlug
-                externalId
-                price
-                stockStatus
-                sourcePageUrl
-                sourcePageId
-                productStoreId
-                linkedProductId
+            """
+            + SCRAPED_ITEM_VARIANT_FIELDS
+            + """
             }
         }
         """
+        )
         data = self._send(
             mutation,
             {

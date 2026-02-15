@@ -43,6 +43,22 @@ class ScrapedItemType:
         return item.source_page_id
 
     @strawberry.field
+    def source_page_raw_content(self) -> str:
+        """Return raw structured context saved by scraper."""
+        item = cast(ScrapedItem, self)
+        if item.source_page:
+            return item.source_page.raw_content or ""
+        return ""
+
+    @strawberry.field
+    def source_page_content_type(self) -> str:
+        """Return source page content type (HTML/JSON)."""
+        item = cast(ScrapedItem, self)
+        if item.source_page:
+            return item.source_page.content_type
+        return ""
+
+    @strawberry.field
     def product_store_id(self) -> int | None:
         """Return linked ProductStore id if exists."""
         item = cast(ScrapedItem, self)

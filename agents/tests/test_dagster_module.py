@@ -52,6 +52,12 @@ class _FakeApiClient:
             "productLink": product_link,
             "sourcePageUrl": product_link,
             "sourcePageId": item.source_page_id,
+            "sourcePageRawContent": item.source_page.raw_content
+            if item.source_page
+            else "",
+            "sourcePageContentType": item.source_page.content_type
+            if item.source_page
+            else "",
             "productStoreId": item.product_store_id,
             "linkedProductId": linked_product_id,
         }
@@ -558,7 +564,6 @@ class TestDagsterAssetsFlow(TestCase):
             {
                 "15/candidates.json": candidates,
                 "15/site_data.json": b'{"page_url":"https://x","extracted":{"json-ld":[]}}',
-                "15/catalog_context.json": b'{"platform":"shopify","options":[{"name":"Sabor","values":["Chocolate"]}]}',
             }
         )
         result = ocr_extraction(
@@ -575,6 +580,8 @@ class TestDagsterAssetsFlow(TestCase):
                 "origin_item_id": 1,
                 "url": "https://x",
                 "storage_path": "15/source.html",
+                "source_page_raw_content": '{"platform":"shopify","variants":[{"title":"Chocolate"}]}',
+                "source_page_content_type": "JSON",
             },
         )
 
@@ -585,7 +592,7 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(call_kwargs["image_paths"][0], "15/images/a.jpg")
         self.assertIn("[IMAGE_SEQUENCE_CONTEXT]", call_kwargs["description"])
         self.assertIn("[SITE_DATA]", call_kwargs["description"])
-        self.assertIn("[CATALOG_CONTEXT]", call_kwargs["description"])
+        self.assertIn("[SCRAPER_CONTEXT]", call_kwargs["description"])
         self.assertIn("kind=NUTRITION_TABLE", call_kwargs["description"])
         self.assertIn("kind=PRODUCT_IMAGE", call_kwargs["description"])
 
@@ -707,10 +714,10 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(len(result["items"]), 2)
 
     @patch("agents.assets.run_structured_extraction")
-    def test_product_analysis_retries_when_flavor_outside_catalog(
+    def test_product_analysis_retries_when_flavor_outside_context(
         self, mock_structured
     ):
-        """Retries with catalog guard when extracted flavor is not in allowed options."""
+        """Retries with context guard when extracted flavor is not allowed."""
         mock_structured.side_effect = [
             ProductAnalysisList(
                 items=[
@@ -735,9 +742,9 @@ class TestDagsterAssetsFlow(TestCase):
         ]
         api = _FakeApiClient()
         raw_text = (
-            "[CATALOG_CONTEXT]\n"
-            '{"options":[{"name":"Sabor","values":["Chocolate"]}]}\n'
-            "[/CATALOG_CONTEXT]"
+            "[SCRAPER_CONTEXT]\n"
+            '{"platform":"shopify","options":[{"name":"Sabor","values":["Chocolate"]}]}\n'
+            "[/SCRAPER_CONTEXT]"
         )
 
         result = product_analysis(
@@ -750,7 +757,54 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(mock_structured.call_count, 2)
         self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
         self.assertIn(
-            "Sabores permitidos", mock_structured.call_args_list[1].kwargs["prompt"]
+            "Variantes permitidas", mock_structured.call_args_list[1].kwargs["prompt"]
+        )
+
+    @patch("agents.assets.run_structured_extraction")
+    def test_product_analysis_retries_when_variant_outside_scraper_context(
+        self, mock_structured
+    ):
+        """Retries when structured flavor is not present in scraper context variants."""
+        mock_structured.side_effect = [
+            ProductAnalysisList(
+                items=[
+                    ProductAnalysisResult(
+                        name="Produto",
+                        flavor_names=["Morango"],
+                        variant_name="Morango",
+                        is_variant=True,
+                    )
+                ]
+            ),
+            ProductAnalysisList(
+                items=[
+                    ProductAnalysisResult(
+                        name="Produto",
+                        flavor_names=["Chocolate"],
+                        variant_name="Chocolate",
+                        is_variant=True,
+                    )
+                ]
+            ),
+        ]
+        api = _FakeApiClient()
+        raw_text = (
+            "[SCRAPER_CONTEXT]\n"
+            '{"platform":"shopify","options":[{"name":"Sabor","values":["Chocolate","Baunilha"]}]}\n'
+            "[/SCRAPER_CONTEXT]"
+        )
+
+        result = product_analysis(
+            context=build_asset_context(),
+            config=ItemConfig(item_id=95, url="https://x", store_slug="demo"),
+            client=_FakeClientResource(api),
+            ocr_extraction=raw_text,
+        )
+
+        self.assertEqual(mock_structured.call_count, 2)
+        self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
+        self.assertIn(
+            "Variantes permitidas", mock_structured.call_args_list[1].kwargs["prompt"]
         )
 
     def test_upload_to_api_creates_additional_variant_items(self):

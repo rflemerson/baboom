@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import time
 from urllib.parse import urlparse
 
 from dagster import AssetExecutionContext, Config, MetadataValue, asset
@@ -371,39 +372,60 @@ def _normalize_flavor_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
-def _extract_allowed_flavors_from_catalog(catalog_context: dict | None) -> set[str]:
-    """Build allowed flavor set from catalog context options/variants."""
-    if not catalog_context:
+def _extract_allowed_variants_from_scraper_context(
+    scraper_context: dict | None,
+) -> set[str]:
+    """Build allowed variant token set from normalized scraper context."""
+    if not scraper_context:
         return set()
-    allowed: set[str] = set()
 
-    for option in catalog_context.get("options") or []:
+    platform = str(scraper_context.get("platform") or "").lower()
+    if "shopify" in platform:
+        return _extract_allowed_variants_from_shopify_context(scraper_context)
+    if "vtex" in platform:
+        return _extract_allowed_variants_from_vtex_context(scraper_context)
+    return set()
+
+
+def _add_allowed_variant_token(allowed: set[str], value) -> None:
+    if value is None:
+        return
+    token = _normalize_flavor_token(str(value))
+    if token:
+        allowed.add(token)
+
+
+def _extract_allowed_variants_from_shopify_context(scraper_context: dict) -> set[str]:
+    allowed: set[str] = set()
+    for option in scraper_context.get("options") or []:
         if not isinstance(option, dict):
             continue
-        option_name = str(option.get("name") or "").lower()
-        if "sabor" not in option_name and "flavor" not in option_name:
-            continue
         for value in option.get("values") or []:
-            token = _normalize_flavor_token(str(value))
-            if token:
-                allowed.add(token)
+            _add_allowed_variant_token(allowed, value)
 
-    for variant in catalog_context.get("variants") or []:
+    for variant in scraper_context.get("variants") or []:
         if not isinstance(variant, dict):
             continue
         for key in ("option1", "option2", "option3", "title", "name"):
-            value = variant.get(key)
-            if value:
-                token = _normalize_flavor_token(str(value))
-                if token:
-                    allowed.add(token)
-
+            _add_allowed_variant_token(allowed, variant.get(key))
     return allowed
 
 
-def _count_invalid_catalog_flavors(payload: dict, allowed_flavors: set[str]) -> int:
-    """Count extracted flavor tokens that do not exist in catalog context."""
-    if not allowed_flavors:
+def _extract_allowed_variants_from_vtex_context(scraper_context: dict) -> set[str]:
+    allowed: set[str] = set()
+    for sku_item in scraper_context.get("items") or []:
+        if not isinstance(sku_item, dict):
+            continue
+        for key in ("name", "complementName"):
+            _add_allowed_variant_token(allowed, sku_item.get(key))
+        for variation in sku_item.get("variations") or []:
+            _add_allowed_variant_token(allowed, variation)
+    return allowed
+
+
+def _count_invalid_variant_tokens(payload: dict, allowed_variants: set[str]) -> int:
+    """Count extracted flavor/variant tokens not present in allowed context."""
+    if not allowed_variants:
         return 0
     invalid = 0
     for item in payload.get("items") or []:
@@ -419,19 +441,19 @@ def _count_invalid_catalog_flavors(payload: dict, allowed_flavors: set[str]) -> 
             token = _normalize_flavor_token(value)
             if not token:
                 continue
-            if token not in allowed_flavors and not any(
-                token in allowed or allowed in token for allowed in allowed_flavors
+            if token not in allowed_variants and not any(
+                token in allowed or allowed in token for allowed in allowed_variants
             ):
                 invalid += 1
     return invalid
 
 
-def _build_catalog_guard_prompt(allowed_flavors: set[str]) -> str:
-    allowed_list = ", ".join(sorted(allowed_flavors))
+def _build_context_guard_prompt(allowed_variants: set[str]) -> str:
+    allowed_list = ", ".join(sorted(allowed_variants))
     return (
-        "Converta o texto bruto para JSON estruturado, obedecendo o catálogo.\n"
+        "Converta o texto bruto para JSON estruturado, obedecendo o contexto da página.\n"
         "Use somente sabores/variantes presentes na lista permitida.\n"
-        f"Sabores permitidos: {allowed_list}\n"
+        f"Variantes permitidas: {allowed_list}\n"
         "Se não houver mapeamento claro, mantenha item sem flavor inventado.\n"
         "Mantenha schema válido."
     )
@@ -571,6 +593,7 @@ def downloaded_assets(
     api = client.get_client()
 
     try:
+        started = time.perf_counter()
         item = api.get_scraped_item(config.item_id)
         if not item:
             raise Exception(f"Scraped item {config.item_id} not found")
@@ -587,12 +610,16 @@ def downloaded_assets(
             raise Exception(f"Missing sourcePageId for item {config.item_id}")
 
         storage_path = service.download_assets(int(page_id), ensured_page_url)
+        source_page_raw_content = item.get("sourcePageRawContent") or ""
+        source_page_content_type = item.get("sourcePageContentType") or ""
         context.add_output_metadata(
             {
                 "path": storage_path,
                 "url": MetadataValue.url(ensured_page_url),
                 "page_id": int(page_id),
                 "origin_item_id": int(ensured_item["id"]),
+                "scraper_context_type": source_page_content_type or "unknown",
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             }
         )
         return {
@@ -601,6 +628,8 @@ def downloaded_assets(
             "page_id": int(page_id),
             "origin_item_id": int(ensured_item["id"]),
             "store_slug": ensured_item.get("storeSlug") or store_slug,
+            "source_page_raw_content": source_page_raw_content,
+            "source_page_content_type": source_page_content_type,
         }
     except Exception as e:
         context.log.error(f"Download failed: {e}")
@@ -653,19 +682,35 @@ def ocr_extraction(
 
     bucket, _ = downloaded_assets["storage_path"].split("/", 1)
     try:
+        started = time.perf_counter()
         candidates: list[dict] = []
         image_paths: list[str] = []
         candidates_key = "candidates.json"
         site_data: dict | None = None
-        catalog_context: dict | None = None
+        scraper_context: dict | None = None
+        raw_scraper_context = downloaded_assets.get("source_page_raw_content")
+        scraper_context_type = str(
+            downloaded_assets.get("source_page_content_type") or ""
+        ).upper()
+
+        if raw_scraper_context and scraper_context_type == "JSON":
+            try:
+                parsed_context = json.loads(raw_scraper_context)
+                if isinstance(parsed_context, dict):
+                    scraper_context = parsed_context
+            except Exception:
+                scraper_context = None
 
         if store.exists(bucket, "site_data.json"):
             site_data = json.loads(store.download(bucket, "site_data.json"))
-        if store.exists(bucket, "catalog_context.json"):
-            catalog_context = json.loads(store.download(bucket, "catalog_context.json"))
 
+        materialize_ms = 0.0
         if not store.exists(bucket, candidates_key):
+            materialize_started = time.perf_counter()
             candidates = service.materialize_candidates(bucket, page_url)
+            materialize_ms = round(
+                (time.perf_counter() - materialize_started) * 1000, 2
+            )
         if not candidates and store.exists(bucket, candidates_key):
             candidates = json.loads(store.download(bucket, candidates_key))
         if candidates:
@@ -691,22 +736,28 @@ def ocr_extraction(
             (scraped_metadata.description or "")
             + sequence_context
             + _build_json_context_block("SITE_DATA", site_data)
-            + _build_json_context_block("CATALOG_CONTEXT", catalog_context)
+            + _build_json_context_block("SCRAPER_CONTEXT", scraper_context)
         )
 
+        llm_started = time.perf_counter()
         raw_text = run_raw_extraction(
             name=scraped_metadata.name or page_url,
             description=llm_description,
             image_paths=image_paths,
         )
+        llm_ms = round((time.perf_counter() - llm_started) * 1000, 2)
 
         context.add_output_metadata(
             {
                 "extraction_mode": extraction_mode,
                 "fallback_reason": fallback_reason,
                 "candidates_available": len(candidates),
+                "scraper_context_included": bool(scraper_context),
                 "images_used": len(image_paths),
                 "images_sent": image_paths,
+                "materialize_ms": materialize_ms,
+                "llm_ms": llm_ms,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 "text_preview": MetadataValue.md(
                     (raw_text[:500] + "...") if raw_text else ""
                 ),
@@ -729,6 +780,7 @@ def product_analysis(
     """Converts raw text into structured list of product analyses."""
     api = client.get_client()
     try:
+        started = time.perf_counter()
         result = run_structured_extraction(ocr_extraction)
         payload = result.model_dump(by_alias=True)
 
@@ -736,8 +788,8 @@ def product_analysis(
         expected_variant_count = len(expected_variant_signals)
         structured_variant_count = _count_structured_variant_signals(payload)
         reconciliation_retry_used = False
-        catalog_guard_retry_used = False
-        catalog_invalid_flavors = 0
+        context_guard_retry_used = False
+        context_invalid_variants = 0
 
         if (
             expected_variant_count >= 2
@@ -760,33 +812,36 @@ def product_analysis(
                 structured_variant_count = reconciled_variant_count
                 reconciliation_retry_used = True
 
-        catalog_context = _extract_context_block(ocr_extraction, "CATALOG_CONTEXT")
-        allowed_flavors = _extract_allowed_flavors_from_catalog(catalog_context)
-        catalog_invalid_flavors = _count_invalid_catalog_flavors(
-            payload, allowed_flavors
+        scraper_context = _extract_context_block(ocr_extraction, "SCRAPER_CONTEXT")
+        allowed_variants = _extract_allowed_variants_from_scraper_context(
+            scraper_context
         )
-        if allowed_flavors and catalog_invalid_flavors > 0:
+        context_invalid_variants = _count_invalid_variant_tokens(
+            payload, allowed_variants
+        )
+        if allowed_variants and context_invalid_variants > 0:
+            source_label = "catalog/scraper context"
             context.log.warning(
-                "Structured extraction returned flavors outside catalog "
-                f"({catalog_invalid_flavors} invalid). Retrying with catalog guard."
+                "Structured extraction returned variants outside "
+                f"{source_label} ({context_invalid_variants} invalid). Retrying with context guard."
             )
             guarded = run_structured_extraction(
                 ocr_extraction,
-                prompt=_build_catalog_guard_prompt(allowed_flavors),
+                prompt=_build_context_guard_prompt(allowed_variants),
             )
             guarded_payload = guarded.model_dump(by_alias=True)
-            guarded_invalid = _count_invalid_catalog_flavors(
-                guarded_payload, allowed_flavors
+            guarded_invalid = _count_invalid_variant_tokens(
+                guarded_payload, allowed_variants
             )
             guarded_variant_count = _count_structured_variant_signals(guarded_payload)
-            if guarded_invalid < catalog_invalid_flavors or (
-                guarded_invalid == catalog_invalid_flavors
+            if guarded_invalid < context_invalid_variants or (
+                guarded_invalid == context_invalid_variants
                 and guarded_variant_count >= structured_variant_count
             ):
                 payload = guarded_payload
                 structured_variant_count = guarded_variant_count
-                catalog_invalid_flavors = guarded_invalid
-                catalog_guard_retry_used = True
+                context_invalid_variants = guarded_invalid
+                context_guard_retry_used = True
 
         context.add_output_metadata(
             {
@@ -794,8 +849,9 @@ def product_analysis(
                 "variants_detected_raw": expected_variant_count,
                 "variants_detected_structured": structured_variant_count,
                 "reconciliation_retry_used": reconciliation_retry_used,
-                "catalog_guard_retry_used": catalog_guard_retry_used,
-                "catalog_invalid_flavors": catalog_invalid_flavors,
+                "context_guard_retry_used": context_guard_retry_used,
+                "context_invalid_variants": context_invalid_variants,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             }
         )
         return payload
@@ -816,6 +872,7 @@ def upload_to_api(
     """Creates one product per analyzed item and links generated scraped items."""
     api = client.get_client()
     try:
+        started = time.perf_counter()
         origin_item = api.get_scraped_item(config.item_id)
         if not origin_item:
             raise Exception(f"Scraped item {config.item_id} not found")
@@ -960,6 +1017,7 @@ def upload_to_api(
                 "items_uploaded": len(results),
                 "additional_scraped_items_created": created_count,
                 "page_id": ensured_origin.get("sourcePageId"),
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             }
         )
         return results

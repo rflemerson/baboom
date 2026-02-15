@@ -5,7 +5,7 @@
 **Base URL:** `https://www.gsuplementos.com.br/api/v2/front`
 **Protocol:** REST / JSON
 **Authentication:** Public App Token (`wapstore`)
-**Security:** Requires specific User-Agent headers and ignoring SSL verification (`verify=False`) to bypass Sucuri WAF when using Python.
+**Security:** Requires specific headers; SSL verification behavior is configurable in spider via `GROWTH_SSL_VERIFY` (default `0`, i.e., `verify=False`).
 
 ## 2. Critical Configuration
 
@@ -22,14 +22,15 @@ To successfully consume this API, every request MUST include the following heade
 ```
 
 ### SSL Verification
-> [!WARNING]
-> You **MUST** disable SSL verification (`verify=False` in Python/Requests) or use a specific cipher suite. The server (protected by Sucuri) often rejects standard Python OpenSSL handshakes.
+Default behavior uses `verify=False` because Sucuri may reject standard Python TLS handshakes.
+Set `GROWTH_SSL_VERIFY=1` to enforce certificate verification in stricter environments.
 
 **Python Example:**
 ```python
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-requests.get(url, headers=headers, verify=False)
+requests.get(url, headers=headers, verify=False)  # default
+# requests.get(url, headers=headers, verify=True)  # with GROWTH_SSL_VERIFY=1
 ```
 
 ## 3. Endpoints
@@ -107,10 +108,13 @@ Check if a URL slug is valid and mapped.
 
 ## 4. Implementation Strategy (Python)
 
-We have implemented `GrowthApiSpider` using this strategy:
-1.  **Session**: Use `requests.Session()` with `verify=False`.
+We have implemented `GrowthSpider` using this strategy:
+1.  **HTTP Client**: Use shared client with configurable `verify` (`GROWTH_SSL_VERIFY`).
 2.  **Pagination**: Loop with `offset += 30` until `len(items) < 30`.
-3.  **Parsing**: robustly check for `data['conteudo']['produtos']` as the API might return structural JSON without products if params are wrong.
+3.  **Parsing**: robustly check `conteudo.produtos` and `data.list`.
+4.  **Validation**: require valid URL and parseable price before persisting item.
+5.  **Stock Logic**: unknown stock keeps item as available (avoids false out-of-stock).
+6.  **Context Persistence**: save structured product JSON in `ScrapedPage.raw_content`.
 
 ## 5. Known Limitations
 -   **Limit**: Strict maximum of 30 items.

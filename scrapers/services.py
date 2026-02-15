@@ -84,3 +84,17 @@ class ScraperService:
             f"Synced Price for {scraped_item.store_slug}: R${scraped_item.price}"
         )
         return True
+
+    @staticmethod
+    def persist_item_context(
+        saved_item: ScrapedItem | None, context_payload: str
+    ) -> None:
+        """Persist structured scraper context into source page when available."""
+        if not saved_item or not saved_item.source_page_id:
+            return
+        page = saved_item.source_page
+        if page is None:
+            return
+        page.raw_content = context_payload
+        page.content_type = "JSON"
+        page.save(update_fields=["raw_content", "content_type"])

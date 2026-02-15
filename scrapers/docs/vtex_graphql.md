@@ -92,3 +92,9 @@ requests.get(endpoint, params={"extensions": extensions, ...})
 The response is standard VTEX JSON:
 *   `data.products.products`: List of Items.
 *   `items[0].sellers[0].commertialOffer`: Price and Stock.
+*   Validation in current spider:
+    * Skip item when URL cannot be built from `linkText`.
+    * Skip item when `Price` is missing/invalid.
+    * Unknown stock stays available (avoid false out-of-stock).
+    * Product IDs are deduplicated globally across categories in one crawl.
+    * Save structured product payload in `ScrapedPage.raw_content` (`content_type="JSON"`).

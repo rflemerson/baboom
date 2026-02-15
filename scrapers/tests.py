@@ -1,9 +1,11 @@
 import logging
 import os
 from decimal import Decimal
+from typing import Any, cast
 from unittest import skipUnless
+from unittest.mock import MagicMock, patch
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from core.models import Brand, Product, ProductPriceHistory, ProductStore, Store
 from scrapers.models import ScrapedItem
@@ -12,6 +14,8 @@ from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
 from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
+from scrapers.spiders.soldiers import SoldiersSpider
+from scrapers.spiders.vtex_search_spider import VtexSearchSpider
 from scrapers.types import ProductIngestionInput
 
 # Disable logging during tests
@@ -180,3 +184,448 @@ class SyncPriceToCoreTests(TestCase):
             self.fail("Latest history not found")
 
         self.assertEqual(latest.price, Decimal("179.90"))
+
+
+class ScraperServiceContextPersistenceTests(SimpleTestCase):
+    """Unit tests for Django-side context persistence helper."""
+
+    def test_persist_item_context_updates_source_page_json_fields(self):
+        """Writes JSON payload into source page and persists both fields."""
+        fake_page = MagicMock()
+        fake_item = MagicMock()
+        fake_item.source_page_id = 123
+        fake_item.source_page = fake_page
+
+        ScraperService.persist_item_context(fake_item, '{"platform":"shopify"}')
+
+        self.assertEqual(fake_page.raw_content, '{"platform":"shopify"}')
+        self.assertEqual(fake_page.content_type, "JSON")
+        fake_page.save.assert_called_once_with(
+            update_fields=["raw_content", "content_type"]
+        )
+
+
+class DarkLabSpiderUnitTests(SimpleTestCase):
+    """Unit tests for DarkLab Shopify parsing behavior."""
+
+    def setUp(self):
+        """Create reusable Shopify fixture item."""
+        self.spider = DarkLabSpider()
+        self.base_item: dict[str, Any] = {
+            "id": 123,
+            "title": "Whey Test",
+            "handle": "whey-test",
+            "vendor": "Dark Lab",
+            "product_type": "Whey",
+            "tags": ["whey", "protein"],
+            "options": [{"name": "Sabor", "values": ["Chocolate", "Baunilha"]}],
+            "images": [{"src": "https://cdn.example.com/1.jpg"}],
+            "variants": [
+                {
+                    "id": 111,
+                    "title": "Chocolate",
+                    "option1": "Chocolate",
+                    "sku": "WHEY-CHOCO",
+                    "barcode": "1234567890123",
+                    "price": "129.90",
+                    "available": True,
+                    "inventory_quantity": 7,
+                }
+            ],
+        }
+
+    @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
+    def test_process_and_save_skips_item_without_handle(self, mock_save):
+        """Should skip item when Shopify handle is missing."""
+        item = dict(self.base_item)
+        item["handle"] = ""
+
+        result = self.spider._process_and_save(item, "whey-protein")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
+    def test_process_and_save_skips_invalid_price(self, mock_save):
+        """Should skip item when selected variant has invalid price."""
+        item = dict(self.base_item)
+        base_variants = cast(list[dict[str, Any]], self.base_item["variants"])
+        item["variants"] = [dict(base_variants[0], price="N/A")]
+
+        result = self.spider._process_and_save(item, "whey-protein")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    def test_parse_price_handles_comma_decimal(self):
+        """Parses prices with comma decimal separator."""
+        value = self.spider._parse_price("149,90")
+        self.assertEqual(value, 149.9)
+
+    @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
+    def test_process_and_save_persists_shopify_context(self, mock_save):
+        """Writes structured Shopify context into source_page raw_content."""
+        fake_source_page = MagicMock()
+        fake_obj = MagicMock()
+        fake_obj.source_page_id = 10
+        fake_obj.source_page = fake_source_page
+        mock_save.return_value = fake_obj
+
+        result = self.spider._process_and_save(self.base_item, "whey-protein")
+
+        self.assertEqual(result, fake_obj)
+        self.assertIn('"platform": "shopify"', fake_source_page.raw_content)
+        self.assertIn('"variants"', fake_source_page.raw_content)
+        self.assertIn('"options"', fake_source_page.raw_content)
+        fake_source_page.save.assert_called_once_with(
+            update_fields=["raw_content", "content_type"]
+        )
+
+
+class SoldiersSpiderUnitTests(SimpleTestCase):
+    """Unit tests for Soldiers Shopify API spider behavior."""
+
+    def setUp(self):
+        """Create reusable Shopify fixture item."""
+        self.spider = SoldiersSpider()
+        self.base_item: dict[str, Any] = {
+            "id": 456,
+            "title": "Elitebar 30g Barra De Proteína - Soldiers Nutrition",
+            "handle": "elitebar-30g-barra-de-proteina-soldiers-nutrition",
+            "vendor": "Soldiers Nutrition",
+            "type": "barra",
+            "tags": ["barra", "proteina"],
+            "options": [
+                {"name": "Quantidade", "values": ["3 Unidades", "6 Unidades"]},
+                {"name": "Sabor", "values": ["Amendoim", "Cookies"]},
+            ],
+            "images": ["https://cdn.example.com/a.webp"],
+            "variants": [
+                {
+                    "id": 999,
+                    "title": "3 Unidades / Amendoim",
+                    "price": "13,90",
+                    "available": True,
+                    "inventory_quantity": None,
+                    "barcode": "",
+                    "sku": "3UA",
+                }
+            ],
+        }
+
+    @patch("scrapers.spiders.catalog_api_spider.requests.get")
+    def test_fetch_categories_from_collections_api(self, mock_get):
+        """Loads category handles from collections endpoint."""
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "collections": [{"handle": "whey"}, {"handle": "creatina"}]
+        }
+        mock_get.return_value = response
+
+        categories = self.spider._fetch_categories()
+
+        self.assertIn("whey", categories)
+        self.assertIn("creatina", categories)
+
+    @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
+    def test_process_and_save_skips_without_handle(self, mock_save):
+        """Skips item when handle is missing."""
+        item = dict(self.base_item)
+        item["handle"] = ""
+
+        result = self.spider._process_and_save(item, "barra")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
+    def test_process_and_save_skips_invalid_price(self, mock_save):
+        """Skips item when selected variant has invalid price."""
+        item = dict(self.base_item)
+        base_variants = cast(list[dict[str, Any]], self.base_item["variants"])
+        item["variants"] = [dict(base_variants[0], price="N/A")]
+
+        result = self.spider._process_and_save(item, "barra")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
+    def test_process_and_save_persists_shopify_context(self, mock_save):
+        """Writes structured Shopify context into source_page raw_content."""
+        fake_source_page = MagicMock()
+        fake_obj = MagicMock()
+        fake_obj.source_page_id = 20
+        fake_obj.source_page = fake_source_page
+        mock_save.return_value = fake_obj
+
+        result = self.spider._process_and_save(self.base_item, "barra")
+
+        self.assertEqual(result, fake_obj)
+        self.assertIn('"platform": "shopify"', fake_source_page.raw_content)
+        self.assertIn('"variants"', fake_source_page.raw_content)
+        self.assertIn('"options"', fake_source_page.raw_content)
+        fake_source_page.save.assert_called_once_with(
+            update_fields=["raw_content", "content_type"]
+        )
+
+    def test_parse_price_handles_shopify_js_cents(self):
+        """Converts integer cents from product.js into decimal reais."""
+        self.assertEqual(self.spider._parse_price(1390), 13.9)
+        self.assertEqual(self.spider._parse_price("1390"), 13.9)
+
+
+class GrowthSpiderUnitTests(SimpleTestCase):
+    """Unit tests for Growth API parsing behavior."""
+
+    def setUp(self):
+        """Create reusable Growth fixture item."""
+        self.spider = GrowthSpider()
+        self.base_item: dict[str, Any] = {
+            "id": 1001,
+            "nome": "Whey Growth",
+            "sku": "WHEY1001",
+            "link": "/whey-growth",
+            "precos": {"por": "139,90"},
+            "estoque": 42,
+            "ean": "7890000000011",
+        }
+
+    @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
+    def test_process_and_save_skips_without_valid_url(self, mock_save):
+        """Skips items when URL is missing/invalid."""
+        item = dict(self.base_item)
+        item["link"] = ""
+
+        result = self.spider._process_and_save(item, "/proteina/")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
+    def test_process_and_save_skips_invalid_price(self, mock_save):
+        """Skips item when price is not parseable."""
+        item = dict(self.base_item)
+        item["precos"] = {"por": "N/A"}
+
+        result = self.spider._process_and_save(item, "/proteina/")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
+    def test_process_and_save_keeps_available_on_unknown_stock(self, mock_save):
+        """Unknown stock should not be forced to out-of-stock."""
+        item = dict(self.base_item)
+        item["estoque"] = "unknown"
+
+        _ = self.spider._process_and_save(item, "/proteina/")
+
+        payload = mock_save.call_args.args[0]
+        self.assertIsNone(payload.stock_quantity)
+        self.assertEqual(payload.stock_status, ScrapedItem.StockStatus.AVAILABLE)
+
+    def test_parse_price_supports_currency_formats(self):
+        """Parses price tokens from common API payload formats."""
+        self.assertEqual(self.spider._parse_price("139,90"), 139.9)
+        self.assertEqual(self.spider._parse_price("R$ 89.50"), 89.5)
+        self.assertIsNone(self.spider._parse_price("N/A"))
+
+    def test_category_path_filter_rejects_non_product_routes(self):
+        """Rejects account/checkout-like paths from dynamic menu."""
+        self.assertFalse(self.spider._is_valid_category_path("/conta/meus-pedidos/"))
+        self.assertFalse(self.spider._is_valid_category_path("/checkout/"))
+        self.assertTrue(self.spider._is_valid_category_path("/proteina/"))
+
+    @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
+    def test_process_and_save_persists_structured_context(self, mock_save):
+        """Writes structured Growth context into source_page raw_content."""
+        fake_source_page = MagicMock()
+        fake_obj = MagicMock()
+        fake_obj.source_page_id = 30
+        fake_obj.source_page = fake_source_page
+        mock_save.return_value = fake_obj
+
+        result = self.spider._process_and_save(self.base_item, "/proteina/")
+
+        self.assertEqual(result, fake_obj)
+        self.assertIn('"platform": "uappi_wapstore"', fake_source_page.raw_content)
+        self.assertIn('"prices"', fake_source_page.raw_content)
+        fake_source_page.save.assert_called_once_with(
+            update_fields=["raw_content", "content_type"]
+        )
+
+
+class _DummyVtexSpider(VtexSearchSpider):
+    """Concrete test double for VtexSearchSpider helper methods."""
+
+    BRAND_NAME = "Dummy VTEX"
+    STORE_SLUG = "dummy_vtex"
+    BASE_URL = "https://dummy.example.com"
+
+
+class VtexSpiderUnitTests(SimpleTestCase):
+    """Unit tests for VTEX base spider parsing behavior."""
+
+    def setUp(self):
+        """Create reusable VTEX fixture item."""
+        self.spider = _DummyVtexSpider()
+        self.base_item: dict[str, Any] = {
+            "productId": "9001",
+            "productName": "Produto VTEX",
+            "linkText": "produto-vtex",
+            "items": [
+                {
+                    "itemId": "SKU-1",
+                    "ean": "7890000000099",
+                    "sellers": [
+                        {
+                            "sellerDefault": True,
+                            "commertialOffer": {
+                                "Price": "99,90",
+                                "AvailableQuantity": 7,
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
+    def test_process_and_save_skips_without_valid_url(self, mock_save):
+        """Skips item when linkText is missing."""
+        item = dict(self.base_item)
+        item["linkText"] = ""
+
+        result = self.spider._process_and_save(item, "proteina")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
+    def test_process_and_save_skips_invalid_price(self, mock_save):
+        """Skips item when price is not parseable."""
+        item = dict(self.base_item)
+        item["items"][0]["sellers"][0]["commertialOffer"]["Price"] = "N/A"
+
+        result = self.spider._process_and_save(item, "proteina")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
+    def test_process_and_save_keeps_available_on_unknown_stock(self, mock_save):
+        """Unknown stock should keep item available by default."""
+        item = dict(self.base_item)
+        item["items"][0]["sellers"][0]["commertialOffer"]["AvailableQuantity"] = "x"
+
+        _ = self.spider._process_and_save(item, "proteina")
+
+        payload = mock_save.call_args.args[0]
+        self.assertIsNone(payload.stock_quantity)
+        self.assertEqual(payload.stock_status, ScrapedItem.StockStatus.AVAILABLE)
+
+    def test_parse_price_supports_common_formats(self):
+        """Parses decimal strings and rejects invalid price."""
+        self.assertEqual(self.spider._parse_price("99,90"), 99.9)
+        self.assertEqual(self.spider._parse_price(55), 55.0)
+        self.assertIsNone(self.spider._parse_price("N/A"))
+
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
+    def test_process_and_save_persists_structured_context(self, mock_save):
+        """Writes structured VTEX context into source_page raw_content."""
+        fake_source_page = MagicMock()
+        fake_obj = MagicMock()
+        fake_obj.source_page_id = 40
+        fake_obj.source_page = fake_source_page
+        mock_save.return_value = fake_obj
+
+        result = self.spider._process_and_save(self.base_item, "proteina")
+
+        self.assertEqual(result, fake_obj)
+        self.assertIn('"platform": "vtex_legacy"', fake_source_page.raw_content)
+        self.assertIn('"items"', fake_source_page.raw_content)
+        fake_source_page.save.assert_called_once_with(
+            update_fields=["raw_content", "content_type"]
+        )
+
+
+class BlackSkullSpiderUnitTests(SimpleTestCase):
+    """Unit tests for BlackSkull VTEX GraphQL parsing behavior."""
+
+    def setUp(self):
+        """Create reusable BlackSkull fixture item."""
+        self.spider = BlackSkullSpider()
+        self.base_item: dict[str, Any] = {
+            "productId": "5001",
+            "productName": "Whey Black Skull",
+            "linkText": "whey-black-skull",
+            "items": [
+                {
+                    "itemId": "BS-SKU-1",
+                    "ean": "7890000000500",
+                    "sellers": [
+                        {
+                            "sellerDefault": True,
+                            "commertialOffer": {
+                                "Price": "119,90",
+                                "AvailableQuantity": 5,
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    def test_process_and_save_skips_without_valid_url(self, mock_save):
+        """Skips item when linkText is missing."""
+        item = dict(self.base_item)
+        item["linkText"] = ""
+
+        result = self.spider._process_and_save(item, "proteina")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    def test_process_and_save_skips_invalid_price(self, mock_save):
+        """Skips item when price is not parseable."""
+        item = dict(self.base_item)
+        item["items"][0]["sellers"][0]["commertialOffer"]["Price"] = "N/A"
+
+        result = self.spider._process_and_save(item, "proteina")
+
+        self.assertIsNone(result)
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    def test_process_and_save_keeps_available_on_unknown_stock(self, mock_save):
+        """Unknown stock should keep item available by default."""
+        item = dict(self.base_item)
+        item["items"][0]["sellers"][0]["commertialOffer"]["AvailableQuantity"] = "x"
+
+        _ = self.spider._process_and_save(item, "proteina")
+
+        payload = mock_save.call_args.args[0]
+        self.assertIsNone(payload.stock_quantity)
+        self.assertEqual(payload.stock_status, ScrapedItem.StockStatus.AVAILABLE)
+
+    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    def test_process_and_save_persists_structured_context(self, mock_save):
+        """Writes structured VTEX GraphQL context into source_page raw_content."""
+        fake_source_page = MagicMock()
+        fake_obj = MagicMock()
+        fake_obj.source_page_id = 50
+        fake_obj.source_page = fake_source_page
+        mock_save.return_value = fake_obj
+
+        result = self.spider._process_and_save(self.base_item, "proteina")
+
+        self.assertEqual(result, fake_obj)
+        self.assertIn('"platform": "vtex_graphql"', fake_source_page.raw_content)
+        self.assertIn('"items"', fake_source_page.raw_content)
+        fake_source_page.save.assert_called_once_with(
+            update_fields=["raw_content", "content_type"]
+        )

@@ -196,36 +196,6 @@ class TestScraperToolService(TestCase):
         manifest = json.loads(self.storage.uploads[("42", "image_manifest.json")])
         self.assertEqual(manifest["images"][0]["url"], "https://cdn/x.jpg")
 
-    def test_download_assets_uploads_shopify_catalog_context_when_available(self):
-        """Persists catalog_context.json when supported store context is found."""
-        with (
-            patch.object(self.service, "_download_html", return_value="<html></html>"),
-            patch.object(
-                self.service,
-                "_build_image_manifest",
-                return_value={"page_url": "x", "generated_at": "t", "images": []},
-            ),
-            patch.object(self.service, "_extract_site_data", return_value={"x": 1}),
-            patch.object(
-                self.service,
-                "_build_catalog_context",
-                return_value={
-                    "platform": "shopify",
-                    "product": {"handle": "demo-handle"},
-                    "variants": [],
-                    "images": [],
-                },
-            ),
-        ):
-            _ = self.service.download_assets(
-                77, "https://www.darklabsuplementos.com.br/products/demo-handle"
-            )
-
-        self.assertIn(("77", "catalog_context.json"), self.storage.uploads)
-        context_json = json.loads(self.storage.uploads[("77", "catalog_context.json")])
-        self.assertEqual(context_json["platform"], "shopify")
-        self.assertEqual(context_json["product"]["handle"], "demo-handle")
-
     def test_download_assets_raises_on_processing_error(self):
         """Propagates failures from image processing step."""
         with (
@@ -493,53 +463,3 @@ class TestScraperToolService(TestCase):
         self.assertEqual(
             self.service._extract_image_url({}, {"opengraph": [{"og:image": "x"}]}), "x"
         )
-
-    @patch("agents.tools.scraper.requests.get")
-    def test_build_catalog_context_for_dark_lab_shopify_url(self, mock_get):
-        """Builds normalized Shopify context for Dark Lab product URLs."""
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {
-            "id": 10,
-            "title": "Whey",
-            "handle": "whey",
-            "vendor": "Dark Lab",
-            "type": "Suplemento",
-            "tags": ["whey"],
-            "options": [{"name": "Sabor", "position": 1, "values": ["Chocolate"]}],
-            "variants": [
-                {
-                    "id": 20,
-                    "title": "Chocolate",
-                    "name": "Whey - Chocolate",
-                    "sku": "SKU-1",
-                    "barcode": "789",
-                    "available": True,
-                    "price": 129.9,
-                    "compare_at_price": 149.9,
-                    "option1": "Chocolate",
-                    "option2": None,
-                    "option3": None,
-                    "options": ["Chocolate"],
-                }
-            ],
-            "images": ["//cdn.shopify.com/s/files/whey.webp"],
-        }
-        mock_get.return_value = response
-
-        context = self.service._build_catalog_context(
-            "https://www.darklabsuplementos.com.br/products/whey"
-        )
-        self.assertIsNotNone(context)
-        context = cast(dict, context)
-        self.assertEqual(context["platform"], "shopify")
-        self.assertEqual(context["counts"]["variants"], 1)
-        self.assertEqual(context["counts"]["images"], 1)
-        self.assertEqual(
-            context["images"][0]["url"], "https://cdn.shopify.com/s/files/whey.webp"
-        )
-
-    def test_build_catalog_context_ignores_non_dark_lab_domains(self):
-        """Returns None for stores not mapped to Shopify context extraction."""
-        context = self.service._build_catalog_context("https://example.com/products/x")
-        self.assertIsNone(context)

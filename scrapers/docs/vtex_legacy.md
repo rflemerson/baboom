@@ -76,6 +76,12 @@ The response is a **List of Product Objects**.
 3.  **Price & Stock**: Located inside `items[].sellers[].commertialOffer`.
     *   `Price`: Current selling price.
     *   `AvailableQuantity`: Stock count.
+4.  **Validation Rules**:
+    *   Skip item when URL cannot be built from `linkText`.
+    *   Skip item when `Price` is missing/invalid.
+    *   If stock is unknown/unparseable, keep status as available (avoid false out-of-stock).
+5.  **Context Persistence**:
+    *   Save structured product payload in `ScrapedPage.raw_content` (`content_type="JSON"`).
 
 ## Implementation Examples
 *   `scrapers/spiders/integral_medica.py`

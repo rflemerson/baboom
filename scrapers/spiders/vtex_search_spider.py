@@ -1,17 +1,22 @@
+import json
 import logging
 from typing import Any
-
-import requests
 
 from ..models import ScrapedItem
 from ..services import ScraperService
 from ..types import ProductIngestionInput
-from .base_spider import BaseSpider
+from .catalog_api_spider import CatalogApiSpider
+from .common import (
+    is_http_url,
+    parse_optional_int,
+    parse_positive_price,
+    persist_json_context,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class VtexSearchSpider(BaseSpider):
+class VtexSearchSpider(CatalogApiSpider):
     """Base Spider for VTEX Legacy / Search API stores."""
 
     BRAND_NAME = ""
@@ -21,9 +26,19 @@ class VtexSearchSpider(BaseSpider):
 
     FALLBACK_CATEGORIES: list[str] = []
 
+    def _initial_cursor(self) -> int:
+        """Return initial offset for pagination."""
+        return 0
+
+    def _next_cursor(self, cursor: int, page_size: int) -> int:
+        """Advance VTEX search offset cursor."""
+        return cursor + page_size
+
     def _fetch_categories(self) -> list[str]:
         try:
-            resp = requests.get(self.API_TREE, headers=self.get_headers(), timeout=10)
+            resp = self._request_get(self.API_TREE, timeout=10)
+            if resp is None:
+                return []
             if resp.status_code != 200:
                 logger.warning(f"Failed to fetch category tree: {resp.status_code}")
                 return []
@@ -50,100 +65,89 @@ class VtexSearchSpider(BaseSpider):
             logger.error(f"Error fetching categories: {e}")
             return []
 
-    def crawl(self) -> list[Any]:
-        """Crawl products from API."""
-        logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
+    def _build_search_url(self, category_slug: str) -> str:
+        """Build category endpoint URL."""
+        return f"{self.BASE_URL}/api/catalog_system/pub/products/search/{category_slug}"
 
-        categories = self._fetch_categories()
-        self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
+    def _build_pagination_params(self, start: int, step: int) -> dict[str, int]:
+        """Build VTEX range params for one page."""
+        end = start + step - 1
+        return {"_from": start, "_to": end}
 
-        if not categories:
-            logger.info("Using Fallback/Config Categories.")
-            categories = self.categories_to_crawl or self.FALLBACK_CATEGORIES
+    def _fetch_page_items(
+        self, category_slug: str, start: int, step: int
+    ) -> list[dict] | None:
+        """Fetch one page and normalize response contract."""
+        search_url = self._build_search_url(category_slug)
+        params = self._build_pagination_params(start, step)
+        response = self._request_get(search_url, params=params, timeout=30)
+        if response is None:
+            return None
+        if response.status_code not in [200, 206]:
+            return None
 
-        logger.info(f"Discovered {len(categories)} categories to crawl.")
+        data = response.json()
+        if not data or not isinstance(data, list):
+            return []
+        return data
 
-        all_products = []
-        processed_ids = set()
+    def _crawl_category(self, category_slug: str, processed_ids: set[str]) -> list[Any]:
+        """Crawl one VTEX category with offset pagination."""
+        logger.info(f"Crawling Category: {category_slug}")
+        products: list[Any] = []
+        start = self._initial_cursor()
+        step = 50
 
-        for category_slug in categories:
-            logger.info(f"Crawling Category: {category_slug}")
-            search_url = f"{self.BASE_URL}/api/catalog_system/pub/products/search/{category_slug}"
-
-            start = 0
-            step = 50
-
-            while True:
-                end = start + step - 1
-                params = {"_from": start, "_to": end}
-
-                try:
-                    response = requests.get(
-                        search_url,
-                        params=params,
-                        headers=self.get_headers(),
-                        timeout=30,
-                    )
-
-                    if response.status_code not in [200, 206]:
-                        break
-
-                    data = response.json()
-                    if not data:
-                        break
-
-                    items_in_page = 0
-                    for item in data:
-                        try:
-                            item_id = str(item.get("productId"))
-                            if item_id in processed_ids:
-                                continue
-
-                            processed_ids.add(item_id)
-
-                            saved_obj = self._process_and_save(item, category_slug)
-                            if saved_obj:
-                                all_products.append(saved_obj)
-                                items_in_page += 1
-                        except Exception as e:
-                            logger.debug(f"Skipping item: {e}")
-
-                    if len(data) < step:
-                        break
-
-                    start += step
-                    self.sleep_random(0.5, 1.0)
-
-                except Exception as e:
-                    logger.error(f"Error crawling {category_slug}: {e}")
+        while True:
+            try:
+                data = self._fetch_page_items(category_slug, start, step)
+                if data is None or not data:
                     break
 
-        logger.info(f"Crawl finished. Total products: {len(all_products)}")
-        return all_products
+                for item in data:
+                    try:
+                        item_id = str(item.get("productId"))
+                        if item_id in processed_ids:
+                            continue
+
+                        processed_ids.add(item_id)
+                        saved_obj = self._process_and_save(item, category_slug)
+                        if saved_obj:
+                            products.append(saved_obj)
+                    except Exception as e:
+                        logger.debug(f"Skipping item: {e}")
+
+                if len(data) < step:
+                    break
+
+                start = self._next_cursor(start, step)
+                self.sleep_random(0.5, 1.0)
+
+            except Exception as e:
+                logger.error(f"Error crawling {category_slug}: {e}")
+                break
+
+        return products
 
     def _process_and_save(self, item: dict, category: str) -> Any | None:
         try:
             skus = item.get("items", [])
-            if not skus:
-                return None
-
-            first_sku = self._extract_first_sku(skus)
-            if not first_sku:
-                return None
-
-            active_seller = self._select_active_seller(first_sku)
-            if not active_seller:
-                return None
-
-            comm_offer = active_seller.get("commertialOffer", {})
-            price = comm_offer.get("Price")
-            if price is None:
-                return None
+            first_sku = self._extract_first_sku(skus) if skus else None
+            active_seller = self._select_active_seller(first_sku) if first_sku else None
+            comm_offer = (
+                active_seller.get("commertialOffer", {}) if active_seller else {}
+            )
+            price = self._parse_price(comm_offer.get("Price"))
 
             pid = item.get("productId")
             name = item.get("productName")
             link_text = item.get("linkText")
             url = f"{self.BASE_URL}/{link_text}/p" if link_text else ""
+
+            if first_sku is None or active_seller is None or price is None:
+                return None
+            if not is_http_url(url):
+                return None
 
             ean = first_sku.get("ean", "")
             sku_code = first_sku.get("itemId", "")
@@ -151,18 +155,17 @@ class VtexSearchSpider(BaseSpider):
             stock_quantity = self._parse_stock(comm_offer.get("AvailableQuantity"))
             stock_status = (
                 ScrapedItem.StockStatus.AVAILABLE
-                if stock_quantity > 0
+                if stock_quantity is None or stock_quantity > 0
                 else ScrapedItem.StockStatus.OUT_OF_STOCK
             )
 
             store_slug = self.STORE_SLUG or self.BRAND_NAME.lower().replace(" ", "_")
-
             input_data = ProductIngestionInput(
                 store_slug=store_slug,
                 external_id=str(pid),
                 url=url,
                 name=str(name) if name else "",
-                price=float(price),
+                price=price,
                 stock_quantity=stock_quantity,
                 stock_status=stock_status,
                 ean=str(ean),
@@ -170,7 +173,9 @@ class VtexSearchSpider(BaseSpider):
                 pid=str(pid),
                 category=category,
             )
-            return ScraperService.save_product(input_data)
+            saved = ScraperService.save_product(input_data)
+            persist_json_context(saved, self._build_product_context(item))
+            return saved
         except Exception as e:
             logger.debug(f"Item parse error: {e}")
             return None
@@ -192,9 +197,25 @@ class VtexSearchSpider(BaseSpider):
                 return seller
         return sellers[0] if sellers else None
 
-    def _parse_stock(self, quantity: Any) -> int:
+    def _parse_stock(self, quantity: Any) -> int | None:
         """Parse stock quantity to integer."""
-        try:
-            return int(quantity) if quantity is not None else 0
-        except (ValueError, TypeError):
-            return 0
+        return parse_optional_int(quantity)
+
+    def _parse_price(self, raw_price: Any) -> float | None:
+        return parse_positive_price(raw_price)
+
+    def _build_product_context(self, item: dict) -> str:
+        """Build structured VTEX context for downstream agents."""
+        payload = {
+            "platform": "vtex_legacy",
+            "product": {
+                "productId": item.get("productId"),
+                "productName": item.get("productName"),
+                "brand": item.get("brand"),
+                "linkText": item.get("linkText"),
+                "categories": item.get("categories") or [],
+                "categoryId": item.get("categoryId"),
+            },
+            "items": item.get("items") or [],
+        }
+        return json.dumps(payload, ensure_ascii=False)

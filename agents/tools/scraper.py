@@ -5,10 +5,11 @@ from __future__ import annotations
 import io
 import json
 import logging
-import re
+import os
 import statistics
+import time
 from datetime import UTC, datetime
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import extruct
 import requests
@@ -50,6 +51,26 @@ class ScraperService:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         self.storage = get_storage()
+        self.http_retries = max(1, int(os.getenv("AGENTS_HTTP_RETRIES", "3")))
+        self.http_backoff = float(os.getenv("AGENTS_HTTP_RETRY_BACKOFF", "0.6"))
+
+    def _request_get(
+        self, url: str, *, headers: dict[str, str] | None = None, timeout: int = 30
+    ) -> requests.Response:
+        """GET with retries for transient failures."""
+        last_response: requests.Response | None = None
+        for attempt in range(1, self.http_retries + 1):
+            response = requests.get(
+                url, headers=headers or self.headers, timeout=timeout
+            )
+            last_response = response
+            if response.status_code not in {429, 500, 502, 503, 504}:
+                return response
+            if attempt < self.http_retries:
+                time.sleep(self.http_backoff * attempt)
+        if last_response is None:
+            raise RuntimeError(f"HTTP request failed for {url}")
+        return last_response
 
     def download_assets(
         self, item_id: int, url: str, html_content: str | None = None
@@ -82,17 +103,6 @@ class ScraperService:
                 content_type="application/json",
             )
 
-            catalog_context = self._build_catalog_context(url)
-            if catalog_context:
-                self.storage.upload(
-                    bucket,
-                    "catalog_context.json",
-                    json.dumps(catalog_context, indent=2, ensure_ascii=False).encode(
-                        "utf-8"
-                    ),
-                    content_type="application/json",
-                )
-
             images_count = len(manifest.get("images", []))
             logger.info(
                 f"Indexed {images_count} images for {item_id} (manifest-only mode)"
@@ -105,111 +115,9 @@ class ScraperService:
 
     def _download_html(self, url: str) -> str:
         logger.info(f"Downloading HTML from {url}")
-        response = requests.get(url, headers=self.headers, timeout=30)
+        response = self._request_get(url, timeout=30)
         response.raise_for_status()
         return response.text
-
-    def _build_catalog_context(self, page_url: str) -> dict | None:
-        """Build structured catalog context for supported stores."""
-        parsed = urlparse(page_url)
-        host = parsed.netloc.lower()
-        if "darklabsuplementos.com.br" not in host:
-            return None
-
-        handle_match = re.search(r"/products/([^/?#]+)", parsed.path)
-        if not handle_match:
-            return None
-
-        handle = handle_match.group(1)
-        base_url = f"{parsed.scheme}://{parsed.netloc}"
-        return self._fetch_shopify_product_context(base_url, handle)
-
-    def _fetch_shopify_product_context(self, base_url: str, handle: str) -> dict | None:
-        """Fetch public Shopify product JSON and normalize key fields."""
-        endpoint = f"{base_url}/products/{handle}.js"
-        try:
-            response = requests.get(endpoint, headers=self.headers, timeout=20)
-            if response.status_code != 200:
-                return None
-            data = response.json()
-        except Exception as e:
-            logger.warning(
-                f"Could not fetch Shopify catalog context from {endpoint}: {e}"
-            )
-            return None
-
-        images: list[dict] = []
-        for idx, raw_url in enumerate(data.get("images") or [], start=1):
-            if not isinstance(raw_url, str):
-                continue
-            images.append(
-                {
-                    "position": idx,
-                    "url": self._normalize_shopify_url(raw_url),
-                }
-            )
-
-        variants: list[dict] = []
-        for variant in data.get("variants") or []:
-            if not isinstance(variant, dict):
-                continue
-            variants.append(
-                {
-                    "id": variant.get("id"),
-                    "title": variant.get("title"),
-                    "name": variant.get("name"),
-                    "sku": variant.get("sku"),
-                    "barcode": variant.get("barcode"),
-                    "available": bool(variant.get("available")),
-                    "price": variant.get("price"),
-                    "compare_at_price": variant.get("compare_at_price"),
-                    "option1": variant.get("option1"),
-                    "option2": variant.get("option2"),
-                    "option3": variant.get("option3"),
-                    "options": variant.get("options") or [],
-                }
-            )
-
-        options: list[dict] = []
-        for option in data.get("options") or []:
-            if not isinstance(option, dict):
-                continue
-            options.append(
-                {
-                    "name": option.get("name"),
-                    "position": option.get("position"),
-                    "values": option.get("values") or [],
-                }
-            )
-
-        return {
-            "platform": "shopify",
-            "source": {
-                "domain": urlparse(base_url).netloc,
-                "endpoint": endpoint,
-            },
-            "product": {
-                "id": data.get("id"),
-                "title": data.get("title"),
-                "handle": data.get("handle"),
-                "vendor": data.get("vendor"),
-                "type": data.get("type"),
-                "tags": data.get("tags") or [],
-                "url": f"{base_url}/products/{handle}",
-            },
-            "options": options,
-            "variants": variants,
-            "images": images,
-            "counts": {
-                "variants": len(variants),
-                "images": len(images),
-            },
-        }
-
-    def _normalize_shopify_url(self, image_url: str) -> str:
-        if image_url.startswith("//"):
-            return f"https:{image_url}"
-        return image_url
 
     def _build_image_manifest(self, html_content: str, base_url: str) -> dict:
         """Extract image links/metadata quickly without downloading bytes."""
@@ -391,7 +299,7 @@ class ScraperService:
         self, index: int, img_url: str, tag: Tag, bucket: str, seen_hashes: set
     ) -> dict | None:
         try:
-            img_resp = requests.get(img_url, headers=self.headers, timeout=10)
+            img_resp = self._request_get(img_url, timeout=10)
             if img_resp.status_code != 200:
                 return None
 
