@@ -19,6 +19,9 @@ def work_queue_sensor(context, client: AgentClientResource):
         return SkipReason("Queue empty. Sleeping...")
 
     item_id = int(work["id"])
+    url = work.get("productLink") or work.get("sourcePageUrl")
+    if not url:
+        return SkipReason(f"Item {item_id} has no source URL.")
 
     # Configuration passed to Assets
     # In Dagster SDA (Software-Defined Assets), config is passed per asset.
@@ -27,28 +30,21 @@ def work_queue_sensor(context, client: AgentClientResource):
             "downloaded_assets": {
                 "config": {
                     "item_id": item_id,
-                    "url": work["productLink"],
+                    "url": url,
                     "store_slug": work.get("storeSlug", "unknown"),
                 }
             },
-            "scraped_metadata": {
+            "product_analysis": {
                 "config": {
                     "item_id": item_id,
-                    "url": work["productLink"],
-                    "store_slug": work.get("storeSlug", "unknown"),
-                }
-            },
-            "ocr_extraction": {
-                "config": {
-                    "item_id": item_id,
-                    "url": work["productLink"],
+                    "url": url,
                     "store_slug": work.get("storeSlug", "unknown"),
                 }
             },
             "upload_to_api": {
                 "config": {
                     "item_id": item_id,
-                    "url": work["productLink"],
+                    "url": url,
                     "store_slug": work.get("storeSlug", "unknown"),
                 }
             },

@@ -1,146 +1,207 @@
-"""Dagster assets for product ingestion pipeline."""
+"""Dagster assets for the page-first product ingestion pipeline."""
 
 import json
+import re
+from typing import Any
 
 from dagster import AssetExecutionContext, Config, MetadataValue, asset
+from django.apps import apps
 
-from .brain.groq_agent import run_groq_json_extraction
-
-# Import your schemas and logics
 from .brain.raw_extraction_agent import run_raw_extraction
+from .brain.structured_agent import run_structured_extraction
 from .resources import AgentClientResource, ScraperServiceResource, StorageResource
 from .schemas.product import RawScrapedData
 
 
-# --- CONFIG ---
+def _get_scraper_models() -> tuple[Any, Any]:
+    scraped_item = apps.get_model("scrapers", "ScrapedItem")
+    scraped_page = apps.get_model("scrapers", "ScrapedPage")
+    return scraped_item, scraped_page
+
+
 class ItemConfig(Config):
-    """Configuration for running a specific item."""
+    """Configuration for running a specific queued scraped item."""
 
     item_id: int
     url: str
     store_slug: str = "unknown"
 
 
-# --- ASSET 1: FILES ON DISK (HTML/Images) ---
+def _slugify(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return normalized or "item"
+
+
+def _to_graphql_stock_status(status: str | None) -> str:
+    stock_map = {
+        "A": "AVAILABLE",
+        "L": "LAST_UNITS",
+        "O": "OUT_OF_STOCK",
+        "AVAILABLE": "AVAILABLE",
+        "LAST_UNITS": "LAST_UNITS",
+        "OUT_OF_STOCK": "OUT_OF_STOCK",
+    }
+    return stock_map.get((status or "").upper(), "AVAILABLE")
+
+
+def _build_nutrition_payload(analysis_data: dict) -> list[dict]:
+    nutrition = analysis_data.get("nutrition_facts")
+    if not nutrition:
+        return []
+
+    micronutrients = [
+        {
+            "name": m.get("name"),
+            "value": float(m.get("value") or 0),
+            "unit": m.get("unit") or "mg",
+        }
+        for m in (nutrition.get("micronutrients") or [])
+        if m.get("name")
+    ]
+
+    return [
+        {
+            "flavorNames": analysis_data.get("flavor_names") or [],
+            "nutritionFacts": {
+                "description": analysis_data.get("variant_name") or "AI Analysis",
+                "servingSizeGrams": float(nutrition.get("serving_size_grams") or 0),
+                "energyKcal": int(nutrition.get("energy_kcal") or 0),
+                "proteins": float(nutrition.get("proteins") or 0),
+                "carbohydrates": float(nutrition.get("carbohydrates") or 0),
+                "totalSugars": float(nutrition.get("total_sugars") or 0),
+                "addedSugars": float(nutrition.get("added_sugars") or 0),
+                "totalFats": float(nutrition.get("total_fats") or 0),
+                "saturatedFats": float(nutrition.get("saturated_fats") or 0),
+                "transFats": float(nutrition.get("trans_fats") or 0),
+                "dietaryFiber": float(nutrition.get("dietary_fiber") or 0),
+                "sodium": float(nutrition.get("sodium") or 0),
+                "micronutrients": micronutrients,
+            },
+        }
+    ]
+
+
 @asset
 def downloaded_assets(
     context: AssetExecutionContext,
     config: ItemConfig,
     scraper: ScraperServiceResource,
     client: AgentClientResource,
-):
-    """
-    Downloads HTML and images to local temp/{id} folder.
-
-    Returns the bucket path in storage.
-    """
+) -> dict:
+    """Ensures page assets are downloaded and returns page storage context."""
     service = scraper.get_service()
     api = client.get_client()
 
-    context.log.info(f"📥 Downloading item {config.item_id} from {config.url}")
-
     try:
-        # Existing download logic
-        storage_path = service.download_assets(config.item_id, config.url)
+        scraped_item_model, scraped_page_model = _get_scraper_models()
 
-        # Dagster UI: Shows path and URL as clickable metadata
+        item = scraped_item_model.objects.get(pk=config.item_id)
+        page = item.source_page
+        if not page:
+            page, _ = scraped_page_model.objects.get_or_create(
+                url=config.url,
+                defaults={"store_slug": config.store_slug},
+            )
+            item.source_page = page
+            item.save(update_fields=["source_page", "updated_at"])
+
+        storage_path = service.download_assets(page.id, page.url)
         context.add_output_metadata(
-            {"path": storage_path, "url": MetadataValue.url(config.url)}
+            {
+                "path": storage_path,
+                "url": MetadataValue.url(page.url),
+                "page_id": page.id,
+                "origin_item_id": item.id,
+            }
         )
-
-        return storage_path
+        return {
+            "storage_path": storage_path,
+            "url": page.url,
+            "page_id": page.id,
+            "origin_item_id": item.id,
+            "store_slug": item.store_slug or config.store_slug,
+        }
     except Exception as e:
         context.log.error(f"Download failed: {e}")
         api.report_error(config.item_id, str(e), is_fatal=False)
         raise
 
 
-# --- ASSET 2: RAW METADATA (Light Extraction) ---
 @asset
 def scraped_metadata(
     context: AssetExecutionContext,
-    config: ItemConfig,
     scraper: ScraperServiceResource,
     client: AgentClientResource,
-    downloaded_assets: str,
+    downloaded_assets: dict,
 ) -> RawScrapedData:
-    """Reads downloaded HTML and extracts JSON-LD/OpenGraph."""
+    """Reads downloaded HTML and extracts lightweight metadata."""
     service = scraper.get_service()
     api = client.get_client()
-
-    # Uses output from previous asset (downloaded_assets)
-    storage_path = downloaded_assets
+    storage_path = downloaded_assets["storage_path"]
+    page_url = downloaded_assets["url"]
+    store_slug = downloaded_assets["store_slug"]
+    origin_item_id = int(downloaded_assets["origin_item_id"])
 
     try:
-        context.log.info(f"🧬 Extracting metadata from {storage_path}")
-        meta_dict = service.extract_metadata(storage_path, config.url)
-
-        # Consolidate
-        raw_data = service.consolidate(meta_dict, brand_name_override=config.store_slug)
-
-        # Dagster UI: Shows found name
-        context.add_output_metadata({"product_name": raw_data.name})
-
+        context.log.info(f"Extracting metadata from {storage_path}")
+        meta_dict = service.extract_metadata(storage_path, page_url)
+        raw_data = service.consolidate(meta_dict, brand_name_override=store_slug)
+        context.add_output_metadata({"product_name": raw_data.name or "unknown"})
         return raw_data
     except Exception as e:
         context.log.error(f"Metadata extraction failed: {e}")
-        api.report_error(config.item_id, str(e), is_fatal=False)
+        api.report_error(origin_item_id, str(e), is_fatal=False)
         raise
 
 
-# --- ASSET 3: OCR (Gemma / Vision) ---
 @asset
 def ocr_extraction(
     context: AssetExecutionContext,
-    config: ItemConfig,
     storage: StorageResource,
     client: AgentClientResource,
     scraped_metadata: RawScrapedData,
-    downloaded_assets: str,
+    downloaded_assets: dict,
 ) -> str:
-    """Uses Gemma 3 to read downloaded images."""
+    """Runs multimodal raw extraction over top-ranked page images."""
     store = storage.get_storage()
     api = client.get_client()
+    origin_item_id = int(downloaded_assets["origin_item_id"])
+    page_url = downloaded_assets["url"]
 
-    bucket, _ = downloaded_assets.split("/", 1)
-
+    bucket, _ = downloaded_assets["storage_path"].split("/", 1)
     try:
-        # Image loading logic (reused from your code)
+        image_paths: list[str] = []
         candidates_key = "candidates.json"
-        image_paths = []
-
         if store.exists(bucket, candidates_key):
-            data = store.download(bucket, candidates_key)
-            candidates = json.loads(data)
-            # Filter Top 5
+            candidates = json.loads(store.download(bucket, candidates_key))
             valid = sorted(
                 [c for c in candidates if c["score"] > 0],
                 key=lambda x: x["score"],
                 reverse=True,
-            )[:5]
+            )[:8]
             image_paths = [f"{bucket}/{c['file']}" for c in valid]
 
-        context.log.info(f"👁️ Running Gemma on {len(image_paths)} images...")
-
         raw_text = run_raw_extraction(
-            name=scraped_metadata.name,
+            name=scraped_metadata.name or page_url,
             description=scraped_metadata.description or "",
             image_paths=image_paths,
         )
 
-        # Dagster UI: Shows text preview
         context.add_output_metadata(
-            {"text_preview": MetadataValue.md(raw_text[:500] + "...")}
+            {
+                "images_used": len(image_paths),
+                "text_preview": MetadataValue.md(
+                    (raw_text[:500] + "...") if raw_text else ""
+                ),
+            }
         )
-
         return raw_text
     except Exception as e:
         context.log.error(f"OCR extraction failed: {e}")
-        api.report_error(config.item_id, str(e), is_fatal=False)
+        api.report_error(origin_item_id, str(e), is_fatal=False)
         raise
 
 
-# --- ASSET 4: FINAL JSON (Groq) ---
 @asset
 def product_analysis(
     context: AssetExecutionContext,
@@ -148,21 +209,19 @@ def product_analysis(
     client: AgentClientResource,
     ocr_extraction: str,
 ) -> dict:
-    """Uses Llama 3 (Groq) to structure text into JSON."""
+    """Converts raw text into structured list of product analyses."""
     api = client.get_client()
-
     try:
-        context.log.info("🧠 Structuring JSON with Groq...")
-        result = run_groq_json_extraction(ocr_extraction)
-
-        return result.model_dump(by_alias=True)
+        result = run_structured_extraction(ocr_extraction)
+        payload = result.model_dump(by_alias=True)
+        context.add_output_metadata({"items_detected": len(payload.get("items", []))})
+        return payload
     except Exception as e:
-        context.log.error(f"Product analysis failed: {e}")
+        context.log.error(f"Structured analysis failed: {e}")
         api.report_error(config.item_id, str(e), is_fatal=False)
         raise
 
 
-# --- ASSET 5: UPLOAD (Finalization) ---
 @asset
 def upload_to_api(
     context: AssetExecutionContext,
@@ -170,69 +229,110 @@ def upload_to_api(
     client: AgentClientResource,
     product_analysis: dict,
     scraped_metadata: RawScrapedData,
-):
-    """Sends final product to Baboom API."""
+    downloaded_assets: dict,
+) -> list[dict]:
+    """Creates one product per analyzed item and links generated scraped items."""
     api = client.get_client()
+    scraped_item_model, scraped_page_model = _get_scraper_models()
 
-    context.log.info(f"🚀 Sending {scraped_metadata.name} to Database...")
+    origin_item = scraped_item_model.objects.get(pk=config.item_id)
+    page = origin_item.source_page
+    if not page:
+        page, _ = scraped_page_model.objects.get_or_create(
+            url=config.url,
+            defaults={"store_slug": config.store_slug},
+        )
+        origin_item.source_page = page
+        origin_item.save(update_fields=["source_page", "updated_at"])
 
-    try:
-        # Reconstruct nutrition profile from raw analysis dict
-        # Since product_analysis is a dict (returned by Asset 4)
-        analysis_data = product_analysis
+    items = product_analysis.get("items") or []
+    if not items:
+        items = [
+            {"name": scraped_metadata.name or origin_item.name or "Unknown Product"}
+        ]
 
-        nutrition_profiles = []
-        if analysis_data.get("nutrition_facts"):
-            nutrition_profiles.append(
-                {
-                    "nutritionFacts": analysis_data["nutrition_facts"],
-                    "flavorNames": analysis_data.get("flavor_names", []),
-                }
+    results: list[dict] = []
+    created_count = 0
+    for idx, analysis_data in enumerate(items):
+        if idx == 0:
+            scraped_item = origin_item
+            if analysis_data.get("name"):
+                scraped_item.name = analysis_data["name"]
+            if scraped_item.source_page_id != page.id:
+                scraped_item.source_page = page
+            scraped_item.save(update_fields=["name", "source_page", "updated_at"])
+        else:
+            base_name = analysis_data.get("name") or scraped_metadata.name or "product"
+            variant_name = analysis_data.get("variant_name") or f"v{idx + 1}"
+            ext_id = f"{origin_item.external_id}::v{idx + 1}-{_slugify(base_name)}-{_slugify(variant_name)}"[
+                :100
+            ]
+            scraped_item, _ = scraped_item_model.objects.update_or_create(
+                store_slug=origin_item.store_slug,
+                external_id=ext_id,
+                defaults={
+                    "name": base_name,
+                    "source_page": page,
+                    "price": origin_item.price,
+                    "stock_status": origin_item.stock_status,
+                    "status": scraped_item_model.Status.PROCESSING,
+                },
             )
+            created_count += 1
 
-        stock_map = {"A": "AVAILABLE", "L": "LAST_UNITS", "O": "OUT_OF_STOCK"}
-
+        tags_hierarchy = analysis_data.get("tags_hierarchy") or []
         payload = {
-            "name": analysis_data.get("name") or scraped_metadata.name,
-            "brandName": scraped_metadata.brand_name,
+            "name": analysis_data.get("name")
+            or scraped_metadata.name
+            or "Unknown Product",
+            "brandName": scraped_metadata.brand_name or "Unknown Brand",
             "weight": int(analysis_data.get("weight_grams") or 0),
             "ean": scraped_metadata.ean,
             "description": scraped_metadata.description,
             "packaging": analysis_data.get("packaging") or "CONTAINER",
-            "originScrapedItemId": int(config.item_id),
+            "originScrapedItemId": int(scraped_item.id),
             "stores": [
                 {
-                    "storeName": config.store_slug,  # Using slug as name for now or could fetch more from config
-                    "productLink": config.url,
-                    "price": float(scraped_metadata.price or 0.0),
-                    "externalId": "",  # Could be added to config if available
-                    "stockStatus": stock_map.get(
-                        scraped_metadata.stock_status or "A", "AVAILABLE"
+                    "storeName": origin_item.store_slug,
+                    "productLink": page.url,
+                    "price": float(scraped_metadata.price or origin_item.price or 0.0),
+                    "externalId": scraped_item.external_id,
+                    "stockStatus": _to_graphql_stock_status(
+                        scraped_metadata.stock_status or origin_item.stock_status
                     ),
+                    "affiliateLink": "",
                 }
             ],
-            "nutrition": nutrition_profiles,
+            "nutrition": _build_nutrition_payload(analysis_data),
             "categoryPath": analysis_data.get("category_hierarchy") or [],
-            "tagPaths": [
-                {"path": tp} for tp in (analysis_data.get("tags_hierarchy") or [])
-            ],
-            "isCombo": analysis_data.get("is_combo", False),
+            "tagPaths": [{"path": path} for path in tags_hierarchy if path],
+            "tags": [],
+            "isCombo": bool(analysis_data.get("is_combo")),
             "components": [
                 {
-                    "name": c["name"],
-                    "quantity": c.get("quantity", 1),
+                    "name": c.get("name"),
+                    "quantity": int(c.get("quantity") or 1),
                     "weightHint": c.get("weight_hint"),
                     "packagingHint": c.get("packaging_hint"),
                 }
-                for c in analysis_data.get("components", [])
+                for c in (analysis_data.get("components") or [])
+                if c.get("name")
             ],
-            "isPublished": True,
+            "nutrientClaims": analysis_data.get("nutrient_claims") or [],
+            "isPublished": False,
         }
 
-        api.create_product(payload)
-    except Exception as e:
-        context.log.error(f"Upload failed: {e}")
-        api.report_error(config.item_id, str(e), is_fatal=True)
-        raise
+        context.log.info(
+            f"Uploading product {idx + 1}/{len(items)} with origin item {scraped_item.id}"
+        )
+        result = api.create_product(payload)
+        results.append(result or {})
 
-    return "OK"
+    context.add_output_metadata(
+        {
+            "items_uploaded": len(results),
+            "additional_scraped_items_created": created_count,
+            "page_id": page.id,
+        }
+    )
+    return results

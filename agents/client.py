@@ -68,6 +68,7 @@ class AgentClient:
             checkoutScrapedItem(force: $force, targetItemId: $targetItemId) {
                 id
                 productLink
+                sourcePageUrl
                 storeSlug
                 storeName
                 externalId

@@ -3,6 +3,45 @@ from django.utils.translation import gettext_lazy as _
 from simple_history.models import HistoricalRecords
 
 
+class ScrapedPage(models.Model):
+    """Raw content of a scraped page."""
+
+    store_slug = models.CharField(
+        max_length=100,
+        db_index=True,
+        help_text=_("Store identifier"),
+    )
+    url = models.URLField(
+        max_length=500,
+        unique=True,
+        help_text=_("Page URL"),
+    )
+    raw_content = models.TextField(
+        help_text=_("Raw HTML or JSON content"),
+        blank=True,
+        default="",
+    )
+    content_type = models.CharField(
+        max_length=10,
+        choices=[("HTML", "HTML"), ("JSON", "JSON")],
+        default="HTML",
+    )
+    scraped_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        """Meta options."""
+
+        ordering = ["-scraped_at"]
+        indexes = [
+            models.Index(fields=["url"]),
+            models.Index(fields=["store_slug", "url"]),
+        ]
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return f"[{self.store_slug}] {self.url}"
+
+
 class ScrapedItem(models.Model):
     """Product data scraped from external sources."""
 
@@ -36,11 +75,7 @@ class ScrapedItem(models.Model):
         help_text=_("Unique ID from Store"),
     )
 
-    product_link = models.URLField(
-        max_length=500,
-        blank=True,
-        help_text=_("URL to product page"),
-    )
+    # product_link removed
 
     name = models.CharField(
         max_length=255,
@@ -112,6 +147,15 @@ class ScrapedItem(models.Model):
         null=True,
         blank=True,
         related_name="scraped_items",
+    )
+
+    source_page = models.ForeignKey(
+        ScrapedPage,
+        on_delete=models.CASCADE,
+        related_name="items",
+        null=True,
+        blank=True,
+        help_text=_("Source page where this item was found"),
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

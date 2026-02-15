@@ -1,6 +1,11 @@
-Analyze the following RAW TEXT REPORT (extracted from product images/description) and map it to the `ProductAnalysisResult` schema.
+Analyze the following RAW TEXT REPORT (extracted from product images/description) and map it to the `ProductAnalysisList` schema.
 
-Return a SINGLE valid JSON object.
+Identify if the page offers multiple purchasing options (e.g. Unit vs Box, Flavors).
+Return a valid JSON object containing a LIST of `items`.
+
+### VARIANT DETECTION
+- **Box/Kit**: If a "Box of 12" is available, create a separate Item in the list.
+- **Flavors**: If different flavors are listed as *purchasable options*, create separate Items (or consolidate if just a list of available flavors).
 
 ### PRODUCT NAMING & CLASSIFICATION
 - **Name**: Extract the full, clean product name. Remove promotional slogans (e.g., "Melhor Preço").

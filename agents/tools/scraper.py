@@ -5,20 +5,17 @@ from __future__ import annotations
 import io
 import json
 import logging
-from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 import extruct
 import requests
 from bs4 import BeautifulSoup, Tag
+from django.apps import apps
 from PIL import Image
 from w3lib.html import get_base_url
 
 from ..schemas.product import RawScrapedData
 from ..storage import get_storage
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +29,68 @@ class ScraperService:
         }
         self.storage = get_storage()
 
-    def download_assets(self, item_id: int, url: str) -> str:
-        """
-        Downloads HTML and images to the storage backend.
+    @staticmethod
+    def _get_scraped_page_model():
+        return apps.get_model("scrapers", "ScrapedPage")
 
-        Returns the storage path/key to the saved HTML file.
+    def capture_page(self, url: str, store_slug: str = "unknown") -> int:
         """
+        Creates a ScrapedPage record without downloading content (Lazy Capture).
+
+        Returns the ScrapedPage ID.
+        """
+        scraped_page_model = self._get_scraped_page_model()
+
+        page, created = scraped_page_model.objects.update_or_create(
+            url=url,
+            defaults={
+                "store_slug": store_slug,
+            },
+        )
+
+        if created:
+            logger.info(f"Created initial ScrapedPage record: {page.id} for {url}")
+        else:
+            logger.info(f"Using existing ScrapedPage record: {page.id}")
+
+        return page.id
+
+    def ensure_page_assets(self, page_id: int) -> bool:
+        """
+        Ensures that HTML and images are downloaded for the given page.
+
+        Returns True if download was performed or already existed.
+        """
+        scraped_page_model = self._get_scraped_page_model()
+
+        page = scraped_page_model.objects.get(id=page_id)
+
+        if page.raw_content:
+            logger.info(f"Assets already exist for Page {page_id}")
+            return True
+
+        logger.info(f"Deferred download triggered for Page {page_id}")
+        html_content = self._download_html(page.url)
+
+        # Update model with HTML
+        page.raw_content = html_content
+        page.save()
+
+        # Download images to storage
+        self.download_assets(page.id, page.url, html_content=html_content)
+        return True
+
+    def download_assets(
+        self, item_id: int, url: str, html_content: str | None = None
+    ) -> str:
+        """Downloads images and saves source HTML to storage."""
         bucket = str(item_id)
 
         try:
-            html_content = self._download_html(url)
+            if not html_content:
+                html_content = self._download_html(url)
+
+            # Archive source HTML
             html_key = "source.html"
             self.storage.upload(
                 bucket, html_key, html_content.encode("utf-8"), content_type="text/html"

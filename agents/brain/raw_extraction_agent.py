@@ -5,10 +5,13 @@ import os
 
 from pydantic_ai import Agent, BinaryContent
 
+from ..brain.agent_factory import get_model
+from ..storage import get_storage
+
 logger = logging.getLogger(__name__)
 
 # Default model if not specified in flow
-DEFAULT_MODEL = "google-gla:gemma-3-27b-it"
+DEFAULT_MODEL = "google-gla:gemini-3-flash-preview"
 
 
 def _get_default_prompt():
@@ -28,14 +31,13 @@ def run_raw_extraction(
     prompt: str | None = None,
     model_name: str | None = None,
 ) -> str:
-    """Runs a multimodal agent (default Gemma 3) to extract raw text data."""
-    from ..storage import get_storage  # noqa: PLC0415
-
+    """Runs a multimodal agent (default Gemini 3) to extract raw text data."""
     storage = get_storage()
     model_name = model_name or DEFAULT_MODEL
     instructions = prompt or _get_default_prompt()
 
-    agent = Agent(model_name)
+    model = get_model(model_name)
+    agent = Agent(model)
 
     user_content: list[str | BinaryContent] = [
         instructions
@@ -84,4 +86,4 @@ def run_raw_extraction(
         return str(result)
     except Exception as e:
         logger.error(f"Raw extraction failed: {e}")
-        return f"ERROR: {e!s}"
+        raise

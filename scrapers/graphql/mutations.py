@@ -46,7 +46,9 @@ class ScrapersMutation:
                         status=ScrapedItem.Status.REVIEW
                     )
 
-                query = base_query.filter(q_filters, product_link__startswith="http")
+                query = base_query.filter(
+                    q_filters, source_page__url__startswith="http"
+                )
 
             item = query.order_by("updated_at").first()
 

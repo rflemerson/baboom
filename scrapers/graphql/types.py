@@ -1,3 +1,5 @@
+from typing import cast
+
 import strawberry
 from strawberry import auto
 from strawberry.django import type as django_type
@@ -12,10 +14,25 @@ class ScrapedItemType:
 
     id: auto
     store_slug: auto
-    product_link: auto
     external_id: auto
     price: auto
     stock_status: auto
+
+    @strawberry.field
+    def product_link(self) -> str:
+        """Backward-compatible URL field used by agent workers."""
+        item = cast(ScrapedItem, self)
+        if item.source_page:
+            return item.source_page.url
+        return ""
+
+    @strawberry.field
+    def source_page_url(self) -> str:
+        """Explicit URL field for page-first pipelines."""
+        item = cast(ScrapedItem, self)
+        if item.source_page:
+            return item.source_page.url
+        return ""
 
     @strawberry.field
     def store_name(self) -> str:

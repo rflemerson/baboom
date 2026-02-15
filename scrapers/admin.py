@@ -29,8 +29,8 @@ def create_product_from_scraped_item(modeladmin, request, queryset):
     desc_parts = []
     if item.store_slug:
         desc_parts.append(f"Imported from {item.store_slug}")
-    if item.product_link:
-        desc_parts.append(f"Link: {item.product_link}")
+    if item.source_page:
+        desc_parts.append(f"Link: {item.source_page.url}")
 
     if desc_parts:
         params["initial_description"] = "\n".join(desc_parts)
@@ -63,7 +63,7 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
         "updated_at",
     ]
     list_filter = ["status", "store_slug", "stock_status"]
-    search_fields = ["name", "external_id", "product_link"]
+    search_fields = ["name", "external_id"]
 
     readonly_fields = [
         "created_at",

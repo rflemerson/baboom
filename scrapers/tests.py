@@ -1,5 +1,7 @@
 import logging
+import os
 from decimal import Decimal
+from unittest import skipUnless
 
 from django.test import TestCase
 
@@ -16,6 +18,10 @@ from scrapers.types import ProductIngestionInput
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
 
 
+@skipUnless(
+    os.getenv("RUN_EXTERNAL_SCRAPER_TESTS") == "1",
+    "External scraper integration tests are opt-in. Set RUN_EXTERNAL_SCRAPER_TESTS=1.",
+)
 class ScraperIntegrationTests(TestCase):
     """
     Integration tests for Spiders.

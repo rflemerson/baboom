@@ -4,7 +4,7 @@ from django.db import transaction
 
 from core.models import ProductPriceHistory
 
-from .models import ScrapedItem
+from .models import ScrapedItem, ScrapedPage
 from .types import ProductIngestionInput
 
 logger = logging.getLogger(__name__)
@@ -17,11 +17,15 @@ class ScraperService:
     @transaction.atomic
     def save_product(data: ProductIngestionInput) -> ScrapedItem | None:
         """Create or update a ScrapedItem."""
+        # Ensure ScrapedPage exists
+        page, _ = ScrapedPage.objects.get_or_create(
+            url=data.url, defaults={"store_slug": data.store_slug}
+        )
+
         obj, created = ScrapedItem.objects.update_or_create(
             store_slug=data.store_slug,
             external_id=data.external_id,
             defaults={
-                "product_link": data.url,
                 "name": data.name,
                 "price": data.price,
                 "stock_quantity": data.stock_quantity,
@@ -30,6 +34,7 @@ class ScraperService:
                 "sku": data.sku,
                 "pid": data.pid,
                 "category": data.category,
+                "source_page": page,
             },
         )
 

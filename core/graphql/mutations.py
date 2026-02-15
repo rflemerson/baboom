@@ -79,7 +79,8 @@ class CoreMutation:
                     item = ScrapedItem.objects.get(id=data.origin_scraped_item_id)
 
                     linked_store = ProductStore.objects.filter(
-                        product=product, product_link=item.product_link
+                        product=product,
+                        product_link=item.source_page.url if item.source_page else "",
                     ).first()
 
                     if not linked_store:

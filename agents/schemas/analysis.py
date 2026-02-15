@@ -68,3 +68,21 @@ class ProductAnalysisResult(BaseModel):
         default_factory=list,
         description="List of all flavors identified in the product (from text + image)",
     )
+
+    # Variant / Combo Fields
+    variant_name: str | None = Field(
+        None,
+        description="Name of the specific variation (e.g. 'Box 12 Units', 'Strawberry')",
+    )
+    is_variant: bool = Field(
+        False, description="True if this is a variation of a main product"
+    )
+    parent_name: str | None = Field(
+        None, description="Name of the parent product if this is a variant"
+    )
+
+
+class ProductAnalysisList(BaseModel):
+    """List of analyzed products found on the page."""
+
+    items: list[ProductAnalysisResult]
