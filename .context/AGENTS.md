@@ -54,3 +54,11 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 **CRITICAL RULE**: Documentation must never get stale.
 1.  **Update on Sight**: If you read this or any documentation (e.g., in `.context/`) and find it conflicts with the actual code/environment, **you must update it immediately** before proceeding with other tasks.
 2.  **Update on Change**: If you make *any* significant change to the code (e.g., adding a library, changing a workflow, refactoring architecture), you **must search for and update** the relevant documentation in the same step.
+
+## 7. Agents Pipeline Contract (Dagster)
+- Scraper stage must stay lightweight and store artifacts only:
+  - `source.html`, `image_manifest.json`, `site_data.json`, optional `catalog_context.json`.
+- Heavy image download/CV scoring must run in Dagster (`ocr_extraction`) and persist:
+  - `images/*` + `candidates.json`.
+- `ocr_extraction` must always send context blocks (`[SITE_DATA]`, `[CATALOG_CONTEXT]`) and expose fallback metadata when running text-only mode.
+- `product_analysis` must enforce schema consistency plus catalog consistency (allowed flavors/variants when context exists).

@@ -432,6 +432,7 @@ class _FakeScraperService:
         self.consolidate_result = RawScrapedData(name="N", brand_name="B")
         self.extract_raises: Exception | None = None
         self.download_assets_calls: list[tuple[int, str]] = []
+        self.materialize_calls: list[tuple[str, str]] = []
 
     def download_assets(self, item_id: int, url: str):
         """Track download call and return storage path."""
@@ -443,6 +444,11 @@ class _FakeScraperService:
         if self.extract_raises:
             raise self.extract_raises
         return self.extract_metadata_result
+
+    def materialize_candidates(self, bucket: str, page_url: str):
+        """Track candidate materialization requests."""
+        self.materialize_calls.append((bucket, page_url))
+        return []
 
     def consolidate(self, _meta: dict, brand_name_override: str):
         """Return configured consolidated structure."""
@@ -548,9 +554,16 @@ class TestDagsterAssetsFlow(TestCase):
             b'[{"file":"images/a.jpg","score":10,"nutrition_signal":3,"metadata":{"alt":"Tabela nutricional sabor chocolate"}},'
             b' {"file":"images/b.jpg","score":8,"nutrition_signal":0,"metadata":{"alt":"Produto sabor chocolate"}}]'
         )
-        storage = _FakeStorage({"15/candidates.json": candidates})
+        storage = _FakeStorage(
+            {
+                "15/candidates.json": candidates,
+                "15/site_data.json": b'{"page_url":"https://x","extracted":{"json-ld":[]}}',
+                "15/catalog_context.json": b'{"platform":"shopify","options":[{"name":"Sabor","values":["Chocolate"]}]}',
+            }
+        )
         result = ocr_extraction(
             context=build_asset_context(),
+            scraper=_FakeScraperResource(_FakeScraperService()),
             storage=_FakeStorageResource(storage),
             client=_FakeClientResource(_FakeApiClient()),
             scraped_metadata=RawScrapedData(
@@ -571,8 +584,33 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(len(call_kwargs["image_paths"]), 2)
         self.assertEqual(call_kwargs["image_paths"][0], "15/images/a.jpg")
         self.assertIn("[IMAGE_SEQUENCE_CONTEXT]", call_kwargs["description"])
+        self.assertIn("[SITE_DATA]", call_kwargs["description"])
+        self.assertIn("[CATALOG_CONTEXT]", call_kwargs["description"])
         self.assertIn("kind=NUTRITION_TABLE", call_kwargs["description"])
         self.assertIn("kind=PRODUCT_IMAGE", call_kwargs["description"])
+
+    @patch("agents.assets.run_raw_extraction", return_value="RAW-TEXT")
+    def test_ocr_extraction_falls_back_to_text_only_when_no_candidates(self, mock_raw):
+        """Falls back to text-only extraction when no candidates are available."""
+        result = ocr_extraction(
+            context=build_asset_context(),
+            scraper=_FakeScraperResource(_FakeScraperService()),
+            storage=_FakeStorageResource(_FakeStorage({})),
+            client=_FakeClientResource(_FakeApiClient()),
+            scraped_metadata=RawScrapedData(
+                name="Produto",
+                brand_name="Marca",
+                description="Desc",
+            ),
+            downloaded_assets={
+                "origin_item_id": 1,
+                "url": "https://x",
+                "storage_path": "15/source.html",
+            },
+        )
+
+        self.assertEqual(result, "RAW-TEXT")
+        self.assertEqual(mock_raw.call_args.kwargs["image_paths"], [])
 
     @patch("agents.assets.run_structured_extraction")
     def test_product_analysis_reports_error_on_failure(self, mock_structured):
@@ -668,6 +706,53 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(mock_structured.call_count, 1)
         self.assertEqual(len(result["items"]), 2)
 
+    @patch("agents.assets.run_structured_extraction")
+    def test_product_analysis_retries_when_flavor_outside_catalog(
+        self, mock_structured
+    ):
+        """Retries with catalog guard when extracted flavor is not in allowed options."""
+        mock_structured.side_effect = [
+            ProductAnalysisList(
+                items=[
+                    ProductAnalysisResult(
+                        name="Produto",
+                        flavor_names=["Morango"],
+                        variant_name="Morango",
+                        is_variant=True,
+                    )
+                ]
+            ),
+            ProductAnalysisList(
+                items=[
+                    ProductAnalysisResult(
+                        name="Produto",
+                        flavor_names=["Chocolate"],
+                        variant_name="Chocolate",
+                        is_variant=True,
+                    )
+                ]
+            ),
+        ]
+        api = _FakeApiClient()
+        raw_text = (
+            "[CATALOG_CONTEXT]\n"
+            '{"options":[{"name":"Sabor","values":["Chocolate"]}]}\n'
+            "[/CATALOG_CONTEXT]"
+        )
+
+        result = product_analysis(
+            context=build_asset_context(),
+            config=ItemConfig(item_id=94, url="https://x", store_slug="demo"),
+            client=_FakeClientResource(api),
+            ocr_extraction=raw_text,
+        )
+
+        self.assertEqual(mock_structured.call_count, 2)
+        self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
+        self.assertIn(
+            "Sabores permitidos", mock_structured.call_args_list[1].kwargs["prompt"]
+        )
+
     def test_upload_to_api_creates_additional_variant_items(self):
         """Creates extra ScrapedItem entries when analysis returns multiple items."""
         page = ScrapedPage.objects.create(
@@ -760,3 +845,67 @@ class TestDagsterAssetsFlow(TestCase):
 
         self.assertEqual(len(api.create_calls), 0)
         self.assertTrue(result[0]["skipped"])
+
+    def test_upload_to_api_handles_numeric_strings_from_llm_payload(self):
+        """Parses numeric strings in analysis payload without crashing."""
+        page = ScrapedPage.objects.create(
+            store_slug="demo-store",
+            url="https://example.com/product-numeric",
+        )
+        origin = ScrapedItem.objects.create(
+            store_slug="demo-store",
+            external_id="demo-origin-num",
+            name="Origin Num",
+            source_page=page,
+            status=ScrapedItem.Status.PROCESSING,
+            price=90,
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+        )
+        api = _FakeApiClient()
+
+        _ = upload_to_api(
+            context=build_asset_context(),
+            config=ItemConfig(item_id=origin.id, url=page.url, store_slug="demo-store"),
+            client=_FakeClientResource(api),
+            product_analysis={
+                "items": [
+                    {
+                        "name": "Produto Num",
+                        "packaging": "CONTAINER",
+                        "weight_grams": "900g",
+                        "components": [{"name": "Dose", "quantity": "2 unidades"}],
+                        "nutrition_facts": {
+                            "serving_size_grams": "30g",
+                            "energy_kcal": "120 kcal",
+                            "proteins": "24g",
+                            "carbohydrates": "3g",
+                            "total_sugars": "1,5g",
+                            "added_sugars": "0g",
+                            "total_fats": "2g",
+                            "saturated_fats": "0.5g",
+                            "trans_fats": "0g",
+                            "dietary_fiber": "1g",
+                            "sodium": "150mg",
+                            "micronutrients": [{"name": "Vitamina C", "value": "45mg"}],
+                        },
+                    }
+                ]
+            },
+            scraped_metadata=RawScrapedData(
+                name="Produto Num",
+                brand_name="Marca",
+                description="Desc",
+                price=99.9,
+                stock_status="A",
+            ),
+        )
+
+        payload = api.create_calls[0]
+        self.assertEqual(payload["weight"], 900)
+        self.assertEqual(payload["stores"][0]["price"], 99.9)
+        self.assertEqual(payload["components"][0]["quantity"], 2)
+        self.assertEqual(
+            payload["nutrition"][0]["nutritionFacts"]["servingSizeGrams"], 30.0
+        )
+        self.assertEqual(payload["nutrition"][0]["nutritionFacts"]["energyKcal"], 120)
+        self.assertEqual(payload["nutrition"][0]["nutritionFacts"]["totalSugars"], 1.5)

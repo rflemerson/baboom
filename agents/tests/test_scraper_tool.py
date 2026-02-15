@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup, Tag
 from django.test import SimpleTestCase, TestCase
 
 from agents.tools.scraper import ScraperService
-from scrapers.models import ScrapedPage
 
 
 class TestScraperToolHelpers(SimpleTestCase):
@@ -173,87 +172,115 @@ class TestScraperToolService(TestCase):
             mock_storage.return_value = self.storage
             self.service = ScraperService()
 
-    def test_capture_page_creates_page(self):
-        """Creates ScrapedPage and returns its id."""
-        page_id = self.service.capture_page("https://example.com/p", "demo-store")
-        page = ScrapedPage.objects.get(id=page_id)
-        self.assertEqual(page.store_slug, "demo-store")
-
-    def test_capture_page_updates_existing_page(self):
-        """Reuses page by URL and updates store slug."""
-        page = ScrapedPage.objects.create(
-            store_slug="old-store",
-            url="https://example.com/same",
-            raw_content="",
-        )
-        page_id = self.service.capture_page("https://example.com/same", "new-store")
-        page.refresh_from_db()
-
-        self.assertEqual(page_id, page.id)
-        self.assertEqual(page.store_slug, "new-store")
-
-    def test_ensure_page_assets_skips_when_raw_content_exists(self):
-        """Returns early when page already has raw content."""
-        page = ScrapedPage.objects.create(
-            store_slug="demo-store",
-            url="https://example.com/p2",
-            raw_content="<html/>",
-        )
-        with patch.object(self.service, "download_assets") as mock_download:
-            result = self.service.ensure_page_assets(page.id)
-        self.assertTrue(result)
-        mock_download.assert_not_called()
-
-    def test_ensure_page_assets_downloads_when_missing(self):
-        """Downloads html and assets when raw content is not present."""
-        page = ScrapedPage.objects.create(
-            store_slug="demo-store",
-            url="https://example.com/p3",
-            raw_content="",
-        )
-        with (
-            patch.object(
-                self.service, "_download_html", return_value="<html>ok</html>"
-            ),
-            patch.object(self.service, "download_assets") as mock_download,
-        ):
-            result = self.service.ensure_page_assets(page.id)
-
-        page.refresh_from_db()
-        self.assertTrue(result)
-        self.assertEqual(page.raw_content, "<html>ok</html>")
-        mock_download.assert_called_once_with(
-            page.id, page.url, html_content="<html>ok</html>"
-        )
-
     def test_download_assets_uploads_html_and_manifest(self):
-        """Uploads source HTML and candidates manifest to storage."""
+        """Uploads source HTML and lightweight image manifest to storage."""
         with (
             patch.object(self.service, "_download_html", return_value="<html></html>"),
             patch.object(
                 self.service,
-                "_process_images",
-                return_value=[{"file": "images/a.jpg", "score": 10}],
+                "_build_image_manifest",
+                return_value={
+                    "page_url": "https://example.com/p",
+                    "generated_at": "2026-01-01T00:00:00+00:00",
+                    "images": [{"url": "https://cdn/x.jpg", "position": 0}],
+                },
             ),
+            patch.object(self.service, "_extract_site_data", return_value={"x": 1}),
         ):
             base = self.service.download_assets(42, "https://example.com/p")
 
         self.assertEqual(base, "42/source.html")
         self.assertIn(("42", "source.html"), self.storage.uploads)
-        self.assertIn(("42", "candidates.json"), self.storage.uploads)
-        manifest = json.loads(self.storage.uploads[("42", "candidates.json")])
-        self.assertEqual(manifest[0]["score"], 10)
+        self.assertIn(("42", "image_manifest.json"), self.storage.uploads)
+        self.assertIn(("42", "site_data.json"), self.storage.uploads)
+        manifest = json.loads(self.storage.uploads[("42", "image_manifest.json")])
+        self.assertEqual(manifest["images"][0]["url"], "https://cdn/x.jpg")
+
+    def test_download_assets_uploads_shopify_catalog_context_when_available(self):
+        """Persists catalog_context.json when supported store context is found."""
+        with (
+            patch.object(self.service, "_download_html", return_value="<html></html>"),
+            patch.object(
+                self.service,
+                "_build_image_manifest",
+                return_value={"page_url": "x", "generated_at": "t", "images": []},
+            ),
+            patch.object(self.service, "_extract_site_data", return_value={"x": 1}),
+            patch.object(
+                self.service,
+                "_build_catalog_context",
+                return_value={
+                    "platform": "shopify",
+                    "product": {"handle": "demo-handle"},
+                    "variants": [],
+                    "images": [],
+                },
+            ),
+        ):
+            _ = self.service.download_assets(
+                77, "https://www.darklabsuplementos.com.br/products/demo-handle"
+            )
+
+        self.assertIn(("77", "catalog_context.json"), self.storage.uploads)
+        context_json = json.loads(self.storage.uploads[("77", "catalog_context.json")])
+        self.assertEqual(context_json["platform"], "shopify")
+        self.assertEqual(context_json["product"]["handle"], "demo-handle")
 
     def test_download_assets_raises_on_processing_error(self):
         """Propagates failures from image processing step."""
         with (
             patch.object(self.service, "_download_html", return_value="<html></html>"),
             patch.object(
-                self.service, "_process_images", side_effect=RuntimeError("x")
+                self.service, "_build_image_manifest", side_effect=RuntimeError("x")
             ),
             self.assertRaises(RuntimeError),
         ):
             self.service.download_assets(8, "https://example.com/p")
+
+    @patch("agents.tools.scraper.requests.get")
+    def test_materialize_candidates_downloads_and_scores_manifest_images(
+        self, mock_get
+    ):
+        """Builds candidates.json from manifest in heavy Dagster-side step."""
+        self.storage.upload(
+            "51",
+            "image_manifest.json",
+            json.dumps(
+                {
+                    "page_url": "https://example.com/p",
+                    "generated_at": "2026-01-01T00:00:00+00:00",
+                    "images": [
+                        {
+                            "position": 1,
+                            "url": "https://example.com/p1.png",
+                            "metadata": {"alt": "Tabela nutricional"},
+                        }
+                    ],
+                }
+            ).encode("utf-8"),
+            "application/json",
+        )
+        response = MagicMock()
+        response.status_code = 200
+        response.content = b"raw-image"
+        mock_get.return_value = response
+
+        with (
+            patch.object(self.service, "_check_hash", return_value=True),
+            patch.object(
+                self.service,
+                "_calculate_image_score",
+                return_value=(20, 400, 400, 2, 0.8),
+            ),
+        ):
+            candidates = self.service.materialize_candidates(
+                "51", "https://example.com/p"
+            )
+
+        self.assertEqual(len(candidates), 1)
+        self.assertIn(("51", "candidates.json"), self.storage.uploads)
+        saved = json.loads(self.storage.uploads[("51", "candidates.json")])
+        self.assertEqual(saved[0]["cv_table_score"], 0.8)
 
     def test_process_images_dedupes_and_sorts_candidates(self):
         """Dedupes repeated URLs and returns candidates sorted by score."""
@@ -466,3 +493,53 @@ class TestScraperToolService(TestCase):
         self.assertEqual(
             self.service._extract_image_url({}, {"opengraph": [{"og:image": "x"}]}), "x"
         )
+
+    @patch("agents.tools.scraper.requests.get")
+    def test_build_catalog_context_for_dark_lab_shopify_url(self, mock_get):
+        """Builds normalized Shopify context for Dark Lab product URLs."""
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "id": 10,
+            "title": "Whey",
+            "handle": "whey",
+            "vendor": "Dark Lab",
+            "type": "Suplemento",
+            "tags": ["whey"],
+            "options": [{"name": "Sabor", "position": 1, "values": ["Chocolate"]}],
+            "variants": [
+                {
+                    "id": 20,
+                    "title": "Chocolate",
+                    "name": "Whey - Chocolate",
+                    "sku": "SKU-1",
+                    "barcode": "789",
+                    "available": True,
+                    "price": 129.9,
+                    "compare_at_price": 149.9,
+                    "option1": "Chocolate",
+                    "option2": None,
+                    "option3": None,
+                    "options": ["Chocolate"],
+                }
+            ],
+            "images": ["//cdn.shopify.com/s/files/whey.webp"],
+        }
+        mock_get.return_value = response
+
+        context = self.service._build_catalog_context(
+            "https://www.darklabsuplementos.com.br/products/whey"
+        )
+        self.assertIsNotNone(context)
+        context = cast(dict, context)
+        self.assertEqual(context["platform"], "shopify")
+        self.assertEqual(context["counts"]["variants"], 1)
+        self.assertEqual(context["counts"]["images"], 1)
+        self.assertEqual(
+            context["images"][0]["url"], "https://cdn.shopify.com/s/files/whey.webp"
+        )
+
+    def test_build_catalog_context_ignores_non_dark_lab_domains(self):
+        """Returns None for stores not mapped to Shopify context extraction."""
+        context = self.service._build_catalog_context("https://example.com/products/x")
+        self.assertIsNone(context)

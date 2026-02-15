@@ -38,6 +38,38 @@ def _to_graphql_stock_status(status: str | None) -> str:
     return stock_map.get((status or "").upper(), "AVAILABLE")
 
 
+def _parse_number(value) -> float | None:
+    """Parse numbers from LLM/API values like '30g', '1,5', 'N/A'."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    raw = str(value).strip()
+    if not raw:
+        return None
+    normalized = raw.replace(",", ".")
+    match = re.search(r"-?\d+(?:\.\d+)?", normalized)
+    parsed = match.group(0) if match else ""
+    if not parsed:
+        return None
+    try:
+        return float(parsed)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_float(value, default: float = 0.0) -> float:
+    parsed = _parse_number(value)
+    return parsed if parsed is not None else default
+
+
+def _to_int(value, default: int = 0) -> int:
+    parsed = _parse_number(value)
+    if parsed is None:
+        return default
+    return int(parsed)
+
+
 def _build_nutrition_payload(analysis_data: dict) -> list[dict]:
     nutrition = analysis_data.get("nutrition_facts")
     if not nutrition:
@@ -46,7 +78,7 @@ def _build_nutrition_payload(analysis_data: dict) -> list[dict]:
     micronutrients = [
         {
             "name": m.get("name"),
-            "value": float(m.get("value") or 0),
+            "value": _to_float(m.get("value")),
             "unit": m.get("unit") or "mg",
         }
         for m in (nutrition.get("micronutrients") or [])
@@ -58,17 +90,17 @@ def _build_nutrition_payload(analysis_data: dict) -> list[dict]:
             "flavorNames": analysis_data.get("flavor_names") or [],
             "nutritionFacts": {
                 "description": analysis_data.get("variant_name") or "AI Analysis",
-                "servingSizeGrams": float(nutrition.get("serving_size_grams") or 0),
-                "energyKcal": int(nutrition.get("energy_kcal") or 0),
-                "proteins": float(nutrition.get("proteins") or 0),
-                "carbohydrates": float(nutrition.get("carbohydrates") or 0),
-                "totalSugars": float(nutrition.get("total_sugars") or 0),
-                "addedSugars": float(nutrition.get("added_sugars") or 0),
-                "totalFats": float(nutrition.get("total_fats") or 0),
-                "saturatedFats": float(nutrition.get("saturated_fats") or 0),
-                "transFats": float(nutrition.get("trans_fats") or 0),
-                "dietaryFiber": float(nutrition.get("dietary_fiber") or 0),
-                "sodium": float(nutrition.get("sodium") or 0),
+                "servingSizeGrams": _to_float(nutrition.get("serving_size_grams")),
+                "energyKcal": _to_int(nutrition.get("energy_kcal")),
+                "proteins": _to_float(nutrition.get("proteins")),
+                "carbohydrates": _to_float(nutrition.get("carbohydrates")),
+                "totalSugars": _to_float(nutrition.get("total_sugars")),
+                "addedSugars": _to_float(nutrition.get("added_sugars")),
+                "totalFats": _to_float(nutrition.get("total_fats")),
+                "saturatedFats": _to_float(nutrition.get("saturated_fats")),
+                "transFats": _to_float(nutrition.get("trans_fats")),
+                "dietaryFiber": _to_float(nutrition.get("dietary_fiber")),
+                "sodium": _to_float(nutrition.get("sodium")),
                 "micronutrients": micronutrients,
             },
         }
@@ -229,6 +261,16 @@ def _build_image_sequence_context(
     )
 
 
+def _build_json_context_block(title: str, payload: dict | list | None) -> str:
+    """Render contextual JSON block for LLM prompts."""
+    if not payload:
+        return ""
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    if len(body) > 7000:
+        body = f"{body[:7000]}..."
+    return f"\n\n[{title}]\n{body}\n[/{title}]"
+
+
 def _extract_expected_variant_signals(raw_text: str) -> set[str]:
     """Extract flavor/variant hints from OCR text for consistency checks."""
     signals: set[str] = set()
@@ -304,6 +346,94 @@ def _build_reconciliation_prompt(expected_variants: int) -> str:
         "3) Nao colapse sabores diferentes no mesmo item.\n"
         "4) Se alguma tabela nao tiver sabor explicito, use um nome descritivo de variante.\n"
         "5) Mantenha schema valido."
+    )
+
+
+def _extract_context_block(raw_text: str, block_name: str) -> dict | None:
+    """Extract JSON payload from contextual block embedded in raw text."""
+    pattern = rf"\[{re.escape(block_name)}\]\s*(.*?)\s*\[/{re.escape(block_name)}\]"
+    match = re.search(pattern, raw_text, flags=re.DOTALL)
+    if not match:
+        return None
+    block_text = match.group(1).strip()
+    if not block_text or block_text.endswith("..."):
+        return None
+    try:
+        payload = json.loads(block_text)
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        return None
+    return None
+
+
+def _normalize_flavor_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def _extract_allowed_flavors_from_catalog(catalog_context: dict | None) -> set[str]:
+    """Build allowed flavor set from catalog context options/variants."""
+    if not catalog_context:
+        return set()
+    allowed: set[str] = set()
+
+    for option in catalog_context.get("options") or []:
+        if not isinstance(option, dict):
+            continue
+        option_name = str(option.get("name") or "").lower()
+        if "sabor" not in option_name and "flavor" not in option_name:
+            continue
+        for value in option.get("values") or []:
+            token = _normalize_flavor_token(str(value))
+            if token:
+                allowed.add(token)
+
+    for variant in catalog_context.get("variants") or []:
+        if not isinstance(variant, dict):
+            continue
+        for key in ("option1", "option2", "option3", "title", "name"):
+            value = variant.get(key)
+            if value:
+                token = _normalize_flavor_token(str(value))
+                if token:
+                    allowed.add(token)
+
+    return allowed
+
+
+def _count_invalid_catalog_flavors(payload: dict, allowed_flavors: set[str]) -> int:
+    """Count extracted flavor tokens that do not exist in catalog context."""
+    if not allowed_flavors:
+        return 0
+    invalid = 0
+    for item in payload.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        candidates: list[str] = []
+        variant_name = item.get("variant_name")
+        if variant_name:
+            candidates.append(str(variant_name))
+        for flavor in item.get("flavor_names") or []:
+            candidates.append(str(flavor))
+        for value in candidates:
+            token = _normalize_flavor_token(value)
+            if not token:
+                continue
+            if token not in allowed_flavors and not any(
+                token in allowed or allowed in token for allowed in allowed_flavors
+            ):
+                invalid += 1
+    return invalid
+
+
+def _build_catalog_guard_prompt(allowed_flavors: set[str]) -> str:
+    allowed_list = ", ".join(sorted(allowed_flavors))
+    return (
+        "Converta o texto bruto para JSON estruturado, obedecendo o catálogo.\n"
+        "Use somente sabores/variantes presentes na lista permitida.\n"
+        f"Sabores permitidos: {allowed_list}\n"
+        "Se não houver mapeamento claro, mantenha item sem flavor inventado.\n"
+        "Mantenha schema válido."
     )
 
 
@@ -508,6 +638,7 @@ def scraped_metadata(
 @asset
 def ocr_extraction(
     context: AssetExecutionContext,
+    scraper: ScraperServiceResource,
     storage: StorageResource,
     client: AgentClientResource,
     scraped_metadata: RawScrapedData,
@@ -515,6 +646,7 @@ def ocr_extraction(
 ) -> str:
     """Runs multimodal raw extraction over top-ranked page images."""
     store = storage.get_storage()
+    service = scraper.get_service()
     api = client.get_client()
     origin_item_id = int(downloaded_assets["origin_item_id"])
     page_url = downloaded_assets["url"]
@@ -524,16 +656,43 @@ def ocr_extraction(
         candidates: list[dict] = []
         image_paths: list[str] = []
         candidates_key = "candidates.json"
-        if store.exists(bucket, candidates_key):
+        site_data: dict | None = None
+        catalog_context: dict | None = None
+
+        if store.exists(bucket, "site_data.json"):
+            site_data = json.loads(store.download(bucket, "site_data.json"))
+        if store.exists(bucket, "catalog_context.json"):
+            catalog_context = json.loads(store.download(bucket, "catalog_context.json"))
+
+        if not store.exists(bucket, candidates_key):
+            candidates = service.materialize_candidates(bucket, page_url)
+        if not candidates and store.exists(bucket, candidates_key):
             candidates = json.loads(store.download(bucket, candidates_key))
+        if candidates:
             image_paths = _select_images_for_ocr(
                 candidates,
                 bucket,
                 product_name=scraped_metadata.name or "",
                 page_url=page_url,
             )
+        extraction_mode = "multimodal"
+        fallback_reason = ""
+        if not image_paths:
+            extraction_mode = "text_only"
+            fallback_reason = (
+                "no_candidates_available" if not candidates else "selection_empty"
+            )
+            context.log.warning(
+                "OCR running in text-only mode: "
+                f"{fallback_reason} for item {origin_item_id}"
+            )
         sequence_context = _build_image_sequence_context(candidates, image_paths)
-        llm_description = (scraped_metadata.description or "") + sequence_context
+        llm_description = (
+            (scraped_metadata.description or "")
+            + sequence_context
+            + _build_json_context_block("SITE_DATA", site_data)
+            + _build_json_context_block("CATALOG_CONTEXT", catalog_context)
+        )
 
         raw_text = run_raw_extraction(
             name=scraped_metadata.name or page_url,
@@ -543,6 +702,9 @@ def ocr_extraction(
 
         context.add_output_metadata(
             {
+                "extraction_mode": extraction_mode,
+                "fallback_reason": fallback_reason,
+                "candidates_available": len(candidates),
                 "images_used": len(image_paths),
                 "images_sent": image_paths,
                 "text_preview": MetadataValue.md(
@@ -574,6 +736,8 @@ def product_analysis(
         expected_variant_count = len(expected_variant_signals)
         structured_variant_count = _count_structured_variant_signals(payload)
         reconciliation_retry_used = False
+        catalog_guard_retry_used = False
+        catalog_invalid_flavors = 0
 
         if (
             expected_variant_count >= 2
@@ -596,12 +760,42 @@ def product_analysis(
                 structured_variant_count = reconciled_variant_count
                 reconciliation_retry_used = True
 
+        catalog_context = _extract_context_block(ocr_extraction, "CATALOG_CONTEXT")
+        allowed_flavors = _extract_allowed_flavors_from_catalog(catalog_context)
+        catalog_invalid_flavors = _count_invalid_catalog_flavors(
+            payload, allowed_flavors
+        )
+        if allowed_flavors and catalog_invalid_flavors > 0:
+            context.log.warning(
+                "Structured extraction returned flavors outside catalog "
+                f"({catalog_invalid_flavors} invalid). Retrying with catalog guard."
+            )
+            guarded = run_structured_extraction(
+                ocr_extraction,
+                prompt=_build_catalog_guard_prompt(allowed_flavors),
+            )
+            guarded_payload = guarded.model_dump(by_alias=True)
+            guarded_invalid = _count_invalid_catalog_flavors(
+                guarded_payload, allowed_flavors
+            )
+            guarded_variant_count = _count_structured_variant_signals(guarded_payload)
+            if guarded_invalid < catalog_invalid_flavors or (
+                guarded_invalid == catalog_invalid_flavors
+                and guarded_variant_count >= structured_variant_count
+            ):
+                payload = guarded_payload
+                structured_variant_count = guarded_variant_count
+                catalog_invalid_flavors = guarded_invalid
+                catalog_guard_retry_used = True
+
         context.add_output_metadata(
             {
                 "items_detected": len(payload.get("items", [])),
                 "variants_detected_raw": expected_variant_count,
                 "variants_detected_structured": structured_variant_count,
                 "reconciliation_retry_used": reconciliation_retry_used,
+                "catalog_guard_retry_used": catalog_guard_retry_used,
+                "catalog_invalid_flavors": catalog_invalid_flavors,
             }
         )
         return payload
@@ -679,7 +873,7 @@ def upload_to_api(
                     page_url=page_url,
                     store_slug=origin_store_slug,
                     price=(
-                        float(origin_item.get("price"))
+                        _to_float(origin_item.get("price"), default=0.0)
                         if origin_item.get("price") is not None
                         else None
                     ),
@@ -716,7 +910,7 @@ def upload_to_api(
                 or scraped_metadata.name
                 or "Unknown Product",
                 "brandName": scraped_metadata.brand_name or "Unknown Brand",
-                "weight": int(analysis_data.get("weight_grams") or 0),
+                "weight": _to_int(analysis_data.get("weight_grams")),
                 "ean": scraped_metadata.ean,
                 "description": scraped_metadata.description,
                 "packaging": analysis_data.get("packaging") or "CONTAINER",
@@ -725,7 +919,7 @@ def upload_to_api(
                     {
                         "storeName": origin_store_slug,
                         "productLink": page_url,
-                        "price": float(
+                        "price": _to_float(
                             scraped_metadata.price or origin_item.get("price") or 0.0
                         ),
                         "externalId": scraped_item.get("externalId"),
@@ -744,7 +938,7 @@ def upload_to_api(
                 "components": [
                     {
                         "name": c.get("name"),
-                        "quantity": int(c.get("quantity") or 1),
+                        "quantity": _to_int(c.get("quantity"), default=1),
                         "weightHint": c.get("weight_hint"),
                         "packagingHint": c.get("packaging_hint"),
                     }

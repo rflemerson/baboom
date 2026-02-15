@@ -1,17 +1,18 @@
-"""Service for scraping and consolidating product data."""
+"""Service for downloading page assets and extracting metadata for agents pipeline."""
 
 from __future__ import annotations
 
 import io
 import json
 import logging
+import re
 import statistics
-from urllib.parse import urljoin
+from datetime import UTC, datetime
+from urllib.parse import urljoin, urlparse
 
 import extruct
 import requests
 from bs4 import BeautifulSoup, Tag
-from django.apps import apps
 from PIL import Image, ImageFilter
 from w3lib.html import get_base_url
 
@@ -19,6 +20,26 @@ from ..schemas.product import RawScrapedData
 from ..storage import get_storage
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_int(value) -> int | None:
+    """Parse optional integer-like values from HTML attributes."""
+    try:
+        if value is None or value == "":
+            return None
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _infer_source_type(src: str) -> str:
+    """Infer image source from raw src string."""
+    lowered = src.lower()
+    if "og:image" in lowered:
+        return "og:image"
+    if "ld+json" in lowered:
+        return "jsonld"
+    return "img"
 
 
 class ScraperService:
@@ -30,85 +51,51 @@ class ScraperService:
         }
         self.storage = get_storage()
 
-    @staticmethod
-    def _get_scraped_page_model():
-        return apps.get_model("scrapers", "ScrapedPage")
-
-    def capture_page(self, url: str, store_slug: str = "unknown") -> int:
-        """
-        Creates a ScrapedPage record without downloading content (Lazy Capture).
-
-        Returns the ScrapedPage ID.
-        """
-        scraped_page_model = self._get_scraped_page_model()
-
-        page, created = scraped_page_model.objects.update_or_create(
-            url=url,
-            defaults={
-                "store_slug": store_slug,
-            },
-        )
-
-        if created:
-            logger.info(f"Created initial ScrapedPage record: {page.id} for {url}")
-        else:
-            logger.info(f"Using existing ScrapedPage record: {page.id}")
-
-        return page.id
-
-    def ensure_page_assets(self, page_id: int) -> bool:
-        """
-        Ensures that HTML and images are downloaded for the given page.
-
-        Returns True if download was performed or already existed.
-        """
-        scraped_page_model = self._get_scraped_page_model()
-
-        page = scraped_page_model.objects.get(id=page_id)
-
-        if page.raw_content:
-            logger.info(f"Assets already exist for Page {page_id}")
-            return True
-
-        logger.info(f"Deferred download triggered for Page {page_id}")
-        html_content = self._download_html(page.url)
-
-        # Update model with HTML
-        page.raw_content = html_content
-        page.save()
-
-        # Download images to storage
-        self.download_assets(page.id, page.url, html_content=html_content)
-        return True
-
     def download_assets(
         self, item_id: int, url: str, html_content: str | None = None
     ) -> str:
-        """Downloads images and saves source HTML to storage."""
+        """Downloads page HTML and lightweight image manifest to storage."""
         bucket = str(item_id)
 
         try:
             if not html_content:
                 html_content = self._download_html(url)
 
-            # Archive source HTML
             html_key = "source.html"
             self.storage.upload(
                 bucket, html_key, html_content.encode("utf-8"), content_type="text/html"
             )
 
-            candidates = self._process_images(html_content, url, bucket)
+            manifest = self._build_image_manifest(html_content, url)
+            site_data = self._extract_site_data(html_content, url)
 
-            manifest_key = "candidates.json"
             self.storage.upload(
                 bucket,
-                manifest_key,
-                json.dumps(candidates, indent=2).encode("utf-8"),
+                "image_manifest.json",
+                json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8"),
+                content_type="application/json",
+            )
+            self.storage.upload(
+                bucket,
+                "site_data.json",
+                json.dumps(site_data, indent=2, ensure_ascii=False).encode("utf-8"),
                 content_type="application/json",
             )
 
+            catalog_context = self._build_catalog_context(url)
+            if catalog_context:
+                self.storage.upload(
+                    bucket,
+                    "catalog_context.json",
+                    json.dumps(catalog_context, indent=2, ensure_ascii=False).encode(
+                        "utf-8"
+                    ),
+                    content_type="application/json",
+                )
+
+            images_count = len(manifest.get("images", []))
             logger.info(
-                f"Downloaded {len(candidates)} images for {item_id}. Top score: {candidates[0]['score'] if candidates else 0}"
+                f"Indexed {images_count} images for {item_id} (manifest-only mode)"
             )
             return f"{bucket}/{html_key}"
 
@@ -121,6 +108,222 @@ class ScraperService:
         response = requests.get(url, headers=self.headers, timeout=30)
         response.raise_for_status()
         return response.text
+
+    def _build_catalog_context(self, page_url: str) -> dict | None:
+        """Build structured catalog context for supported stores."""
+        parsed = urlparse(page_url)
+        host = parsed.netloc.lower()
+        if "darklabsuplementos.com.br" not in host:
+            return None
+
+        handle_match = re.search(r"/products/([^/?#]+)", parsed.path)
+        if not handle_match:
+            return None
+
+        handle = handle_match.group(1)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        return self._fetch_shopify_product_context(base_url, handle)
+
+    def _fetch_shopify_product_context(self, base_url: str, handle: str) -> dict | None:
+        """Fetch public Shopify product JSON and normalize key fields."""
+        endpoint = f"{base_url}/products/{handle}.js"
+        try:
+            response = requests.get(endpoint, headers=self.headers, timeout=20)
+            if response.status_code != 200:
+                return None
+            data = response.json()
+        except Exception as e:
+            logger.warning(
+                f"Could not fetch Shopify catalog context from {endpoint}: {e}"
+            )
+            return None
+
+        images: list[dict] = []
+        for idx, raw_url in enumerate(data.get("images") or [], start=1):
+            if not isinstance(raw_url, str):
+                continue
+            images.append(
+                {
+                    "position": idx,
+                    "url": self._normalize_shopify_url(raw_url),
+                }
+            )
+
+        variants: list[dict] = []
+        for variant in data.get("variants") or []:
+            if not isinstance(variant, dict):
+                continue
+            variants.append(
+                {
+                    "id": variant.get("id"),
+                    "title": variant.get("title"),
+                    "name": variant.get("name"),
+                    "sku": variant.get("sku"),
+                    "barcode": variant.get("barcode"),
+                    "available": bool(variant.get("available")),
+                    "price": variant.get("price"),
+                    "compare_at_price": variant.get("compare_at_price"),
+                    "option1": variant.get("option1"),
+                    "option2": variant.get("option2"),
+                    "option3": variant.get("option3"),
+                    "options": variant.get("options") or [],
+                }
+            )
+
+        options: list[dict] = []
+        for option in data.get("options") or []:
+            if not isinstance(option, dict):
+                continue
+            options.append(
+                {
+                    "name": option.get("name"),
+                    "position": option.get("position"),
+                    "values": option.get("values") or [],
+                }
+            )
+
+        return {
+            "platform": "shopify",
+            "source": {
+                "domain": urlparse(base_url).netloc,
+                "endpoint": endpoint,
+            },
+            "product": {
+                "id": data.get("id"),
+                "title": data.get("title"),
+                "handle": data.get("handle"),
+                "vendor": data.get("vendor"),
+                "type": data.get("type"),
+                "tags": data.get("tags") or [],
+                "url": f"{base_url}/products/{handle}",
+            },
+            "options": options,
+            "variants": variants,
+            "images": images,
+            "counts": {
+                "variants": len(variants),
+                "images": len(images),
+            },
+        }
+
+    def _normalize_shopify_url(self, image_url: str) -> str:
+        if image_url.startswith("//"):
+            return f"https:{image_url}"
+        return image_url
+
+    def _build_image_manifest(self, html_content: str, base_url: str) -> dict:
+        """Extract image links/metadata quickly without downloading bytes."""
+        soup = BeautifulSoup(html_content, "html.parser")
+        sources = self._extract_image_sources(soup)
+
+        manifest: list[dict] = []
+        seen_urls: set[str] = set()
+        for index, (src, tag) in enumerate(sources):
+            if not src or not isinstance(src, str):
+                continue
+            img_url = urljoin(base_url, src)
+            if img_url in seen_urls:
+                continue
+            seen_urls.add(img_url)
+            declared_width = _safe_int(tag.get("width"))
+            declared_height = _safe_int(tag.get("height"))
+            manifest.append(
+                {
+                    "position": index,
+                    "url": img_url,
+                    "source": _infer_source_type(src),
+                    "declared_dimensions": [declared_width, declared_height],
+                    "metadata": {
+                        "alt": self._get_attr(tag, "alt"),
+                        "id": self._get_attr(tag, "id"),
+                        "class": self._get_attr(tag, "class"),
+                        "title": self._get_attr(tag, "title"),
+                    },
+                }
+            )
+        return {
+            "page_url": base_url,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "images": manifest,
+        }
+
+    def _extract_site_data(self, html_content: str, page_url: str) -> dict:
+        """Extract structured page data for LLM context blocks."""
+        try:
+            base_url = get_base_url(html_content, page_url)
+            extracted = extruct.extract(html_content, base_url=base_url)
+        except Exception as e:
+            logger.warning(
+                f"Failed to extract site_data via extruct for {page_url}: {e}"
+            )
+            extracted = {}
+        return {
+            "page_url": page_url,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "extracted": extracted,
+        }
+
+    def materialize_candidates(self, bucket: str, page_url: str) -> list[dict]:
+        """Dagster-side heavy step: download image bytes and compute CV scores."""
+        try:
+            manifest_payload = json.loads(
+                self.storage.download(bucket, "image_manifest.json")
+            )
+        except Exception as e:
+            logger.warning(f"No image manifest for bucket {bucket}: {e}")
+            return []
+
+        manifest = (
+            manifest_payload.get("images")
+            if isinstance(manifest_payload, dict)
+            else manifest_payload
+        )
+        if not isinstance(manifest, list):
+            return []
+
+        candidates: list[dict] = []
+        seen_hashes: set[str] = set()
+
+        for item in manifest:
+            if not isinstance(item, dict):
+                continue
+            img_url = str(item.get("url") or "")
+            if not img_url:
+                continue
+            tag = self._tag_from_manifest_item(item)
+            position = int(item.get("position") or 0)
+            candidate = self._process_single_candidate(
+                position,
+                img_url,
+                tag,
+                bucket,
+                seen_hashes,
+            )
+            if candidate:
+                candidates.append(candidate)
+
+        candidates.sort(key=lambda x: int(str(x.get("score", 0))), reverse=True)
+        self.storage.upload(
+            bucket,
+            "candidates.json",
+            json.dumps(candidates, indent=2).encode("utf-8"),
+            content_type="application/json",
+        )
+        logger.info(
+            f"Materialized {len(candidates)} OCR candidates for bucket {bucket} ({page_url})"
+        )
+        return candidates
+
+    def _tag_from_manifest_item(self, item: dict) -> Tag:
+        """Create synthetic img Tag from manifest metadata for keyword scoring."""
+        soup = BeautifulSoup("", "html.parser")
+        tag = soup.new_tag("img")
+        metadata = item.get("metadata") or {}
+        for key in ("alt", "title", "id", "class"):
+            value = metadata.get(key)
+            if value:
+                tag[key] = str(value)
+        return tag
 
     def _process_images(
         self, html_content: str, base_url: str, bucket: str
@@ -148,29 +351,24 @@ class ScraperService:
             if candidate:
                 candidates.append(candidate)
 
-        # Sort candidates by score descending
         candidates.sort(key=lambda x: int(str(x["score"])), reverse=True)
         return candidates
 
     def _extract_image_sources(self, soup: BeautifulSoup) -> list[tuple[str, Tag]]:
         sources = []
         for img in soup.find_all("img"):
-            # Check multiple src-like attributes used by lazy loaders
             for attr in ["src", "data-src", "data-zoom", "data-lazy", "data-original"]:
                 src = img.get(attr)
                 if src and isinstance(src, str):
                     sources.append((src, img))
-                    break  # Only take one per img tag
+                    break
 
-        # OpenGraph images
         for meta in soup.find_all("meta", property="og:image"):
             src = meta.get("content")
             if src and isinstance(src, str):
                 sources.append((src, meta))
 
-        # JSON-LD or Script embedded images
         self._extract_json_ld_images(soup, sources)
-
         return sources
 
     def _extract_json_ld_images(self, soup: BeautifulSoup, sources: list) -> None:
@@ -198,12 +396,9 @@ class ScraperService:
                 return None
 
             content = img_resp.content
-
-            # De-duplication check
             if not self._check_hash(content, img_url, seen_hashes):
                 return None
 
-            # Extension check
             ext = urljoin(img_url, "").split("?")[0].split(".")[-1].lower()
             if ext == "svg":
                 return None
@@ -214,7 +409,6 @@ class ScraperService:
                 self._calculate_image_score(tag, img_url, content)
             )
 
-            # Skip small images
             if width < 200 or height < 200:
                 return None
 
@@ -269,7 +463,6 @@ class ScraperService:
         return str(val) if val else ""
 
     def _compute_phash(self, content: bytes) -> str:
-        """Computes a simple 8x8 perceptual hash to identify visually similar images."""
         img = (
             Image.open(io.BytesIO(content))
             .convert("L")
@@ -283,7 +476,6 @@ class ScraperService:
     def _calculate_image_score(
         self, img_tag: Tag, img_url: str, content: bytes
     ) -> tuple[int, int, int, int, float]:
-        """Calculate relevance score for an image."""
         score = 0
         keyword_score, nutrition_signal = self._score_by_keywords(img_tag, img_url)
         score += keyword_score
@@ -301,12 +493,6 @@ class ScraperService:
         return score, width, height, nutrition_signal, cv_table_score
 
     def _estimate_table_structure_score(self, content: bytes) -> float:
-        """
-        Estimate how much an image looks like a tabular layout.
-
-        This is a lightweight CV heuristic based on long horizontal/vertical
-        runs and their intersections after binarization.
-        """
         img = Image.open(io.BytesIO(content)).convert("L")
         img.thumbnail((900, 900))
         width, height = img.size
@@ -471,7 +657,6 @@ class ScraperService:
             base_url = get_base_url(html_content, url)
             data = extruct.extract(html_content, base_url=base_url)
 
-            # Custom extraction for nutrition tables hidden in HTML
             try:
                 soup = BeautifulSoup(html_content, "html.parser")
                 nutrition_text = self._extract_html_nutrition(soup)
@@ -493,12 +678,9 @@ class ScraperService:
             raise
 
     def _extract_html_nutrition(self, soup: BeautifulSoup) -> str:
-        """Extracts text from known nutrition table containers."""
         try:
-            # Selector specific to Soldiers Nutrition / Vtex legacy
             table = soup.select_one(".nutrition-info-table")
             if table:
-                # Basic text extraction, preserving some structure
                 lines = []
                 for row in table.select("tr"):
                     cols = [c.get_text(strip=True) for c in row.select("th, td")]
@@ -531,7 +713,6 @@ class ScraperService:
             or ""
         )
 
-        # Append custom extracted nutrition text
         if metadata.get("custom_nutrition_text"):
             description += f"\n\n--- NUTRITION TABLE RAW TEXT ---\n{metadata['custom_nutrition_text']}\n--------------------------------"
 

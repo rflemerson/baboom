@@ -15,6 +15,27 @@ Prioritize **high recall** for nutrition table images in product pages:
 - OCR image selection: `agents/assets.py` (`_select_images_for_ocr`)
 - Sequence context sent to LLM: `agents/assets.py` (`_build_image_sequence_context`)
 
+## Linear Artifact Contract (Scraper -> Dagster)
+
+The pipeline is linear and shared by all stores:
+
+1. Scraper step (`download_assets`) writes lightweight artifacts:
+   - `source.html`
+   - `image_manifest.json` (URLs + declared metadata, no image bytes)
+   - `site_data.json` (extruct payload)
+   - `catalog_context.json` (when store integration supports it)
+2. Dagster OCR step (`ocr_extraction`) materializes heavy artifacts on demand:
+   - reads `image_manifest.json`
+   - downloads/scored images
+   - writes `images/*` and `candidates.json`
+3. Dagster sends multimodal input to LLM with context blocks:
+   - `[IMAGE_SEQUENCE_CONTEXT]`
+   - `[SITE_DATA]`
+   - `[CATALOG_CONTEXT]`
+
+If no image is selected, `ocr_extraction` explicitly marks `text_only` mode in
+asset metadata (`extraction_mode`, `fallback_reason`, `candidates_available`).
+
 ## Current Selection Logic
 
 1. `scraper.py` pre-filters candidates:
@@ -93,3 +114,13 @@ This confirms current behavior is intentionally recall-heavy, with high false-po
 2. Add flavor/variant consistency checks before adding neighbor context.
 3. Add fixture-based regression set with manually labeled real candidate manifests.
 4. Keep high recall as default, but add per-store policy knobs.
+
+## Structured Validation Guard
+
+`product_analysis` now performs two quality guards:
+
+1. Variant reconciliation retry when raw OCR indicates more variants than structured output.
+2. Catalog guard retry when extracted flavors are outside allowed values in
+   `[CATALOG_CONTEXT]` (Shopify options/variants).
+
+This reduces flavor hallucination without changing the schema contract.
