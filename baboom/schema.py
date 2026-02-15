@@ -2,12 +2,13 @@ import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.graphql.schema import CoreMutation, CoreQuery
-from scrapers.graphql.schema import ScrapersMutation
+from scrapers.graphql.schema import ScrapersMutation, ScrapersQuery
 
 
 @strawberry.type
 class Query(
     CoreQuery,
+    ScrapersQuery,
 ):
     """Root GraphQL Query."""
 

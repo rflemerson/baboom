@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from scrapers.models import ScrapedItem
+from scrapers.models import ScrapedItem, ScrapedPage
 
 from .types import ScrapedItemType
 
@@ -96,3 +96,101 @@ class ScrapersMutation:
             return True
         except ScrapedItem.DoesNotExist:
             return False
+
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
+    def ensure_scraped_item_source_page(
+        self, item_id: int, url: str, store_slug: str
+    ) -> ScrapedItemType | None:
+        """Ensure item has source page linked, creating page by URL when needed."""
+        try:
+            item = ScrapedItem.objects.get(id=item_id)
+            page, _ = ScrapedPage.objects.get_or_create(
+                url=url,
+                defaults={"store_slug": store_slug},
+            )
+            changed = False
+            if item.source_page_id != page.id:
+                item.source_page = page
+                changed = True
+            if item.store_slug != store_slug:
+                item.store_slug = store_slug
+                changed = True
+            if changed:
+                item.save()
+            return cast(ScrapedItemType, item)
+        except ScrapedItem.DoesNotExist:
+            return None
+
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
+    def update_scraped_item_data(
+        self,
+        item_id: int,
+        name: str | None = None,
+        source_page_url: str | None = None,
+        store_slug: str | None = None,
+    ) -> ScrapedItemType | None:
+        """Update mutable fields of a scraped item used by agents pipeline."""
+        try:
+            item = ScrapedItem.objects.get(id=item_id)
+            changed = False
+            if name:
+                item.name = name
+                changed = True
+            if source_page_url:
+                resolved_store = store_slug or item.store_slug
+                page, _ = ScrapedPage.objects.get_or_create(
+                    url=source_page_url,
+                    defaults={"store_slug": resolved_store},
+                )
+                if item.source_page_id != page.id:
+                    item.source_page = page
+                    changed = True
+            if store_slug and item.store_slug != store_slug:
+                item.store_slug = store_slug
+                changed = True
+            if changed:
+                item.save()
+            return cast(ScrapedItemType, item)
+        except ScrapedItem.DoesNotExist:
+            return None
+
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
+    def upsert_scraped_item_variant(
+        self,
+        origin_item_id: int,
+        external_id: str,
+        name: str,
+        page_url: str,
+        store_slug: str,
+        price: float | None = None,
+        stock_status: str | None = None,
+    ) -> ScrapedItemType | None:
+        """Create or update a variant ScrapedItem linked to the same source page."""
+        try:
+            origin_item = ScrapedItem.objects.get(id=origin_item_id)
+        except ScrapedItem.DoesNotExist:
+            return None
+
+        page, _ = ScrapedPage.objects.get_or_create(
+            url=page_url,
+            defaults={"store_slug": store_slug},
+        )
+
+        resolved_price = price if price is not None else origin_item.price
+        resolved_stock_status = stock_status or origin_item.stock_status
+        valid_stock_values = {choice[0] for choice in ScrapedItem.StockStatus.choices}
+        if resolved_stock_status not in valid_stock_values:
+            resolved_stock_status = ScrapedItem.StockStatus.AVAILABLE
+
+        item, _ = ScrapedItem.objects.update_or_create(
+            store_slug=store_slug,
+            external_id=external_id,
+            defaults={
+                "name": name,
+                "source_page": page,
+                "price": resolved_price,
+                "stock_status": resolved_stock_status,
+                "status": ScrapedItem.Status.PROCESSING,
+            },
+        )
+        return cast(ScrapedItemType, item)

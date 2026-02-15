@@ -5,13 +5,14 @@ from __future__ import annotations
 import io
 import json
 import logging
+import statistics
 from urllib.parse import urljoin
 
 import extruct
 import requests
 from bs4 import BeautifulSoup, Tag
 from django.apps import apps
-from PIL import Image
+from PIL import Image, ImageFilter
 from w3lib.html import get_base_url
 
 from ..schemas.product import RawScrapedData
@@ -209,8 +210,8 @@ class ScraperService:
             if not ext or len(ext) > 5:
                 ext = "jpg"
 
-            score, width, height, nutrition_signal = self._calculate_image_score(
-                tag, img_url, content
+            score, width, height, nutrition_signal, cv_table_score = (
+                self._calculate_image_score(tag, img_url, content)
             )
 
             # Skip small images
@@ -218,13 +219,25 @@ class ScraperService:
                 return None
 
             image_key = f"images/image_{index}.{ext}"
-            self.storage.upload(bucket, image_key, content, content_type="image/jpeg")
+            content_type_map = {
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "png": "image/png",
+                "webp": "image/webp",
+            }
+            self.storage.upload(
+                bucket,
+                image_key,
+                content,
+                content_type=content_type_map.get(ext, "image/jpeg"),
+            )
 
             return {
                 "file": image_key,
                 "url": img_url,
                 "score": score,
                 "nutrition_signal": nutrition_signal,
+                "cv_table_score": cv_table_score,
                 "dimensions": [width, height],
                 "metadata": {
                     "alt": self._get_attr(tag, "alt"),
@@ -269,20 +282,109 @@ class ScraperService:
 
     def _calculate_image_score(
         self, img_tag: Tag, img_url: str, content: bytes
-    ) -> tuple[int, int, int, int]:
+    ) -> tuple[int, int, int, int, float]:
         """Calculate relevance score for an image."""
         score = 0
         keyword_score, nutrition_signal = self._score_by_keywords(img_tag, img_url)
         score += keyword_score
         width, height = 0, 0
+        cv_table_score = 0.0
         try:
             with Image.open(io.BytesIO(content)) as im:
                 width, height = im.size
                 score += self._score_by_dimensions(width, height)
+            cv_table_score = self._estimate_table_structure_score(content)
+            score += int(cv_table_score * 40)
         except Exception as e:
             logger.debug(f"Could not check dimensions for {img_url}: {e}")
 
-        return score, width, height, nutrition_signal
+        return score, width, height, nutrition_signal, cv_table_score
+
+    def _estimate_table_structure_score(self, content: bytes) -> float:
+        """
+        Estimate how much an image looks like a tabular layout.
+
+        This is a lightweight CV heuristic based on long horizontal/vertical
+        runs and their intersections after binarization.
+        """
+        img = Image.open(io.BytesIO(content)).convert("L")
+        img.thumbnail((900, 900))
+        width, height = img.size
+        if width < 80 or height < 80:
+            return 0.0
+
+        edges = img.filter(ImageFilter.FIND_EDGES)
+        edge_values = list(edges.getdata())
+        threshold = int(statistics.mean(edge_values) + statistics.pstdev(edge_values))
+        bw = edges.point(lambda p: 255 if p >= threshold else 0, mode="1")
+        pixels = bw.load()
+
+        min_h_run = max(30, int(width * 0.40))
+        min_v_run = max(30, int(height * 0.40))
+
+        row_is_line = self._detect_horizontal_lines(pixels, width, height, min_h_run)
+        col_is_line = self._detect_vertical_lines(pixels, width, height, min_v_run)
+
+        row_count = sum(row_is_line)
+        col_count = sum(col_is_line)
+        if row_count == 0 and col_count == 0:
+            return 0.0
+
+        intersections = 0
+        for y in range(height):
+            if not row_is_line[y]:
+                continue
+            for x in range(width):
+                if col_is_line[x] and pixels[x, y] == 255:
+                    intersections += 1
+
+        h_ratio = row_count / height
+        v_ratio = col_count / width
+        grid_density = intersections / max(1, row_count * col_count)
+
+        h_quality = max(0.0, 1.0 - abs(h_ratio - 0.10) / 0.10)
+        v_quality = max(0.0, 1.0 - abs(v_ratio - 0.10) / 0.10)
+        grid_quality = min(1.0, grid_density * 20.0)
+        score = (0.35 * h_quality) + (0.35 * v_quality) + (0.30 * grid_quality)
+        return float(min(1.0, max(0.0, score)))
+
+    def _detect_horizontal_lines(
+        self, pixels, width: int, height: int, min_h_run: int
+    ) -> list[bool]:
+        row_is_line = [False] * height
+        for y in range(height):
+            longest = 0
+            current = 0
+            ink_count = 0
+            for x in range(width):
+                if pixels[x, y] == 255:
+                    ink_count += 1
+                    current += 1
+                    longest = max(longest, current)
+                else:
+                    current = 0
+            ink_ratio = ink_count / width
+            row_is_line[y] = longest >= min_h_run and 0.01 <= ink_ratio <= 0.95
+        return row_is_line
+
+    def _detect_vertical_lines(
+        self, pixels, width: int, height: int, min_v_run: int
+    ) -> list[bool]:
+        col_is_line = [False] * width
+        for x in range(width):
+            longest = 0
+            current = 0
+            ink_count = 0
+            for y in range(height):
+                if pixels[x, y] == 255:
+                    ink_count += 1
+                    current += 1
+                    longest = max(longest, current)
+                else:
+                    current = 0
+            ink_ratio = ink_count / height
+            col_is_line[x] = longest >= min_v_run and 0.01 <= ink_ratio <= 0.95
+        return col_is_line
 
     def _score_by_keywords(self, img_tag: Tag, img_url: str) -> tuple[int, int]:
         score = 0

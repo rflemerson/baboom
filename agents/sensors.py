@@ -16,12 +16,14 @@ def work_queue_sensor(context, client: AgentClientResource):
     work = api.checkout_work()
 
     if not work:
-        return SkipReason("Queue empty. Sleeping...")
+        yield SkipReason("Queue empty. Sleeping...")
+        return
 
     item_id = int(work["id"])
     url = work.get("productLink") or work.get("sourcePageUrl")
     if not url:
-        return SkipReason(f"Item {item_id} has no source URL.")
+        yield SkipReason(f"Item {item_id} has no source URL.")
+        return
 
     # Configuration passed to Assets
     # In Dagster SDA (Software-Defined Assets), config is passed per asset.

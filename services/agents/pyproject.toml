@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "baboom-agents-service"
+version = "0.1.0"
+description = "Isolated dependency project for the Baboom Agents service (Dagster + LLM pipeline)."
+requires-python = ">=3.14"
+dependencies = [
+  "requests",
+  "Pillow",
+  "beautifulsoup4",
+  "lxml",
+  "extruct",
+  "w3lib",
+  "pydantic-ai",
+  "pydantic",
+  "python-dotenv",
+  "dagster",
+  "dagster-webserver",
+  "django>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "pytest-django",
+  "pytest-asyncio",
+  "ruff",
+  "mypy",
+  "pre-commit",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "baboom.settings"
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+addopts = "--reuse-db --nomigrations"
+asyncio_mode = "auto"

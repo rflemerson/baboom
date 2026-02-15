@@ -15,6 +15,8 @@ class ScrapedItemType:
     id: auto
     store_slug: auto
     external_id: auto
+    name: auto
+    status: auto
     price: auto
     stock_status: auto
 
@@ -33,6 +35,26 @@ class ScrapedItemType:
         if item.source_page:
             return item.source_page.url
         return ""
+
+    @strawberry.field
+    def source_page_id(self) -> int | None:
+        """Return source page id for storage bucket mapping."""
+        item = cast(ScrapedItem, self)
+        return item.source_page_id
+
+    @strawberry.field
+    def product_store_id(self) -> int | None:
+        """Return linked ProductStore id if exists."""
+        item = cast(ScrapedItem, self)
+        return item.product_store_id
+
+    @strawberry.field
+    def linked_product_id(self) -> int | None:
+        """Return linked Product id if exists."""
+        item = cast(ScrapedItem, self)
+        if item.product_store:
+            return item.product_store.product_id
+        return None
 
     @strawberry.field
     def store_name(self) -> str:

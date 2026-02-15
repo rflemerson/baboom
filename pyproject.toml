@@ -60,6 +60,7 @@ dev = [
   "safety",
   "factory-boy",
   "pytest",
+  "pytest-cov",
   "pytest-django",
   "pytest-asyncio",
   "pytest-sugar",

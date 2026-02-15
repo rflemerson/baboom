@@ -6,6 +6,7 @@ Return a valid JSON object containing a LIST of `items`.
 ### VARIANT DETECTION
 - **Box/Kit**: If a "Box of 12" is available, create a separate Item in the list.
 - **Flavors**: If different flavors are listed as *purchasable options*, create separate Items (or consolidate if just a list of available flavors).
+- **Multiple Nutrition Tables**: When raw text indicates table-to-variant mapping, keep each table tied to the correct variant/item. Do not merge unrelated tables.
 
 ### PRODUCT NAMING & CLASSIFICATION
 - **Name**: Extract the full, clean product name. Remove promotional slogans (e.g., "Melhor Preço").
@@ -34,3 +35,4 @@ Return a valid JSON object containing a LIST of `items`.
 1. **No Hallucinations**: Do not invent values. If a flavor is not listed, do not guess.
 2. **Numeric Parsing**: Convert text like "2,5g" to `2.5`. Ensure integers for KCAL and Sodium.
 3. **Array Fields**: Always return arrays for `flavor_names`, `nutrient_claims`, and `tags_hierarchy`, even if empty `[]`.
+4. **Table Association**: If there are multiple tables, prefer explicit flavor/natural markers and sequence clues from the raw report to map each table to the right item.

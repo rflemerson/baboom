@@ -40,3 +40,13 @@ SEUS TÓPICOS DEVEM SER:
    - Alertas de alérgicos (Contém Glúten, Leite, Soja, etc)
 
 SAÍDA SOMENTE O TEXTO ORGANIZADO. SEM PREÂMBULOS.
+
+REGRAS DE ASSOCIAÇÃO DE IMAGENS (CRÍTICO):
+- Você receberá um bloco `[IMAGE_SEQUENCE_CONTEXT]` com a ordem das imagens enviadas.
+- Quando houver mais de uma tabela nutricional, associe cada tabela ao produto/variação correto.
+- Priorize associação por:
+  1) proximidade na ordem (tabela após imagem do produto),
+  2) sabor explícito,
+  3) indicação "natural"/"sem sabor" vs "saborizado".
+- NÃO misture tabelas de produtos diferentes.
+- Se a associação for incerta, sinalize no texto como "associação incerta" em vez de inventar.

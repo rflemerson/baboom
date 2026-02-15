@@ -113,7 +113,150 @@ class AgentClient:
         """
         data = self._send(mutation, {"data": product_input})
         result = data.get("data", {}).get("createProduct")
+        if not result:
+            raise Exception("Product creation failed: empty createProduct response")
         if result and result.get("errors"):
             logger.error(f"Product creation failed: {result['errors']}")
             raise Exception(f"Product creation failed: {result['errors']}")
+        product = result.get("product")
+        if not product or not product.get("id"):
+            raise Exception("Product creation failed: missing product id in response")
         return result
+
+    def get_scraped_item(self, item_id: int):
+        """Fetch one scraped item snapshot for pipeline state decisions."""
+        query = """
+        query($itemId: Int!) {
+            scrapedItem(itemId: $itemId) {
+                id
+                name
+                status
+                storeSlug
+                storeName
+                externalId
+                price
+                stockStatus
+                productLink
+                sourcePageUrl
+                sourcePageId
+                productStoreId
+                linkedProductId
+            }
+        }
+        """
+        data = self._send(query, {"itemId": int(item_id)})
+        return data.get("data", {}).get("scrapedItem")
+
+    def ensure_source_page(self, item_id: int, url: str, store_slug: str):
+        """Ensure source page exists and is linked to the scraped item."""
+        mutation = """
+        mutation($itemId: Int!, $url: String!, $storeSlug: String!) {
+            ensureScrapedItemSourcePage(itemId: $itemId, url: $url, storeSlug: $storeSlug) {
+                id
+                status
+                storeSlug
+                externalId
+                sourcePageUrl
+                sourcePageId
+                productStoreId
+                linkedProductId
+            }
+        }
+        """
+        data = self._send(
+            mutation,
+            {"itemId": int(item_id), "url": str(url), "storeSlug": str(store_slug)},
+        )
+        return data.get("data", {}).get("ensureScrapedItemSourcePage")
+
+    def update_scraped_item_data(
+        self,
+        item_id: int,
+        name: str | None = None,
+        source_page_url: str | None = None,
+        store_slug: str | None = None,
+    ):
+        """Update mutable scraped item fields used by agents flow."""
+        mutation = """
+        mutation($itemId: Int!, $name: String, $sourcePageUrl: String, $storeSlug: String) {
+            updateScrapedItemData(itemId: $itemId, name: $name, sourcePageUrl: $sourcePageUrl, storeSlug: $storeSlug) {
+                id
+                name
+                status
+                storeSlug
+                externalId
+                sourcePageUrl
+                sourcePageId
+                productStoreId
+                linkedProductId
+            }
+        }
+        """
+        data = self._send(
+            mutation,
+            {
+                "itemId": int(item_id),
+                "name": name,
+                "sourcePageUrl": source_page_url,
+                "storeSlug": store_slug,
+            },
+        )
+        return data.get("data", {}).get("updateScrapedItemData")
+
+    def upsert_scraped_item_variant(
+        self,
+        origin_item_id: int,
+        external_id: str,
+        name: str,
+        page_url: str,
+        store_slug: str,
+        price: float | None = None,
+        stock_status: str | None = None,
+    ):
+        """Create or update a variant scraped item for multi-product pages."""
+        mutation = """
+        mutation(
+            $originItemId: Int!,
+            $externalId: String!,
+            $name: String!,
+            $pageUrl: String!,
+            $storeSlug: String!,
+            $price: Float,
+            $stockStatus: String
+        ) {
+            upsertScrapedItemVariant(
+                originItemId: $originItemId,
+                externalId: $externalId,
+                name: $name,
+                pageUrl: $pageUrl,
+                storeSlug: $storeSlug,
+                price: $price,
+                stockStatus: $stockStatus
+            ) {
+                id
+                name
+                status
+                storeSlug
+                externalId
+                price
+                stockStatus
+                sourcePageUrl
+                sourcePageId
+                productStoreId
+                linkedProductId
+            }
+        }
+        """
+        data = self._send(
+            mutation,
+            {
+                "originItemId": int(origin_item_id),
+                "externalId": str(external_id),
+                "name": str(name),
+                "pageUrl": str(page_url),
+                "storeSlug": str(store_slug),
+                "price": price,
+                "stockStatus": stock_status,
+            },
+        )
+        return data.get("data", {}).get("upsertScrapedItemVariant")
