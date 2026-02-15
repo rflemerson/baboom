@@ -209,7 +209,9 @@ class ScraperService:
             if not ext or len(ext) > 5:
                 ext = "jpg"
 
-            score, width, height = self._calculate_image_score(tag, img_url, content)
+            score, width, height, nutrition_signal = self._calculate_image_score(
+                tag, img_url, content
+            )
 
             # Skip small images
             if width < 200 or height < 200:
@@ -222,10 +224,13 @@ class ScraperService:
                 "file": image_key,
                 "url": img_url,
                 "score": score,
+                "nutrition_signal": nutrition_signal,
                 "dimensions": [width, height],
                 "metadata": {
                     "alt": self._get_attr(tag, "alt"),
                     "id": self._get_attr(tag, "id"),
+                    "class": self._get_attr(tag, "class"),
+                    "title": self._get_attr(tag, "title"),
                 },
             }
         except Exception as e:
@@ -264,10 +269,11 @@ class ScraperService:
 
     def _calculate_image_score(
         self, img_tag: Tag, img_url: str, content: bytes
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, int]:
         """Calculate relevance score for an image."""
         score = 0
-        score += self._score_by_keywords(img_tag, img_url)
+        keyword_score, nutrition_signal = self._score_by_keywords(img_tag, img_url)
+        score += keyword_score
         width, height = 0, 0
         try:
             with Image.open(io.BytesIO(content)) as im:
@@ -276,9 +282,9 @@ class ScraperService:
         except Exception as e:
             logger.debug(f"Could not check dimensions for {img_url}: {e}")
 
-        return score, width, height
+        return score, width, height, nutrition_signal
 
-    def _score_by_keywords(self, img_tag: Tag, img_url: str) -> int:
+    def _score_by_keywords(self, img_tag: Tag, img_url: str) -> tuple[int, int]:
         score = 0
         alt_text = self._get_attr(img_tag, "alt").lower()
         title_text = self._get_attr(img_tag, "title").lower()
@@ -300,16 +306,19 @@ class ScraperService:
             "valor",
             "energetico",
         ]
+        nutrition_signal = 0
         if any(kw in alt_text for kw in nutrition_keywords) and (
             any(k in alt_text for k in ["info", "tabela", "label", "rotulo", "facts"])
         ):
             score += 60
+            nutrition_signal += 3
 
         if any(
             kw in img_id or kw in img_class
             for kw in ["nutri", "tabela", "label", "rotulo"]
         ):
             score += 40
+            nutrition_signal += 2
 
         keywords = [
             "tabela",
@@ -326,13 +335,17 @@ class ScraperService:
         for kw in keywords:
             if kw in alt_text:
                 score += 10
+                nutrition_signal += 1
             if kw in title_text:
                 score += 5
+                nutrition_signal += 1
             if kw in src_lower:
                 score += 5
+                nutrition_signal += 1
             if kw in img_class:
                 score += 5
-        return score
+                nutrition_signal += 1
+        return score, nutrition_signal
 
     def _score_by_dimensions(self, width: int, height: int) -> int:
         score = 0

@@ -52,7 +52,6 @@ def work_queue_sensor(context, client: AgentClientResource):
     }
 
     yield RunRequest(
-        run_key=f"item_{item_id}",  # Evita processar o mesmo ID duas vezes
         run_config=run_config,
         tags={"item_id": str(item_id), "store": work.get("storeName", "unknown")},
     )

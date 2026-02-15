@@ -1,6 +1,7 @@
 """Dagster assets for the page-first product ingestion pipeline."""
 
 import json
+import os
 import re
 from typing import Any
 
@@ -79,6 +80,70 @@ def _build_nutrition_payload(analysis_data: dict) -> list[dict]:
             },
         }
     ]
+
+
+def _candidate_nutrition_signal(candidate: dict) -> int:
+    signal = int(candidate.get("nutrition_signal") or 0)
+    metadata = candidate.get("metadata") or {}
+    text = " ".join(
+        [
+            str(metadata.get("alt") or ""),
+            str(metadata.get("title") or ""),
+            str(metadata.get("class") or ""),
+            str(metadata.get("id") or ""),
+            str(candidate.get("url") or ""),
+        ]
+    ).lower()
+    nutrition_keywords = [
+        "tabela",
+        "nutricional",
+        "nutrition",
+        "facts",
+        "label",
+        "rotulo",
+        "ingrediente",
+        "ingredientes",
+        "composition",
+        "composicao",
+    ]
+    signal += sum(1 for kw in nutrition_keywords if kw in text)
+    return signal
+
+
+def _select_images_for_ocr(candidates: list[dict], bucket: str) -> list[str]:
+    max_total = int(os.getenv("OCR_MAX_IMAGES", "12"))
+    max_nutrition = int(os.getenv("OCR_MAX_NUTRITION_IMAGES", "8"))
+    max_if_no_nutrition = int(os.getenv("OCR_MAX_IMAGES_NO_NUTRITION", "16"))
+
+    valid = [c for c in candidates if int(c.get("score", 0)) > 0 and c.get("file")]
+    valid.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
+
+    nutrition_candidates = [c for c in valid if _candidate_nutrition_signal(c) > 0]
+    nutrition_candidates.sort(
+        key=lambda x: (_candidate_nutrition_signal(x), int(x.get("score", 0))),
+        reverse=True,
+    )
+
+    selected_files: list[str] = []
+    seen_files: set[str] = set()
+
+    for c in nutrition_candidates[:max_nutrition]:
+        file_name = str(c["file"])
+        if file_name not in seen_files:
+            selected_files.append(file_name)
+            seen_files.add(file_name)
+
+    target_total = max_total if selected_files else max_if_no_nutrition
+    for c in valid:
+        file_name = str(c["file"])
+        if file_name in seen_files:
+            continue
+        selected_files.append(file_name)
+        seen_files.add(file_name)
+        if len(selected_files) >= target_total:
+            break
+
+    return [f"{bucket}/{file_name}" for file_name in selected_files]
 
 
 @asset
@@ -174,12 +239,7 @@ def ocr_extraction(
         candidates_key = "candidates.json"
         if store.exists(bucket, candidates_key):
             candidates = json.loads(store.download(bucket, candidates_key))
-            valid = sorted(
-                [c for c in candidates if c["score"] > 0],
-                key=lambda x: x["score"],
-                reverse=True,
-            )[:8]
-            image_paths = [f"{bucket}/{c['file']}" for c in valid]
+            image_paths = _select_images_for_ocr(candidates, bucket)
 
         raw_text = run_raw_extraction(
             name=scraped_metadata.name or page_url,
@@ -190,6 +250,7 @@ def ocr_extraction(
         context.add_output_metadata(
             {
                 "images_used": len(image_paths),
+                "images_sent": image_paths,
                 "text_preview": MetadataValue.md(
                     (raw_text[:500] + "...") if raw_text else ""
                 ),
@@ -233,106 +294,115 @@ def upload_to_api(
 ) -> list[dict]:
     """Creates one product per analyzed item and links generated scraped items."""
     api = client.get_client()
-    scraped_item_model, scraped_page_model = _get_scraper_models()
+    try:
+        scraped_item_model, scraped_page_model = _get_scraper_models()
 
-    origin_item = scraped_item_model.objects.get(pk=config.item_id)
-    page = origin_item.source_page
-    if not page:
-        page, _ = scraped_page_model.objects.get_or_create(
-            url=config.url,
-            defaults={"store_slug": config.store_slug},
-        )
-        origin_item.source_page = page
-        origin_item.save(update_fields=["source_page", "updated_at"])
-
-    items = product_analysis.get("items") or []
-    if not items:
-        items = [
-            {"name": scraped_metadata.name or origin_item.name or "Unknown Product"}
-        ]
-
-    results: list[dict] = []
-    created_count = 0
-    for idx, analysis_data in enumerate(items):
-        if idx == 0:
-            scraped_item = origin_item
-            if analysis_data.get("name"):
-                scraped_item.name = analysis_data["name"]
-            if scraped_item.source_page_id != page.id:
-                scraped_item.source_page = page
-            scraped_item.save(update_fields=["name", "source_page", "updated_at"])
-        else:
-            base_name = analysis_data.get("name") or scraped_metadata.name or "product"
-            variant_name = analysis_data.get("variant_name") or f"v{idx + 1}"
-            ext_id = f"{origin_item.external_id}::v{idx + 1}-{_slugify(base_name)}-{_slugify(variant_name)}"[
-                :100
-            ]
-            scraped_item, _ = scraped_item_model.objects.update_or_create(
-                store_slug=origin_item.store_slug,
-                external_id=ext_id,
-                defaults={
-                    "name": base_name,
-                    "source_page": page,
-                    "price": origin_item.price,
-                    "stock_status": origin_item.stock_status,
-                    "status": scraped_item_model.Status.PROCESSING,
-                },
+        origin_item = scraped_item_model.objects.get(pk=config.item_id)
+        page = origin_item.source_page
+        if not page:
+            page, _ = scraped_page_model.objects.get_or_create(
+                url=config.url,
+                defaults={"store_slug": config.store_slug},
             )
-            created_count += 1
+            origin_item.source_page = page
+            origin_item.save(update_fields=["source_page", "updated_at"])
 
-        tags_hierarchy = analysis_data.get("tags_hierarchy") or []
-        payload = {
-            "name": analysis_data.get("name")
-            or scraped_metadata.name
-            or "Unknown Product",
-            "brandName": scraped_metadata.brand_name or "Unknown Brand",
-            "weight": int(analysis_data.get("weight_grams") or 0),
-            "ean": scraped_metadata.ean,
-            "description": scraped_metadata.description,
-            "packaging": analysis_data.get("packaging") or "CONTAINER",
-            "originScrapedItemId": int(scraped_item.id),
-            "stores": [
-                {
-                    "storeName": origin_item.store_slug,
-                    "productLink": page.url,
-                    "price": float(scraped_metadata.price or origin_item.price or 0.0),
-                    "externalId": scraped_item.external_id,
-                    "stockStatus": _to_graphql_stock_status(
-                        scraped_metadata.stock_status or origin_item.stock_status
-                    ),
-                    "affiliateLink": "",
-                }
-            ],
-            "nutrition": _build_nutrition_payload(analysis_data),
-            "categoryPath": analysis_data.get("category_hierarchy") or [],
-            "tagPaths": [{"path": path} for path in tags_hierarchy if path],
-            "tags": [],
-            "isCombo": bool(analysis_data.get("is_combo")),
-            "components": [
-                {
-                    "name": c.get("name"),
-                    "quantity": int(c.get("quantity") or 1),
-                    "weightHint": c.get("weight_hint"),
-                    "packagingHint": c.get("packaging_hint"),
-                }
-                for c in (analysis_data.get("components") or [])
-                if c.get("name")
-            ],
-            "nutrientClaims": analysis_data.get("nutrient_claims") or [],
-            "isPublished": False,
-        }
+        items = product_analysis.get("items") or []
+        if not items:
+            items = [
+                {"name": scraped_metadata.name or origin_item.name or "Unknown Product"}
+            ]
 
-        context.log.info(
-            f"Uploading product {idx + 1}/{len(items)} with origin item {scraped_item.id}"
+        results: list[dict] = []
+        created_count = 0
+        for idx, analysis_data in enumerate(items):
+            if idx == 0:
+                scraped_item = origin_item
+                if analysis_data.get("name"):
+                    scraped_item.name = analysis_data["name"]
+                if scraped_item.source_page_id != page.id:
+                    scraped_item.source_page = page
+                scraped_item.save(update_fields=["name", "source_page", "updated_at"])
+            else:
+                base_name = (
+                    analysis_data.get("name") or scraped_metadata.name or "product"
+                )
+                variant_name = analysis_data.get("variant_name") or f"v{idx + 1}"
+                ext_id = f"{origin_item.external_id}::v{idx + 1}-{_slugify(base_name)}-{_slugify(variant_name)}"[
+                    :100
+                ]
+                scraped_item, _ = scraped_item_model.objects.update_or_create(
+                    store_slug=origin_item.store_slug,
+                    external_id=ext_id,
+                    defaults={
+                        "name": base_name,
+                        "source_page": page,
+                        "price": origin_item.price,
+                        "stock_status": origin_item.stock_status,
+                        "status": scraped_item_model.Status.PROCESSING,
+                    },
+                )
+                created_count += 1
+
+            tags_hierarchy = analysis_data.get("tags_hierarchy") or []
+            payload = {
+                "name": analysis_data.get("name")
+                or scraped_metadata.name
+                or "Unknown Product",
+                "brandName": scraped_metadata.brand_name or "Unknown Brand",
+                "weight": int(analysis_data.get("weight_grams") or 0),
+                "ean": scraped_metadata.ean,
+                "description": scraped_metadata.description,
+                "packaging": analysis_data.get("packaging") or "CONTAINER",
+                "originScrapedItemId": int(scraped_item.id),
+                "stores": [
+                    {
+                        "storeName": origin_item.store_slug,
+                        "productLink": page.url,
+                        "price": float(
+                            scraped_metadata.price or origin_item.price or 0.0
+                        ),
+                        "externalId": scraped_item.external_id,
+                        "stockStatus": _to_graphql_stock_status(
+                            scraped_metadata.stock_status or origin_item.stock_status
+                        ),
+                        "affiliateLink": "",
+                    }
+                ],
+                "nutrition": _build_nutrition_payload(analysis_data),
+                "categoryPath": analysis_data.get("category_hierarchy") or [],
+                "tagPaths": [{"path": path} for path in tags_hierarchy if path],
+                "tags": [],
+                "isCombo": bool(analysis_data.get("is_combo")),
+                "components": [
+                    {
+                        "name": c.get("name"),
+                        "quantity": int(c.get("quantity") or 1),
+                        "weightHint": c.get("weight_hint"),
+                        "packagingHint": c.get("packaging_hint"),
+                    }
+                    for c in (analysis_data.get("components") or [])
+                    if c.get("name")
+                ],
+                "nutrientClaims": analysis_data.get("nutrient_claims") or [],
+                "isPublished": False,
+            }
+
+            context.log.info(
+                f"Uploading product {idx + 1}/{len(items)} with origin item {scraped_item.id}"
+            )
+            result = api.create_product(payload)
+            results.append(result or {})
+
+        context.add_output_metadata(
+            {
+                "items_uploaded": len(results),
+                "additional_scraped_items_created": created_count,
+                "page_id": page.id,
+            }
         )
-        result = api.create_product(payload)
-        results.append(result or {})
-
-    context.add_output_metadata(
-        {
-            "items_uploaded": len(results),
-            "additional_scraped_items_created": created_count,
-            "page_id": page.id,
-        }
-    )
-    return results
+        return results
+    except Exception as e:
+        context.log.error(f"Upload failed: {e}")
+        api.report_error(config.item_id, str(e), is_fatal=False)
+        raise
