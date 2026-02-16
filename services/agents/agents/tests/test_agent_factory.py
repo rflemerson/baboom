@@ -2,9 +2,8 @@
 
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
-
 from agents.brain.agent_factory import get_model
+from django.test import SimpleTestCase
 
 
 class TestAgentFactory(SimpleTestCase):

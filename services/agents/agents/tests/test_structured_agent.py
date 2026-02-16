@@ -2,13 +2,12 @@
 
 from unittest.mock import MagicMock, mock_open, patch
 
-from django.test import SimpleTestCase
-
 from agents.brain.structured_agent import (
     _get_default_prompt,
     get_agent,
     run_structured_extraction,
 )
+from django.test import SimpleTestCase
 
 
 class TestStructuredAgent(SimpleTestCase):

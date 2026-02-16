@@ -1,3 +1,5 @@
+"""HTTP client used by the agents service to communicate with the backend API."""
+
 import logging
 import os
 import time

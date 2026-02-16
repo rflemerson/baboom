@@ -1,0 +1,11 @@
+requests
+Pillow
+beautifulsoup4
+lxml
+extruct
+w3lib
+pydantic-ai
+pydantic
+python-dotenv
+dagster
+dagster-webserver

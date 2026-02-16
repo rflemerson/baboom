@@ -1,3 +1,5 @@
+"""Model factory for creating provider-backed pydantic-ai model instances."""
+
 import logging
 import os
 from collections.abc import Callable

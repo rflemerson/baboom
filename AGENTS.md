@@ -31,11 +31,11 @@ You are the guardian of this project's "Brain". Keep it sharp.
 ```bash
 # Workflow
 Test: python manage.py test
-Test (Pytest): pytest agents/tests -q
-Coverage (Pytest): pytest agents/tests --cov=agents --cov-report=term-missing
+Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
+Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
 Lint: pre-commit run --all-files
 Run: python manage.py runserver
-Orchestration: PYTHONPATH=. dagster dev -m agents.definitions
+Orchestration: PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
 ```
 

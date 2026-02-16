@@ -19,7 +19,6 @@ dependencies = [
   "python-dotenv",
   "dagster",
   "dagster-webserver",
-  "django>=6.0",
 ]
 
 [project.optional-dependencies]

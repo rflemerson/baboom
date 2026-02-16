@@ -2,9 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
-
 from agents.client import AgentClient
+from django.test import SimpleTestCase
 
 
 class TestAgentClient(SimpleTestCase):

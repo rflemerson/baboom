@@ -138,7 +138,7 @@ blank_line_after_tag = "load,extends,include"
 
 [tool.deptry]
 ignore_notebooks = true
-extend_exclude = ["infra", "assets", "docs"]
+extend_exclude = ["infra", "assets", "docs", "services/agents/agents/tests"]
 ignore = ["DEP002"]
 
 [tool.vulture]

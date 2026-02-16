@@ -1,10 +1,9 @@
-from django.test import SimpleTestCase
-
 from agents.defs.assets.shared import (
     _build_nutrition_payload,
     _slugify,
     _to_graphql_stock_status,
 )
+from django.test import SimpleTestCase
 
 
 class TestAssetsHelpers(SimpleTestCase):

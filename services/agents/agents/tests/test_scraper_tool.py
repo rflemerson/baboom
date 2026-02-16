@@ -4,10 +4,9 @@ import json
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+from agents.tools.scraper import ScraperService
 from bs4 import BeautifulSoup, Tag
 from django.test import SimpleTestCase, TestCase
-
-from agents.tools.scraper import ScraperService
 
 
 class TestScraperToolHelpers(SimpleTestCase):

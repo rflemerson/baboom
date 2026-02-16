@@ -2,12 +2,11 @@
 
 from unittest.mock import MagicMock, mock_open, patch
 
-from django.test import SimpleTestCase
-
 from agents.brain.raw_extraction_agent import (
     _get_default_prompt,
     run_raw_extraction,
 )
+from django.test import SimpleTestCase
 
 
 class _FakeStorage:

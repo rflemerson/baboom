@@ -2,9 +2,6 @@
 
 from unittest.mock import patch
 
-from dagster import RunRequest, SkipReason, build_asset_context
-from django.test import SimpleTestCase, TestCase
-
 from agents.defs.assets import (
     ItemConfig,
     _is_potential_table_candidate,
@@ -18,6 +15,9 @@ from agents.defs.assets import (
 from agents.defs.sensors import work_queue_sensor
 from agents.schemas.analysis import ProductAnalysisList, ProductAnalysisResult
 from agents.schemas.product import RawScrapedData
+from dagster import RunRequest, SkipReason, build_asset_context
+from django.test import SimpleTestCase, TestCase
+
 from core.models import Brand, Product, ProductStore, Store
 from scrapers.models import ScrapedItem, ScrapedPage
 

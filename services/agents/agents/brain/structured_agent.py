@@ -1,3 +1,5 @@
+"""Structured extraction agent wrapper for converting OCR text to typed output."""
+
 import logging
 import os
 

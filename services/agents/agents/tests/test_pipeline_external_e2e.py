@@ -4,12 +4,11 @@ import json
 import os
 from unittest import skipUnless
 
-from django.test import SimpleTestCase
-
 from agents.brain.raw_extraction_agent import run_raw_extraction
 from agents.brain.structured_agent import run_structured_extraction
 from agents.defs.assets.shared import _select_images_for_ocr
 from agents.tools.scraper import ScraperService
+from django.test import SimpleTestCase
 
 
 def _has_llm_credentials() -> bool:
