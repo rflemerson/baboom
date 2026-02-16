@@ -68,8 +68,8 @@ class TestRawExtractionAgent(SimpleTestCase):
         mock_agent_cls.return_value = agent
 
         result = run_raw_extraction(
-            name="Produto",
-            description="Descricao",
+            name="Product",
+            description="Description",
             image_paths=["1/images/a.jpg", "1/images/b.gif"],
             prompt="PROMPT",
             model_name="google-gla:gemini",
@@ -96,7 +96,7 @@ class TestRawExtractionAgent(SimpleTestCase):
         mock_agent_cls.return_value = agent
 
         result = run_raw_extraction(
-            name="Produto",
+            name="Product",
             description="",
             image_paths=[],
         )
@@ -118,4 +118,4 @@ class TestRawExtractionAgent(SimpleTestCase):
         mock_agent_cls.return_value = agent
 
         with self.assertRaisesRegex(RuntimeError, "boom"):
-            run_raw_extraction(name="Produto", description="", image_paths=[])
+            run_raw_extraction(name="Product", description="", image_paths=[])

@@ -6,15 +6,34 @@ from unittest import skipUnless
 
 from django.test import SimpleTestCase
 
-from agents.assets import _select_images_for_ocr
 from agents.brain.raw_extraction_agent import run_raw_extraction
 from agents.brain.structured_agent import run_structured_extraction
+from agents.defs.assets.shared import _select_images_for_ocr
 from agents.tools.scraper import ScraperService
 
 
+def _has_llm_credentials() -> bool:
+    """Check if env contains credentials for the configured LLM provider."""
+    model = (os.getenv("LLM_MODEL") or "").strip().lower()
+    if model.startswith(("gemini:", "google-gla:")):
+        return bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+    if model.startswith("groq:"):
+        return bool(os.getenv("GROQ_API_KEY"))
+    if model.startswith("openai:"):
+        return bool(os.getenv("OPENAI_API_KEY"))
+
+    # Default: accept any configured provider key.
+    return bool(
+        os.getenv("OPENAI_API_KEY")
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+        or os.getenv("GROQ_API_KEY")
+    )
+
+
 @skipUnless(
-    os.getenv("RUN_EXTERNAL_PIPELINE_TESTS") == "1" and os.getenv("OPENAI_API_KEY"),
-    "External pipeline test is opt-in. Set RUN_EXTERNAL_PIPELINE_TESTS=1 and OPENAI_API_KEY.",
+    os.getenv("RUN_EXTERNAL_PIPELINE_TESTS") == "1" and _has_llm_credentials(),
+    "External pipeline test is opt-in. Set RUN_EXTERNAL_PIPELINE_TESTS=1 and provider API key env vars.",
 )
 class ExternalPipelineE2ETests(SimpleTestCase):
     """Runs one real URL through scraper manifest/cv and LLM extraction."""

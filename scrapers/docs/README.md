@@ -26,7 +26,7 @@ shared retry/backoff and crawl metrics logging (`categories_*`,
 | **Black Skull** | VTEX IO | React/GraphQL | GraphQL (Persisted) | `extensions` param with Base64 encoded variables + Query Hash |
 | **Integral Medica** | VTEX Legacy | CMS/Legacy | REST (Search) | Standard HTTP (`_from`, `_to` pagination) |
 | **Max Titanium** | VTEX Legacy | CMS/Legacy | REST (Search) | Standard HTTP (`_from`, `_to` pagination) |
-| **Probiótica** | VTEX Legacy | CMS/Legacy | REST (Search) | Standard HTTP (`_from`, `_to` pagination) |
+| **Probiotica** | VTEX Legacy | CMS/Legacy | REST (Search) | Standard HTTP (`_from`, `_to` pagination) |
 | **Dux Nutrition** | VTEX Legacy | CMS/Legacy | REST (Search) | Standard HTTP (`_from`, `_to` pagination) |
 | **Dark Lab** | Shopify | Liquid/Remix | REST (JSON) | `/collections/{handle}/products.json`, `/products/{handle}.js` |
 | **Soldiers Nutrition** | Shopify | Liquid/Remix | REST (JSON) | `/collections/{handle}/products.json`, `/products/{handle}.js` |

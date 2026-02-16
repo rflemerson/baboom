@@ -1,13 +1,12 @@
+"""Dagster code location entrypoint for the agents pipeline."""
+
 from dagster import Definitions, define_asset_job, load_assets_from_modules
 
-from . import assets
-from .resources import AgentClientResource, ScraperServiceResource, StorageResource
-from .sensors import work_queue_sensor
+from .defs.assets import ASSET_MODULES
+from .defs.resources import AgentClientResource, ScraperServiceResource, StorageResource
+from .defs.sensors import work_queue_sensor
 
-# Carrega todos os assets do arquivo assets.py
-all_assets = load_assets_from_modules([assets])
-
-# Define um Job que sabe materializar (rodar) todos esses assets em ordem
+all_assets = load_assets_from_modules(ASSET_MODULES)
 process_item_job = define_asset_job(name="process_item_job", selection=all_assets)
 
 defs = Definitions(

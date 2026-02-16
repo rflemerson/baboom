@@ -22,7 +22,7 @@ class TestScraperToolHelpers(SimpleTestCase):
     def test_score_by_keywords_detects_nutrition_signals(self):
         """Assigns nutrition signal when attributes mention nutrition table."""
         soup = BeautifulSoup(
-            '<img alt="Tabela Nutricional" class="label-nutri" src="/img/facts.jpg" />',
+            '<img alt="Nutrition Facts" class="label-nutri" src="/img/facts.jpg" />',
             "html.parser",
         )
         tag = soup.find("img")
@@ -36,7 +36,7 @@ class TestScraperToolHelpers(SimpleTestCase):
     def test_score_by_keywords_has_no_signal_for_generic_image(self):
         """Keeps zero nutrition signal for non-nutrition image metadata."""
         soup = BeautifulSoup(
-            '<img alt="Foto do produto" class="gallery-image" src="/img/product.jpg" />',
+            '<img alt="Product photo" class="gallery-image" src="/img/product.jpg" />',
             "html.parser",
         )
         tag = soup.find("img")
@@ -55,14 +55,14 @@ class TestScraperToolHelpers(SimpleTestCase):
         """Extracts normalized text from known nutrition table selector."""
         html = """
             <table class="nutrition-info-table">
-              <tr><th>Nutriente</th><th>Qtd</th></tr>
-              <tr><td>Proteinas</td><td>20g</td></tr>
+              <tr><th>Nutrient</th><th>Qty</th></tr>
+              <tr><td>Protein</td><td>20g</td></tr>
             </table>
         """
         soup = BeautifulSoup(html, "html.parser")
         text = self.service._extract_html_nutrition(soup)
-        self.assertIn("Nutriente | Qtd", text)
-        self.assertIn("Proteinas | 20g", text)
+        self.assertIn("Nutrient | Qty", text)
+        self.assertIn("Protein | 20g", text)
 
     @patch("agents.tools.scraper.requests.get")
     def test_download_html_uses_requests_with_timeout(self, mock_get):
@@ -223,7 +223,7 @@ class TestScraperToolService(TestCase):
                         {
                             "position": 1,
                             "url": "https://example.com/p1.png",
-                            "metadata": {"alt": "Tabela nutricional"},
+                            "metadata": {"alt": "Nutrition facts"},
                         }
                     ],
                 }
@@ -296,7 +296,9 @@ class TestScraperToolService(TestCase):
         response.content = b"raw-image"
         mock_get.return_value = response
 
-        soup = BeautifulSoup('<img alt="Tabela" src="/x.png" />', "html.parser")
+        soup = BeautifulSoup(
+            '<img alt="Nutrition table" src="/x.png" />', "html.parser"
+        )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
         tag = cast(Tag, tag)
@@ -332,7 +334,9 @@ class TestScraperToolService(TestCase):
         response.status_code = 200
         response.content = b"svg-content"
         mock_get.return_value = response
-        soup = BeautifulSoup('<img alt="Tabela" src="/x.svg" />', "html.parser")
+        soup = BeautifulSoup(
+            '<img alt="Nutrition table" src="/x.svg" />', "html.parser"
+        )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
         tag = cast(Tag, tag)
@@ -352,7 +356,9 @@ class TestScraperToolService(TestCase):
         response.status_code = 200
         response.content = b"raw-image"
         mock_get.return_value = response
-        soup = BeautifulSoup('<img alt="Tabela" src="/x.abcdef" />', "html.parser")
+        soup = BeautifulSoup(
+            '<img alt="Nutrition table" src="/x.abcdef" />', "html.parser"
+        )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
         tag = cast(Tag, tag)
@@ -391,7 +397,7 @@ class TestScraperToolService(TestCase):
             <html>
               <body>
                 <table class="nutrition-info-table">
-                  <tr><th>Nutriente</th><th>Qtd</th></tr>
+                  <tr><th>Nutrient</th><th>Qty</th></tr>
                 </table>
               </body>
             </html>
@@ -402,7 +408,7 @@ class TestScraperToolService(TestCase):
             "agents.tools.scraper.extruct.extract", return_value={"json-ld": []}
         ):
             data = self.service.extract_metadata(
-                "77/source.html", "https://example.com/produto"
+                "77/source.html", "https://example.com/product"
             )
 
         self.assertIn("custom_nutrition_text", data)
@@ -423,11 +429,11 @@ class TestScraperToolService(TestCase):
                 {
                     "@type": "Product",
                     "name": "Whey Pro",
-                    "description": "Produto principal",
-                    "brand": {"name": "Marca X"},
+                    "description": "Main product",
+                    "brand": {"name": "Brand X"},
                     "image": ["https://cdn/x.jpg"],
                     "gtin13": "789123",
-                    "category": "Suplementos",
+                    "category": "Supplements",
                 },
             ],
             "opengraph": [{"og:title": "OG title", "og:description": "OG desc"}],
@@ -436,7 +442,7 @@ class TestScraperToolService(TestCase):
         result = self.service.consolidate(metadata, price=10.5, stock_status="A")
 
         self.assertEqual(result.name, "Whey Pro")
-        self.assertEqual(result.brand_name, "Marca X")
+        self.assertEqual(result.brand_name, "Brand X")
         self.assertEqual(result.ean, "789123")
         self.assertEqual(result.image_url, "https://cdn/x.jpg")
         self.assertEqual(result.price, 10.5)
@@ -444,13 +450,13 @@ class TestScraperToolService(TestCase):
 
     def test_consolidate_brand_override_and_unknown_defaults(self):
         """Uses override and defaults when Product JSON-LD is absent."""
-        metadata = {"json-ld": [], "opengraph": [{"og:title": "Produto OG"}]}
+        metadata = {"json-ld": [], "opengraph": [{"og:title": "OG Product"}]}
         result = self.service.consolidate(
-            metadata, brand_name_override="Marca Override"
+            metadata, brand_name_override="Brand Override"
         )
 
-        self.assertEqual(result.name, "Produto OG")
-        self.assertEqual(result.brand_name, "Marca Override")
+        self.assertEqual(result.name, "OG Product")
+        self.assertEqual(result.brand_name, "Brand Override")
         self.assertEqual(result.description, "")
 
     def test_extract_brand_and_image_url_variants(self):

@@ -218,7 +218,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
             "vendor": "Dark Lab",
             "product_type": "Whey",
             "tags": ["whey", "protein"],
-            "options": [{"name": "Sabor", "values": ["Chocolate", "Baunilha"]}],
+            "options": [{"name": "Flavor", "values": ["Chocolate", "Vanilla"]}],
             "images": [{"src": "https://cdn.example.com/1.jpg"}],
             "variants": [
                 {
@@ -290,20 +290,20 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         self.spider = SoldiersSpider()
         self.base_item: dict[str, Any] = {
             "id": 456,
-            "title": "Elitebar 30g Barra De Proteína - Soldiers Nutrition",
+            "title": "Elitebar 30g Protein Bar - Soldiers Nutrition",
             "handle": "elitebar-30g-barra-de-proteina-soldiers-nutrition",
             "vendor": "Soldiers Nutrition",
             "type": "barra",
             "tags": ["barra", "proteina"],
             "options": [
-                {"name": "Quantidade", "values": ["3 Unidades", "6 Unidades"]},
-                {"name": "Sabor", "values": ["Amendoim", "Cookies"]},
+                {"name": "Quantity", "values": ["3 Units", "6 Units"]},
+                {"name": "Flavor", "values": ["Peanut", "Cookies"]},
             ],
             "images": ["https://cdn.example.com/a.webp"],
             "variants": [
                 {
                     "id": 999,
-                    "title": "3 Unidades / Amendoim",
+                    "title": "3 Units / Peanut",
                     "price": "13,90",
                     "available": True,
                     "inventory_quantity": None,
@@ -473,8 +473,8 @@ class VtexSpiderUnitTests(SimpleTestCase):
         self.spider = _DummyVtexSpider()
         self.base_item: dict[str, Any] = {
             "productId": "9001",
-            "productName": "Produto VTEX",
-            "linkText": "produto-vtex",
+            "productName": "VTEX Product",
+            "linkText": "vtex-product",
             "items": [
                 {
                     "itemId": "SKU-1",

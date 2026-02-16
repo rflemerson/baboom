@@ -9,10 +9,10 @@ Return a valid JSON object containing a LIST of `items`.
 - **Multiple Nutrition Tables**: When raw text indicates table-to-variant mapping, keep each table tied to the correct variant/item. Do not merge unrelated tables.
 
 ### PRODUCT NAMING & CLASSIFICATION
-- **Name**: Extract the full, clean product name. Remove promotional slogans (e.g., "Melhor Preço").
+- **Name**: Extract the full, clean product name. Remove promotional slogans (e.g., "Best Price").
 - **Category Hierarchy**: Must be a list of strings representing the path.
-  - Example: `["Proteína", "Animal", "Whey", "Concentrado"]`
-  - For Creatine: `["Energia", "Creatina", "Monohidratada"]`
+  - Example: `["Protein", "Animal", "Whey", "Concentrate"]`
+  - For Creatine: `["Energy", "Creatine", "Monohydrate"]`
 - **Packaging**: STRICTLY map to one of these enums:
   - `CONTAINER`: For tubs, pots, jars, cans.
   - `REFILL`: For pouches, bags, sachets.

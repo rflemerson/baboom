@@ -3,7 +3,7 @@
 **Applicable Brands:**
 *   Integral Medica
 *   Max Titanium
-*   Probiótica
+*   Probiotica
 *   Dux Nutrition
 
 ## Overview

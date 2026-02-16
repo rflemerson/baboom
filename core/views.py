@@ -17,16 +17,16 @@ DEFAULT_PER_PAGE = 12
 PER_PAGE_OPTIONS = [12, 24, 48]
 
 
-# --- CORREÇÃO DO MYPY ---
-# Definimos uma classe apenas para Tipagem que extende HttpRequest
-# e diz ao MyPy que existe um atributo .htmx
+# --- MYPY FIX ---
+# Type-only wrapper extending HttpRequest
+# so MyPy understands the `.htmx` attribute.
 class HtmxHttpRequest(HttpRequest):
     """Type hint wrapper for HttpRequest with HtmxDetails."""
 
     htmx: HtmxDetails
 
 
-# ------------------------
+# ---------------
 
 
 def list_view(request: HtmxHttpRequest) -> HttpResponse:

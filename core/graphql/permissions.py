@@ -27,5 +27,5 @@ class IsAuthenticatedWithAPIKey(BasePermission):
             APIKey.objects.get(key=key, is_active=True)
             return True
         except APIKey.DoesNotExist:
-            logger.warning(f"Tentativa de acesso com API Key inválida: {key[:8]}...")
+            logger.warning("Access attempt with invalid API key: %s...", key[:8])
             return False

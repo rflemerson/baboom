@@ -15,11 +15,11 @@
       {% component "list.card_list" product=product %}{% endcomponent %}
     </div>
   {% empty %}
-    {# Estado Vazio #}
+    {# Empty State #}
     <div class="col-span-full py-12 text-center border-dashed border border-base-200 rounded-lg">
       <p>{% trans "No products found" %}</p>
     </div>
   {% endfor %}
-  {# Paginação #}
+  {# Pagination #}
   {% component "list.pagination" page_obj=page_obj per_page=per_page query_params=query_params %}{% endcomponent %}
 </div>

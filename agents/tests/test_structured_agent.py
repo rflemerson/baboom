@@ -42,7 +42,7 @@ class TestStructuredAgent(SimpleTestCase):
     def test_run_structured_extraction_returns_output(self, mock_get_agent):
         """Returns parsed schema from Agent run output."""
         agent = MagicMock()
-        expected = {"items": [{"name": "Produto"}]}
+        expected = {"items": [{"name": "Product"}]}
         agent.run_sync.return_value = type("R", (), {"output": expected})()
         mock_get_agent.return_value = agent
 

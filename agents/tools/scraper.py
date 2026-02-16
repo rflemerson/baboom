@@ -525,7 +525,6 @@ class ScraperService:
             "info",
             "tab",
             "ingredientes",
-            "composição",
             "ingrediente",
         ]
         for kw in keywords:

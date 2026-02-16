@@ -1,52 +1,52 @@
-OBJETIVO:
-Analise as IMAGENS (Rótulo, Tabela Nutricional) e o TEXTO fornecidos.
-Extraia TUDO o que puder sobre o produto e Organize em um TEXTO ESTRUTURADO (Markdown).
-Não invente nada. Se não estiver visível, não inclua.
+OBJECTIVE:
+Analyze the provided IMAGES (label, nutrition table) and TEXT.
+Extract everything you can about the product and organize it as STRUCTURED TEXT (Markdown).
+Do not hallucinate. If it is not visible, do not include it.
 
-SEUS TÓPICOS DEVEM SER:
+YOUR SECTIONS MUST BE:
 
-1. NOME COMPLETO E VARIAÇÕES
-   - Nome principal, subtítulos, slogans.
+1. FULL NAME AND VARIATIONS
+   - Main name, subtitles, slogans.
 
-2. METADADOS VISUAIS
-   - Peso líquido (ex: 900g, 1.8kg)
-   - Tipo de Embalagem (Pote, Refil, Saco, Barra)
-   - Marca/Fabricante
-   - É UM KIT/COMBO? (Sim/Não). Se sim, descreva os itens (ex: "3x Whey 900g", "Leve 2 Pague 1").
+2. VISUAL METADATA
+   - Net weight (e.g., 900g, 1.8kg)
+   - Packaging type (Container, Refill, Bag, Bar)
+   - Brand/Manufacturer
+   - IS IT A KIT/COMBO? (Yes/No). If yes, describe items (e.g., "3x Whey 900g", "Buy 2 Get 1").
 
-3. CATEGORIZAÇÃO (Inferred Hierarchy)
-   - Extraia a categoria seguindo uma árvore lógica.
-   - Para PROTEÍNAS, use obrigatoriamente: ["Proteína", <Origem: Animal/Vegetal>, <Tipo: Whey/Caseína/Soja/etc>, <Processo: Isolado/Concentrado/Hidrolisado/Blend>]
-   - Exemplo 1: ["Proteína", "Animal", "Whey", "Isolado"]
-   - Exemplo 2: ["Proteína", "Vegetal", "Ervilha", "Concentrado"]
-   - Para outros produtos, siga lógica similar (ex: ["Aminoácido", "Creatina", "Monohidratada"]).
+3. CATEGORIZATION (Inferred Hierarchy)
+   - Extract category using a logical taxonomy tree.
+   - For PROTEIN products, prefer: ["Protein", <Source: Animal/Plant>, <Type: Whey/Casein/Soy/etc>, <Process: Isolate/Concentrate/Hydrolyzed/Blend>]
+   - Example 1: ["Protein", "Animal", "Whey", "Isolate"]
+   - Example 2: ["Protein", "Plant", "Pea", "Concentrate"]
+   - For other products, follow equivalent logic (e.g., ["Amino Acid", "Creatine", "Monohydrate"]).
 
-4. SABORES DISPONÍVEIS
-   - Liste todos os sabores que você vê na imagem ou texto.
+4. AVAILABLE FLAVORS
+   - List all flavors visible in image or text.
 
-5. TABELA NUTRICIONAL COMPLETA
-   - Extraia TODOS os campos obrigatórios da legislação brasileira:
-     - Porção de referência (ex: 30g, 2 scoops)
-     - Valor Energético (kcal)
-     - Carboidratos (g) e Açúcares (Totais/Adicionados)
-     - Proteínas (g)
-     - Gorduras Totais, Saturadas, Trans (g)
-     - Fibra Alimentar (g)
-     - Sódio (mg)
-   - Além disso, liste TODOS os Micronutrientes, Vitaminas, Minerais e Aminoácidos visíveis.
+5. COMPLETE NUTRITION TABLE
+   - Extract all core fields typically present in nutrition labels:
+     - Serving size (e.g., 30g, 2 scoops)
+     - Energy (kcal)
+     - Carbohydrates (g) and Sugars (Total/Added)
+     - Proteins (g)
+     - Total/Saturated/Trans fats (g)
+     - Dietary fiber (g)
+     - Sodium (mg)
+   - Also list all visible micronutrients, vitamins, minerals, and amino acids.
 
-6. INGREDIENTES E ALÉRGICOS
-   - Lista de ingredientes (se legível)
-   - Alertas de alérgicos (Contém Glúten, Leite, Soja, etc)
+6. INGREDIENTS AND ALLERGENS
+   - Ingredient list (if readable)
+   - Allergen warnings (Contains gluten, milk, soy, etc.)
 
-SAÍDA SOMENTE O TEXTO ORGANIZADO. SEM PREÂMBULOS.
+OUTPUT ONLY THE ORGANIZED TEXT. NO PREAMBLE.
 
-REGRAS DE ASSOCIAÇÃO DE IMAGENS (CRÍTICO):
-- Você receberá um bloco `[IMAGE_SEQUENCE_CONTEXT]` com a ordem das imagens enviadas.
-- Quando houver mais de uma tabela nutricional, associe cada tabela ao produto/variação correto.
-- Priorize associação por:
-  1) proximidade na ordem (tabela após imagem do produto),
-  2) sabor explícito,
-  3) indicação "natural"/"sem sabor" vs "saborizado".
-- NÃO misture tabelas de produtos diferentes.
-- Se a associação for incerta, sinalize no texto como "associação incerta" em vez de inventar.
+IMAGE ASSOCIATION RULES (CRITICAL):
+- You will receive an `[IMAGE_SEQUENCE_CONTEXT]` block with the exact order of images sent.
+- When there are multiple nutrition tables, map each table to the correct product/variant.
+- Prioritize association by:
+  1) sequence proximity (table right after product image),
+  2) explicit flavor mention,
+  3) plain/unflavored vs flavored cues.
+- DO NOT mix tables from different products.
+- If association is uncertain, explicitly mark it as "uncertain association" instead of guessing.

@@ -1,6 +1,8 @@
+"""Dagster sensor polling the work queue and launching the item pipeline."""
+
 from dagster import DefaultSensorStatus, RunRequest, SkipReason, sensor
 
-from .resources import AgentClientResource
+from ..resources import AgentClientResource
 
 
 @sensor(
@@ -12,9 +14,7 @@ def work_queue_sensor(context, client: AgentClientResource):
     """Poll API for new items to process."""
     api = client.get_client()
 
-    # Check for work (no force, get next in queue)
     work = api.checkout_work()
-
     if not work:
         yield SkipReason("Queue empty. Sleeping...")
         return
@@ -25,8 +25,6 @@ def work_queue_sensor(context, client: AgentClientResource):
         yield SkipReason(f"Item {item_id} has no source URL.")
         return
 
-    # Configuration passed to Assets
-    # In Dagster SDA (Software-Defined Assets), config is passed per asset.
     run_config = {
         "ops": {
             "downloaded_assets": {

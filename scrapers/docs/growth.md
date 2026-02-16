@@ -49,7 +49,7 @@ Retrieve the full category tree and dynamic URLs.
   "nome": "ESCOLHA SEU SUPLEMENTO POR CATEGORIA",
   "menu": [
     {
-      "label": "Proteínas",
+      "label": "Proteins",
       "link": "https://www.gsuplementos.com.br/proteina",
       "target": "_self"
     }

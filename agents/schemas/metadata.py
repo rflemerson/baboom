@@ -17,9 +17,9 @@ class ProductMetadata(BaseModel):
     )
     category_hierarchy: list[str] = Field(
         default_factory=list,
-        description="Hierarchical category path: ['Proteína', 'Whey', 'Concentrado']",
+        description="Hierarchical category path: ['Protein', 'Whey', 'Concentrate']",
     )
     tags_hierarchy: list[list[str]] = Field(
         default_factory=list,
-        description="List of hierarchical tag paths: [['Proteína', 'Whey'], ['Suplemento']]",
+        description="List of hierarchical tag paths: [['Protein', 'Whey'], ['Supplement']]",
     )

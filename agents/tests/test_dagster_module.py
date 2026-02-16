@@ -5,7 +5,7 @@ from unittest.mock import patch
 from dagster import RunRequest, SkipReason, build_asset_context
 from django.test import SimpleTestCase, TestCase
 
-from agents.assets import (
+from agents.defs.assets import (
     ItemConfig,
     _is_potential_table_candidate,
     _select_images_for_ocr,
@@ -15,9 +15,9 @@ from agents.assets import (
     scraped_metadata,
     upload_to_api,
 )
+from agents.defs.sensors import work_queue_sensor
 from agents.schemas.analysis import ProductAnalysisList, ProductAnalysisResult
 from agents.schemas.product import RawScrapedData
-from agents.sensors import work_queue_sensor
 from core.models import Brand, Product, ProductStore, Store
 from scrapers.models import ScrapedItem, ScrapedPage
 
@@ -324,20 +324,20 @@ class TestImageSelection(SimpleTestCase):
                 "score": 30,
                 "nutrition_signal": 2,
                 "url": "https://cdn/x/elitebar-chocolate.jpg",
-                "metadata": {"alt": "Elitebar 30g Barra De Proteína"},
+                "metadata": {"alt": "Elitebar 30g Protein Bar"},
             },
             {
                 "file": "images/elite-2.jpg",
                 "score": 25,
                 "nutrition_signal": 2,
                 "url": "https://cdn/x/elitebar-cookies.jpg",
-                "metadata": {"alt": "Elitebar 30g Barra De Proteína"},
+                "metadata": {"alt": "Elitebar 30g Protein Bar"},
             },
         ]
         selected = _select_images_for_ocr(
             candidates,
             "9002",
-            product_name="Elitebar 30g Barra De Proteína",
+            product_name="Elitebar 30g Protein Bar",
             page_url="https://soldiersnutrition.com.br/products/elitebar-30g-barra-de-proteina-soldiers-nutrition",
         )
         self.assertEqual(
@@ -362,8 +362,8 @@ class TestImageSelection(SimpleTestCase):
         selected = _select_images_for_ocr(
             candidates,
             "12",
-            product_name="Produto Inexistente",
-            page_url="https://example.com/products/produto-inexistente",
+            product_name="Missing Product",
+            page_url="https://example.com/products/missing-product",
         )
         self.assertEqual(selected, ["12/images/a.jpg", "12/images/b.jpg"])
 
@@ -375,7 +375,7 @@ class TestImageSelection(SimpleTestCase):
             "score": 2,
             "nutrition_signal": 0,
             "cv_table_score": 0.9,
-            "metadata": {"alt": "imagem produto"},
+            "metadata": {"alt": "product image"},
             "url": "https://cdn/x/image.jpg",
         }
         self.assertTrue(_is_potential_table_candidate(candidate))
@@ -553,12 +553,12 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(len(api.report_error_calls), 1)
         self.assertEqual(api.report_error_calls[0][0], 10)
 
-    @patch("agents.assets.run_raw_extraction", return_value="RAW-TEXT")
+    @patch("agents.defs.assets.ocr.run_raw_extraction", return_value="RAW-TEXT")
     def test_ocr_extraction_uses_candidates_manifest(self, mock_raw):
         """Selects image paths from candidates and forwards them to raw extraction."""
         candidates = (
-            b'[{"file":"images/a.jpg","score":10,"nutrition_signal":3,"metadata":{"alt":"Tabela nutricional sabor chocolate"}},'
-            b' {"file":"images/b.jpg","score":8,"nutrition_signal":0,"metadata":{"alt":"Produto sabor chocolate"}}]'
+            b'[{"file":"images/a.jpg","score":10,"nutrition_signal":3,"metadata":{"alt":"Nutrition table flavor chocolate"}},'
+            b' {"file":"images/b.jpg","score":8,"nutrition_signal":0,"metadata":{"alt":"Product flavor chocolate"}}]'
         )
         storage = _FakeStorage(
             {
@@ -572,8 +572,8 @@ class TestDagsterAssetsFlow(TestCase):
             storage=_FakeStorageResource(storage),
             client=_FakeClientResource(_FakeApiClient()),
             scraped_metadata=RawScrapedData(
-                name="Produto",
-                brand_name="Marca",
+                name="Product",
+                brand_name="Brand",
                 description="Desc",
             ),
             downloaded_assets={
@@ -587,7 +587,7 @@ class TestDagsterAssetsFlow(TestCase):
 
         self.assertEqual(result, "RAW-TEXT")
         call_kwargs = mock_raw.call_args.kwargs
-        self.assertEqual(call_kwargs["name"], "Produto")
+        self.assertEqual(call_kwargs["name"], "Product")
         self.assertEqual(len(call_kwargs["image_paths"]), 2)
         self.assertEqual(call_kwargs["image_paths"][0], "15/images/a.jpg")
         self.assertIn("[IMAGE_SEQUENCE_CONTEXT]", call_kwargs["description"])
@@ -596,7 +596,7 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertIn("kind=NUTRITION_TABLE", call_kwargs["description"])
         self.assertIn("kind=PRODUCT_IMAGE", call_kwargs["description"])
 
-    @patch("agents.assets.run_raw_extraction", return_value="RAW-TEXT")
+    @patch("agents.defs.assets.ocr.run_raw_extraction", return_value="RAW-TEXT")
     def test_ocr_extraction_falls_back_to_text_only_when_no_candidates(self, mock_raw):
         """Falls back to text-only extraction when no candidates are available."""
         result = ocr_extraction(
@@ -605,8 +605,8 @@ class TestDagsterAssetsFlow(TestCase):
             storage=_FakeStorageResource(_FakeStorage({})),
             client=_FakeClientResource(_FakeApiClient()),
             scraped_metadata=RawScrapedData(
-                name="Produto",
-                brand_name="Marca",
+                name="Product",
+                brand_name="Brand",
                 description="Desc",
             ),
             downloaded_assets={
@@ -619,7 +619,7 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(result, "RAW-TEXT")
         self.assertEqual(mock_raw.call_args.kwargs["image_paths"], [])
 
-    @patch("agents.assets.run_structured_extraction")
+    @patch("agents.defs.assets.analysis.run_structured_extraction")
     def test_product_analysis_reports_error_on_failure(self, mock_structured):
         """Reports queue error when structured extraction raises."""
         mock_structured.side_effect = RuntimeError("structured failed")
@@ -636,7 +636,7 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(len(api.report_error_calls), 1)
         self.assertEqual(api.report_error_calls[0][0], 99)
 
-    @patch("agents.assets.run_structured_extraction")
+    @patch("agents.defs.assets.analysis.run_structured_extraction")
     def test_product_analysis_retries_when_raw_has_more_variants(self, mock_structured):
         """Retries structured extraction when OCR indicates more variants than output."""
         mock_structured.side_effect = [
@@ -644,8 +644,8 @@ class TestDagsterAssetsFlow(TestCase):
                 items=[
                     ProductAnalysisResult(
                         name="Elitebar",
-                        flavor_names=["Amendoim"],
-                        variant_name="Amendoim",
+                        flavor_names=["Peanut"],
+                        variant_name="Peanut",
                         is_variant=True,
                     )
                 ]
@@ -654,8 +654,8 @@ class TestDagsterAssetsFlow(TestCase):
                 items=[
                     ProductAnalysisResult(
                         name="Elitebar",
-                        flavor_names=["Amendoim"],
-                        variant_name="Amendoim",
+                        flavor_names=["Peanut"],
+                        variant_name="Peanut",
                         is_variant=True,
                     ),
                     ProductAnalysisResult(
@@ -668,7 +668,7 @@ class TestDagsterAssetsFlow(TestCase):
             ),
         ]
         api = _FakeApiClient()
-        raw_text = "### 4. SABORES DISPONIVEIS\n- Amendoim\n- Cookies & Cream\n- Coco\n"
+        raw_text = "### 4. AVAILABLE FLAVORS\n- Peanut\n- Cookies & Cream\n- Coco\n"
 
         result = product_analysis(
             context=build_asset_context(),
@@ -681,27 +681,27 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(len(result["items"]), 2)
         self.assertEqual(result["items"][1]["variant_name"], "Cookies & Cream")
 
-    @patch("agents.assets.run_structured_extraction")
+    @patch("agents.defs.assets.analysis.run_structured_extraction")
     def test_product_analysis_skips_retry_when_consistent(self, mock_structured):
         """Keeps single structured call when variant count is already consistent."""
         mock_structured.return_value = ProductAnalysisList(
             items=[
                 ProductAnalysisResult(
-                    name="Produto",
-                    flavor_names=["Chocolate", "Baunilha"],
+                    name="Product",
+                    flavor_names=["Chocolate", "Vanilla"],
                     variant_name="Chocolate",
                     is_variant=True,
                 ),
                 ProductAnalysisResult(
-                    name="Produto",
-                    flavor_names=["Baunilha"],
-                    variant_name="Baunilha",
+                    name="Product",
+                    flavor_names=["Vanilla"],
+                    variant_name="Vanilla",
                     is_variant=True,
                 ),
             ]
         )
         api = _FakeApiClient()
-        raw_text = "### 4. SABORES DISPONIVEIS\n- Chocolate\n- Baunilha\n"
+        raw_text = "### 4. AVAILABLE FLAVORS\n- Chocolate\n- Vanilla\n"
 
         result = product_analysis(
             context=build_asset_context(),
@@ -713,7 +713,7 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(mock_structured.call_count, 1)
         self.assertEqual(len(result["items"]), 2)
 
-    @patch("agents.assets.run_structured_extraction")
+    @patch("agents.defs.assets.analysis.run_structured_extraction")
     def test_product_analysis_retries_when_flavor_outside_context(
         self, mock_structured
     ):
@@ -722,9 +722,9 @@ class TestDagsterAssetsFlow(TestCase):
             ProductAnalysisList(
                 items=[
                     ProductAnalysisResult(
-                        name="Produto",
-                        flavor_names=["Morango"],
-                        variant_name="Morango",
+                        name="Product",
+                        flavor_names=["Strawberry"],
+                        variant_name="Strawberry",
                         is_variant=True,
                     )
                 ]
@@ -732,7 +732,7 @@ class TestDagsterAssetsFlow(TestCase):
             ProductAnalysisList(
                 items=[
                     ProductAnalysisResult(
-                        name="Produto",
+                        name="Product",
                         flavor_names=["Chocolate"],
                         variant_name="Chocolate",
                         is_variant=True,
@@ -743,7 +743,7 @@ class TestDagsterAssetsFlow(TestCase):
         api = _FakeApiClient()
         raw_text = (
             "[SCRAPER_CONTEXT]\n"
-            '{"platform":"shopify","options":[{"name":"Sabor","values":["Chocolate"]}]}\n'
+            '{"platform":"shopify","options":[{"name":"Flavor","values":["Chocolate"]}]}\n'
             "[/SCRAPER_CONTEXT]"
         )
 
@@ -757,10 +757,10 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(mock_structured.call_count, 2)
         self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
         self.assertIn(
-            "Variantes permitidas", mock_structured.call_args_list[1].kwargs["prompt"]
+            "Allowed variants", mock_structured.call_args_list[1].kwargs["prompt"]
         )
 
-    @patch("agents.assets.run_structured_extraction")
+    @patch("agents.defs.assets.analysis.run_structured_extraction")
     def test_product_analysis_retries_when_variant_outside_scraper_context(
         self, mock_structured
     ):
@@ -769,9 +769,9 @@ class TestDagsterAssetsFlow(TestCase):
             ProductAnalysisList(
                 items=[
                     ProductAnalysisResult(
-                        name="Produto",
-                        flavor_names=["Morango"],
-                        variant_name="Morango",
+                        name="Product",
+                        flavor_names=["Strawberry"],
+                        variant_name="Strawberry",
                         is_variant=True,
                     )
                 ]
@@ -779,7 +779,7 @@ class TestDagsterAssetsFlow(TestCase):
             ProductAnalysisList(
                 items=[
                     ProductAnalysisResult(
-                        name="Produto",
+                        name="Product",
                         flavor_names=["Chocolate"],
                         variant_name="Chocolate",
                         is_variant=True,
@@ -790,7 +790,7 @@ class TestDagsterAssetsFlow(TestCase):
         api = _FakeApiClient()
         raw_text = (
             "[SCRAPER_CONTEXT]\n"
-            '{"platform":"shopify","options":[{"name":"Sabor","values":["Chocolate","Baunilha"]}]}\n'
+            '{"platform":"shopify","options":[{"name":"Flavor","values":["Chocolate","Vanilla"]}]}\n'
             "[/SCRAPER_CONTEXT]"
         )
 
@@ -804,7 +804,7 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(mock_structured.call_count, 2)
         self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
         self.assertIn(
-            "Variantes permitidas", mock_structured.call_args_list[1].kwargs["prompt"]
+            "Allowed variants", mock_structured.call_args_list[1].kwargs["prompt"]
         )
 
     def test_upload_to_api_creates_additional_variant_items(self):
@@ -830,17 +830,17 @@ class TestDagsterAssetsFlow(TestCase):
             client=_FakeClientResource(api),
             product_analysis={
                 "items": [
-                    {"name": "Produto Base", "packaging": "CONTAINER"},
+                    {"name": "Base Product", "packaging": "CONTAINER"},
                     {
-                        "name": "Produto Base",
+                        "name": "Base Product",
                         "variant_name": "Chocolate",
                         "packaging": "CONTAINER",
                     },
                 ]
             },
             scraped_metadata=RawScrapedData(
-                name="Produto Base",
-                brand_name="Marca",
+                name="Base Product",
+                brand_name="Brand",
                 description="Desc",
                 price=90,
                 stock_status="A",
@@ -890,7 +890,7 @@ class TestDagsterAssetsFlow(TestCase):
             product_analysis={"items": [{"name": "Linked", "packaging": "CONTAINER"}]},
             scraped_metadata=RawScrapedData(
                 name="Linked",
-                brand_name="Marca",
+                brand_name="Brand",
                 description="Desc",
                 price=90,
                 stock_status="A",
@@ -924,7 +924,7 @@ class TestDagsterAssetsFlow(TestCase):
             product_analysis={
                 "items": [
                     {
-                        "name": "Produto Num",
+                        "name": "Numeric Product",
                         "packaging": "CONTAINER",
                         "weight_grams": "900g",
                         "components": [{"name": "Dose", "quantity": "2 unidades"}],
@@ -940,14 +940,14 @@ class TestDagsterAssetsFlow(TestCase):
                             "trans_fats": "0g",
                             "dietary_fiber": "1g",
                             "sodium": "150mg",
-                            "micronutrients": [{"name": "Vitamina C", "value": "45mg"}],
+                            "micronutrients": [{"name": "Vitamin C", "value": "45mg"}],
                         },
                     }
                 ]
             },
             scraped_metadata=RawScrapedData(
-                name="Produto Num",
-                brand_name="Marca",
+                name="Numeric Product",
+                brand_name="Brand",
                 description="Desc",
                 price=99.9,
                 stock_status="A",
