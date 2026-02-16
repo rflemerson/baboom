@@ -1,15 +1,11 @@
 # Services Layout
 
-This monorepo is deployed as two independent services:
+This folder currently contains the isolated `agents` service deployment contract.
 
-1. `web`: Django app + scrapers + Celery workers/beat
-2. `agents`: Dagster + LLM pipeline
-
-Each service has its own dependency contract and environment template.
+The Django web app + scrapers still run from the repository root.
 
 ## Deploy Model
 
-- `services/web`: runs with `python manage.py ...` and Celery commands.
 - `services/agents`: runs with `PYTHONPATH=services/agents:. dagster dev -m agents.definitions` or Dagster daemon/processes.
 
 ## Shared Code

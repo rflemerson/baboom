@@ -1,18 +1,25 @@
-@.context/TECH-STACK.md
-@.context/DAISYUI.md
-@.context/HTMX.md
-@.context/ALPINE.md
-@.context/DJANGO.md
-@.context/PYTHON.md
-@.context/NIX.md
-@.context/PRE_COMMIT.md
-@.context/DOCKER.md
-@.context/SECURITY.md
-@.context/AGENTS.md
+@.agent/context/TECH-STACK.md
+@.agent/context/PRE_COMMIT.md
+@.agent/context/SECURITY.md
+@.agent/context/AGENTS.md
 
 ---
 
-# Agent Behavior Protocol
+# Agent Runtime Guide
+
+## Context loading policy
+
+- Keep root context minimal to reduce prompt bloat.
+- Load additional docs from `.agent/context/` only when needed by the task.
+- Priority order:
+  1. `.agent/context/AGENTS.md`
+  2. task-specific docs (framework/tool/security)
+
+## Extended context index (load on demand)
+
+- UI: `.agent/context/DAISYUI.md`, `.agent/context/HTMX.md`, `.agent/context/ALPINE.md`
+- Backend: `.agent/context/DJANGO.md`, `.agent/context/PYTHON.md`
+- Infra: `.agent/context/NIX.md`, `.agent/context/DOCKER.md`
 
 ## 1. When in Doubt, Research
 If you are stuck, unsure about a syntax, or encountering a complex error:
