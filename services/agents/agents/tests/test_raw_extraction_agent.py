@@ -1,12 +1,12 @@
 """Tests for raw extraction agent behavior."""
 
+from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
 
 from agents.brain.raw_extraction_agent import (
     _get_default_prompt,
     run_raw_extraction,
 )
-from django.test import SimpleTestCase
 
 
 class _FakeStorage:
@@ -24,7 +24,7 @@ class _FakeStorage:
         return self.files[f"{bucket}/{key}"]
 
 
-class TestRawExtractionAgent(SimpleTestCase):
+class TestRawExtractionAgent(TestCase):
     """Tests for multimodal raw extraction helper."""
 
     @patch("agents.brain.raw_extraction_agent.os.path.exists", return_value=False)

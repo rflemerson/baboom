@@ -25,15 +25,8 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-cov",
-  "pytest-django",
   "pytest-asyncio",
   "ruff",
   "mypy",
   "pre-commit",
 ]
-
-[tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "baboom.settings"
-python_files = ["test_*.py", "*_test.py", "tests.py"]
-addopts = "--reuse-db --nomigrations"
-asyncio_mode = "auto"

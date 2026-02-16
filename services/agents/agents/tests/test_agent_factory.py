@@ -1,12 +1,12 @@
 """Tests for LLM model factory routing."""
 
+from unittest import TestCase
 from unittest.mock import patch
 
 from agents.brain.agent_factory import get_model
-from django.test import SimpleTestCase
 
 
-class TestAgentFactory(SimpleTestCase):
+class TestAgentFactory(TestCase):
     """Tests for provider-to-model mapping."""
 
     @patch("agents.brain.agent_factory.GroqModel", return_value="groq-model")

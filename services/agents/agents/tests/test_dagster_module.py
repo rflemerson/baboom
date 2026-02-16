@@ -1,5 +1,6 @@
 """Tests for Dagster sensor/assets behavior in the agents module."""
 
+from unittest import TestCase
 from unittest.mock import patch
 
 from agents.defs.assets import (
@@ -16,10 +17,6 @@ from agents.defs.sensors import work_queue_sensor
 from agents.schemas.analysis import ProductAnalysisList, ProductAnalysisResult
 from agents.schemas.product import RawScrapedData
 from dagster import RunRequest, SkipReason, build_asset_context
-from django.test import SimpleTestCase, TestCase
-
-from core.models import Brand, Product, ProductStore, Store
-from scrapers.models import ScrapedItem, ScrapedPage
 
 
 class _FakeApiClient:
@@ -30,45 +27,43 @@ class _FakeApiClient:
         self.create_raises = create_raises
         self.report_error_calls: list[tuple[int, str, bool]] = []
         self.create_calls: list[dict] = []
+        self._items: dict[int, dict] = {}
+        self._next_item_id = 1000
+        self._next_page_id = 5000
 
-    @staticmethod
-    def _serialize_item(item: ScrapedItem) -> dict:
-        """Build GraphQL-like payload for one scraped item."""
-        product_link = item.source_page.url if item.source_page else None
-        linked_product_id = (
-            item.product_store.product_id
-            if item.product_store_id and item.product_store
-            else None
-        )
-        return {
-            "id": item.id,
-            "name": item.name,
-            "status": item.status,
-            "storeSlug": item.store_slug,
-            "storeName": item.store_slug.replace("_", " ").title(),
-            "externalId": item.external_id,
-            "price": item.price,
-            "stockStatus": item.stock_status,
-            "productLink": product_link,
-            "sourcePageUrl": product_link,
-            "sourcePageId": item.source_page_id,
-            "sourcePageRawContent": item.source_page.raw_content
-            if item.source_page
-            else "",
-            "sourcePageContentType": item.source_page.content_type
-            if item.source_page
-            else "",
-            "productStoreId": item.product_store_id,
-            "linkedProductId": linked_product_id,
+    def seed_item(self, item_id: int, payload: dict) -> dict:
+        """Insert one fake scraped item for tests."""
+        item = {
+            "id": int(item_id),
+            "name": payload["name"],
+            "status": payload.get("status", "processing"),
+            "storeSlug": payload["store_slug"],
+            "storeName": payload["store_slug"].replace("_", " ").title(),
+            "externalId": payload["external_id"],
+            "price": payload.get("price"),
+            "stockStatus": payload.get("stock_status"),
+            "productLink": payload.get("page_url"),
+            "sourcePageUrl": payload.get("page_url"),
+            "sourcePageId": payload.get("source_page_id"),
+            "sourcePageRawContent": payload.get("source_page_raw_content", ""),
+            "sourcePageContentType": payload.get("source_page_content_type", ""),
+            "productStoreId": payload.get("product_store_id"),
+            "linkedProductId": payload.get("linked_product_id"),
         }
+        self._items[int(item_id)] = item
+        self._next_item_id = max(self._next_item_id, int(item_id) + 1)
+        source_page_id = payload.get("source_page_id")
+        if source_page_id is not None:
+            self._next_page_id = max(self._next_page_id, int(source_page_id) + 1)
+        return item
 
     def checkout_work(self):
         """Return configured queue payload."""
         return self.work_payload
 
-    def create_product(self, _payload):
+    def create_product(self, payload):
         """Simulate API create product behavior."""
-        self.create_calls.append(_payload)
+        self.create_calls.append(payload)
         if self.create_raises:
             raise self.create_raises
         return {"product": {"id": 1}, "errors": []}
@@ -78,26 +73,22 @@ class _FakeApiClient:
         self.report_error_calls.append((int(item_id), str(message), bool(is_fatal)))
 
     def get_scraped_item(self, item_id: int):
-        """Fetch item from DB and return GraphQL-like payload."""
-        item = ScrapedItem.objects.filter(id=int(item_id)).first()
-        if not item:
-            return None
-        return self._serialize_item(item)
+        """Return fake scraped item payload by id."""
+        return self._items.get(int(item_id))
 
     def ensure_source_page(self, item_id: int, url: str, store_slug: str):
-        """Ensure source page exists and is attached to the item."""
-        item = ScrapedItem.objects.filter(id=int(item_id)).first()
+        """Ensure source page fields are present in fake item."""
+        item = self._items.get(int(item_id))
         if not item:
             return None
-        if not item.source_page_id:
-            page, _ = ScrapedPage.objects.get_or_create(
-                store_slug=store_slug,
-                url=url,
-            )
-            item.source_page = page
-            item.store_slug = store_slug or item.store_slug
-            item.save(update_fields=["source_page", "store_slug"])
-        return self._serialize_item(item)
+        if not item.get("sourcePageId"):
+            item["sourcePageId"] = self._next_page_id
+            self._next_page_id += 1
+        item["sourcePageUrl"] = item.get("sourcePageUrl") or url
+        item["productLink"] = item.get("productLink") or item["sourcePageUrl"]
+        item["storeSlug"] = store_slug or item.get("storeSlug")
+        item["storeName"] = item["storeSlug"].replace("_", " ").title()
+        return item
 
     def update_scraped_item_data(
         self,
@@ -106,27 +97,22 @@ class _FakeApiClient:
         source_page_url: str | None = None,
         store_slug: str | None = None,
     ):
-        """Update mutable fields in DB and return GraphQL-like payload."""
-        item = ScrapedItem.objects.filter(id=int(item_id)).first()
+        """Update mutable fields in fake item and return payload."""
+        item = self._items.get(int(item_id))
         if not item:
             return None
-        dirty_fields: list[str] = []
         if name:
-            item.name = name
-            dirty_fields.append("name")
+            item["name"] = name
         if store_slug:
-            item.store_slug = store_slug
-            dirty_fields.append("store_slug")
+            item["storeSlug"] = store_slug
+            item["storeName"] = store_slug.replace("_", " ").title()
         if source_page_url:
-            page, _ = ScrapedPage.objects.get_or_create(
-                store_slug=item.store_slug,
-                url=source_page_url,
-            )
-            item.source_page = page
-            dirty_fields.append("source_page")
-        if dirty_fields:
-            item.save(update_fields=dirty_fields)
-        return self._serialize_item(item)
+            item["sourcePageUrl"] = source_page_url
+            item["productLink"] = source_page_url
+            if not item.get("sourcePageId"):
+                item["sourcePageId"] = self._next_page_id
+                self._next_page_id += 1
+        return item
 
     def upsert_scraped_item_variant(
         self,
@@ -138,29 +124,48 @@ class _FakeApiClient:
         price: float | None = None,
         stock_status: str | None = None,
     ):
-        """Create or update one variant item in DB."""
-        origin = ScrapedItem.objects.filter(id=int(origin_item_id)).first()
+        """Create or update one variant item in memory."""
+        origin = self._items.get(int(origin_item_id))
         if not origin:
             return None
 
-        page = origin.source_page
-        if not page:
-            page, _ = ScrapedPage.objects.get_or_create(
-                store_slug=store_slug, url=page_url
-            )
+        existing = None
+        for item in self._items.values():
+            if (
+                item.get("storeSlug") == store_slug
+                and item.get("externalId") == external_id
+            ):
+                existing = item
+                break
 
-        item, _ = ScrapedItem.objects.update_or_create(
-            store_slug=store_slug,
-            external_id=external_id,
-            defaults={
+        if existing is None:
+            item_id = self._next_item_id
+            self._next_item_id += 1
+            existing = {
+                "id": item_id,
                 "name": name,
-                "source_page": page,
-                "status": ScrapedItem.Status.PROCESSING,
-                "price": price if price is not None else origin.price,
-                "stock_status": stock_status or origin.stock_status,
-            },
-        )
-        return self._serialize_item(item)
+                "status": "processing",
+                "storeSlug": store_slug,
+                "storeName": store_slug.replace("_", " ").title(),
+                "externalId": external_id,
+                "price": price if price is not None else origin.get("price"),
+                "stockStatus": stock_status or origin.get("stockStatus"),
+                "productLink": page_url,
+                "sourcePageUrl": page_url,
+                "sourcePageId": origin.get("sourcePageId") or self._next_page_id,
+                "sourcePageRawContent": "",
+                "sourcePageContentType": "",
+                "productStoreId": None,
+                "linkedProductId": None,
+            }
+            self._items[item_id] = existing
+        else:
+            existing["name"] = name
+            existing["price"] = price if price is not None else existing.get("price")
+            existing["stockStatus"] = stock_status or existing.get("stockStatus")
+            existing["sourcePageUrl"] = page_url
+            existing["productLink"] = page_url
+        return existing
 
 
 class _FakeClientResource:
@@ -174,7 +179,7 @@ class _FakeClientResource:
         return self.api
 
 
-class TestDagsterSensor(SimpleTestCase):
+class TestDagsterSensor(TestCase):
     """Tests for work queue Dagster sensor logic."""
 
     def test_sensor_skips_when_queue_empty(self):
@@ -216,7 +221,7 @@ class TestDagsterSensor(SimpleTestCase):
         )
 
 
-class TestImageSelection(SimpleTestCase):
+class TestImageSelection(TestCase):
     """Tests for OCR image selection strategy."""
 
     @patch.dict(
@@ -386,47 +391,45 @@ class TestUploadToApiErrorHandling(TestCase):
 
     def test_upload_reports_error_when_create_product_fails(self):
         """Asset must report queue error and re-raise upload exceptions."""
-        page = ScrapedPage.objects.create(
-            store_slug="demo-store", url="https://example.com/product"
-        )
-        item = ScrapedItem.objects.create(
-            store_slug="demo-store",
-            external_id="demo-1",
-            name="Demo Product",
-            source_page=page,
-            status=ScrapedItem.Status.PROCESSING,
-            price=99.9,
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
-        )
-
         api = _FakeApiClient(create_raises=RuntimeError("create failed"))
-        client = _FakeClientResource(api)
-        context = build_asset_context()
-
-        config = ItemConfig(item_id=item.id, url=page.url, store_slug="demo-store")
-        metadata = RawScrapedData(
-            name="Demo Product",
-            brand_name="Demo Brand",
-            description="Description",
-            price=99.9,
-            stock_status="A",
+        api.seed_item(
+            101,
+            {
+                "name": "Demo Product",
+                "store_slug": "demo-store",
+                "external_id": "demo-1",
+                "page_url": "https://example.com/product",
+                "source_page_id": 10,
+                "status": "processing",
+                "price": 99.9,
+                "stock_status": "A",
+            },
         )
-        product_analysis = {
-            "items": [{"name": "Demo Product", "packaging": "CONTAINER"}]
-        }
 
         with self.assertRaises(RuntimeError):
             _ = upload_to_api(
-                context=context,
-                config=config,
-                client=client,
-                product_analysis=product_analysis,
-                scraped_metadata=metadata,
+                context=build_asset_context(),
+                config=ItemConfig(
+                    item_id=101,
+                    url="https://example.com/product",
+                    store_slug="demo-store",
+                ),
+                client=_FakeClientResource(api),
+                product_analysis={
+                    "items": [{"name": "Demo Product", "packaging": "CONTAINER"}]
+                },
+                scraped_metadata=RawScrapedData(
+                    name="Demo Product",
+                    brand_name="Demo Brand",
+                    description="Description",
+                    price=99.9,
+                    stock_status="A",
+                ),
             )
 
         self.assertEqual(len(api.report_error_calls), 1)
         reported_item_id, _message, is_fatal = api.report_error_calls[0]
-        self.assertEqual(reported_item_id, item.id)
+        self.assertEqual(reported_item_id, 101)
         self.assertFalse(is_fatal)
 
 
@@ -507,29 +510,33 @@ class TestDagsterAssetsFlow(TestCase):
 
     def test_downloaded_assets_sets_source_page_when_missing(self):
         """Creates source_page and returns expected storage context payload."""
-        item = ScrapedItem.objects.create(
-            store_slug="demo-store",
-            external_id="item-1",
-            name="Item",
-            status=ScrapedItem.Status.NEW,
-        )
         api = _FakeApiClient()
+        api.seed_item(
+            1,
+            {
+                "name": "Item",
+                "store_slug": "demo-store",
+                "external_id": "item-1",
+                "page_url": "https://example.com/p1",
+                "status": "new",
+            },
+        )
         scraper = _FakeScraperService()
         result = downloaded_assets(
             context=build_asset_context(),
             config=ItemConfig(
-                item_id=item.id,
-                url="https://example.com/p1",
-                store_slug="demo-store",
+                item_id=1, url="https://example.com/p1", store_slug="demo-store"
             ),
             scraper=_FakeScraperResource(scraper),
             client=_FakeClientResource(api),
         )
 
-        item.refresh_from_db()
-        self.assertIsNotNone(item.source_page_id)
-        self.assertEqual(result["origin_item_id"], item.id)
-        self.assertEqual(result["storage_path"], f"{item.source_page_id}/source.html")
+        seeded = api.get_scraped_item(1)
+        self.assertIsNotNone(seeded["sourcePageId"])
+        self.assertEqual(result["origin_item_id"], 1)
+        self.assertEqual(
+            result["storage_path"], f"{seeded['sourcePageId']}/source.html"
+        )
 
     def test_scraped_metadata_reports_error_on_extraction_failure(self):
         """Reports queue error when metadata extraction fails."""
@@ -572,9 +579,7 @@ class TestDagsterAssetsFlow(TestCase):
             storage=_FakeStorageResource(storage),
             client=_FakeClientResource(_FakeApiClient()),
             scraped_metadata=RawScrapedData(
-                name="Product",
-                brand_name="Brand",
-                description="Desc",
+                name="Product", brand_name="Brand", description="Desc"
             ),
             downloaded_assets={
                 "origin_item_id": 1,
@@ -605,9 +610,7 @@ class TestDagsterAssetsFlow(TestCase):
             storage=_FakeStorageResource(_FakeStorage({})),
             client=_FakeClientResource(_FakeApiClient()),
             scraped_metadata=RawScrapedData(
-                name="Product",
-                brand_name="Brand",
-                description="Desc",
+                name="Product", brand_name="Brand", description="Desc"
             ),
             downloaded_assets={
                 "origin_item_id": 1,
@@ -808,25 +811,27 @@ class TestDagsterAssetsFlow(TestCase):
         )
 
     def test_upload_to_api_creates_additional_variant_items(self):
-        """Creates extra ScrapedItem entries when analysis returns multiple items."""
-        page = ScrapedPage.objects.create(
-            store_slug="demo-store",
-            url="https://example.com/product",
-        )
-        origin = ScrapedItem.objects.create(
-            store_slug="demo-store",
-            external_id="demo-origin",
-            name="Origin",
-            source_page=page,
-            status=ScrapedItem.Status.PROCESSING,
-            price=90,
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
-        )
+        """Creates extra scraped items when analysis returns multiple items."""
         api = _FakeApiClient()
+        api.seed_item(
+            201,
+            {
+                "name": "Origin",
+                "store_slug": "demo-store",
+                "external_id": "demo-origin",
+                "page_url": "https://example.com/product",
+                "source_page_id": 44,
+                "status": "processing",
+                "price": 90,
+                "stock_status": "A",
+            },
+        )
 
         result = upload_to_api(
             context=build_asset_context(),
-            config=ItemConfig(item_id=origin.id, url=page.url, store_slug="demo-store"),
+            config=ItemConfig(
+                item_id=201, url="https://example.com/product", store_slug="demo-store"
+            ),
             client=_FakeClientResource(api),
             product_analysis={
                 "items": [
@@ -850,42 +855,35 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(len(api.create_calls), 2)
         self.assertTrue(
-            ScrapedItem.objects.filter(
-                store_slug="demo-store", external_id__contains="::v2-"
-            ).exists()
+            any("::v2-" in str(item.get("externalId")) for item in api._items.values())
         )
 
     def test_upload_to_api_skips_already_linked_item(self):
         """Skips create_product when scraped item is already linked."""
-        brand = Brand.objects.create(name="brand", display_name="Brand")
-        store = Store.objects.create(name="demo-store", display_name="Demo Store")
-        product = Product.objects.create(name="Linked Product", brand=brand, weight=900)
-        product_store = ProductStore.objects.create(
-            product=product,
-            store=store,
-            external_id="demo-linked",
-            product_link="https://example.com/already-linked",
-        )
-
-        page = ScrapedPage.objects.create(
-            store_slug="demo-store",
-            url="https://example.com/already-linked",
-        )
-        origin = ScrapedItem.objects.create(
-            store_slug="demo-store",
-            external_id="demo-linked",
-            name="Linked",
-            source_page=page,
-            status=ScrapedItem.Status.LINKED,
-            product_store=product_store,
-            price=90,
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
-        )
         api = _FakeApiClient()
+        api.seed_item(
+            301,
+            {
+                "name": "Linked",
+                "store_slug": "demo-store",
+                "external_id": "demo-linked",
+                "page_url": "https://example.com/already-linked",
+                "source_page_id": 55,
+                "status": "linked",
+                "price": 90,
+                "stock_status": "A",
+                "product_store_id": 77,
+                "linked_product_id": 99,
+            },
+        )
 
         result = upload_to_api(
             context=build_asset_context(),
-            config=ItemConfig(item_id=origin.id, url=page.url, store_slug="demo-store"),
+            config=ItemConfig(
+                item_id=301,
+                url="https://example.com/already-linked",
+                store_slug="demo-store",
+            ),
             client=_FakeClientResource(api),
             product_analysis={"items": [{"name": "Linked", "packaging": "CONTAINER"}]},
             scraped_metadata=RawScrapedData(
@@ -902,24 +900,28 @@ class TestDagsterAssetsFlow(TestCase):
 
     def test_upload_to_api_handles_numeric_strings_from_llm_payload(self):
         """Parses numeric strings in analysis payload without crashing."""
-        page = ScrapedPage.objects.create(
-            store_slug="demo-store",
-            url="https://example.com/product-numeric",
-        )
-        origin = ScrapedItem.objects.create(
-            store_slug="demo-store",
-            external_id="demo-origin-num",
-            name="Origin Num",
-            source_page=page,
-            status=ScrapedItem.Status.PROCESSING,
-            price=90,
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
-        )
         api = _FakeApiClient()
+        api.seed_item(
+            401,
+            {
+                "name": "Origin Num",
+                "store_slug": "demo-store",
+                "external_id": "demo-origin-num",
+                "page_url": "https://example.com/product-numeric",
+                "source_page_id": 66,
+                "status": "processing",
+                "price": 90,
+                "stock_status": "A",
+            },
+        )
 
         _ = upload_to_api(
             context=build_asset_context(),
-            config=ItemConfig(item_id=origin.id, url=page.url, store_slug="demo-store"),
+            config=ItemConfig(
+                item_id=401,
+                url="https://example.com/product-numeric",
+                store_slug="demo-store",
+            ),
             client=_FakeClientResource(api),
             product_analysis={
                 "items": [
@@ -927,7 +929,7 @@ class TestDagsterAssetsFlow(TestCase):
                         "name": "Numeric Product",
                         "packaging": "CONTAINER",
                         "weight_grams": "900g",
-                        "components": [{"name": "Dose", "quantity": "2 unidades"}],
+                        "components": [{"name": "Dose", "quantity": "2 units"}],
                         "nutrition_facts": {
                             "serving_size_grams": "30g",
                             "energy_kcal": "120 kcal",

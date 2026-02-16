@@ -1,12 +1,12 @@
 """Tests for AgentClient network and payload behavior."""
 
+from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from agents.client import AgentClient
-from django.test import SimpleTestCase
 
 
-class TestAgentClient(SimpleTestCase):
+class TestAgentClient(TestCase):
     """Unit tests for GraphQL HTTP client."""
 
     @patch("agents.client.requests.post")

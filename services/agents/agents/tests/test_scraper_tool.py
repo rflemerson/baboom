@@ -2,14 +2,14 @@
 
 import json
 from typing import cast
+from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from agents.tools.scraper import ScraperService
 from bs4 import BeautifulSoup, Tag
-from django.test import SimpleTestCase, TestCase
 
 
-class TestScraperToolHelpers(SimpleTestCase):
+class TestScraperToolHelpers(TestCase):
     """Unit tests for local scoring/parsing helpers."""
 
     def setUp(self):

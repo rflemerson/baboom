@@ -1,5 +1,6 @@
 """Tests for structured extraction agent behavior."""
 
+from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
 
 from agents.brain.structured_agent import (
@@ -7,10 +8,9 @@ from agents.brain.structured_agent import (
     get_agent,
     run_structured_extraction,
 )
-from django.test import SimpleTestCase
 
 
-class TestStructuredAgent(SimpleTestCase):
+class TestStructuredAgent(TestCase):
     """Tests for structured extraction wrapper."""
 
     @patch("agents.brain.structured_agent.os.path.exists", return_value=False)

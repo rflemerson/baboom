@@ -1,12 +1,13 @@
+from unittest import TestCase
+
 from agents.defs.assets.shared import (
     _build_nutrition_payload,
     _slugify,
     _to_graphql_stock_status,
 )
-from django.test import SimpleTestCase
 
 
-class TestAssetsHelpers(SimpleTestCase):
+class TestAssetsHelpers(TestCase):
     """Tests for small helper functions used by Dagster assets."""
 
     def test_slugify(self):

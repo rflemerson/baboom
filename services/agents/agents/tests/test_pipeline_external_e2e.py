@@ -2,13 +2,12 @@
 
 import json
 import os
-from unittest import skipUnless
+from unittest import TestCase, skipUnless
 
 from agents.brain.raw_extraction_agent import run_raw_extraction
 from agents.brain.structured_agent import run_structured_extraction
 from agents.defs.assets.shared import _select_images_for_ocr
 from agents.tools.scraper import ScraperService
-from django.test import SimpleTestCase
 
 
 def _has_llm_credentials() -> bool:
@@ -34,7 +33,7 @@ def _has_llm_credentials() -> bool:
     os.getenv("RUN_EXTERNAL_PIPELINE_TESTS") == "1" and _has_llm_credentials(),
     "External pipeline test is opt-in. Set RUN_EXTERNAL_PIPELINE_TESTS=1 and provider API key env vars.",
 )
-class ExternalPipelineE2ETests(SimpleTestCase):
+class ExternalPipelineE2ETests(TestCase):
     """Runs one real URL through scraper manifest/cv and LLM extraction."""
 
     def test_real_url_pipeline_flow(self):
