@@ -28,7 +28,12 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path(
         "graphql/",
-        csrf_exempt(GraphQLView.as_view(schema=schema, graphiql=settings.DEBUG)),
+        csrf_exempt(
+            GraphQLView.as_view(
+                schema=schema,
+                graphql_ide="graphiql" if settings.DEBUG else None,
+            )
+        ),
     ),
     path("", include("core.urls")),
 ]
