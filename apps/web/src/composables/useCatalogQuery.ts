@@ -1,16 +1,13 @@
-import { computed } from 'vue'
+import { computed, type MaybeRefOrGetter, toValue } from 'vue'
 import { useQuery } from '@vue/apollo-composable'
 
-import {
-  CATALOG_PRODUCTS_QUERY,
-  DEFAULT_CATALOG_PRODUCTS_VARIABLES,
-} from '@/graphql/queries/catalog'
-import type { CatalogPageInfo, CatalogProduct } from '@/types/catalog'
+import { CatalogProductsDocument } from '@/gql/graphql'
+import type { CatalogPageInfo, CatalogProduct, CatalogProductsVariables } from '@/types/catalog'
 
-export function useCatalogQuery() {
+export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVariables>) {
   const { result, loading, error } = useQuery(
-    CATALOG_PRODUCTS_QUERY,
-    DEFAULT_CATALOG_PRODUCTS_VARIABLES,
+    CatalogProductsDocument,
+    () => toValue(variables),
   )
 
   const pageInfo = computed<CatalogPageInfo | null>(

@@ -1,0 +1,11 @@
+mutation SubscribeAlerts($email: String!) {
+  subscribeAlerts(email: $email) {
+    success
+    alreadySubscribed
+    email
+    errors {
+      field
+      message
+    }
+  }
+}

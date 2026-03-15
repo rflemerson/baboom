@@ -7,8 +7,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from baboom.utils import ValidationError as GqlValidationError
 from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.models import Product, ProductStore
-from core.services import product_create, product_update_content
+from core.models import AlertSubscriber, Product, ProductStore
+from core.services import alert_subscriber_create, product_create, product_update_content
 from core.types import ProductComponentInput as ProductComponentDTO
 from core.types import ProductCreateInput
 from scrapers.models import ScrapedItem
@@ -20,7 +20,7 @@ from .inputs import (
     ProductNutritionInput,
     ProductStoreInput,
 )
-from .types import ProductResult, ProductType
+from .types import AlertSubscriptionResult, ProductResult, ProductType
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,29 @@ logger = logging.getLogger(__name__)
 @strawberry.type
 class CoreMutation:
     """Core mutations."""
+
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
+    def subscribe_alerts(self, email: str) -> AlertSubscriptionResult:
+        """Subscribe an email to price alerts."""
+        if AlertSubscriber.objects.filter(email=email).exists():
+            return AlertSubscriptionResult(
+                success=False,
+                already_subscribed=True,
+                email=email,
+            )
+
+        try:
+            subscriber = alert_subscriber_create(email=email)
+            return AlertSubscriptionResult(
+                success=True,
+                email=subscriber.email,
+            )
+        except DjangoValidationError as e:
+            return AlertSubscriptionResult(
+                success=False,
+                email=email,
+                errors=format_graphql_errors(e),
+            )
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def create_product(self, data: ProductInput) -> ProductResult:

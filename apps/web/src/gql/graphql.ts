@@ -20,6 +20,14 @@ export type Scalars = {
   Decimal: { input: any; output: any; }
 };
 
+export type AlertSubscriptionResult = {
+  __typename?: 'AlertSubscriptionResult';
+  alreadySubscribed: Scalars['Boolean']['output'];
+  email?: Maybe<Scalars['String']['output']>;
+  errors?: Maybe<Array<ValidationError>>;
+  success: Scalars['Boolean']['output'];
+};
+
 export type BrandType = {
   __typename?: 'BrandType';
   displayName: Scalars['String']['output'];
@@ -95,6 +103,7 @@ export type Mutation = {
   discardScrapedItem: Scalars['Boolean']['output'];
   ensureScrapedItemSourcePage?: Maybe<ScrapedItemType>;
   reportScrapedItemError: Scalars['Boolean']['output'];
+  subscribeAlerts: AlertSubscriptionResult;
   updateProductContent: ProductResult;
   updateScrapedItemData?: Maybe<ScrapedItemType>;
   upsertScrapedItemVariant?: Maybe<ScrapedItemType>;
@@ -129,6 +138,11 @@ export type MutationReportScrapedItemErrorArgs = {
   isFatal?: Scalars['Boolean']['input'];
   itemId: Scalars['Int']['input'];
   message: Scalars['String']['input'];
+};
+
+
+export type MutationSubscribeAlertsArgs = {
+  email: Scalars['String']['input'];
 };
 
 
@@ -409,13 +423,31 @@ export type ValidationError = {
   message: Scalars['String']['output'];
 };
 
+export type SubscribeAlertsMutationVariables = Exact<{
+  email: Scalars['String']['input'];
+}>;
+
+
+export type SubscribeAlertsMutation = { __typename?: 'Mutation', subscribeAlerts: { __typename?: 'AlertSubscriptionResult', success: boolean, alreadySubscribed: boolean, email?: string | null, errors?: Array<{ __typename?: 'ValidationError', field: string, message: string }> | null } };
+
 export type CatalogProductsQueryVariables = Exact<{
   page: Scalars['Int']['input'];
   perPage: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  brand?: InputMaybe<Scalars['String']['input']>;
+  priceMin?: InputMaybe<Scalars['Float']['input']>;
+  priceMax?: InputMaybe<Scalars['Float']['input']>;
+  pricePerGramMin?: InputMaybe<Scalars['Float']['input']>;
+  pricePerGramMax?: InputMaybe<Scalars['Float']['input']>;
+  concentrationMin?: InputMaybe<Scalars['Float']['input']>;
+  concentrationMax?: InputMaybe<Scalars['Float']['input']>;
+  sortBy: Scalars['String']['input'];
+  sortDir: Scalars['String']['input'];
 }>;
 
 
 export type CatalogProductsQuery = { __typename?: 'Query', catalogProducts: { __typename?: 'CatalogProductsResult', pageInfo: { __typename?: 'CatalogPageInfo', currentPage: number, perPage: number, totalPages: number, totalCount: number, hasPreviousPage: boolean, hasNextPage: boolean }, items: Array<{ __typename?: 'CatalogProductType', id: number, name: string, packagingDisplay: string, weight: number, lastPrice?: any | null, pricePerGram?: any | null, concentration?: any | null, totalProtein?: any | null, externalLink?: string | null, brand: { __typename?: 'BrandType', name: string }, category?: { __typename?: 'CategoryType', name: string } | null, tags: Array<{ __typename?: 'TagType', name: string }> }> } };
 
 
-export const CatalogProductsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CatalogProducts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"perPage"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"catalogProducts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}},{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"Variable","name":{"kind":"Name","value":"perPage"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currentPage"}},{"kind":"Field","name":{"kind":"Name","value":"perPage"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"hasPreviousPage"}},{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"packagingDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"weight"}},{"kind":"Field","name":{"kind":"Name","value":"lastPrice"}},{"kind":"Field","name":{"kind":"Name","value":"pricePerGram"}},{"kind":"Field","name":{"kind":"Name","value":"concentration"}},{"kind":"Field","name":{"kind":"Name","value":"totalProtein"}},{"kind":"Field","name":{"kind":"Name","value":"externalLink"}},{"kind":"Field","name":{"kind":"Name","value":"brand"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"category"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]}}]} as unknown as DocumentNode<CatalogProductsQuery, CatalogProductsQueryVariables>;
+export const SubscribeAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubscribeAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"subscribeAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"alreadySubscribed"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"errors"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]}}]} as unknown as DocumentNode<SubscribeAlertsMutation, SubscribeAlertsMutationVariables>;
+export const CatalogProductsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CatalogProducts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"perPage"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"search"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"brand"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"priceMin"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"priceMax"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pricePerGramMin"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pricePerGramMax"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"concentrationMin"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"concentrationMax"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortDir"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"catalogProducts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}},{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"Variable","name":{"kind":"Name","value":"perPage"}}},{"kind":"Argument","name":{"kind":"Name","value":"search"},"value":{"kind":"Variable","name":{"kind":"Name","value":"search"}}},{"kind":"Argument","name":{"kind":"Name","value":"brand"},"value":{"kind":"Variable","name":{"kind":"Name","value":"brand"}}},{"kind":"Argument","name":{"kind":"Name","value":"priceMin"},"value":{"kind":"Variable","name":{"kind":"Name","value":"priceMin"}}},{"kind":"Argument","name":{"kind":"Name","value":"priceMax"},"value":{"kind":"Variable","name":{"kind":"Name","value":"priceMax"}}},{"kind":"Argument","name":{"kind":"Name","value":"pricePerGramMin"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pricePerGramMin"}}},{"kind":"Argument","name":{"kind":"Name","value":"pricePerGramMax"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pricePerGramMax"}}},{"kind":"Argument","name":{"kind":"Name","value":"concentrationMin"},"value":{"kind":"Variable","name":{"kind":"Name","value":"concentrationMin"}}},{"kind":"Argument","name":{"kind":"Name","value":"concentrationMax"},"value":{"kind":"Variable","name":{"kind":"Name","value":"concentrationMax"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortDir"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortDir"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currentPage"}},{"kind":"Field","name":{"kind":"Name","value":"perPage"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"hasPreviousPage"}},{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"packagingDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"weight"}},{"kind":"Field","name":{"kind":"Name","value":"lastPrice"}},{"kind":"Field","name":{"kind":"Name","value":"pricePerGram"}},{"kind":"Field","name":{"kind":"Name","value":"concentration"}},{"kind":"Field","name":{"kind":"Name","value":"totalProtein"}},{"kind":"Field","name":{"kind":"Name","value":"externalLink"}},{"kind":"Field","name":{"kind":"Name","value":"brand"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"category"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]}}]} as unknown as DocumentNode<CatalogProductsQuery, CatalogProductsQueryVariables>;

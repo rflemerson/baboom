@@ -202,3 +202,13 @@ class CatalogProductsResult:
 
     items: list[CatalogProductType]
     page_info: CatalogPageInfo
+
+
+@strawberry.type
+class AlertSubscriptionResult:
+    """Result type for alert subscription mutations."""
+
+    success: bool
+    already_subscribed: bool = False
+    email: str | None = None
+    errors: list[ValidationError] | None = None

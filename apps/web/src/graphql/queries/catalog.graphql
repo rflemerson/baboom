@@ -1,0 +1,58 @@
+query CatalogProducts(
+  $page: Int!
+  $perPage: Int!
+  $search: String
+  $brand: String
+  $priceMin: Float
+  $priceMax: Float
+  $pricePerGramMin: Float
+  $pricePerGramMax: Float
+  $concentrationMin: Float
+  $concentrationMax: Float
+  $sortBy: String!
+  $sortDir: String!
+) {
+  catalogProducts(
+    page: $page
+    perPage: $perPage
+    search: $search
+    brand: $brand
+    priceMin: $priceMin
+    priceMax: $priceMax
+    pricePerGramMin: $pricePerGramMin
+    pricePerGramMax: $pricePerGramMax
+    concentrationMin: $concentrationMin
+    concentrationMax: $concentrationMax
+    sortBy: $sortBy
+    sortDir: $sortDir
+  ) {
+    pageInfo {
+      currentPage
+      perPage
+      totalPages
+      totalCount
+      hasPreviousPage
+      hasNextPage
+    }
+    items {
+      id
+      name
+      packagingDisplay
+      weight
+      lastPrice
+      pricePerGram
+      concentration
+      totalProtein
+      externalLink
+      brand {
+        name
+      }
+      category {
+        name
+      }
+      tags {
+        name
+      }
+    }
+  }
+}

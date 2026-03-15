@@ -43,7 +43,13 @@ describe('useCatalogQuery', () => {
       error: computed(() => null),
     } as never)
 
-    const { loading, pageInfo, products } = useCatalogQuery()
+    const { loading, pageInfo, products } = useCatalogQuery({
+      page: 1,
+      perPage: 12,
+      search: null,
+      sortBy: 'price_per_gram',
+      sortDir: 'asc',
+    })
 
     expect(loading.value).toBe(false)
     expect(pageInfo.value?.totalCount).toBe(15)

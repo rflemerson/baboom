@@ -8,7 +8,7 @@
 
 ## Current project pattern
 
-- Apollo setup lives in `src/lib/apollo.ts`.
+- Apollo setup lives in `src/graphql/client/apollo.ts`.
 - The app provides the default client in `src/main.ts` with `DefaultApolloClient`.
 - Components should consume GraphQL through composables such as `useCatalogQuery()`.
 

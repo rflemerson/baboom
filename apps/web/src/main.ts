@@ -5,7 +5,7 @@ import { createPinia } from 'pinia'
 import './styles.css'
 
 import App from './App.vue'
-import { apolloClient } from './lib/apollo'
+import { apolloClient } from './graphql/client/apollo'
 import router from './router'
 
 const app = createApp({

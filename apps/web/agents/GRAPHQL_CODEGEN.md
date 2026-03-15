@@ -35,7 +35,7 @@ const config: CodegenConfig = {
         },
       ]
     : graphqlUrl,
-  documents: ['src/**/*.{ts,vue}', '!src/gql/**/*'],
+  documents: ['src/**/*.{ts,vue,graphql}', '!src/gql/**/*'],
   ignoreNoDocuments: true,
   generates: {
     './src/gql/': {
@@ -70,33 +70,26 @@ CODEGEN_API_KEY=your-local-api-key npm run graphql-codegen
 
 ## How to use it in Vue
 
-Instead of importing `gql` from Apollo directly, use the generated helper:
+Preferred structure in this repo:
+
+```text
+src/graphql/
+├── mutations/
+│   └── alerts.graphql
+└── queries/
+    └── catalog.graphql
+```
+
+Then import the generated document from `src/gql/graphql.ts`:
 
 ```ts
-import { graphql } from '@/gql'
-
-export const catalogProductsQuery = graphql(`
-  query CatalogProducts($page: Int!, $perPage: Int!) {
-    catalogProducts(page: $page, perPage: $perPage) {
-      pageInfo {
-        currentPage
-        perPage
-        totalPages
-        totalCount
-      }
-      items {
-        id
-        name
-      }
-    }
-  }
-`)
+import { CatalogProductsDocument } from '@/gql/graphql'
 ```
 
 Then in the composable:
 
 ```ts
-const { result } = useQuery(catalogProductsQuery, { page: 1, perPage: 12 })
+const { result } = useQuery(CatalogProductsDocument, { page: 1, perPage: 12 })
 ```
 
 The query result and variables become typed automatically.

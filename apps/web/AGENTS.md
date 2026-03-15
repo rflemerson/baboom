@@ -44,11 +44,12 @@ cd apps/web && npm run format
 
 - Keep route components under `src/views/`.
 - Keep reusable UI under `src/components/`, grouped by domain (`catalog/`, `alerts/`, `layout/`, `ui/`).
-- Keep GraphQL documents under `src/graphql/`, split by operation type (`queries/`, `mutations/`, `fragments/`) when the folder grows.
+- Keep GraphQL documents under `src/graphql/`, split by operation type (`queries/`, `mutations/`, `fragments/`).
+- Prefer `.graphql` files for operations instead of inline document strings in TypeScript.
+- Keep GraphQL client setup under `src/graphql/client/`.
 - Keep generated GraphQL artifacts under `src/gql/`.
 - Keep frontend runtime types under `src/types/`.
 - Keep stateful integration logic under `src/composables/`.
-- Keep Apollo setup under `src/lib/`.
 - Colocate unit tests with the file they cover using `*.spec.ts`.
 
 ## Integration Rules

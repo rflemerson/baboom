@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import CatalogPagination from '@/components/catalog/CatalogPagination.vue'
 import CatalogGridCard from '@/components/catalog/CatalogGridCard.vue'
+import CatalogListCard from '@/components/catalog/CatalogListCard.vue'
+import type { CatalogViewMode } from '@/composables/useCatalogViewMode'
 import type { CatalogPageInfo, CatalogProduct } from '@/types/catalog'
 
 defineProps<{
@@ -7,6 +10,11 @@ defineProps<{
   products: CatalogProduct[]
   loading: boolean
   errorMessage?: string
+  viewMode: CatalogViewMode
+}>()
+
+const emit = defineEmits<{
+  'update:page': [value: number]
 }>()
 </script>
 
@@ -25,11 +33,16 @@ defineProps<{
 
   <section
     v-if="!loading && !errorMessage && products.length"
-    class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+    :class="
+      viewMode === 'grid'
+        ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
+        : 'flex flex-col gap-4'
+    "
   >
-    <CatalogGridCard
+    <component
       v-for="product in products"
       :key="product.id"
+      :is="viewMode === 'grid' ? CatalogGridCard : CatalogListCard"
       :product="product"
     />
   </section>
@@ -40,4 +53,10 @@ defineProps<{
   >
     No products found.
   </section>
+
+  <CatalogPagination
+    v-if="pageInfo && !loading && !errorMessage && products.length"
+    :page-info="pageInfo"
+    @update:page="emit('update:page', $event)"
+  />
 </template>

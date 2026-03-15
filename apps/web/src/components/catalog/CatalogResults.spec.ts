@@ -36,6 +36,7 @@ describe('CatalogResults', () => {
         pageInfo: null,
         products: [],
         loading: true,
+        viewMode: 'grid',
       },
     })
 
@@ -48,6 +49,7 @@ describe('CatalogResults', () => {
         pageInfo,
         products: [],
         loading: false,
+        viewMode: 'grid',
       },
     })
 
@@ -60,6 +62,7 @@ describe('CatalogResults', () => {
         pageInfo,
         products,
         loading: false,
+        viewMode: 'grid',
       },
     })
 

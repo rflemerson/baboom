@@ -15,7 +15,7 @@ const config: CodegenConfig = {
         },
       ]
     : graphqlUrl,
-  documents: ['src/**/*.{ts,vue}', '!src/gql/**/*'],
+  documents: ['src/**/*.{ts,vue,graphql}', '!src/gql/**/*'],
   ignoreNoDocuments: true,
   generates: {
     './src/gql/': {
