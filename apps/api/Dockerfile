@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 RUN curl -sL daisyui.com/fast | bash
 
-COPY . .
+COPY apps/api/ .
 
 RUN ./tailwindcss -i input.css -o output.css --minify
 
@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-COPY . /app/
+COPY apps/api/ /app/
 RUN pip install --no-cache-dir .
 
 COPY --from=css-builder /build/output.css /app/static/css/output.css

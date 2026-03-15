@@ -13,7 +13,7 @@ repos:
     hooks:
       - id: interrogate
         args: [-vv]
-        exclude: ^(core|scrapers|baboom|manage.py|tests|docs|agents/brain/groq_agent.py)/
+        exclude: ^(apps/api/core|apps/api/scrapers|apps/api/baboom|apps/api/manage.py|tests|docs|agents/brain/groq_agent.py)/
 
   - repo: https://github.com/adamchainz/django-upgrade
     rev: 1.29.1
@@ -41,7 +41,7 @@ repos:
     rev: v1.19.1
     hooks:
       - id: mypy
-        exclude: ^baboom/settings/|^\.ai/|^docs/
+        exclude: ^apps/api/baboom/settings/|^\.ai/|^docs/
         additional_dependencies: [
           "django-stubs",
           "types-PyYAML",
@@ -65,17 +65,18 @@ repos:
           "extruct",
           "w3lib",
         ]
-        args: ["--config-file", "pyproject.toml"]
+        args: ["--config-file", "apps/api/pyproject.toml"]
 
   - repo: https://github.com/fpgmaas/deptry
     rev: 0.24.0
     hooks:
       - id: deptry
-        args: ["."]
+        args: ["apps/api", "--config", "apps/api/pyproject.toml"]
         exclude: ^\.ai/|^docs/
 
   - repo: https://github.com/jendrikseipp/vulture
     rev: v2.14
     hooks:
       - id: vulture
+        args: ["--config", "apps/api/pyproject.toml"]
         exclude: ^migrations/|^\.ai/|^docs/

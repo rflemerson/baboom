@@ -27,7 +27,7 @@ These packages are required for the application runtime.
 - **Scraping:** `playwright`, `beautifulsoup4`, `lxml`, `curl_cffi`
 
 ## Quality Assurance & Development
-Tools configured in `.pre-commit-config.yaml` and `pyproject.toml`.
+Tools configured in `.pre-commit-config.yaml` and `apps/api/pyproject.toml`.
 - **Linter (Ruff):** 0.14.* (Target: py314)
 - **Template Linter (DjLint):** 1.36.*
 - **Template Formatter (DjHTML):** 3.0.*
@@ -41,3 +41,4 @@ Tools configured in `.pre-commit-config.yaml` and `pyproject.toml`.
 - **Workflow Engine:** Dagster
 - **Environment Manager:** Nix (via `.idx/dev.nix`)
 - **QA:** Scripts for verification before commit.
+- **Repository Layout:** Django API lives in `apps/api`; agents service stays in `services/agents`.

@@ -2,7 +2,7 @@
 
 This folder currently contains the isolated `agents` service deployment contract.
 
-The Django web app + scrapers still run from the repository root.
+The Django API app + scrapers now run from `apps/api`.
 
 ## Deploy Model
 

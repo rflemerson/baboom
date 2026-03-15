@@ -1,6 +1,8 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
     restart: always
     expose:
       - "8000"
@@ -46,7 +48,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./apps/api/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - static_data:/app/staticfiles:ro
       - media_data:/app/media:ro
       - certbot_conf:/etc/letsencrypt
@@ -91,7 +93,9 @@ services:
       retries: 3
 
   celery:
-    build: .
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
     restart: always
     command: celery -A baboom worker -l info
     volumes:

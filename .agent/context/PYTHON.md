@@ -7,11 +7,11 @@ applyTo: "**"
 # Python Packaging Reference
 
 ## Overview
-This project uses modern Python packaging standards (PEP 621) via `pyproject.toml`.
+This project uses modern Python packaging standards (PEP 621) via `apps/api/pyproject.toml`.
 
-**CRITICAL RULE**: `pyproject.toml` is the Single Source of Truth for dependencies. **Delete** `requirements.txt` if found.
+**CRITICAL RULE**: `apps/api/pyproject.toml` is the Single Source of Truth for API dependencies. **Delete** `requirements.txt` if found.
 
-## Configuration (`pyproject.toml`)
+## Configuration (`apps/api/pyproject.toml`)
 
 ### 1. Metadata
 -   **Requires Python**: `>= 3.14`
@@ -30,9 +30,9 @@ List of development/testing tools.
 -   **Testing**: `factory-boy`, `django-stubs`.
 
 ## Usage
--   **Install/Sync**: `pip install -e .[dev]`
--   **Unlock/Upgrade**: `pip install --upgrade package_name` (then update `pyproject.toml` if pinning is needed).
--   **Add Dependency**: Add it to `pyproject.toml` manually, then run `pip install -e .`.
+-   **Install/Sync**: `cd apps/api && pip install -e .[dev]`
+-   **Unlock/Upgrade**: `pip install --upgrade package_name` (then update `apps/api/pyproject.toml` if pinning is needed).
+-   **Add Dependency**: Add it to `apps/api/pyproject.toml` manually, then run `cd apps/api && pip install -e .`.
 
 ## Tool Configuration
-All tool configuration (Ruff, MyPy, DjLint, Coverage) lives in `pyproject.toml` under `[tool.*]` sections. Avoid creating separate config files like `.flake8` or `pytest.ini` unless strictly necessary.
+All API tool configuration (Ruff, MyPy, DjLint, Coverage) lives in `apps/api/pyproject.toml` under `[tool.*]` sections. Avoid creating separate config files like `.flake8` or `pytest.ini` unless strictly necessary.

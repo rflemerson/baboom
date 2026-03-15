@@ -28,16 +28,16 @@ Services are managed declaratively in the `services` block.
 
 ### 3. Lifecycle Hooks (`idx.workspace`)
 -   **onCreate**: Runs once on environment creation.
-    -   Installs Python dependencies: `pip install -e .[dev]`
-    -   Migrates DB: `python manage.py migrate`
+    -   Installs API dependencies: `cd apps/api && pip install -e .[dev]`
+    -   Migrates DB: `python apps/api/manage.py migrate`
 -   **onStart**: Runs every time the workspace starts.
 -   **Previews**: Configures the web preview (Django runserver on `$PORT`).
 
 ## Managing Dependencies
 
 ### Python Packages
-1.  Add dependency to `pyproject.toml`.
-2.  Run `pip install -e .` (or `.[dev]`).
+1.  Add dependency to `apps/api/pyproject.toml`.
+2.  Run `cd apps/api && pip install -e .` (or `.[dev]`).
 3.  **Do NOT** use `requirements.txt`.
 
 ### System Packages

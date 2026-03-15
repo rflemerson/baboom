@@ -37,12 +37,13 @@ You are the guardian of this project's "Brain". Keep it sharp.
 ## 3. Workflow Commands
 ```bash
 # Workflow
-Test: python manage.py test
+Test: python apps/api/manage.py test
 Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
 Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
 Lint: pre-commit run --all-files
-Run: python manage.py runserver
+Run: python apps/api/manage.py runserver
 Orchestration: PYTHONPATH=services/agents:. dagster dev -m agents.definitions
+API Deps: cd apps/api && pip install -e .
 Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
 ```
 

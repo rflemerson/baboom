@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
 ### 3. Application Installation
 We treat the app as a package.
 ```dockerfile
-COPY . /app/
+COPY apps/api/ /app/
 RUN pip install --no-cache-dir .
 ```
 -   **Rule**: `COPY . .` should be near the end to maximize layer caching.
@@ -68,10 +68,12 @@ RUN python manage.py collectstatic --noinput
 ```yaml
 services:
   web:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: python apps/api/manage.py runserver 0.0.0.0:8000
     volumes:
-      - .:/app  # Hot-reloading
+      - ./apps/api:/app  # Hot-reloading
     ports:
       - "8000:8000"
     env_file: .env

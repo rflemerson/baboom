@@ -17,7 +17,7 @@ Quality Assurance is enforced via `pre-commit` hooks. These checks run automatic
 ## Enabled Hooks
 
 ### 1. Ruff (Python Linter & Formatter)
--   **Config**: `pyproject.toml` (`[tool.ruff]`).
+-   **Config**: `apps/api/pyproject.toml` (`[tool.ruff]`).
 -   **Target**: Python 3.14.
 -   **Rules**:
     -   `E`, `W`, `F` (Standard flake8/pycodestyle)
@@ -28,7 +28,7 @@ Quality Assurance is enforced via `pre-commit` hooks. These checks run automatic
     -   `S` (Bandit - security)
 
 ### 2. DjLint (Template Linter)
--   **Config**: `pyproject.toml` (`[tool.djlint]`).
+-   **Config**: `apps/api/pyproject.toml` (`[tool.djlint]`).
 -   **Target**: `.html` files.
 -   **Profile**: `django`.
 
@@ -41,12 +41,12 @@ Quality Assurance is enforced via `pre-commit` hooks. These checks run automatic
 -   **Check**: Jinja/Django template syntax errors.
 
 ### 5. MyPy (Type Checker)
--   **Config**: `pyproject.toml` (`[tool.mypy]`).
+-   **Config**: `apps/api/pyproject.toml` (`[tool.mypy]`).
 -   **Plugins**: `django-stubs`, `pydantic`.
 -   **Strictness**: `check_untyped_defs = true`.
 
 ### 6. Deptry (Dependency Checker)
--   **Target**: `pyproject.toml` vs imports.
+-   **Target**: `apps/api/pyproject.toml` vs imports.
 -   **Check**: Unused dependencies, missing dependencies.
 
 ### 7. Safety (Security)
@@ -57,4 +57,4 @@ Quality Assurance is enforced via `pre-commit` hooks. These checks run automatic
 2.  **Fix Issues**:
     -   **Ruff**: Auto-fix most issues.
     -   **MyPy**: Add type hints.
-    -   **Deptry**: Remove unused packages from `pyproject.toml`.
+    -   **Deptry**: Remove unused packages from `apps/api/pyproject.toml`.

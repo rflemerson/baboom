@@ -28,12 +28,13 @@ List versions explicitly. Agents assume defaults if not specified.
 Explicit commands for common tasks. Don't let the agent guess.
 ```bash
 # Workflow
-Test: python manage.py test
+Test: python apps/api/manage.py test
 Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
 Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
 Lint: pre-commit run --all-files
-Run: python manage.py runserver
+Run: python apps/api/manage.py runserver
 Orchestration (Agents): PYTHONPATH=services/agents:. dagster dev -m agents.definitions
+API Isolated Deps: cd apps/api && pip install -e .
 Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
 ```
 
