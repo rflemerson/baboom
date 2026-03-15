@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import strawberry
 from strawberry import auto
 from strawberry.django import type as django_type
@@ -152,3 +154,51 @@ class ProductResult:
 
     product: ProductType | None = None
     errors: list[ValidationError] | None = None
+
+
+@strawberry.type
+class CatalogProductType:
+    """Product list item tailored for the public catalog."""
+
+    id: int
+    name: str
+    weight: int
+    packaging: str
+    is_published: bool
+    brand: BrandType
+    category: CategoryType | None
+    last_price: Decimal | None = None
+    price_per_gram: Decimal | None = None
+    concentration: Decimal | None = None
+    total_protein: Decimal | None = None
+    external_link: str | None = None
+
+    @strawberry.field
+    def packaging_display(self) -> str:
+        """Return the human-readable packaging label."""
+        return self.get_packaging_display()
+
+    @strawberry.field
+    def tags(self) -> list[TagType]:
+        """Return tags as a concrete list for GraphQL serialization."""
+        return list(self.tags.all())
+
+
+@strawberry.type
+class CatalogPageInfo:
+    """Pagination metadata for the public catalog."""
+
+    current_page: int
+    per_page: int
+    total_pages: int
+    total_count: int
+    has_previous_page: bool
+    has_next_page: bool
+
+
+@strawberry.type
+class CatalogProductsResult:
+    """Catalog listing payload for the public frontend."""
+
+    items: list[CatalogProductType]
+    page_info: CatalogPageInfo

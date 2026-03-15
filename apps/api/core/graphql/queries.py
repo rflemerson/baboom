@@ -1,16 +1,83 @@
+from django.core.paginator import Paginator
 from typing import cast
 
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Category, Product, Tag
+from core.filters import ProductFilter
+from core.selectors import list_with_stats
 
-from .types import CategoryType, ProductType, TagType
+from .types import (
+    CatalogPageInfo,
+    CatalogProductType,
+    CatalogProductsResult,
+    CategoryType,
+    ProductType,
+    TagType,
+)
 
 
 @strawberry.type
 class CoreQuery:
     """GraphQL queries for core module."""
+
+    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
+    def catalog_products(
+        self,
+        search: str | None = None,
+        brand: str | None = None,
+        price_min: float | None = None,
+        price_max: float | None = None,
+        price_per_gram_min: float | None = None,
+        price_per_gram_max: float | None = None,
+        concentration_min: float | None = None,
+        concentration_max: float | None = None,
+        sort_by: str = "price_per_gram",
+        sort_dir: str = "asc",
+        page: int = 1,
+        per_page: int = 12,
+    ) -> CatalogProductsResult:
+        """Return the public catalog list using the same selector/filter pipeline as Django views."""
+        normalized_per_page = per_page if per_page in {12, 24, 48} else 12
+        normalized_page = max(page, 1)
+
+        filter_data: dict[str, str | float] = {
+            "sort_by": sort_by,
+            "sort_dir": sort_dir,
+        }
+
+        optional_filters = {
+            "search": search,
+            "brand": brand,
+            "price_min": price_min,
+            "price_max": price_max,
+            "price_per_gram_min": price_per_gram_min,
+            "price_per_gram_max": price_per_gram_max,
+            "concentration_min": concentration_min,
+            "concentration_max": concentration_max,
+        }
+
+        for key, value in optional_filters.items():
+            if value not in (None, ""):
+                filter_data[key] = value
+
+        queryset = list_with_stats().filter(is_published=True)
+        product_filter = ProductFilter(filter_data, queryset=queryset)
+        paginator = Paginator(product_filter.qs, normalized_per_page)
+        page_obj = paginator.get_page(normalized_page)
+
+        return CatalogProductsResult(
+            items=cast(list[CatalogProductType], list(page_obj.object_list)),
+            page_info=CatalogPageInfo(
+                current_page=page_obj.number,
+                per_page=normalized_per_page,
+                total_pages=paginator.num_pages,
+                total_count=paginator.count,
+                has_previous_page=page_obj.has_previous(),
+                has_next_page=page_obj.has_next(),
+            ),
+        )
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def products(self, limit: int = 50, offset: int = 0) -> list[ProductType]:
