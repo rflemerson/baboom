@@ -11,7 +11,12 @@ applyTo: "**"
 - [Hadolint Rules](https://github.com/hadolint/hadolint)
 
 ## Overview
-The project uses `python:3.14-slim` for the application and `docker compose` for local orchestration.
+The project uses `python:3.14-slim` for application images and `docker compose` for local orchestration.
+
+Current image ownership:
+- `apps/api/Dockerfile`: Django API
+- `services/agents/Dockerfile`: agents service
+- future frontend should use `apps/web/Dockerfile`
 
 ## Dockerfile Structure
 

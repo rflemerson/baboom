@@ -30,6 +30,16 @@ cd /path/to/baboom
 PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 ```
 
+## Container Build
+
+The service owns its container definition at `services/agents/Dockerfile`.
+
+Build from repository root:
+
+```bash
+docker build -f services/agents/Dockerfile -t baboom-agents .
+```
+
 ## Environment Variables
 
 Minimum:

@@ -36,6 +36,8 @@ Run: python apps/api/manage.py runserver
 Orchestration (Agents): PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 API Isolated Deps: cd apps/api && pip install -e .
 Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
+API Image: docker build -f apps/api/Dockerfile -t baboom-api .
+Agents Image: docker build -f services/agents/Dockerfile -t baboom-agents .
 ```
 
 ### IV. Coding Standards (The "Rules")
