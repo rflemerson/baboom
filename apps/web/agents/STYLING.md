@@ -9,8 +9,9 @@
 ## Current project pattern
 
 - Global Tailwind entry lives in `src/styles.css`.
+- Theme tokens and semantic UI classes live in `src/theme.scss`.
 - Prefer utility classes first.
-- Reach for Sass only when the component benefits from local structure or repeated styling logic.
+- Reach for Sass when the component or the whole app needs semantic tokens, shared UI primitives, or repeated styling logic.
 - Prettier uses `prettier-plugin-tailwindcss` to sort Tailwind classes automatically.
 - Do not add `eslint-plugin-tailwindcss` right now; the current released plugin line targets Tailwind 3, while this project uses Tailwind 4.
 
@@ -20,6 +21,9 @@
 - Keep component-level Sass scoped.
 - Avoid rebuilding a separate design system on top of Tailwind too early.
 - Prefer extracting repeated markup into Vue components before extracting repeated utility sets into custom classes.
+- Put theme colors, borders, and reusable UI primitives in `src/theme.scss` so visual changes can cascade from one place.
+- Use Tailwind primarily for layout, spacing, sizing, and responsive behavior.
+- Use semantic classes such as buttons, panels, inputs, and dialog shells to avoid long repeated class strings in templates.
 - Let Prettier handle Tailwind class ordering instead of trying to enforce that through custom manual conventions.
 - If Tailwind-specific linting is revisited later, re-check Tailwind 4 compatibility first instead of forcing the older ESLint plugin into the toolchain.
 

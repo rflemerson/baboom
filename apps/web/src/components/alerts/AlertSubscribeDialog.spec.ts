@@ -79,6 +79,33 @@ describe('AlertSubscribeDialog', () => {
     })
 
     expect(wrapper.text()).toContain('Please enter a valid email address.')
-    expect(wrapper.find('input[type="email"]').classes()).toContain('border-red-400')
+    expect(wrapper.find('input[type="email"]').classes()).toContain('is-invalid')
+  })
+
+  it('closes on escape', async () => {
+    vi.mocked(useAlertSubscription).mockReturnValue({
+      canSubmit: computed(() => true),
+      email: ref(''),
+      emailIsValid: computed(() => true),
+      errorMessage: ref(null),
+      hasEmail: computed(() => false),
+      loading: ref(false),
+      reset: vi.fn(),
+      showFieldError: computed(() => false),
+      status: ref('idle'),
+      submit: vi.fn(),
+    })
+
+    const wrapper = mount(AlertSubscribeDialog, {
+      attachTo: document.body,
+      props: {
+        modelValue: true,
+      },
+    })
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false])
+    wrapper.unmount()
   })
 })

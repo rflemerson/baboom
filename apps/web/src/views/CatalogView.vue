@@ -54,12 +54,12 @@ const advancedFiltersActive = computed(() => {
 </script>
 
 <template>
-  <main class="min-h-screen bg-stone-950 px-6 py-12 text-stone-50">
-    <div class="mx-auto max-w-6xl">
+  <main class="app-page px-6 py-12">
+    <div class="app-shell">
       <header class="mb-10 flex flex-col gap-3">
-        <p class="text-xs tracking-[0.3em] text-orange-300 uppercase">Baboom catalog</p>
+        <p class="app-eyebrow">Baboom catalog</p>
         <h1 class="text-4xl font-semibold tracking-tight">Public catalog</h1>
-        <p class="max-w-2xl text-sm text-stone-300">
+        <p class="app-copy-muted max-w-2xl text-sm">
           This is the first slice of the Vue migration. The catalog listing is now consuming GraphQL
           directly.
         </p>

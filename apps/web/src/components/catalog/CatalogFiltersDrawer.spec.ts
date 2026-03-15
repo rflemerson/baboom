@@ -40,4 +40,25 @@ describe('CatalogFiltersDrawer', () => {
     expect(wrapper.emitted('clear')).toHaveLength(1)
     expect(wrapper.emitted('apply')).toHaveLength(1)
   })
+
+  it('closes on escape', async () => {
+    const wrapper = mount(CatalogFiltersDrawer, {
+      attachTo: document.body,
+      props: {
+        brand: '',
+        concentrationMax: null,
+        concentrationMin: null,
+        modelValue: true,
+        priceMax: null,
+        priceMin: null,
+        pricePerGramMax: null,
+        pricePerGramMin: null,
+      },
+    })
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([false])
+    wrapper.unmount()
+  })
 })

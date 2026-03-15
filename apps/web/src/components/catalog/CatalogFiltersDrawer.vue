@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BaseModal from '@/components/ui/BaseModal.vue'
+
 defineProps<{
   brand: string
   concentrationMax: number | null
@@ -31,25 +33,31 @@ function applyFilters() {
   emit('apply')
   emit('update:modelValue', false)
 }
+
+const titleId = 'catalog-filters-drawer-title'
 </script>
 
 <template>
-  <div
-    v-if="modelValue"
-    class="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm"
-    @click.self="emit('update:modelValue', false)"
+  <BaseModal
+    :aria-labelledby="titleId"
+    container-class="justify-end"
+    initial-focus='input[type="text"]'
+    :model-value="modelValue"
+    panel-class="flex h-full w-full max-w-md flex-col border-l"
+    @update:modelValue="emit('update:modelValue', $event)"
   >
-    <aside
-      class="flex h-full w-full max-w-md flex-col border-l border-white/10 bg-stone-950 text-white"
-    >
-      <header class="flex items-center justify-between border-b border-white/10 px-6 py-5">
+    <aside class="flex h-full w-full flex-col">
+      <header
+        class="flex items-center justify-between px-6 py-5"
+        style="border-bottom: 1px solid var(--app-border)"
+      >
         <div>
-          <p class="text-xs tracking-[0.24em] text-orange-300 uppercase">Catalog filters</p>
-          <h2 class="mt-2 text-xl font-semibold">Refine results</h2>
+          <p class="app-eyebrow">Catalog filters</p>
+          <h2 :id="titleId" class="mt-2 text-xl font-semibold">Refine results</h2>
         </div>
         <button
           type="button"
-          class="rounded-xl border border-white/10 px-3 py-2 text-sm transition hover:border-orange-400"
+          class="app-button app-button--ghost rounded-xl px-3 py-2 text-sm"
           @click="emit('update:modelValue', false)"
         >
           Close
@@ -58,18 +66,18 @@ function applyFilters() {
 
       <div class="flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <label class="flex flex-col gap-2">
-          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Brand</span>
+          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Brand</span>
           <input
             :value="brand"
             type="text"
             placeholder="Filter by brand"
-            class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+            class="app-input rounded-xl px-4 py-3 text-sm"
             @input="emit('update:brand', ($event.target as HTMLInputElement).value)"
           />
         </label>
 
         <div class="space-y-3">
-          <p class="text-xs tracking-[0.24em] text-stone-400 uppercase">Price range</p>
+          <p class="app-copy-soft text-xs tracking-[0.24em] uppercase">Price range</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="priceMin ?? ''"
@@ -77,7 +85,7 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Min"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-4 py-3 text-sm"
               @input="
                 emit('update:priceMin', parseNumber(($event.target as HTMLInputElement).value))
               "
@@ -88,7 +96,7 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Max"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-4 py-3 text-sm"
               @input="
                 emit('update:priceMax', parseNumber(($event.target as HTMLInputElement).value))
               "
@@ -97,7 +105,7 @@ function applyFilters() {
         </div>
 
         <div class="space-y-3">
-          <p class="text-xs tracking-[0.24em] text-stone-400 uppercase">Price per gram</p>
+          <p class="app-copy-soft text-xs tracking-[0.24em] uppercase">Price per gram</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="pricePerGramMin ?? ''"
@@ -105,7 +113,7 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Min"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-4 py-3 text-sm"
               @input="
                 emit(
                   'update:pricePerGramMin',
@@ -119,7 +127,7 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Max"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-4 py-3 text-sm"
               @input="
                 emit(
                   'update:pricePerGramMax',
@@ -131,7 +139,7 @@ function applyFilters() {
         </div>
 
         <div class="space-y-3">
-          <p class="text-xs tracking-[0.24em] text-stone-400 uppercase">Concentration</p>
+          <p class="app-copy-soft text-xs tracking-[0.24em] uppercase">Concentration</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="concentrationMin ?? ''"
@@ -139,7 +147,7 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Min"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-4 py-3 text-sm"
               @input="
                 emit(
                   'update:concentrationMin',
@@ -153,7 +161,7 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Max"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-4 py-3 text-sm"
               @input="
                 emit(
                   'update:concentrationMax',
@@ -165,22 +173,22 @@ function applyFilters() {
         </div>
       </div>
 
-      <footer class="flex gap-3 border-t border-white/10 px-6 py-5">
+      <footer class="flex gap-3 px-6 py-5" style="border-top: 1px solid var(--app-border)">
         <button
           type="button"
-          class="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-stone-200 transition hover:border-white/30"
+          class="app-button app-button--secondary flex-1 rounded-xl px-4 py-3 text-sm"
           @click="emit('clear')"
         >
           Clear
         </button>
         <button
           type="button"
-          class="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-orange-400"
+          class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
           @click="applyFilters"
         >
           Apply filters
         </button>
       </footer>
     </aside>
-  </div>
+  </BaseModal>
 </template>

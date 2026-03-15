@@ -3,6 +3,7 @@ import { createApp, h, provide } from 'vue'
 import { createPinia } from 'pinia'
 
 import './styles.css'
+import './theme.scss'
 
 import App from './App.vue'
 import { apolloClient } from './graphql/client/apollo'

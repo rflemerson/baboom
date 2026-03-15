@@ -45,32 +45,32 @@ function onSortByChange(event: Event) {
 </script>
 
 <template>
-  <section class="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+  <section class="app-panel app-panel--soft mb-8 rounded-2xl p-4">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div
         class="grid flex-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]"
       >
         <label class="flex flex-col gap-2">
-          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Search</span>
+          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Search</span>
           <div class="relative">
             <Search
-              class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-stone-500"
+              class="app-copy-soft pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2"
             />
             <input
               :value="search"
               type="search"
               placeholder="Search products, brands, categories, or tags"
-              class="w-full rounded-xl border border-white/10 bg-stone-950 px-11 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              class="app-input rounded-xl px-11 py-3 text-sm"
               @input="onSearchInput"
             />
           </div>
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Sort by</span>
+          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Sort by</span>
           <select
             :value="sortBy"
-            class="rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+            class="app-select rounded-xl px-4 py-3 text-sm"
             @change="onSortByChange"
           >
             <option v-for="option in sortOptions" :key="option.value" :value="option.value">
@@ -80,10 +80,10 @@ function onSortByChange(event: Event) {
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Per page</span>
+          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Per page</span>
           <select
             :value="perPage"
-            class="rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+            class="app-select rounded-xl px-4 py-3 text-sm"
             @change="onPerPageChange"
           >
             <option :value="12">12</option>
@@ -96,12 +96,8 @@ function onSortByChange(event: Event) {
       <div class="flex flex-wrap gap-3">
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition"
-          :class="
-            advancedFiltersActive
-              ? 'border-orange-400 bg-orange-400/15 text-orange-200'
-              : 'border-white/10 text-stone-200 hover:border-orange-400'
-          "
+          class="app-button rounded-xl px-4 py-3 text-sm"
+          :class="advancedFiltersActive ? 'app-button--accent' : 'app-button--secondary'"
           @click="emit('openFilters')"
         >
           <SlidersHorizontal class="h-4 w-4" />
@@ -109,21 +105,17 @@ function onSortByChange(event: Event) {
         </button>
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm font-medium text-white transition hover:border-orange-400"
+          class="app-button app-button--ghost rounded-xl px-4 py-3 text-sm"
           @click="emit('toggle:sortDir')"
         >
           <ArrowDownUp class="h-4 w-4" />
           <span>{{ sortDir === 'asc' ? 'Ascending' : 'Descending' }}</span>
         </button>
-        <div class="flex overflow-hidden rounded-xl border border-white/10">
+        <div class="flex overflow-hidden rounded-xl border" style="border-color: var(--app-border)">
           <button
             type="button"
-            class="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium transition"
-            :class="
-              viewMode === 'grid'
-                ? 'bg-orange-400/15 text-orange-200'
-                : 'bg-stone-950 text-stone-200 hover:text-white'
-            "
+            class="app-button px-4 py-3 text-sm"
+            :class="viewMode === 'grid' ? 'app-button--accent' : 'app-button--ghost'"
             @click="emit('update:viewMode', 'grid')"
           >
             <Grid3X3 class="h-4 w-4" />
@@ -131,12 +123,9 @@ function onSortByChange(event: Event) {
           </button>
           <button
             type="button"
-            class="inline-flex items-center gap-2 border-l border-white/10 px-4 py-3 text-sm font-medium transition"
-            :class="
-              viewMode === 'list'
-                ? 'bg-orange-400/15 text-orange-200'
-                : 'bg-stone-950 text-stone-200 hover:text-white'
-            "
+            class="app-button px-4 py-3 text-sm"
+            style="border-left: 1px solid var(--app-border)"
+            :class="viewMode === 'list' ? 'app-button--accent' : 'app-button--ghost'"
             @click="emit('update:viewMode', 'list')"
           >
             <List class="h-4 w-4" />
@@ -145,7 +134,7 @@ function onSortByChange(event: Event) {
         </div>
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-stone-200 transition hover:border-white/30"
+          class="app-button app-button--secondary rounded-xl px-4 py-3 text-sm"
           @click="emit('clear')"
         >
           <RotateCcw class="h-4 w-4" />
