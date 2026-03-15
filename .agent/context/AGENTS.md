@@ -31,7 +31,10 @@ Explicit commands for common tasks. Don't let the agent guess.
 Test: python apps/api/manage.py test
 Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
 Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
-Lint: pre-commit run --all-files
+Lint: prek run --all-files
+Lint (Just): just check
+Lint API (Just): just api-lint
+Lint Agents (Just): just agents-lint
 Run: python apps/api/manage.py runserver
 Orchestration (Agents): PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 API Isolated Deps: cd apps/api && pip install -e .

@@ -1,0 +1,49 @@
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "DJ",  # django specific
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "ANN", # type annotations
+    "ASYNC", # async/await issues
+    "BLE", # blind exception catches
+    "C4",  # flake8-comprehensions
+    "COM", # trailing commas
+    "EM",  # exception message style
+    "EXE", # shebang / executable files
+    "FBT", # boolean trap
+    "FIX", # TODO / FIXME / XXX / HACK
+    "FLY", # flynt-style string improvements
+    "FURB", # refurb modernizations
+    "G",   # logging format
+    "ICN", # import conventions
+    "INP", # implicit namespace packages
+    "ISC", # implicit string concatenation
+    "LOG", # logging usage
+    "PERF", # performance suggestions
+    "PIE", # miscellaneous improvements
+    "PT",  # pytest style
+    "PTH", # pathlib preference
+    "Q",   # quotes
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "ERA", # eradicate (commented code)
+    "SLF", # private member access
+    "TD",  # TODO format
+    "T20", # flake8-print
+    "TRY", # exception handling style
+    "RUF", # ruff-specific rules
+    "A",   # flake8-builtins
+    "ARG", # unused arguments
+    "C90", # mccabe complexity
+    "DTZ", # datetime timezone safety
+    "PL",  # pylint
+    "N",   # pep8-naming
+    "T10", # debugger
+    "TC",  # type-checking imports
+    "D",   # pydocstyle
+]

@@ -40,7 +40,10 @@ You are the guardian of this project's "Brain". Keep it sharp.
 Test: python apps/api/manage.py test
 Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
 Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
-Lint: pre-commit run --all-files
+Lint: prek run --all-files
+Lint (Just): just check
+Lint API (Just): just api-lint
+Lint Agents (Just): just agents-lint
 Run: python apps/api/manage.py runserver
 Orchestration: PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 API Deps: cd apps/api && pip install -e .
@@ -53,4 +56,4 @@ Agents Image: docker build -f services/agents/Dockerfile -t baboom-agents .
 **NEVER**, under any circumstances, commit code without **EXPLICIT** user authorization.
 -   Always ask for permission before running `git commit`.
 -   Even if you are fixing a small error or amending a previous commit, **ASK FIRST**.
--   **NEVER SKIP CHECKS**. Always run pre-commit hooks. Do NOT use `--no-verify`.
+-   **NEVER SKIP CHECKS**. Always run the configured git hooks/QA checks. Do NOT use `--no-verify`.
