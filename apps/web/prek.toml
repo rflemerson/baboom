@@ -1,0 +1,30 @@
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "web-lint",
+    name = "web lint",
+    language = "system",
+    entry = "npm run lint",
+    files = "^(src/|e2e/|package\\.json|package-lock\\.json|tsconfig.*\\.json|vite\\.config\\.ts|vitest\\.config\\.ts|playwright\\.config\\.ts|eslint\\.config\\.ts|codegen\\.ts)",
+    pass_filenames = false,
+  },
+  {
+    id = "web-type-check",
+    name = "web type-check",
+    language = "system",
+    entry = "npm run type-check",
+    files = "^(src/|env\\.d\\.ts|package\\.json|package-lock\\.json|tsconfig.*\\.json|vite\\.config\\.ts|vitest\\.config\\.ts|codegen\\.ts)",
+    pass_filenames = false,
+  },
+  {
+    id = "web-test-unit",
+    name = "web test:unit",
+    language = "system",
+    entry = "npm run test:unit -- --run",
+    files = "^(src/|vitest\\.config\\.ts|package\\.json|package-lock\\.json|tsconfig.*\\.json)",
+    pass_filenames = false,
+  },
+]

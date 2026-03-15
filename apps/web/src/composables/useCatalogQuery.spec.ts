@@ -1,16 +1,52 @@
+import type { Ref } from 'vue'
 import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import type { UseQueryReturn } from '@vue/apollo-composable'
+import type { CatalogProductsQuery, CatalogProductsQueryVariables } from '@/gql/graphql'
 
-vi.mock('@vue/apollo-composable', () => ({
-  useQuery: vi.fn(),
+const { mockUseQuery } = vi.hoisted(() => ({
+  mockUseQuery: vi.fn<
+    (
+      ...args: unknown[]
+    ) => UseQueryReturn<CatalogProductsQuery, CatalogProductsQueryVariables>
+  >(),
 }))
 
-import { useQuery } from '@vue/apollo-composable'
+vi.mock('@vue/apollo-composable', () => ({
+  useQuery: mockUseQuery,
+}))
+
 import { useCatalogQuery } from './useCatalogQuery'
+
+function createUseQueryReturn(
+  overrides: Partial<UseQueryReturn<CatalogProductsQuery, CatalogProductsQueryVariables>>,
+): UseQueryReturn<CatalogProductsQuery, CatalogProductsQueryVariables> {
+  return {
+    result: ref(undefined),
+    loading: ref(false),
+    networkStatus: ref(undefined),
+    error: computed(() => null),
+    start: vi.fn(),
+    stop: vi.fn(),
+    restart: vi.fn(),
+    forceDisabled: ref(false),
+    document: ref(null),
+    variables: ref(undefined) as Ref<CatalogProductsQueryVariables | undefined>,
+    options: {},
+    query: ref(null),
+    refetch: vi.fn(),
+    fetchMore: vi.fn(),
+    updateQuery: vi.fn(),
+    subscribeToMore: vi.fn(),
+    onResult: vi.fn(() => ({ off: vi.fn() })),
+    onError: vi.fn(() => ({ off: vi.fn() })),
+    ...overrides,
+  }
+}
 
 describe('useCatalogQuery', () => {
   it('maps products and page info from the GraphQL response', () => {
-    vi.mocked(useQuery).mockReturnValue({
+    mockUseQuery.mockImplementation(() => createUseQueryReturn({
       result: ref({
         catalogProducts: {
           pageInfo: {
@@ -41,7 +77,7 @@ describe('useCatalogQuery', () => {
       }),
       loading: ref(false),
       error: computed(() => null),
-    } as never)
+    }))
 
     const { loading, pageInfo, products } = useCatalogQuery({
       page: 1,

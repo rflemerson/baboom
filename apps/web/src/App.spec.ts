@@ -9,12 +9,12 @@ describe('App', () => {
       global: {
         stubs: {
           RouterView: {
-            template: '<div data-test=\"router-view\" />',
+            template: '<div data-test="router-view" />',
           },
         },
       },
     })
 
-    expect(wrapper.find('[data-test=\"router-view\"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true)
   })
 })

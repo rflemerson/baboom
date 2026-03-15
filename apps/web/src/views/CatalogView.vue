@@ -13,7 +13,6 @@ const {
   clearFilters,
   concentrationMax,
   concentrationMin,
-  page,
   perPage,
   priceMax,
   priceMin,

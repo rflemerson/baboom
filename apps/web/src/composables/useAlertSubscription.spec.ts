@@ -1,16 +1,39 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import type { UseMutationReturn } from '@vue/apollo-composable'
+import type { SubscribeAlertsMutation, SubscribeAlertsMutationVariables } from '@/gql/graphql'
 
-vi.mock('@vue/apollo-composable', () => ({
-  useMutation: vi.fn(),
+const { mockUseMutation } = vi.hoisted(() => ({
+  mockUseMutation: vi.fn<
+    (
+      ...args: unknown[]
+    ) => UseMutationReturn<SubscribeAlertsMutation, SubscribeAlertsMutationVariables>
+  >(),
 }))
 
-import { useMutation } from '@vue/apollo-composable'
+vi.mock('@vue/apollo-composable', () => ({
+  useMutation: mockUseMutation,
+}))
+
 import { useAlertSubscription } from './useAlertSubscription'
+
+function createUseMutationReturn(
+  overrides: Partial<UseMutationReturn<SubscribeAlertsMutation, SubscribeAlertsMutationVariables>>,
+): UseMutationReturn<SubscribeAlertsMutation, SubscribeAlertsMutationVariables> {
+  return {
+    mutate: vi.fn().mockResolvedValue(null),
+    loading: ref(false),
+    error: ref(null),
+    called: ref(false),
+    onDone: vi.fn(() => ({ off: vi.fn() })),
+    onError: vi.fn(() => ({ off: vi.fn() })),
+    ...overrides,
+  }
+}
 
 describe('useAlertSubscription', () => {
   it('sets success state when the mutation succeeds', async () => {
-    vi.mocked(useMutation).mockReturnValue({
+    mockUseMutation.mockImplementation(() => createUseMutationReturn({
       loading: ref(false),
       mutate: vi.fn().mockResolvedValue({
         data: {
@@ -22,7 +45,7 @@ describe('useAlertSubscription', () => {
           },
         },
       }),
-    } as never)
+    }))
 
     const { email, status, submit } = useAlertSubscription()
 
@@ -33,7 +56,7 @@ describe('useAlertSubscription', () => {
   })
 
   it('sets duplicate state when the email already exists', async () => {
-    vi.mocked(useMutation).mockReturnValue({
+    mockUseMutation.mockImplementation(() => createUseMutationReturn({
       loading: ref(false),
       mutate: vi.fn().mockResolvedValue({
         data: {
@@ -45,7 +68,7 @@ describe('useAlertSubscription', () => {
           },
         },
       }),
-    } as never)
+    }))
 
     const { email, status, submit } = useAlertSubscription()
 
