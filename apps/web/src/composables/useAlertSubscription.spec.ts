@@ -33,6 +33,26 @@ function createUseMutationReturn(
 }
 
 describe('useAlertSubscription', () => {
+  it('sets a local validation error when the email is invalid', async () => {
+    const mutate = vi.fn()
+
+    mockUseMutation.mockImplementation(() =>
+      createUseMutationReturn({
+        loading: ref(false),
+        mutate,
+      }),
+    )
+
+    const { email, errorMessage, status, submit } = useAlertSubscription()
+
+    email.value = 'invalid-email'
+    await submit()
+
+    expect(status.value).toBe('error')
+    expect(errorMessage.value).toBe('Please enter a valid email address.')
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
   it('sets success state when the mutation succeeds', async () => {
     mockUseMutation.mockImplementation(() =>
       createUseMutationReturn({

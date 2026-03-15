@@ -4,6 +4,16 @@ import { BellRing, Mail, X } from 'lucide-vue-next'
 
 import { useAlertSubscription } from '@/composables/useAlertSubscription'
 
+const DEBUG_ALERTS = import.meta.env.DEV
+
+function debugLog(message: string, payload?: unknown) {
+  if (!DEBUG_ALERTS) {
+    return
+  }
+
+  console.log(message, payload)
+}
+
 const props = defineProps<{
   modelValue: boolean
 }>()
@@ -12,19 +22,38 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
 
-const { canSubmit, email, errorMessage, loading, reset, status, submit } = useAlertSubscription()
+const { canSubmit, email, errorMessage, loading, reset, showFieldError, status, submit } =
+  useAlertSubscription()
 
 watch(
   () => props.modelValue,
   (isOpen) => {
+    debugLog('[alerts-dialog] modelValue changed', { isOpen })
     if (!isOpen) {
+      debugLog('[alerts-dialog] dialog closed, resetting state')
       reset()
     }
   },
 )
 
 async function onSubmit() {
+  debugLog('[alerts-dialog] form submit triggered', {
+    email: email.value,
+    status: status.value,
+    errorMessage: errorMessage.value,
+    canSubmit: canSubmit.value,
+    loading: loading.value,
+    showFieldError: showFieldError.value,
+  })
   await submit()
+  debugLog('[alerts-dialog] form submit finished', {
+    email: email.value,
+    status: status.value,
+    errorMessage: errorMessage.value,
+    canSubmit: canSubmit.value,
+    loading: loading.value,
+    showFieldError: showFieldError.value,
+  })
 }
 </script>
 
@@ -39,24 +68,34 @@ async function onSubmit() {
     >
       <div v-if="status === 'success'" class="space-y-4 text-center">
         <p class="text-xs tracking-[0.24em] text-emerald-300 uppercase">Subscribed</p>
-        <h2 class="text-2xl font-semibold">You are on the alert list.</h2>
+        <h2 class="text-2xl font-semibold">You're Subscribed!</h2>
         <p class="text-sm text-stone-300">
-          We will notify <strong>{{ email }}</strong> when prices move.
+          We&apos;ve added <strong>{{ email }}</strong> to our list. You&apos;ll be the first to
+          know about price drops!
         </p>
-        <button
-          type="button"
-          class="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-orange-400"
-          @click="emit('update:modelValue', false)"
-        >
-          Close
-        </button>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-orange-400"
+            @click="emit('update:modelValue', false)"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            class="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-stone-100 transition hover:border-white/30"
+            @click="reset"
+          >
+            Subscribe another email
+          </button>
+        </div>
       </div>
 
       <div v-else-if="status === 'duplicate'" class="space-y-4 text-center">
         <p class="text-xs tracking-[0.24em] text-sky-300 uppercase">Already subscribed</p>
-        <h2 class="text-2xl font-semibold">This email is already subscribed.</h2>
+        <h2 class="text-2xl font-semibold">Already Subscribed</h2>
         <p class="text-sm text-stone-300">
-          Try a different email if you want another alert recipient.
+          The email <strong>{{ email }}</strong> is already in our database.
         </p>
         <div class="flex gap-3">
           <button
@@ -78,15 +117,15 @@ async function onSubmit() {
 
       <div v-else class="space-y-5">
         <div class="flex items-start justify-between gap-4">
-          <div class="flex items-start gap-3">
+            <div class="flex items-start gap-3">
             <div
               class="mt-1 rounded-2xl border border-orange-400/20 bg-orange-400/10 p-3 text-orange-300"
             >
               <BellRing class="h-5 w-5" />
             </div>
             <div>
-              <p class="text-xs tracking-[0.24em] text-orange-300 uppercase">Price alerts</p>
-              <h2 class="mt-2 text-2xl font-semibold">Stay on top of price drops.</h2>
+              <p class="text-xs tracking-[0.24em] text-orange-300 uppercase">Alerts</p>
+              <h2 class="mt-2 text-2xl font-semibold">Enter your email to receive notifications.</h2>
             </div>
           </div>
           <button
@@ -99,10 +138,6 @@ async function onSubmit() {
           </button>
         </div>
 
-        <p class="text-sm text-stone-300">
-          Enter your email and we will let you know when tracked products become more interesting.
-        </p>
-
         <form class="space-y-4" @submit.prevent="onSubmit">
           <label class="flex flex-col gap-2">
             <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Email</span>
@@ -113,8 +148,13 @@ async function onSubmit() {
               <input
                 v-model="email"
                 type="email"
-                placeholder="you@example.com"
-                class="w-full rounded-xl border border-white/10 bg-stone-900 px-11 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+                placeholder="your@email.com"
+                class="w-full rounded-xl border bg-stone-900 px-11 py-3 text-sm text-white transition outline-none"
+                :class="
+                  showFieldError
+                    ? 'border-red-400 focus:border-red-400'
+                    : 'border-white/10 focus:border-orange-400'
+                "
               />
             </div>
           </label>
@@ -123,13 +163,22 @@ async function onSubmit() {
             {{ errorMessage }}
           </p>
 
-          <button
-            type="submit"
-            :disabled="!canSubmit"
-            class="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {{ loading ? 'Subscribing...' : 'Subscribe' }}
-          </button>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              class="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-stone-100 transition hover:border-white/30"
+              @click="emit('update:modelValue', false)"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="!canSubmit"
+              class="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {{ loading ? 'Subscribing...' : 'Subscribe' }}
+            </button>
+          </div>
         </form>
       </div>
     </section>
