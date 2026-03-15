@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { watch } from 'vue'
+import { BellRing, Mail, X } from 'lucide-vue-next'
 
 import { useAlertSubscription } from '@/composables/useAlertSubscription'
 
@@ -76,16 +77,22 @@ async function onSubmit() {
 
       <div v-else class="space-y-5">
         <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-xs uppercase tracking-[0.24em] text-orange-300">Price alerts</p>
-            <h2 class="mt-2 text-2xl font-semibold">Stay on top of price drops.</h2>
+          <div class="flex items-start gap-3">
+            <div class="mt-1 rounded-2xl border border-orange-400/20 bg-orange-400/10 p-3 text-orange-300">
+              <BellRing class="h-5 w-5" />
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-orange-300">Price alerts</p>
+              <h2 class="mt-2 text-2xl font-semibold">Stay on top of price drops.</h2>
+            </div>
           </div>
           <button
             type="button"
-            class="rounded-xl border border-white/10 px-3 py-2 text-sm transition hover:border-orange-400"
+            class="rounded-xl border border-white/10 p-2 text-sm transition hover:border-orange-400"
             @click="emit('update:modelValue', false)"
           >
-            Close
+            <X class="h-4 w-4" />
+            <span class="sr-only">Close</span>
           </button>
         </div>
 
@@ -96,12 +103,15 @@ async function onSubmit() {
         <form class="space-y-4" @submit.prevent="onSubmit">
           <label class="flex flex-col gap-2">
             <span class="text-xs uppercase tracking-[0.24em] text-stone-400">Email</span>
-            <input
-              v-model="email"
-              type="email"
-              placeholder="you@example.com"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-            >
+            <div class="relative">
+              <Mail class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+              <input
+                v-model="email"
+                type="email"
+                placeholder="you@example.com"
+                class="w-full rounded-xl border border-white/10 bg-stone-900 px-11 py-3 text-sm text-white outline-none transition focus:border-orange-400"
+              >
+            </div>
           </label>
 
           <p v-if="errorMessage" class="text-sm text-red-300">

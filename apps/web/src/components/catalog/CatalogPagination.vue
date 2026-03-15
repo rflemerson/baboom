@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
+
 import type { CatalogPageInfo } from '@/types/catalog'
 
 defineProps<{
@@ -29,11 +31,12 @@ function buildPages(pageInfo: CatalogPageInfo) {
     <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        class="rounded-lg border border-white/10 px-3 py-2 transition hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 transition hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!pageInfo.hasPreviousPage"
         @click="emit('update:page', pageInfo.currentPage - 1)"
       >
-        Previous
+        <ChevronLeft class="h-4 w-4" />
+        <span>Previous</span>
       </button>
 
       <button
@@ -53,11 +56,12 @@ function buildPages(pageInfo: CatalogPageInfo) {
 
       <button
         type="button"
-        class="rounded-lg border border-white/10 px-3 py-2 transition hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 transition hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!pageInfo.hasNextPage"
         @click="emit('update:page', pageInfo.currentPage + 1)"
       >
-        Next
+        <span>Next</span>
+        <ChevronRight class="h-4 w-4" />
       </button>
     </div>
   </nav>
