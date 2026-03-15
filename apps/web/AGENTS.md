@@ -69,4 +69,4 @@ cd apps/web && npm run format
 - Every file in `apps/web/agents/` must include source links for the guidance it contains.
 - If frontend tooling or integration patterns change, update the relevant topic file in the same task.
 - Do not hand-edit files under `src/gql/`; regenerate them with `npm run graphql-codegen`.
-- Keep frontend prek hooks in `apps/web/prek.toml`; use `npm`-backed local hooks for lint, type-check, and unit tests.
+- Keep frontend prek hooks in `apps/web/prek.toml`; use `npm`-backed local hooks for format, lint, type-check, and unit tests.

@@ -14,13 +14,9 @@ defineEmits<{
           src="/images/logo-header-600w.svg"
           alt="Baboom"
           class="h-11 w-11 rounded-2xl border border-white/10 bg-white/5 object-cover p-1"
-        >
+        />
         <div class="flex flex-col gap-1">
-          <img
-            src="/images/logo-name.svg"
-            alt="Baboom"
-            class="h-4 w-auto"
-          >
+          <img src="/images/logo-name.svg" alt="Baboom" class="h-4 w-auto" />
           <p class="text-sm text-stone-300">Protein catalog</p>
         </div>
       </div>

@@ -10,7 +10,7 @@ defineProps<{
   <article class="rounded-2xl border border-white/10 bg-stone-900/80 p-5 shadow-lg shadow-black/20">
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <p class="text-xs uppercase tracking-[0.24em] text-orange-300">
+        <p class="text-xs tracking-[0.24em] text-orange-300 uppercase">
           {{ product.brand.name }}
         </p>
         <h2 class="mt-2 text-xl font-semibold text-white">{{ product.name }}</h2>
@@ -22,27 +22,27 @@ defineProps<{
 
     <dl class="grid grid-cols-2 gap-3 text-sm text-stone-300">
       <div>
-        <dt class="text-xs uppercase tracking-wide text-stone-500">Weight</dt>
+        <dt class="text-xs tracking-wide text-stone-500 uppercase">Weight</dt>
         <dd>{{ product.weight }} g</dd>
       </div>
       <div>
-        <dt class="text-xs uppercase tracking-wide text-stone-500">Category</dt>
+        <dt class="text-xs tracking-wide text-stone-500 uppercase">Category</dt>
         <dd>{{ product.category?.name ?? 'Uncategorized' }}</dd>
       </div>
       <div>
-        <dt class="text-xs uppercase tracking-wide text-stone-500">Price</dt>
+        <dt class="text-xs tracking-wide text-stone-500 uppercase">Price</dt>
         <dd>{{ product.lastPrice ?? '-' }}</dd>
       </div>
       <div>
-        <dt class="text-xs uppercase tracking-wide text-stone-500">Price / g</dt>
+        <dt class="text-xs tracking-wide text-stone-500 uppercase">Price / g</dt>
         <dd>{{ product.pricePerGram ?? '-' }}</dd>
       </div>
       <div>
-        <dt class="text-xs uppercase tracking-wide text-stone-500">Concentration</dt>
+        <dt class="text-xs tracking-wide text-stone-500 uppercase">Concentration</dt>
         <dd>{{ product.concentration ?? '-' }}</dd>
       </div>
       <div>
-        <dt class="text-xs uppercase tracking-wide text-stone-500">Total protein</dt>
+        <dt class="text-xs tracking-wide text-stone-500 uppercase">Total protein</dt>
         <dd>{{ product.totalProtein ?? '-' }}</dd>
       </div>
     </dl>

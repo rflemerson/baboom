@@ -16,7 +16,7 @@
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@apollo/client": "^3.14.1",
@@ -54,6 +54,7 @@
     "npm-run-all2": "^8.0.4",
     "oxlint": "~1.50.0",
     "prettier": "3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "sass": "^1.98.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",

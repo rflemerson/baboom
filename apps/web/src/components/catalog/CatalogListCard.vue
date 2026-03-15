@@ -10,7 +10,9 @@ defineProps<{
   <article class="rounded-2xl border border-white/10 bg-stone-900/80 p-5 shadow-lg shadow-black/20">
     <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex-1">
-        <div class="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.24em] text-orange-300">
+        <div
+          class="flex flex-wrap items-center gap-2 text-xs tracking-[0.24em] text-orange-300 uppercase"
+        >
           <span>{{ product.brand.name }}</span>
           <span class="rounded-full bg-white/10 px-2.5 py-1 text-stone-200">
             {{ product.packagingDisplay }}
@@ -51,7 +53,9 @@ defineProps<{
         </ul>
       </div>
 
-      <div class="min-w-[220px] border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+      <div
+        class="min-w-[220px] border-t border-white/10 pt-5 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6"
+      >
         <dl class="grid gap-3 text-sm text-stone-300">
           <div class="flex items-center justify-between gap-4">
             <dt class="text-stone-500">Price</dt>

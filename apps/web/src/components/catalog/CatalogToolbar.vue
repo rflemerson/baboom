@@ -47,43 +47,43 @@ function onSortByChange(event: Event) {
 <template>
   <section class="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div class="grid flex-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
+      <div
+        class="grid flex-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]"
+      >
         <label class="flex flex-col gap-2">
-          <span class="text-xs uppercase tracking-[0.24em] text-stone-400">Search</span>
+          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Search</span>
           <div class="relative">
-            <Search class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+            <Search
+              class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-stone-500"
+            />
             <input
               :value="search"
               type="search"
               placeholder="Search products, brands, categories, or tags"
-              class="w-full rounded-xl border border-white/10 bg-stone-950 px-11 py-3 text-sm text-white outline-none transition focus:border-orange-400"
+              class="w-full rounded-xl border border-white/10 bg-stone-950 px-11 py-3 text-sm text-white transition outline-none focus:border-orange-400"
               @input="onSearchInput"
-            >
+            />
           </div>
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="text-xs uppercase tracking-[0.24em] text-stone-400">Sort by</span>
+          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Sort by</span>
           <select
             :value="sortBy"
-            class="rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
+            class="rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
             @change="onSortByChange"
           >
-            <option
-              v-for="option in sortOptions"
-              :key="option.value"
-              :value="option.value"
-            >
+            <option v-for="option in sortOptions" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
           </select>
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="text-xs uppercase tracking-[0.24em] text-stone-400">Per page</span>
+          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Per page</span>
           <select
             :value="perPage"
-            class="rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
+            class="rounded-xl border border-white/10 bg-stone-950 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
             @change="onPerPageChange"
           >
             <option :value="12">12</option>

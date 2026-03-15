@@ -43,12 +43,12 @@ const filtersOpen = ref(false)
 const advancedFiltersActive = computed(() => {
   return Boolean(
     brand.value ||
-      priceMin.value !== null ||
-      priceMax.value !== null ||
-      pricePerGramMin.value !== null ||
-      pricePerGramMax.value !== null ||
-      concentrationMin.value !== null ||
-      concentrationMax.value !== null,
+    priceMin.value !== null ||
+    priceMax.value !== null ||
+    pricePerGramMin.value !== null ||
+    pricePerGramMax.value !== null ||
+    concentrationMin.value !== null ||
+    concentrationMax.value !== null,
   )
 })
 </script>
@@ -57,11 +57,11 @@ const advancedFiltersActive = computed(() => {
   <main class="min-h-screen bg-stone-950 px-6 py-12 text-stone-50">
     <div class="mx-auto max-w-6xl">
       <header class="mb-10 flex flex-col gap-3">
-        <p class="text-xs uppercase tracking-[0.3em] text-orange-300">Baboom catalog</p>
+        <p class="text-xs tracking-[0.3em] text-orange-300 uppercase">Baboom catalog</p>
         <h1 class="text-4xl font-semibold tracking-tight">Public catalog</h1>
         <p class="max-w-2xl text-sm text-stone-300">
-          This is the first slice of the Vue migration. The catalog listing is now
-          consuming GraphQL directly.
+          This is the first slice of the Vue migration. The catalog listing is now consuming GraphQL
+          directly.
         </p>
       </header>
 

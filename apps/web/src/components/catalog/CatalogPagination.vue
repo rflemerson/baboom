@@ -24,9 +24,7 @@ function buildPages(pageInfo: CatalogPageInfo) {
     v-if="pageInfo.totalPages > 1"
     class="mt-8 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-stone-300 md:flex-row md:items-center md:justify-between"
   >
-    <p>
-      Showing page {{ pageInfo.currentPage }} of {{ pageInfo.totalPages }}
-    </p>
+    <p>Showing page {{ pageInfo.currentPage }} of {{ pageInfo.totalPages }}</p>
 
     <div class="flex flex-wrap items-center gap-2">
       <button

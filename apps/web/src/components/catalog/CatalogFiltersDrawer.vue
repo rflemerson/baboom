@@ -11,8 +11,8 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'apply': []
-  'clear': []
+  apply: []
+  clear: []
   'update:brand': [value: string]
   'update:concentrationMax': [value: number | null]
   'update:concentrationMin': [value: number | null]
@@ -39,10 +39,12 @@ function applyFilters() {
     class="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm"
     @click.self="emit('update:modelValue', false)"
   >
-    <aside class="flex h-full w-full max-w-md flex-col border-l border-white/10 bg-stone-950 text-white">
+    <aside
+      class="flex h-full w-full max-w-md flex-col border-l border-white/10 bg-stone-950 text-white"
+    >
       <header class="flex items-center justify-between border-b border-white/10 px-6 py-5">
         <div>
-          <p class="text-xs uppercase tracking-[0.24em] text-orange-300">Catalog filters</p>
+          <p class="text-xs tracking-[0.24em] text-orange-300 uppercase">Catalog filters</p>
           <h2 class="mt-2 text-xl font-semibold">Refine results</h2>
         </div>
         <button
@@ -56,18 +58,18 @@ function applyFilters() {
 
       <div class="flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <label class="flex flex-col gap-2">
-          <span class="text-xs uppercase tracking-[0.24em] text-stone-400">Brand</span>
+          <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Brand</span>
           <input
             :value="brand"
             type="text"
             placeholder="Filter by brand"
-            class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
+            class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
             @input="emit('update:brand', ($event.target as HTMLInputElement).value)"
-          >
+          />
         </label>
 
         <div class="space-y-3">
-          <p class="text-xs uppercase tracking-[0.24em] text-stone-400">Price range</p>
+          <p class="text-xs tracking-[0.24em] text-stone-400 uppercase">Price range</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="priceMin ?? ''"
@@ -75,23 +77,27 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Min"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              @input="emit('update:priceMin', parseNumber(($event.target as HTMLInputElement).value))"
-            >
+              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              @input="
+                emit('update:priceMin', parseNumber(($event.target as HTMLInputElement).value))
+              "
+            />
             <input
               :value="priceMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              @input="emit('update:priceMax', parseNumber(($event.target as HTMLInputElement).value))"
-            >
+              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              @input="
+                emit('update:priceMax', parseNumber(($event.target as HTMLInputElement).value))
+              "
+            />
           </div>
         </div>
 
         <div class="space-y-3">
-          <p class="text-xs uppercase tracking-[0.24em] text-stone-400">Price per gram</p>
+          <p class="text-xs tracking-[0.24em] text-stone-400 uppercase">Price per gram</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="pricePerGramMin ?? ''"
@@ -99,23 +105,33 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Min"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              @input="emit('update:pricePerGramMin', parseNumber(($event.target as HTMLInputElement).value))"
-            >
+              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              @input="
+                emit(
+                  'update:pricePerGramMin',
+                  parseNumber(($event.target as HTMLInputElement).value),
+                )
+              "
+            />
             <input
               :value="pricePerGramMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              @input="emit('update:pricePerGramMax', parseNumber(($event.target as HTMLInputElement).value))"
-            >
+              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              @input="
+                emit(
+                  'update:pricePerGramMax',
+                  parseNumber(($event.target as HTMLInputElement).value),
+                )
+              "
+            />
           </div>
         </div>
 
         <div class="space-y-3">
-          <p class="text-xs uppercase tracking-[0.24em] text-stone-400">Concentration</p>
+          <p class="text-xs tracking-[0.24em] text-stone-400 uppercase">Concentration</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="concentrationMin ?? ''"
@@ -123,18 +139,28 @@ function applyFilters() {
               min="0"
               step="0.01"
               placeholder="Min"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              @input="emit('update:concentrationMin', parseNumber(($event.target as HTMLInputElement).value))"
-            >
+              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              @input="
+                emit(
+                  'update:concentrationMin',
+                  parseNumber(($event.target as HTMLInputElement).value),
+                )
+              "
+            />
             <input
               :value="concentrationMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
-              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              @input="emit('update:concentrationMax', parseNumber(($event.target as HTMLInputElement).value))"
-            >
+              class="rounded-xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              @input="
+                emit(
+                  'update:concentrationMax',
+                  parseNumber(($event.target as HTMLInputElement).value),
+                )
+              "
+            />
           </div>
         </div>
       </div>

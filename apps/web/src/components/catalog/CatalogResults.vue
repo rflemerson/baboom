@@ -19,9 +19,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section
-    class="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-stone-200"
-  >
+  <section class="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-stone-200">
     <p v-if="loading">Loading products...</p>
     <p v-else-if="errorMessage">Error while querying GraphQL: {{ errorMessage }}</p>
     <div v-else-if="pageInfo" class="flex flex-wrap gap-6">
@@ -34,9 +32,7 @@ const emit = defineEmits<{
   <section
     v-if="!loading && !errorMessage && products.length"
     :class="
-      viewMode === 'grid'
-        ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
-        : 'flex flex-col gap-4'
+      viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3' : 'flex flex-col gap-4'
     "
   >
     <component

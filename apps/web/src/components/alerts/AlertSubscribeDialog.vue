@@ -12,8 +12,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
 
-const { canSubmit, email, errorMessage, loading, reset, status, submit } =
-  useAlertSubscription()
+const { canSubmit, email, errorMessage, loading, reset, status, submit } = useAlertSubscription()
 
 watch(
   () => props.modelValue,
@@ -35,9 +34,11 @@ async function onSubmit() {
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6 backdrop-blur-sm"
     @click.self="emit('update:modelValue', false)"
   >
-    <section class="w-full max-w-md rounded-3xl border border-white/10 bg-stone-950 p-6 text-white shadow-2xl">
+    <section
+      class="w-full max-w-md rounded-3xl border border-white/10 bg-stone-950 p-6 text-white shadow-2xl"
+    >
       <div v-if="status === 'success'" class="space-y-4 text-center">
-        <p class="text-xs uppercase tracking-[0.24em] text-emerald-300">Subscribed</p>
+        <p class="text-xs tracking-[0.24em] text-emerald-300 uppercase">Subscribed</p>
         <h2 class="text-2xl font-semibold">You are on the alert list.</h2>
         <p class="text-sm text-stone-300">
           We will notify <strong>{{ email }}</strong> when prices move.
@@ -52,7 +53,7 @@ async function onSubmit() {
       </div>
 
       <div v-else-if="status === 'duplicate'" class="space-y-4 text-center">
-        <p class="text-xs uppercase tracking-[0.24em] text-sky-300">Already subscribed</p>
+        <p class="text-xs tracking-[0.24em] text-sky-300 uppercase">Already subscribed</p>
         <h2 class="text-2xl font-semibold">This email is already subscribed.</h2>
         <p class="text-sm text-stone-300">
           Try a different email if you want another alert recipient.
@@ -78,11 +79,13 @@ async function onSubmit() {
       <div v-else class="space-y-5">
         <div class="flex items-start justify-between gap-4">
           <div class="flex items-start gap-3">
-            <div class="mt-1 rounded-2xl border border-orange-400/20 bg-orange-400/10 p-3 text-orange-300">
+            <div
+              class="mt-1 rounded-2xl border border-orange-400/20 bg-orange-400/10 p-3 text-orange-300"
+            >
               <BellRing class="h-5 w-5" />
             </div>
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-orange-300">Price alerts</p>
+              <p class="text-xs tracking-[0.24em] text-orange-300 uppercase">Price alerts</p>
               <h2 class="mt-2 text-2xl font-semibold">Stay on top of price drops.</h2>
             </div>
           </div>
@@ -102,15 +105,17 @@ async function onSubmit() {
 
         <form class="space-y-4" @submit.prevent="onSubmit">
           <label class="flex flex-col gap-2">
-            <span class="text-xs uppercase tracking-[0.24em] text-stone-400">Email</span>
+            <span class="text-xs tracking-[0.24em] text-stone-400 uppercase">Email</span>
             <div class="relative">
-              <Mail class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+              <Mail
+                class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-stone-500"
+              />
               <input
                 v-model="email"
                 type="email"
                 placeholder="you@example.com"
-                class="w-full rounded-xl border border-white/10 bg-stone-900 px-11 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-              >
+                class="w-full rounded-xl border border-white/10 bg-stone-900 px-11 py-3 text-sm text-white transition outline-none focus:border-orange-400"
+              />
             </div>
           </label>
 
