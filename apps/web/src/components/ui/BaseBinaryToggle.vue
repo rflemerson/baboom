@@ -38,7 +38,7 @@ function toggle() {
     type="button"
     class="app-binary-toggle app-button--control"
     :data-test="testId"
-    :aria-label="name"
+    :aria-label="`${name}: ${options[activeIndex]?.title}`"
     :title="options[activeIndex]?.title"
     @click="toggle"
   >
@@ -51,7 +51,7 @@ function toggle() {
       :key="option.value"
       class="app-binary-toggle__option"
       :class="{ 'is-active': activeIndex === index }"
-      :aria-label="option.ariaLabel"
+      aria-hidden="true"
     >
       <component :is="option.icon" class="h-4 w-4" />
     </span>

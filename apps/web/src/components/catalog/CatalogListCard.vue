@@ -68,7 +68,7 @@ defineProps<{
               target="_blank"
               rel="noreferrer"
               class="app-button app-button--primary app-button--icon-square rounded-2xl"
-              aria-label="View offer"
+              :aria-label="`View offer for ${product.name}`"
               title="View offer"
             >
               <ArrowUpRight class="h-4 w-4" />

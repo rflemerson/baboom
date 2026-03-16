@@ -98,6 +98,7 @@ function onSortByChange(event: Event) {
             />
             <input
               :value="search"
+              aria-label="Search catalog"
               type="search"
               placeholder="Search products, brands, or tags"
               class="app-input rounded-xl px-11 py-2.5 text-sm sm:py-3"
@@ -110,6 +111,7 @@ function onSortByChange(event: Event) {
           <span class="app-section-title">Sort by</span>
           <select
             :value="sortBy"
+            aria-label="Sort catalog results"
             class="app-select rounded-xl px-4 py-2.5 text-sm sm:py-3"
             @change="onSortByChange"
           >
@@ -123,6 +125,7 @@ function onSortByChange(event: Event) {
           <span class="app-section-title">Per page</span>
           <select
             :value="perPage"
+            aria-label="Results per page"
             class="app-select rounded-xl px-4 py-2.5 text-sm sm:py-3"
             @change="onPerPageChange"
           >

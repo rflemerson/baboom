@@ -32,4 +32,25 @@ describe('CatalogPagination', () => {
     expect(wrapper.emitted('update:page')?.[1]).toEqual([2])
     expect(wrapper.emitted('update:page')?.[2]).toEqual([4])
   })
+
+  it('renders anchored pagination with ellipses for many pages', () => {
+    const wrapper = mount(CatalogPagination, {
+      props: {
+        pageInfo: {
+          currentPage: 6,
+          perPage: 12,
+          totalPages: 12,
+          totalCount: 144,
+          hasPreviousPage: true,
+          hasNextPage: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('1')
+    expect(wrapper.text()).toContain('6')
+    expect(wrapper.text()).toContain('12')
+    expect(wrapper.text()).toContain('...')
+    expect(wrapper.get('[aria-current="page"]').text()).toBe('6')
+  })
 })

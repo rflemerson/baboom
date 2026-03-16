@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 
 import type { CatalogProductsVariables } from '@/types/catalog'
 
@@ -8,6 +8,8 @@ export const CATALOG_SORT_OPTIONS = [
   { label: 'Protein', value: 'total_protein' },
   { label: 'Concentration', value: 'concentration' },
 ] as const
+
+export const CATALOG_SEARCH_DEBOUNCE_MS = 250
 
 const DEFAULT_CATALOG_PRODUCTS_VARIABLES: CatalogProductsVariables = {
   page: 1,
@@ -26,6 +28,7 @@ const DEFAULT_CATALOG_PRODUCTS_VARIABLES: CatalogProductsVariables = {
 
 export function useCatalogFilters() {
   const search = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.search ?? '')
+  const debouncedSearch = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.search ?? '')
   const brand = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.brand ?? '')
   const priceMin = ref<number | null>(DEFAULT_CATALOG_PRODUCTS_VARIABLES.priceMin ?? null)
   const priceMax = ref<number | null>(DEFAULT_CATALOG_PRODUCTS_VARIABLES.priceMax ?? null)
@@ -45,11 +48,32 @@ export function useCatalogFilters() {
   const sortDir = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.sortDir)
   const page = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.page)
   const perPage = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.perPage)
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+  watch(
+    search,
+    (value) => {
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer)
+      }
+
+      searchDebounceTimer = setTimeout(() => {
+        debouncedSearch.value = value
+      }, CATALOG_SEARCH_DEBOUNCE_MS)
+    },
+    { immediate: true },
+  )
+
+  onScopeDispose(() => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer)
+    }
+  })
 
   const variables = computed<CatalogProductsVariables>(() => ({
     page: page.value,
     perPage: perPage.value,
-    search: search.value.trim() || null,
+    search: debouncedSearch.value.trim() || null,
     brand: brand.value.trim() || null,
     priceMin: priceMin.value,
     priceMax: priceMax.value,

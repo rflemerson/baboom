@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
+
 import BaseModal from '@/components/ui/BaseModal.vue'
 
-defineProps<{
+const props = defineProps<{
   brand: string
   concentrationMax: number | null
   concentrationMin: number | null
@@ -13,24 +15,75 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  apply: []
+  apply: [
+    payload: {
+      brand: string
+      concentrationMax: number | null
+      concentrationMin: number | null
+      priceMax: number | null
+      priceMin: number | null
+      pricePerGramMax: number | null
+      pricePerGramMin: number | null
+    },
+  ]
   clear: []
-  'update:brand': [value: string]
-  'update:concentrationMax': [value: number | null]
-  'update:concentrationMin': [value: number | null]
   'update:modelValue': [value: boolean]
-  'update:priceMax': [value: number | null]
-  'update:priceMin': [value: number | null]
-  'update:pricePerGramMax': [value: number | null]
-  'update:pricePerGramMin': [value: number | null]
 }>()
+
+const draftBrand = ref('')
+const draftPriceMin = ref<number | null>(null)
+const draftPriceMax = ref<number | null>(null)
+const draftPricePerGramMin = ref<number | null>(null)
+const draftPricePerGramMax = ref<number | null>(null)
+const draftConcentrationMin = ref<number | null>(null)
+const draftConcentrationMax = ref<number | null>(null)
+
+function syncDrafts() {
+  draftBrand.value = props.brand
+  draftPriceMin.value = props.priceMin
+  draftPriceMax.value = props.priceMax
+  draftPricePerGramMin.value = props.pricePerGramMin
+  draftPricePerGramMax.value = props.pricePerGramMax
+  draftConcentrationMin.value = props.concentrationMin
+  draftConcentrationMax.value = props.concentrationMax
+}
+
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (isOpen) {
+      syncDrafts()
+    }
+  },
+  { immediate: true },
+)
 
 function parseNumber(value: string) {
   return value === '' ? null : Number(value)
 }
 
 function applyFilters() {
-  emit('apply')
+  emit('apply', {
+    brand: draftBrand.value,
+    concentrationMax: draftConcentrationMax.value,
+    concentrationMin: draftConcentrationMin.value,
+    priceMax: draftPriceMax.value,
+    priceMin: draftPriceMin.value,
+    pricePerGramMax: draftPricePerGramMax.value,
+    pricePerGramMin: draftPricePerGramMin.value,
+  })
+  emit('update:modelValue', false)
+}
+
+function clearDrafts() {
+  draftBrand.value = ''
+  draftPriceMin.value = null
+  draftPriceMax.value = null
+  draftPricePerGramMin.value = null
+  draftPricePerGramMax.value = null
+  draftConcentrationMin.value = null
+  draftConcentrationMax.value = null
+  emit('clear')
   emit('update:modelValue', false)
 }
 
@@ -66,11 +119,11 @@ const titleId = 'catalog-filters-drawer-title'
           <label class="flex flex-col gap-2">
             <span class="app-section-title">Brand</span>
             <input
-              :value="brand"
+              :value="draftBrand"
               type="text"
               placeholder="Filter by brand"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="emit('update:brand', ($event.target as HTMLInputElement).value)"
+              @input="draftBrand = ($event.target as HTMLInputElement).value"
             />
           </label>
         </section>
@@ -79,26 +132,22 @@ const titleId = 'catalog-filters-drawer-title'
           <p class="app-section-title">Price range</p>
           <div class="grid grid-cols-2 gap-3">
             <input
-              :value="priceMin ?? ''"
+              :value="draftPriceMin ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Min"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="
-                emit('update:priceMin', parseNumber(($event.target as HTMLInputElement).value))
-              "
+              @input="draftPriceMin = parseNumber(($event.target as HTMLInputElement).value)"
             />
             <input
-              :value="priceMax ?? ''"
+              :value="draftPriceMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="
-                emit('update:priceMax', parseNumber(($event.target as HTMLInputElement).value))
-              "
+              @input="draftPriceMax = parseNumber(($event.target as HTMLInputElement).value)"
             />
           </div>
         </section>
@@ -107,32 +156,22 @@ const titleId = 'catalog-filters-drawer-title'
           <p class="app-section-title">Price per gram</p>
           <div class="grid grid-cols-2 gap-3">
             <input
-              :value="pricePerGramMin ?? ''"
+              :value="draftPricePerGramMin ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Min"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="
-                emit(
-                  'update:pricePerGramMin',
-                  parseNumber(($event.target as HTMLInputElement).value),
-                )
-              "
+              @input="draftPricePerGramMin = parseNumber(($event.target as HTMLInputElement).value)"
             />
             <input
-              :value="pricePerGramMax ?? ''"
+              :value="draftPricePerGramMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="
-                emit(
-                  'update:pricePerGramMax',
-                  parseNumber(($event.target as HTMLInputElement).value),
-                )
-              "
+              @input="draftPricePerGramMax = parseNumber(($event.target as HTMLInputElement).value)"
             />
           </div>
         </section>
@@ -141,32 +180,22 @@ const titleId = 'catalog-filters-drawer-title'
           <p class="app-section-title">Concentration</p>
           <div class="grid grid-cols-2 gap-3">
             <input
-              :value="concentrationMin ?? ''"
+              :value="draftConcentrationMin ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Min"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="
-                emit(
-                  'update:concentrationMin',
-                  parseNumber(($event.target as HTMLInputElement).value),
-                )
-              "
+              @input="draftConcentrationMin = parseNumber(($event.target as HTMLInputElement).value)"
             />
             <input
-              :value="concentrationMax ?? ''"
+              :value="draftConcentrationMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="
-                emit(
-                  'update:concentrationMax',
-                  parseNumber(($event.target as HTMLInputElement).value),
-                )
-              "
+              @input="draftConcentrationMax = parseNumber(($event.target as HTMLInputElement).value)"
             />
           </div>
         </section>
@@ -176,7 +205,7 @@ const titleId = 'catalog-filters-drawer-title'
         <button
           type="button"
           class="app-button app-button--secondary app-button--control flex-1"
-          @click="emit('clear')"
+          @click="clearDrafts"
         >
           Clear
         </button>

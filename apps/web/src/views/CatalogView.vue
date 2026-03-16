@@ -36,7 +36,7 @@ const {
   toggleSortDirection,
   variables,
 } = useCatalogFilters()
-const { error, loading, pageInfo, products } = useCatalogQuery(variables)
+const { error, loading, pageInfo, products, refetch } = useCatalogQuery(variables)
 const { setViewMode, viewMode } = useCatalogViewMode()
 const filtersOpen = ref(false)
 
@@ -51,6 +51,28 @@ const advancedFiltersActive = computed(() => {
     concentrationMax.value !== null,
   )
 })
+
+const filtersActive = computed(() => {
+  return Boolean(search.value || advancedFiltersActive.value)
+})
+
+function applyAdvancedFilters(payload: {
+  brand: string
+  concentrationMax: number | null
+  concentrationMin: number | null
+  priceMax: number | null
+  priceMin: number | null
+  pricePerGramMax: number | null
+  pricePerGramMin: number | null
+}) {
+  setBrand(payload.brand)
+  setPriceMin(payload.priceMin)
+  setPriceMax(payload.priceMax)
+  setPricePerGramMin(payload.pricePerGramMin)
+  setPricePerGramMax(payload.pricePerGramMax)
+  setConcentrationMin(payload.concentrationMin)
+  setConcentrationMax(payload.concentrationMax)
+}
 </script>
 
 <template>
@@ -74,11 +96,14 @@ const advancedFiltersActive = computed(() => {
       />
 
       <CatalogResults
+        :filters-active="filtersActive"
         :page-info="pageInfo"
         :products="products"
         :loading="loading"
         :error-message="error?.message"
         :view-mode="viewMode"
+        @clear-filters="clearFilters"
+        @retry="refetch()"
         @update:page="setPage"
       />
     </div>
@@ -92,15 +117,8 @@ const advancedFiltersActive = computed(() => {
       :price-per-gram-max="pricePerGramMax"
       :concentration-min="concentrationMin"
       :concentration-max="concentrationMax"
-      @apply="setPage(1)"
+      @apply="applyAdvancedFilters"
       @clear="clearFilters"
-      @update:brand="setBrand"
-      @update:concentration-max="setConcentrationMax"
-      @update:concentration-min="setConcentrationMin"
-      @update:price-max="setPriceMax"
-      @update:price-min="setPriceMin"
-      @update:price-per-gram-max="setPricePerGramMax"
-      @update:price-per-gram-min="setPricePerGramMin"
     />
   </main>
 </template>

@@ -26,7 +26,9 @@
 - Keep the light theme as the default token set in `:root` and add dark overrides under `:root[data-theme='dark']`.
 - Use Tailwind primarily for layout, spacing, sizing, and responsive behavior.
 - Use semantic classes such as buttons, panels, inputs, and dialog shells to avoid long repeated class strings in templates.
+- For empty, error, or other catalog state panels, prefer a shared semantic class such as `app-state-panel` instead of reassembling dashed borders and muted surfaces per component.
 - When multiple controls should share the same visual size, prefer semantic button size modifiers from `src/theme.scss` instead of per-component padding tweaks.
+- Keep theme-toggle animation timing centralized in `src/theme.scss` with shared duration/easing tokens so dark/light transitions stay visually synchronized across surfaces, controls, and text.
 - For binary icon toggles, prefer a reusable Vue component such as `BaseBinaryToggle` over hand-writing sibling buttons in each feature component.
 - For repeated metric blocks with label/value presentation, prefer `BaseMetricCard` instead of duplicating markup in feature components.
 - Let Prettier handle Tailwind class ordering instead of trying to enforce that through custom manual conventions.

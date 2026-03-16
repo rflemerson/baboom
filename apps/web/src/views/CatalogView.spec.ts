@@ -38,6 +38,7 @@ describe('CatalogView', () => {
           tags: [{ name: 'Whey' }],
         },
       ]),
+      refetch: vi.fn(),
       result: ref(undefined),
     })
 

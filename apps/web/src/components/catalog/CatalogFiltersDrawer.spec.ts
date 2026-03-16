@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils'
 import CatalogFiltersDrawer from './CatalogFiltersDrawer.vue'
 
 describe('CatalogFiltersDrawer', () => {
-  it('emits advanced filter updates and actions', async () => {
+  it('keeps local drafts and emits apply payload', async () => {
     const wrapper = mount(CatalogFiltersDrawer, {
       props: {
         brand: '',
@@ -27,18 +27,41 @@ describe('CatalogFiltersDrawer', () => {
     await inputs[4]?.setValue('0.5')
     await inputs[5]?.setValue('70')
     await inputs[6]?.setValue('90')
-    await wrapper.findAll('button')[1]?.trigger('click')
     await wrapper.findAll('button')[2]?.trigger('click')
 
-    expect(wrapper.emitted('update:brand')?.[0]).toEqual(['max'])
-    expect(wrapper.emitted('update:priceMin')?.[0]).toEqual([50])
-    expect(wrapper.emitted('update:priceMax')?.[0]).toEqual([150])
-    expect(wrapper.emitted('update:pricePerGramMin')?.[0]).toEqual([0.1])
-    expect(wrapper.emitted('update:pricePerGramMax')?.[0]).toEqual([0.5])
-    expect(wrapper.emitted('update:concentrationMin')?.[0]).toEqual([70])
-    expect(wrapper.emitted('update:concentrationMax')?.[0]).toEqual([90])
+    expect(wrapper.emitted('apply')?.[0]).toEqual([
+      {
+        brand: 'max',
+        concentrationMax: 90,
+        concentrationMin: 70,
+        priceMax: 150,
+        priceMin: 50,
+        pricePerGramMax: 0.5,
+        pricePerGramMin: 0.1,
+      },
+    ])
+  })
+
+  it('clears drafts and closes the drawer', async () => {
+    const wrapper = mount(CatalogFiltersDrawer, {
+      props: {
+        brand: 'dux',
+        concentrationMax: 85,
+        concentrationMin: 70,
+        modelValue: true,
+        priceMax: 150,
+        priceMin: 50,
+        pricePerGramMax: 0.5,
+        pricePerGramMin: 0.1,
+      },
+    })
+
+    await wrapper.findAll('button')[1]?.trigger('click')
+
+    expect(wrapper.emitted('apply')).toBeUndefined()
     expect(wrapper.emitted('clear')).toHaveLength(1)
-    expect(wrapper.emitted('apply')).toHaveLength(1)
+    const modelValueEvents = wrapper.emitted('update:modelValue')
+    expect(modelValueEvents?.[modelValueEvents.length - 1]).toEqual([false])
   })
 
   it('closes on escape', async () => {

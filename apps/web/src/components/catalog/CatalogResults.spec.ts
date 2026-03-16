@@ -41,25 +41,33 @@ describe('CatalogResults', () => {
     })
 
     expect(wrapper.text()).toContain('Loading products...')
+    expect(wrapper.findAll('[data-test="catalog-loading-card"]')).toHaveLength(6)
   })
 
-  it('renders an empty state', () => {
+  it('renders an empty state', async () => {
     const wrapper = mount(CatalogResults, {
       props: {
         pageInfo,
+        filtersActive: true,
         products: [],
         loading: false,
         viewMode: 'grid',
       },
     })
 
-    expect(wrapper.text()).toContain('No products found.')
+    expect(wrapper.text()).toContain('No products matched this search')
+    expect(wrapper.text()).toContain('Clear filters')
+
+    await wrapper.get('button').trigger('click')
+
+    expect(wrapper.emitted('clear-filters')).toHaveLength(1)
   })
 
-  it('renders an error state', () => {
+  it('renders an error state', async () => {
     const wrapper = mount(CatalogResults, {
       props: {
         pageInfo,
+        filtersActive: true,
         products: [],
         loading: false,
         errorMessage: 'GraphQL exploded',
@@ -67,7 +75,12 @@ describe('CatalogResults', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Error while querying GraphQL: GraphQL exploded')
+    expect(wrapper.text()).toContain("We couldn't load the catalog")
+    expect(wrapper.text()).toContain('GraphQL exploded')
+
+    await wrapper.get('button').trigger('click')
+
+    expect(wrapper.emitted('retry')).toHaveLength(1)
   })
 
   it('renders result cards', () => {

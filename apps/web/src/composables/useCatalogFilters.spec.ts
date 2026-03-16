@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { useCatalogFilters } from './useCatalogFilters'
+import { CATALOG_SEARCH_DEBOUNCE_MS, useCatalogFilters } from './useCatalogFilters'
 
 describe('useCatalogFilters', () => {
   it('builds default query variables', () => {
@@ -62,5 +62,20 @@ describe('useCatalogFilters', () => {
     setPage(8)
     setConcentrationMax(90)
     expect(page.value).toBe(1)
+  })
+
+  it('debounces the search variable used by the query', async () => {
+    vi.useFakeTimers()
+
+    const { setSearch, variables } = useCatalogFilters()
+
+    setSearch('whey')
+    expect(variables.value.search).toBeNull()
+
+    await vi.advanceTimersByTimeAsync(CATALOG_SEARCH_DEBOUNCE_MS)
+
+    expect(variables.value.search).toBe('whey')
+
+    vi.useRealTimers()
   })
 })

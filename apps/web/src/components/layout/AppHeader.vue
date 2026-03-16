@@ -18,7 +18,7 @@ defineEmits<{
       class="app-shell flex items-center justify-between gap-3 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-4 sm:px-6 sm:py-4"
     >
       <div class="justify-self-start">
-        <RouterLink to="/" class="block">
+        <RouterLink to="/" class="block" aria-label="Go to catalog home">
           <picture class="block">
             <source srcset="/images/logo-header-600w.avif" type="image/avif" />
             <source srcset="/images/logo-header-600w.webp" type="image/webp" />
@@ -34,7 +34,7 @@ defineEmits<{
       </div>
 
       <div class="hidden justify-self-center sm:block">
-        <RouterLink to="/" class="block">
+        <RouterLink to="/" class="block" aria-label="Go to catalog home">
           <img src="/images/logo-name.svg" alt="Baboom" class="h-7 w-auto sm:h-10" />
         </RouterLink>
       </div>
