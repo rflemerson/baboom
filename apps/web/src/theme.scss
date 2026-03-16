@@ -69,9 +69,80 @@ body {
   box-shadow: none;
 }
 
+.app-meta-row {
+  color: var(--app-text-muted);
+}
+
 .app-toolbar {
   border: 1px solid var(--app-border);
   background: var(--app-surface-soft);
+}
+
+.app-card {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.app-card__brand {
+  color: var(--app-brand-fg);
+  font-size: 0.75rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.app-card__title {
+  color: var(--app-text);
+}
+
+.app-card__subtle {
+  color: var(--app-text-soft);
+}
+
+.app-card__cta {
+  width: 100%;
+}
+
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--app-border);
+  border-radius: 9999px;
+  background: var(--app-surface-soft);
+  color: var(--app-text-muted);
+}
+
+.app-chip--accent {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: var(--app-brand-soft);
+  color: var(--app-brand-fg);
+}
+
+.app-metric {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+}
+
+.app-metric__label {
+  color: var(--app-text-soft);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app-metric__value {
+  color: var(--app-text);
+}
+
+.app-link {
+  color: var(--app-brand);
+  text-underline-offset: 0.25rem;
+}
+
+.app-link:hover {
+  color: var(--app-brand-strong);
+  text-decoration: underline;
 }
 
 .app-section-title {
@@ -296,6 +367,19 @@ body {
 .app-drawer__section {
   border: 1px solid var(--app-border);
   background: var(--app-surface-soft);
+}
+
+.app-pagination {
+  border-top: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+
+.app-pagination__summary {
+  color: var(--app-text-muted);
+}
+
+.app-pagination__page {
+  min-width: 2.75rem;
 }
 
 .app-status--success {

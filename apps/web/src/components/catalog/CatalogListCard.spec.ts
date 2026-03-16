@@ -28,5 +28,9 @@ describe('CatalogListCard', () => {
     expect(wrapper.text()).toContain('integralmedica')
     expect(wrapper.text()).toContain('Container Package')
     expect(wrapper.text()).toContain('Price / g')
+    expect(wrapper.text()).toContain('0.23')
+    expect(wrapper.get('a[aria-label="View offer"]').attributes('href')).toBe(
+      'https://example.com/whey-isolado',
+    )
   })
 })

@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { ArrowUpRight } from 'lucide-vue-next'
+
 import type { CatalogProduct } from '@/types/catalog'
+import BaseMetricCard from '@/components/ui/BaseMetricCard.vue'
+import { formatDecimal } from '@/utils/number'
 
 defineProps<{
   product: CatalogProduct
@@ -7,75 +11,70 @@ defineProps<{
 </script>
 
 <template>
-  <article class="rounded-2xl border border-white/10 bg-stone-900/80 p-5 shadow-lg shadow-black/20">
+  <article class="app-card rounded-2xl p-5">
     <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex-1">
-        <div
-          class="flex flex-wrap items-center gap-2 text-xs tracking-[0.24em] text-orange-300 uppercase"
-        >
-          <span>{{ product.brand.name }}</span>
-          <span class="rounded-full bg-white/10 px-2.5 py-1 text-stone-200">
-            {{ product.packagingDisplay }}
-          </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="app-card__brand">{{ product.brand.name }}</span>
         </div>
 
-        <h2 class="mt-3 text-2xl font-semibold text-white">{{ product.name }}</h2>
+        <h2 class="app-card__title mt-3 text-2xl font-semibold">{{ product.name }}</h2>
 
         <div class="mt-4 flex flex-wrap gap-2">
-          <span class="rounded-full border border-white/10 px-3 py-1 text-xs text-stone-300">
+          <span class="app-chip app-chip--accent px-2.5 py-1 text-xs">
+            {{ product.packagingDisplay }}
+          </span>
+          <span class="app-chip px-3 py-1 text-xs">
             {{ product.weight }} g
           </span>
-          <span class="rounded-full border border-white/10 px-3 py-1 text-xs text-stone-300">
+          <span class="app-chip px-3 py-1 text-xs">
             {{ product.category?.name ?? 'Uncategorized' }}
           </span>
           <span
             v-if="product.concentration"
-            class="rounded-full border border-white/10 px-3 py-1 text-xs text-stone-300"
+            class="app-chip px-3 py-1 text-xs"
           >
             {{ product.concentration }}% concentration
           </span>
-          <span
-            v-if="product.totalProtein"
-            class="rounded-full border border-white/10 px-3 py-1 text-xs text-stone-300"
-          >
-            {{ product.totalProtein }} total protein
-          </span>
         </div>
 
-        <ul class="mt-4 flex flex-wrap gap-2">
+        <ul v-if="product.tags.length" class="mt-4 flex flex-wrap gap-2">
           <li
-            v-for="tag in product.tags"
+            v-for="tag in product.tags.slice(0, 3)"
             :key="`${product.id}-${tag.name}`"
-            class="rounded-full border border-orange-400/30 bg-orange-400/10 px-2.5 py-1 text-xs text-orange-200"
+            class="app-chip px-2.5 py-1 text-xs"
           >
             {{ tag.name }}
           </li>
         </ul>
       </div>
 
-      <div
-        class="min-w-[220px] border-t border-white/10 pt-5 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6"
-      >
-        <dl class="grid gap-3 text-sm text-stone-300">
-          <div class="flex items-center justify-between gap-4">
-            <dt class="text-stone-500">Price</dt>
-            <dd>{{ product.lastPrice ?? '-' }}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <dt class="text-stone-500">Price / g</dt>
-            <dd>{{ product.pricePerGram ?? '-' }}</dd>
-          </div>
-        </dl>
+      <div class="grid gap-3 lg:min-w-[220px]">
+        <div class="grid grid-cols-2 gap-3">
+          <BaseMetricCard compact label="Total price" :value="formatDecimal(product.lastPrice)" />
+          <BaseMetricCard compact label="Max protein" :value="formatDecimal(product.totalProtein)" />
+        </div>
 
-        <a
-          v-if="product.externalLink"
-          :href="product.externalLink"
-          target="_blank"
-          rel="noreferrer"
-          class="mt-5 inline-flex text-sm font-medium text-orange-300 underline-offset-4 hover:underline"
+        <BaseMetricCard
+          class="rounded-3xl"
+          inline-action
+          label="Price / g"
+          :value="formatDecimal(product.pricePerGram)"
         >
-          Open offer
-        </a>
+          <template #action>
+            <a
+              v-if="product.externalLink"
+              :href="product.externalLink"
+              target="_blank"
+              rel="noreferrer"
+              class="app-button app-button--primary app-button--icon-square rounded-2xl"
+              aria-label="View offer"
+              title="View offer"
+            >
+              <ArrowUpRight class="h-4 w-4" />
+            </a>
+          </template>
+        </BaseMetricCard>
       </div>
     </div>
   </article>

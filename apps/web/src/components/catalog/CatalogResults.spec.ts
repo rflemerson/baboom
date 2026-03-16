@@ -56,6 +56,20 @@ describe('CatalogResults', () => {
     expect(wrapper.text()).toContain('No products found.')
   })
 
+  it('renders an error state', () => {
+    const wrapper = mount(CatalogResults, {
+      props: {
+        pageInfo,
+        products: [],
+        loading: false,
+        errorMessage: 'GraphQL exploded',
+        viewMode: 'grid',
+      },
+    })
+
+    expect(wrapper.text()).toContain('Error while querying GraphQL: GraphQL exploded')
+  })
+
   it('renders result cards', () => {
     const wrapper = mount(CatalogResults, {
       props: {
@@ -66,7 +80,6 @@ describe('CatalogResults', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Total: 1')
     expect(wrapper.text()).toContain('Creatina Monohidratada 300g')
   })
 })

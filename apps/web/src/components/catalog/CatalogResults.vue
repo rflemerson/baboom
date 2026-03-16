@@ -19,18 +19,22 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-stone-200">
-    <p v-if="loading">Loading products...</p>
-    <p v-else-if="errorMessage">Error while querying GraphQL: {{ errorMessage }}</p>
-    <div v-else-if="pageInfo" class="flex flex-wrap gap-6">
-      <span>Total: {{ pageInfo.totalCount }}</span>
-      <span>Page: {{ pageInfo.currentPage }} / {{ pageInfo.totalPages }}</span>
-      <span>Per page: {{ pageInfo.perPage }}</span>
-    </div>
+  <section
+    v-if="loading"
+    class="app-meta-row app-panel app-panel--soft mb-8 rounded-2xl px-6 py-12 text-center text-sm"
+  >
+    Loading products...
   </section>
 
   <section
-    v-if="!loading && !errorMessage && products.length"
+    v-else-if="errorMessage"
+    class="app-panel app-panel--soft mb-8 rounded-2xl border border-dashed px-6 py-12 text-center"
+  >
+    Error while querying GraphQL: {{ errorMessage }}
+  </section>
+
+  <section
+    v-else-if="products.length"
     :class="
       viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3' : 'flex flex-col gap-4'
     "
@@ -44,8 +48,8 @@ const emit = defineEmits<{
   </section>
 
   <section
-    v-else-if="!loading && !errorMessage"
-    class="rounded-2xl border border-dashed border-white/15 bg-white/5 px-6 py-12 text-center text-stone-300"
+    v-else
+    class="app-panel app-panel--soft rounded-2xl border border-dashed px-6 py-12 text-center"
   >
     No products found.
   </section>

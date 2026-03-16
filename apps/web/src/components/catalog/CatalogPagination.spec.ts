@@ -18,6 +18,10 @@ describe('CatalogPagination', () => {
       },
     })
 
+    expect(wrapper.text()).toContain('72 products')
+    expect(wrapper.text()).toContain('Page 3 of 6')
+    expect(wrapper.text()).toContain('12 per page')
+
     const buttons = wrapper.findAll('button')
 
     await buttons[0]?.trigger('click')

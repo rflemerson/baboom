@@ -22,14 +22,18 @@ function buildPages(pageInfo: CatalogPageInfo) {
 <template>
   <nav
     v-if="pageInfo.totalPages > 1"
-    class="mt-8 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-stone-300 md:flex-row md:items-center md:justify-between"
+    class="app-pagination mt-8 flex flex-col gap-4 pt-6 text-sm md:flex-row md:items-center md:justify-between"
   >
-    <p>Showing page {{ pageInfo.currentPage }} of {{ pageInfo.totalPages }}</p>
+    <div class="app-pagination__summary flex flex-wrap items-center gap-x-4 gap-y-2">
+      <span>{{ pageInfo.totalCount }} products</span>
+      <span>Page {{ pageInfo.currentPage }} of {{ pageInfo.totalPages }}</span>
+      <span>{{ pageInfo.perPage }} per page</span>
+    </div>
 
     <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 transition hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
+        class="app-button app-button--ghost app-button--control inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!pageInfo.hasPreviousPage"
         @click="emit('update:page', pageInfo.currentPage - 1)"
       >
@@ -41,11 +45,11 @@ function buildPages(pageInfo: CatalogPageInfo) {
         v-for="pageNumber in buildPages(pageInfo)"
         :key="pageNumber"
         type="button"
-        class="rounded-lg border px-3 py-2 transition"
+        class="app-pagination__page app-button app-button--control transition"
         :class="
           pageNumber === pageInfo.currentPage
-            ? 'border-orange-400 bg-orange-400/15 text-orange-200'
-            : 'border-white/10 hover:border-orange-400'
+            ? 'app-button--accent'
+            : 'app-button--ghost'
         "
         @click="emit('update:page', pageNumber)"
       >
@@ -54,7 +58,7 @@ function buildPages(pageInfo: CatalogPageInfo) {
 
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 transition hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
+        class="app-button app-button--ghost app-button--control inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!pageInfo.hasNextPage"
         @click="emit('update:page', pageInfo.currentPage + 1)"
       >

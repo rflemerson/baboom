@@ -28,6 +28,7 @@
 - Use semantic classes such as buttons, panels, inputs, and dialog shells to avoid long repeated class strings in templates.
 - When multiple controls should share the same visual size, prefer semantic button size modifiers from `src/theme.scss` instead of per-component padding tweaks.
 - For binary icon toggles, prefer a reusable Vue component such as `BaseBinaryToggle` over hand-writing sibling buttons in each feature component.
+- For repeated metric blocks with label/value presentation, prefer `BaseMetricCard` instead of duplicating markup in feature components.
 - Let Prettier handle Tailwind class ordering instead of trying to enforce that through custom manual conventions.
 - If Tailwind-specific linting is revisited later, re-check Tailwind 4 compatibility first instead of forcing the older ESLint plugin into the toolchain.
 
