@@ -54,7 +54,7 @@ const advancedFiltersActive = computed(() => {
 </script>
 
 <template>
-  <main class="app-page px-6 py-12">
+  <main class="app-page px-4 py-8 sm:px-6 sm:py-12">
     <div class="app-shell">
       <CatalogToolbar
         :advanced-filters-active="advancedFiltersActive"

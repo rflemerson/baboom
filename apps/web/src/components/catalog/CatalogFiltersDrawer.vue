@@ -43,13 +43,11 @@ const titleId = 'catalog-filters-drawer-title'
     container-class="justify-end"
     initial-focus='input[type="text"]'
     :model-value="modelValue"
-    panel-class="app-drawer flex h-full w-full max-w-md flex-col"
+    panel-class="app-drawer flex h-full w-full flex-col sm:max-w-md"
     @update:modelValue="emit('update:modelValue', $event)"
   >
     <aside class="flex h-full w-full flex-col">
-      <header
-        class="app-drawer__header flex items-center justify-between border-b px-6 py-5"
-      >
+      <header class="app-drawer__header flex items-center justify-between border-b px-4 py-4 sm:px-6 sm:py-5">
         <div>
           <p class="app-eyebrow">Catalog filters</p>
           <h2 :id="titleId" class="mt-2 text-xl font-semibold">Refine results</h2>
@@ -63,7 +61,7 @@ const titleId = 'catalog-filters-drawer-title'
         </button>
       </header>
 
-      <div class="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+      <div class="flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:space-y-6 sm:px-6 sm:py-6">
         <section class="app-drawer__section rounded-2xl p-4">
           <label class="flex flex-col gap-2">
             <span class="app-section-title">Brand</span>
@@ -174,7 +172,7 @@ const titleId = 'catalog-filters-drawer-title'
         </section>
       </div>
 
-      <footer class="app-drawer__footer flex gap-3 border-t px-6 py-5">
+      <footer class="app-drawer__footer flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:px-6 sm:py-5">
         <button
           type="button"
           class="app-button app-button--secondary app-button--control flex-1"

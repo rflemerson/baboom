@@ -24,21 +24,21 @@ function buildPages(pageInfo: CatalogPageInfo) {
     v-if="pageInfo.totalPages > 1"
     class="app-pagination mt-8 flex flex-col gap-4 pt-6 text-sm md:flex-row md:items-center md:justify-between"
   >
-    <div class="app-pagination__summary flex flex-wrap items-center gap-x-4 gap-y-2">
+    <div class="app-pagination__summary flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center md:justify-start md:text-left">
       <span>{{ pageInfo.totalCount }} products</span>
       <span>Page {{ pageInfo.currentPage }} of {{ pageInfo.totalPages }}</span>
       <span>{{ pageInfo.perPage }} per page</span>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center justify-center gap-2 md:justify-end">
       <button
         type="button"
-        class="app-button app-button--ghost app-button--control inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+        class="app-button app-button--ghost app-button--control inline-flex items-center gap-2 px-3 sm:px-4 disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!pageInfo.hasPreviousPage"
         @click="emit('update:page', pageInfo.currentPage - 1)"
       >
         <ChevronLeft class="h-4 w-4" />
-        <span>Previous</span>
+        <span class="hidden sm:inline">Previous</span>
       </button>
 
       <button
@@ -58,11 +58,11 @@ function buildPages(pageInfo: CatalogPageInfo) {
 
       <button
         type="button"
-        class="app-button app-button--ghost app-button--control inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+        class="app-button app-button--ghost app-button--control inline-flex items-center gap-2 px-3 sm:px-4 disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!pageInfo.hasNextPage"
         @click="emit('update:page', pageInfo.currentPage + 1)"
       >
-        <span>Next</span>
+        <span class="hidden sm:inline">Next</span>
         <ChevronRight class="h-4 w-4" />
       </button>
     </div>

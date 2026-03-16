@@ -14,7 +14,7 @@ defineProps<{
         <p class="app-metric__label">{{ label }}</p>
         <p
           class="app-metric__value mt-1.5"
-          :class="compact ? 'text-lg font-semibold' : 'text-xl font-semibold'"
+          :class="compact ? 'text-base font-semibold sm:text-lg' : 'text-lg font-semibold sm:text-xl'"
         >
           {{ value }}
         </p>
@@ -25,7 +25,7 @@ defineProps<{
       <p class="app-metric__label">{{ label }}</p>
       <p
         class="app-metric__value mt-1.5"
-        :class="compact ? 'text-lg font-semibold' : 'text-xl font-semibold'"
+        :class="compact ? 'text-base font-semibold sm:text-lg' : 'text-lg font-semibold sm:text-xl'"
       >
         {{ value }}
       </p>

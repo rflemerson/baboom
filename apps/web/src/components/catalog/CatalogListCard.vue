@@ -11,14 +11,14 @@ defineProps<{
 </script>
 
 <template>
-  <article class="app-card rounded-2xl p-5">
+  <article class="app-card rounded-2xl p-4 sm:p-5">
     <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <span class="app-card__brand">{{ product.brand.name }}</span>
         </div>
 
-        <h2 class="app-card__title mt-3 text-2xl font-semibold">{{ product.name }}</h2>
+        <h2 class="app-card__title mt-3 text-xl font-semibold sm:text-2xl">{{ product.name }}</h2>
 
         <div class="mt-4 flex flex-wrap gap-2">
           <span class="app-chip app-chip--accent px-2.5 py-1 text-xs">
@@ -49,7 +49,7 @@ defineProps<{
         </ul>
       </div>
 
-      <div class="grid gap-3 lg:min-w-[220px]">
+      <div class="grid gap-3 sm:min-w-[220px] lg:min-w-[220px]">
         <div class="grid grid-cols-2 gap-3">
           <BaseMetricCard compact label="Total price" :value="formatDecimal(product.lastPrice)" />
           <BaseMetricCard compact label="Max protein" :value="formatDecimal(product.totalProtein)" />

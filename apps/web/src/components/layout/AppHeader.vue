@@ -15,17 +15,17 @@ defineEmits<{
 <template>
   <header class="app-header">
     <div
-      class="app-shell grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-4"
+      class="app-shell flex items-center justify-between gap-3 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-4 sm:px-6 sm:py-4"
     >
       <div class="justify-self-start">
         <RouterLink to="/" class="block">
-          <picture class="hidden sm:block">
+          <picture class="block">
             <source srcset="/images/logo-header-600w.avif" type="image/avif" />
             <source srcset="/images/logo-header-600w.webp" type="image/webp" />
             <img
               src="/images/logo-header-600w.svg"
               alt="Baboom logo"
-              class="h-auto w-20 sm:w-24"
+              class="h-auto w-11 sm:w-24"
               width="100"
               height="81"
             />
@@ -33,9 +33,9 @@ defineEmits<{
         </RouterLink>
       </div>
 
-      <div class="justify-self-center">
+      <div class="hidden justify-self-center sm:block">
         <RouterLink to="/" class="block">
-          <img src="/images/logo-name.svg" alt="Baboom" class="h-8 w-auto sm:h-10" />
+          <img src="/images/logo-name.svg" alt="Baboom" class="h-7 w-auto sm:h-10" />
         </RouterLink>
       </div>
 
@@ -48,7 +48,7 @@ defineEmits<{
           @click="$emit('open-alerts')"
         >
           <Bomb class="alert-trigger__icon h-4 w-4" />
-          <span class="hidden sm:inline">Alerts</span>
+          <span class="hidden md:inline">Alerts</span>
         </button>
 
         <button

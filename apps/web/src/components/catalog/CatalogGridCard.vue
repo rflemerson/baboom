@@ -11,10 +11,10 @@ defineProps<{
 </script>
 
 <template>
-  <article class="app-card rounded-2xl p-5">
-    <div class="mb-4 rounded-2xl px-4 py-5 text-center" style="background: var(--app-brand-soft)">
+  <article class="app-card rounded-2xl p-4 sm:p-5">
+    <div class="mb-4 rounded-2xl px-3 py-4 text-center sm:px-4 sm:py-5" style="background: var(--app-brand-soft)">
       <p class="app-card__brand">{{ product.brand.name }}</p>
-      <h2 class="app-card__title mt-2 text-lg font-semibold">
+      <h2 class="app-card__title mt-2 text-base font-semibold sm:text-lg">
         {{ product.name }}
       </h2>
     </div>

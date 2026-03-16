@@ -85,12 +85,12 @@ function onSortByChange(event: Event) {
 </script>
 
 <template>
-  <section class="app-toolbar mb-8 rounded-2xl p-4">
+  <section class="app-toolbar mb-6 rounded-2xl p-3 sm:mb-8 sm:p-4">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div
-        class="grid flex-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]"
+        class="grid flex-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]"
       >
-        <label class="flex flex-col gap-2">
+        <label class="flex flex-col gap-2 sm:col-span-2 xl:col-span-1">
           <span class="app-section-title">Search</span>
           <div class="relative">
             <Search
@@ -99,8 +99,8 @@ function onSortByChange(event: Event) {
             <input
               :value="search"
               type="search"
-              placeholder="Search products, brands, categories, or tags"
-              class="app-input rounded-xl px-11 py-3 text-sm"
+              placeholder="Search products, brands, or tags"
+              class="app-input rounded-xl px-11 py-2.5 text-sm sm:py-3"
               @input="onSearchInput"
             />
           </div>
@@ -110,7 +110,7 @@ function onSortByChange(event: Event) {
           <span class="app-section-title">Sort by</span>
           <select
             :value="sortBy"
-            class="app-select rounded-xl px-4 py-3 text-sm"
+            class="app-select rounded-xl px-4 py-2.5 text-sm sm:py-3"
             @change="onSortByChange"
           >
             <option v-for="option in sortOptions" :key="option.value" :value="option.value">
@@ -123,7 +123,7 @@ function onSortByChange(event: Event) {
           <span class="app-section-title">Per page</span>
           <select
             :value="perPage"
-            class="app-select rounded-xl px-4 py-3 text-sm"
+            class="app-select rounded-xl px-4 py-2.5 text-sm sm:py-3"
             @change="onPerPageChange"
           >
             <option :value="12">12</option>
@@ -133,7 +133,7 @@ function onSortByChange(event: Event) {
         </label>
       </div>
 
-      <div class="flex flex-wrap gap-3">
+      <div class="flex flex-wrap items-center justify-end gap-2 self-end sm:gap-3 lg:self-auto">
         <button
           type="button"
           data-test="open-filters"
