@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { RouterLinkStub } from '@vue/test-utils'
 
 import App from './App.vue'
 
@@ -8,6 +9,7 @@ describe('App', () => {
     const wrapper = mount(App, {
       global: {
         stubs: {
+          RouterLink: RouterLinkStub,
           RouterView: {
             template: '<div data-test="router-view" />',
           },

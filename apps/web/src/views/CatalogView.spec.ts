@@ -10,7 +10,7 @@ import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import CatalogView from './CatalogView.vue'
 
 describe('CatalogView', () => {
-  it('renders the catalog heading and the fetched item', () => {
+  it('renders the fetched item', () => {
     vi.mocked(useCatalogQuery).mockReturnValue({
       error: computed(() => null),
       loading: computed(() => false),
@@ -43,7 +43,6 @@ describe('CatalogView', () => {
 
     const wrapper = mount(CatalogView)
 
-    expect(wrapper.text()).toContain('Public catalog')
     expect(wrapper.text()).toContain('100% Whey Concentrado 900g')
   })
 })

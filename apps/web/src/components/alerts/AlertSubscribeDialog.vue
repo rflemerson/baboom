@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { watch } from 'vue'
-import { BellRing, Mail, X } from 'lucide-vue-next'
+import { CircleAlert, CircleCheckBig, Mail } from 'lucide-vue-next'
 
 import { useAlertSubscription } from '@/composables/useAlertSubscription'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -65,17 +65,19 @@ async function onSubmit() {
     container-class="items-center justify-center"
     initial-focus='input[type="email"]'
     :model-value="modelValue"
-    panel-class="w-full max-w-md rounded-3xl p-6"
+    panel-class="w-full max-w-md rounded-2xl p-6 sm:p-8"
     @update:modelValue="emit('update:modelValue', $event)"
   >
-      <div v-if="status === 'success'" class="space-y-4 text-center">
-        <p class="app-status--success text-xs tracking-[0.24em] uppercase">Subscribed</p>
+      <div v-if="status === 'success'" class="space-y-5 text-center">
+        <div class="flex justify-center">
+          <CircleCheckBig class="app-status--success h-16 w-16" />
+        </div>
         <h2 :id="titleId" class="text-2xl font-semibold">You're Subscribed!</h2>
         <p class="app-copy-muted text-sm">
           We&apos;ve added <strong>{{ email }}</strong> to our list. You&apos;ll be the first to
           know about price drops!
         </p>
-        <div class="flex gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button
             type="button"
             class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
@@ -93,51 +95,36 @@ async function onSubmit() {
         </div>
       </div>
 
-      <div v-else-if="status === 'duplicate'" class="space-y-4 text-center">
-        <p class="app-status--info text-xs tracking-[0.24em] uppercase">Already subscribed</p>
+      <div v-else-if="status === 'duplicate'" class="space-y-5 text-center">
+        <div class="flex justify-center">
+          <CircleAlert class="app-status--info h-14 w-14" />
+        </div>
         <h2 :id="titleId" class="text-2xl font-semibold">Already Subscribed</h2>
         <p class="app-copy-muted text-sm">
           The email <strong>{{ email }}</strong> is already in our database.
         </p>
-        <div class="flex gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             class="app-button app-button--secondary flex-1 rounded-xl px-4 py-3 text-sm"
-            @click="reset"
+            @click="emit('update:modelValue', false)"
           >
-            Use another email
+            Close
           </button>
           <button
             type="button"
             class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
-            @click="emit('update:modelValue', false)"
+            @click="reset"
           >
-            Close
+            Use another email
           </button>
         </div>
       </div>
 
       <div v-else class="space-y-5">
-        <div class="flex items-start justify-between gap-4">
-          <div class="flex items-start gap-3">
-            <div class="app-button--accent mt-1 rounded-2xl border p-3">
-              <BellRing class="h-5 w-5" />
-            </div>
-            <div>
-              <p class="app-eyebrow">Alerts</p>
-              <h2 :id="titleId" class="mt-2 text-2xl font-semibold">
-                Enter your email to receive notifications.
-              </h2>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="app-button app-button--ghost app-button--icon rounded-xl p-2 text-sm"
-            @click="emit('update:modelValue', false)"
-          >
-            <X class="h-4 w-4" />
-            <span class="sr-only">Close</span>
-          </button>
+        <div class="space-y-3">
+          <h2 :id="titleId" class="text-2xl font-semibold">Alerts</h2>
+          <p class="app-copy-muted text-sm">Enter your email to receive notifications.</p>
         </div>
 
         <form class="space-y-4" @submit.prevent="onSubmit">

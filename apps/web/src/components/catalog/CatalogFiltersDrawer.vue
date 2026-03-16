@@ -43,13 +43,12 @@ const titleId = 'catalog-filters-drawer-title'
     container-class="justify-end"
     initial-focus='input[type="text"]'
     :model-value="modelValue"
-    panel-class="flex h-full w-full max-w-md flex-col border-l"
+    panel-class="app-drawer flex h-full w-full max-w-md flex-col"
     @update:modelValue="emit('update:modelValue', $event)"
   >
     <aside class="flex h-full w-full flex-col">
       <header
-        class="flex items-center justify-between px-6 py-5"
-        style="border-bottom: 1px solid var(--app-border)"
+        class="app-drawer__header flex items-center justify-between border-b px-6 py-5"
       >
         <div>
           <p class="app-eyebrow">Catalog filters</p>
@@ -57,7 +56,7 @@ const titleId = 'catalog-filters-drawer-title'
         </div>
         <button
           type="button"
-          class="app-button app-button--ghost rounded-xl px-3 py-2 text-sm"
+          class="app-button app-button--ghost app-button--control"
           @click="emit('update:modelValue', false)"
         >
           Close
@@ -65,19 +64,21 @@ const titleId = 'catalog-filters-drawer-title'
       </header>
 
       <div class="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-        <label class="flex flex-col gap-2">
-          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Brand</span>
-          <input
-            :value="brand"
-            type="text"
-            placeholder="Filter by brand"
-            class="app-input rounded-xl px-4 py-3 text-sm"
-            @input="emit('update:brand', ($event.target as HTMLInputElement).value)"
-          />
-        </label>
+        <section class="app-drawer__section rounded-2xl p-4">
+          <label class="flex flex-col gap-2">
+            <span class="app-section-title">Brand</span>
+            <input
+              :value="brand"
+              type="text"
+              placeholder="Filter by brand"
+              class="app-input rounded-xl px-4 py-3 text-sm"
+              @input="emit('update:brand', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+        </section>
 
-        <div class="space-y-3">
-          <p class="app-copy-soft text-xs tracking-[0.24em] uppercase">Price range</p>
+        <section class="app-drawer__section space-y-3 rounded-2xl p-4">
+          <p class="app-section-title">Price range</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="priceMin ?? ''"
@@ -102,10 +103,10 @@ const titleId = 'catalog-filters-drawer-title'
               "
             />
           </div>
-        </div>
+        </section>
 
-        <div class="space-y-3">
-          <p class="app-copy-soft text-xs tracking-[0.24em] uppercase">Price per gram</p>
+        <section class="app-drawer__section space-y-3 rounded-2xl p-4">
+          <p class="app-section-title">Price per gram</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="pricePerGramMin ?? ''"
@@ -136,10 +137,10 @@ const titleId = 'catalog-filters-drawer-title'
               "
             />
           </div>
-        </div>
+        </section>
 
-        <div class="space-y-3">
-          <p class="app-copy-soft text-xs tracking-[0.24em] uppercase">Concentration</p>
+        <section class="app-drawer__section space-y-3 rounded-2xl p-4">
+          <p class="app-section-title">Concentration</p>
           <div class="grid grid-cols-2 gap-3">
             <input
               :value="concentrationMin ?? ''"
@@ -170,20 +171,20 @@ const titleId = 'catalog-filters-drawer-title'
               "
             />
           </div>
-        </div>
+        </section>
       </div>
 
-      <footer class="flex gap-3 px-6 py-5" style="border-top: 1px solid var(--app-border)">
+      <footer class="app-drawer__footer flex gap-3 border-t px-6 py-5">
         <button
           type="button"
-          class="app-button app-button--secondary flex-1 rounded-xl px-4 py-3 text-sm"
+          class="app-button app-button--secondary app-button--control flex-1"
           @click="emit('clear')"
         >
           Clear
         </button>
         <button
           type="button"
-          class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
+          class="app-button app-button--primary app-button--control flex-1"
           @click="applyFilters"
         >
           Apply filters

@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import { Grid3X3, List, RotateCcw, Search, SlidersHorizontal, ArrowDownUp } from 'lucide-vue-next'
+import {
+  Search,
+  SlidersHorizontal,
+  X,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  Grid3X3,
+  List,
+} from 'lucide-vue-next'
+import { computed } from 'vue'
 
 import type { CatalogViewMode } from '@/composables/useCatalogViewMode'
+import BaseBinaryToggle, { type BinaryToggleOption } from '@/components/ui/BaseBinaryToggle.vue'
 
 type SortOption = {
   label: string
   value: string
 }
 
-defineProps<{
+const props = defineProps<{
   advancedFiltersActive?: boolean
   perPage: number
   search: string
@@ -28,6 +38,36 @@ const emit = defineEmits<{
   'toggle:sortDir': []
 }>()
 
+const sortDirectionOptions = computed<readonly [BinaryToggleOption, BinaryToggleOption]>(() => [
+  {
+    ariaLabel: 'Ascending',
+    icon: ArrowUpNarrowWide,
+    title: 'Ascending',
+    value: 'asc',
+  },
+  {
+    ariaLabel: 'Descending',
+    icon: ArrowDownWideNarrow,
+    title: 'Descending',
+    value: 'desc',
+  },
+])
+
+const viewModeOptions = computed<readonly [BinaryToggleOption, BinaryToggleOption]>(() => [
+  {
+    ariaLabel: 'Grid view',
+    icon: Grid3X3,
+    title: 'Grid view',
+    value: 'grid',
+  },
+  {
+    ariaLabel: 'List view',
+    icon: List,
+    title: 'List view',
+    value: 'list',
+  },
+])
+
 function onPerPageChange(event: Event) {
   const target = event.target as HTMLSelectElement
   emit('update:perPage', Number(target.value))
@@ -45,13 +85,13 @@ function onSortByChange(event: Event) {
 </script>
 
 <template>
-  <section class="app-panel app-panel--soft mb-8 rounded-2xl p-4">
+  <section class="app-toolbar mb-8 rounded-2xl p-4">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div
         class="grid flex-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]"
       >
         <label class="flex flex-col gap-2">
-          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Search</span>
+          <span class="app-section-title">Search</span>
           <div class="relative">
             <Search
               class="app-copy-soft pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2"
@@ -67,7 +107,7 @@ function onSortByChange(event: Event) {
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Sort by</span>
+          <span class="app-section-title">Sort by</span>
           <select
             :value="sortBy"
             class="app-select rounded-xl px-4 py-3 text-sm"
@@ -80,7 +120,7 @@ function onSortByChange(event: Event) {
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Per page</span>
+          <span class="app-section-title">Per page</span>
           <select
             :value="perPage"
             class="app-select rounded-xl px-4 py-3 text-sm"
@@ -96,49 +136,38 @@ function onSortByChange(event: Event) {
       <div class="flex flex-wrap gap-3">
         <button
           type="button"
-          class="app-button rounded-xl px-4 py-3 text-sm"
-          :class="advancedFiltersActive ? 'app-button--accent' : 'app-button--secondary'"
+          data-test="open-filters"
+          :aria-label="advancedFiltersActive ? 'Filters active' : 'Open filters'"
+          :title="advancedFiltersActive ? 'Filters active' : 'Open filters'"
+          class="app-button app-button--control app-button--icon-square"
+          :class="advancedFiltersActive ? 'app-button--accent' : 'app-button--ghost'"
           @click="emit('openFilters')"
         >
           <SlidersHorizontal class="h-4 w-4" />
-          <span>Advanced filters</span>
         </button>
+        <BaseBinaryToggle
+          name="Sort direction"
+          :model-value="props.sortDir"
+          :options="sortDirectionOptions"
+          test-id="sort-direction-toggle"
+          @update:modelValue="emit('toggle:sortDir')"
+        />
+        <BaseBinaryToggle
+          name="View mode"
+          :model-value="props.viewMode"
+          :options="viewModeOptions"
+          test-id="view-mode-toggle"
+          @update:modelValue="emit('update:viewMode', $event as CatalogViewMode)"
+        />
         <button
           type="button"
-          class="app-button app-button--ghost rounded-xl px-4 py-3 text-sm"
-          @click="emit('toggle:sortDir')"
-        >
-          <ArrowDownUp class="h-4 w-4" />
-          <span>{{ sortDir === 'asc' ? 'Ascending' : 'Descending' }}</span>
-        </button>
-        <div class="flex overflow-hidden rounded-xl border" style="border-color: var(--app-border)">
-          <button
-            type="button"
-            class="app-button px-4 py-3 text-sm"
-            :class="viewMode === 'grid' ? 'app-button--accent' : 'app-button--ghost'"
-            @click="emit('update:viewMode', 'grid')"
-          >
-            <Grid3X3 class="h-4 w-4" />
-            <span>Grid</span>
-          </button>
-          <button
-            type="button"
-            class="app-button px-4 py-3 text-sm"
-            style="border-left: 1px solid var(--app-border)"
-            :class="viewMode === 'list' ? 'app-button--accent' : 'app-button--ghost'"
-            @click="emit('update:viewMode', 'list')"
-          >
-            <List class="h-4 w-4" />
-            <span>List</span>
-          </button>
-        </div>
-        <button
-          type="button"
-          class="app-button app-button--secondary rounded-xl px-4 py-3 text-sm"
+          data-test="clear-filters"
+          class="app-button app-button--ghost app-button--control app-button--icon-square"
+          title="Clear filters"
+          aria-label="Clear filters"
           @click="emit('clear')"
         >
-          <RotateCcw class="h-4 w-4" />
-          <span>Clear filters</span>
+          <X class="h-4 w-4" />
         </button>
       </div>
     </div>
