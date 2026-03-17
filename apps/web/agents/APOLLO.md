@@ -10,7 +10,8 @@
 
 - Apollo setup lives in `src/graphql/client/apollo.ts`.
 - The app provides the default client in `src/main.ts` with `DefaultApolloClient`.
-- Components should consume GraphQL through composables such as `useCatalogQuery()`.
+- Components should consume GraphQL through composables such as `useCatalogQuery()` and `useAlertSubscription()`.
+- Prefer importing generated `*Document` values from `src/gql/graphql.ts` inside composables instead of keeping raw GraphQL strings in components.
 
 ## Usage guidance
 
@@ -18,6 +19,7 @@
 - Keep UI components dumb when possible; fetch in a composable or route-level view.
 - Pass variables explicitly; avoid hidden global query state.
 - Prefer one composable per feature area when the query has UI state attached.
+- Expose `refetch` or explicit action methods from the composable when the UI needs retry behavior, instead of letting components reach down into Apollo directly.
 
 ## Sources
 

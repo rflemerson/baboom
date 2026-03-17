@@ -25,11 +25,8 @@ const activeIndex = computed(() =>
 )
 
 function toggle() {
-  const nextValue = props.options[activeIndex.value === 0 ? 1 : 0]?.value
-
-  if (nextValue) {
-    emit('update:modelValue', nextValue)
-  }
+  const nextValue = props.options[activeIndex.value === 0 ? 1 : 0].value
+  emit('update:modelValue', nextValue)
 }
 </script>
 
@@ -38,8 +35,8 @@ function toggle() {
     type="button"
     class="app-binary-toggle app-button--control"
     :data-test="testId"
-    :aria-label="`${name}: ${options[activeIndex]?.title}`"
-    :title="options[activeIndex]?.title"
+    :aria-label="`${name}: ${options[activeIndex].title}`"
+    :title="options[activeIndex].title"
     @click="toggle"
   >
     <span

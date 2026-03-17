@@ -124,7 +124,9 @@ watch(
     }
 
     document.removeEventListener('keydown', onKeydown)
-    previousActiveElement?.focus?.()
+    if (previousActiveElement) {
+      previousActiveElement.focus()
+    }
   },
   { immediate: true },
 )

@@ -2,44 +2,44 @@
   --app-theme-duration: 120ms;
   --app-theme-easing: ease-out;
   --app-bg: #f7f2ea;
-  --app-bg-accent: rgba(249, 115, 22, 0.12);
-  --app-surface: rgba(255, 252, 247, 0.88);
-  --app-surface-strong: rgba(255, 249, 240, 0.96);
-  --app-surface-soft: rgba(120, 53, 15, 0.05);
-  --app-border: rgba(120, 53, 15, 0.12);
-  --app-border-strong: rgba(120, 53, 15, 0.25);
+  --app-bg-accent: rgb(249 115 22 / 12%);
+  --app-surface: rgb(255 252 247 / 88%);
+  --app-surface-strong: rgb(255 249 240 / 96%);
+  --app-surface-soft: rgb(120 53 15 / 5%);
+  --app-border: rgb(120 53 15 / 12%);
+  --app-border-strong: rgb(120 53 15 / 25%);
   --app-text: #1c1917;
   --app-text-muted: #57534e;
   --app-text-soft: #78716c;
   --app-brand: #ea580c;
   --app-brand-strong: #c2410c;
-  --app-brand-soft: rgba(249, 115, 22, 0.14);
+  --app-brand-soft: rgb(249 115 22 / 14%);
   --app-brand-fg: #9a3412;
   --app-success: #15803d;
   --app-info: #0369a1;
   --app-danger: #b91c1c;
-  --app-shadow: 0 24px 80px rgba(120, 53, 15, 0.12);
+  --app-shadow: 0 24px 80px rgb(120 53 15 / 12%);
 }
 
 :root[data-theme='dark'] {
   --app-bg: #0f0b0a;
-  --app-bg-accent: rgba(249, 115, 22, 0.08);
-  --app-surface: rgba(28, 25, 23, 0.9);
-  --app-surface-strong: rgba(12, 10, 9, 0.96);
-  --app-surface-soft: rgba(255, 255, 255, 0.05);
-  --app-border: rgba(255, 255, 255, 0.1);
-  --app-border-strong: rgba(255, 255, 255, 0.22);
+  --app-bg-accent: rgb(249 115 22 / 8%);
+  --app-surface: rgb(28 25 23 / 90%);
+  --app-surface-strong: rgb(12 10 9 / 96%);
+  --app-surface-soft: rgb(255 255 255 / 5%);
+  --app-border: rgb(255 255 255 / 10%);
+  --app-border-strong: rgb(255 255 255 / 22%);
   --app-text: #fafaf9;
   --app-text-muted: #d6d3d1;
   --app-text-soft: #a8a29e;
   --app-brand: #f97316;
   --app-brand-strong: #fb923c;
-  --app-brand-soft: rgba(249, 115, 22, 0.14);
+  --app-brand-soft: rgb(249 115 22 / 14%);
   --app-brand-fg: #fed7aa;
   --app-success: #86efac;
   --app-info: #7dd3fc;
   --app-danger: #fca5a5;
-  --app-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  --app-shadow: 0 24px 80px rgb(0 0 0 / 35%);
 }
 
 body {
@@ -109,7 +109,7 @@ body {
 .app-toolbar {
   border: 1px solid var(--app-border);
   background: var(--app-surface-soft);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
 }
 
 .app-card {
@@ -148,7 +148,7 @@ body {
 }
 
 .app-chip--accent {
-  border-color: rgba(249, 115, 22, 0.35);
+  border-color: rgb(249 115 22 / 35%);
   background: var(--app-brand-soft);
   color: var(--app-brand-fg);
 }
@@ -262,12 +262,12 @@ body {
 
   &:focus {
     border-color: var(--app-brand);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+    box-shadow: 0 0 0 3px rgb(249 115 22 / 12%);
   }
 
   &.is-invalid {
     border-color: var(--app-danger);
-    box-shadow: 0 0 0 3px rgba(252, 165, 165, 0.12);
+    box-shadow: 0 0 0 3px rgb(252 165 165 / 12%);
   }
 }
 
@@ -344,7 +344,7 @@ body {
 }
 
 .app-button--accent {
-  border-color: rgba(249, 115, 22, 0.45);
+  border-color: rgb(249 115 22 / 45%);
   background: var(--app-brand-soft);
   color: var(--app-brand-fg);
 
@@ -379,7 +379,7 @@ body {
   top: 0.125rem;
   bottom: 0.125rem;
   width: calc(50% - 0.125rem);
-  border: 1px solid rgba(249, 115, 22, 0.45);
+  border: 1px solid rgb(249 115 22 / 45%);
   border-radius: 0.625rem;
   background: var(--app-brand-soft);
   transition:
@@ -418,13 +418,13 @@ body {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(0 0 0 / 60%);
   backdrop-filter: blur(6px);
 }
 
 :root[data-theme='light'] .app-dialog-backdrop,
 :root:not([data-theme]) .app-dialog-backdrop {
-  background: rgba(28, 25, 23, 0.28);
+  background: rgb(28 25 23 / 28%);
 }
 
 .app-dialog {

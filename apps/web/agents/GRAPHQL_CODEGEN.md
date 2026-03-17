@@ -6,7 +6,7 @@
 - Removes most manual `Response` / `Variables` typing.
 - Works with Vue and `@vue/apollo-composable` through the `client` preset.
 
-## Recommended setup for this project
+## Current project setup
 
 Install:
 
@@ -94,13 +94,14 @@ const { result } = useQuery(CatalogProductsDocument, { page: 1, perPage: 12 })
 
 The query result and variables become typed automatically.
 
-## Recommendation for this repo
+## Project guidance
 
-- Add Codegen after the catalog query and alert mutation shapes settle a bit more.
-- Use the `client` preset first.
 - Keep generated code in `src/gql/`.
 - Do not hand-edit generated files.
-- Prefer generated typed documents over handwritten response/variables types once Codegen is enabled.
+- Prefer `.graphql` files for operations even though Codegen currently scans `ts`, `vue`, and `graphql`; the broader glob is there for compatibility, not as the preferred authoring style.
+- Prefer generated typed documents over handwritten response/variables types.
+- Keep GraphQL variables in composables and pass them explicitly into `useQuery` / `useMutation`.
+- Regenerate after schema or operation changes with `npm run graphql-codegen`.
 
 ## Sources
 
