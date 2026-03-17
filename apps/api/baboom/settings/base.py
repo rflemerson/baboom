@@ -9,11 +9,9 @@ For the full list of settings, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import os
-
 from baboom.settings.env import BASE_DIR, env
 
-env.read_env(os.path.join(BASE_DIR, ".env"))
+env.read_env(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -85,7 +83,10 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",

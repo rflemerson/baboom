@@ -1,3 +1,5 @@
+"""Wap.Store API spider for Growth Supplements."""
+
 import logging
 
 from .wapstore_api_spider import WapStoreApiSpider
@@ -17,7 +19,7 @@ class GrowthSpider(WapStoreApiSpider):
     )
     API_MENU = "https://www.gsuplementos.com.br/api/v2/front/struct/menus/nova-home-suplementos-categorias"
 
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "/proteina/",
         "/creatina/",
         "/aminoacidos/",
@@ -25,4 +27,4 @@ class GrowthSpider(WapStoreApiSpider):
         "/vitaminas/",
         "/acessorios/",
         "/vegano/",
-    ]
+    )

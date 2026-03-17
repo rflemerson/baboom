@@ -1,3 +1,5 @@
+"""Database models for scraper state and imported payloads."""
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from simple_history.models import HistoricalRecords
@@ -31,11 +33,11 @@ class ScrapedPage(models.Model):
     class Meta:
         """Meta options."""
 
-        ordering = ["-scraped_at"]
-        indexes = [
+        ordering = ("-scraped_at",)
+        indexes = (
             models.Index(fields=["url"]),
             models.Index(fields=["store_slug", "url"]),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -166,20 +168,23 @@ class ScrapedItem(models.Model):
     class Meta:
         """Meta options."""
 
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["store_slug", "external_id"],
                 name="unique_scraped_item_identity",
             ),
-        ]
-        indexes = [
+        )
+        indexes = (
             models.Index(fields=["store_slug", "external_id"]),
             models.Index(fields=["status"]),
-        ]
+        )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return string representation."""
-        return f"[{self.store_slug}] {self.external_id} - {self.get_stock_status_display()}"
+        return (
+            f"[{self.store_slug}] {self.external_id} - "
+            f"{self.get_stock_status_display()}"
+        )
 
 
 class OpenFoodFactsData(models.Model):

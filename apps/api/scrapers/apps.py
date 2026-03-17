@@ -1,3 +1,5 @@
+"""Django app configuration for scraper workflows."""
+
 from django.apps import AppConfig
 
 

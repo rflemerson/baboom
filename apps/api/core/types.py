@@ -1,3 +1,5 @@
+"""Typed DTOs shared by core services and ingestion workflows."""
+
 from typing import Any
 
 from pydantic import BaseModel

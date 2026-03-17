@@ -1,3 +1,5 @@
+"""Celery tasks for running scraper monitors and recovery jobs."""
+
 from datetime import timedelta
 
 from celery import shared_task
@@ -18,7 +20,7 @@ logger = get_task_logger(__name__)
 
 
 @shared_task
-def scrape_growth_monitor():
+def scrape_growth_monitor() -> str:
     """Scrape Growth Supplements via API."""
     logger.info("Starting Growth Monitor Task (API)")
     spider = GrowthSpider()
@@ -28,7 +30,7 @@ def scrape_growth_monitor():
 
 
 @shared_task
-def scrape_blackskull_monitor():
+def scrape_blackskull_monitor() -> str:
     """Scrape Black Skull via API."""
     logger.info("Starting Black Skull Monitor Task (API)")
     spider = BlackSkullSpider()
@@ -38,7 +40,7 @@ def scrape_blackskull_monitor():
 
 
 @shared_task
-def scrape_integral_monitor():
+def scrape_integral_monitor() -> str:
     """Scrape Integral Medica."""
     logger.info("Starting Integral Medica Monitor Task")
     spider = IntegralMedicaSpider()
@@ -48,7 +50,7 @@ def scrape_integral_monitor():
 
 
 @shared_task
-def scrape_maxtitanium_monitor():
+def scrape_maxtitanium_monitor() -> str:
     """Scrape Max Titanium."""
     logger.info("Starting Max Titanium Monitor Task")
     spider = MaxTitaniumSpider()
@@ -58,7 +60,7 @@ def scrape_maxtitanium_monitor():
 
 
 @shared_task
-def scrape_probiotica_monitor():
+def scrape_probiotica_monitor() -> str:
     """Scrape Probiotica."""
     logger.info("Starting Probiotica Monitor Task")
     spider = ProbioticaSpider()
@@ -68,7 +70,7 @@ def scrape_probiotica_monitor():
 
 
 @shared_task
-def scrape_darklab_monitor():
+def scrape_darklab_monitor() -> str:
     """Scrape Dark Lab."""
     logger.info("Starting Dark Lab Monitor Task")
     spider = DarkLabSpider()
@@ -78,7 +80,7 @@ def scrape_darklab_monitor():
 
 
 @shared_task
-def scrape_dux_monitor():
+def scrape_dux_monitor() -> str:
     """Scrape Dux Nutrition."""
     logger.info("Starting Dux Monitor Task")
     spider = DuxSpider()
@@ -88,7 +90,7 @@ def scrape_dux_monitor():
 
 
 @shared_task
-def scrape_soldiers_monitor():
+def scrape_soldiers_monitor() -> str:
     """Scrape Soldiers Nutrition."""
     logger.info("Starting Soldiers Nutrition Monitor Task")
     spider = SoldiersSpider()
@@ -98,7 +100,7 @@ def scrape_soldiers_monitor():
 
 
 @shared_task
-def release_stuck_items():
+def release_stuck_items() -> str:
     """Unlock items stuck in PROCESSING state.
 
     Cleaner: Unlocks items that have been in PROCESSING for too long

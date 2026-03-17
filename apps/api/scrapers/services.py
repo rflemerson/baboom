@@ -1,11 +1,18 @@
+"""Services for persisting and syncing scraped catalog data."""
+
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 from django.db import transaction
 
 from core.models import ProductPriceHistory
 
 from .models import ScrapedItem, ScrapedPage
-from .types import ProductIngestionInput
+
+if TYPE_CHECKING:
+    from .types import ProductIngestionInput
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +47,7 @@ class ScraperService:
         )
 
         action = "Created" if created else "Updated"
-        logger.debug(f"{action} item {data.external_id} for {data.store_slug}")
+        logger.debug("%s item %s for %s", action, data.external_id, data.store_slug)
 
         if obj.product_store_id:
             ScraperService.sync_price_to_core(obj)
@@ -49,7 +56,7 @@ class ScraperService:
 
     @staticmethod
     def sync_price_to_core(scraped_item: ScrapedItem) -> bool:
-        """Syncs price/stock from a LINKED ScrapedItem to ProductPriceHistory."""
+        """Sync price and stock from a linked scraped item to price history."""
         if not scraped_item.product_store_id:
             return False
 
@@ -83,13 +90,15 @@ class ScraperService:
         )
 
         logger.info(
-            f"Synced Price for {scraped_item.store_slug}: R${scraped_item.price}",
+            "Synced price for %s: R$%s",
+            scraped_item.store_slug,
+            scraped_item.price,
         )
         return True
 
     @staticmethod
     def persist_item_context(
-        saved_item: ScrapedItem | None,
+        saved_item: object | None,
         context_payload: str,
     ) -> None:
         """Persist structured scraper context into source page when available."""

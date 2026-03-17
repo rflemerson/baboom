@@ -1,10 +1,13 @@
 """Core catalog, alert, and pricing models."""
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import secrets
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -14,6 +17,14 @@ from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
 
 logger = logging.getLogger(__name__)
+
+
+class MicronutrientHashInput(TypedDict, total=False):
+    """Mapping shape accepted when hashing micronutrient payloads."""
+
+    name: str
+    value: Decimal | float | int | str | None
+    unit: str
 
 
 class BaseModel(models.Model):
@@ -51,7 +62,7 @@ class Brand(BaseModel):
 
         verbose_name = _("Brand")
         verbose_name_plural = _("Brands")
-        ordering = ["name"]
+        ordering = ("name",)
 
     def __str__(self) -> str:
         """Return display name."""
@@ -74,7 +85,7 @@ class Store(BaseModel):
 
         verbose_name = _("Store")
         verbose_name_plural = _("Stores")
-        ordering = ["name"]
+        ordering = ("name",)
 
     def __str__(self) -> str:
         """Return display name."""
@@ -96,7 +107,7 @@ class Flavor(BaseModel):
 
         verbose_name = _("Flavor")
         verbose_name_plural = _("Flavors")
-        ordering = ["name"]
+        ordering = ("name",)
 
     def __str__(self) -> str:
         """Return name."""
@@ -118,7 +129,7 @@ class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
         help_text=_("Tag description"),
     )
 
-    node_order_by = ["name"]
+    node_order_by = ("name",)
 
     class Meta:
         """Meta options."""
@@ -147,7 +158,7 @@ class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
         help_text=_("Category description"),
     )
 
-    node_order_by = ["name"]
+    node_order_by = ("name",)
 
     class Meta:
         """Meta options."""
@@ -155,7 +166,7 @@ class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
         verbose_name = _("Category")
         verbose_name_plural = _("Categories")
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return name."""
         return self.name
 
@@ -176,7 +187,7 @@ class Nutrient(BaseModel):
 
         verbose_name = _("Nutrient")
         verbose_name_plural = _("Nutrients")
-        ordering = ["name"]
+        ordering = ("name",)
 
     def __str__(self) -> str:
         """Return name."""
@@ -294,30 +305,30 @@ class Product(BaseModel):
 
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
-        ordering = ["brand__name", "name"]
+        ordering = ("brand__name", "name")
 
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["brand", "name", "weight"],
                 name="unique_product_brand_weight",
             ),
-        ]
+        )
 
-        indexes = [
+        indexes = (
             models.Index(fields=["name"]),
             models.Index(fields=["brand", "name"]),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.brand.name} - {self.name} ({self.weight}g)"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: object, **kwargs: object) -> None:
         """Validate rules on save."""
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def clean(self):
+    def clean(self) -> None:
         """Validate business rules."""
         super().clean()
 
@@ -366,12 +377,12 @@ class ProductComponent(BaseModel):
 
         verbose_name = _("Product Component")
         verbose_name_plural = _("Product Components")
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["parent", "component"],
                 name="unique_product_component",
             ),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -418,9 +429,9 @@ class ProductStore(BaseModel):
 
         verbose_name = _("Store Product Link")
         verbose_name_plural = _("Store Product Links")
-        ordering = ["store__name", "product__name"]
+        ordering = ("store__name", "product__name")
 
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["product", "store"],
                 name="unique_product_store",
@@ -431,12 +442,12 @@ class ProductStore(BaseModel):
                 condition=models.Q(external_id__isnull=False)
                 & ~models.Q(external_id=""),
             ),
-        ]
+        )
 
-        indexes = [
+        indexes = (
             models.Index(fields=["external_id"]),
             models.Index(fields=["store", "product"]),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -481,20 +492,21 @@ class ProductPriceHistory(models.Model):
     class Meta:
         """Meta options."""
 
-        ordering = ["-collected_at"]
+        ordering = ("-collected_at",)
         get_latest_by = "collected_at"
         verbose_name = _("Price Tracking Record")
         verbose_name_plural = _("Price Tracking Records")
 
-        indexes = [
+        indexes = (
             models.Index(fields=["collected_at"]),
             models.Index(fields=["stock_status"]),
             models.Index(fields=["store_product_link", "collected_at"]),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.store_product_link} | R${self.price} @ {self.collected_at:%d/%m %H:%M}"
+        collected_at = self.collected_at.strftime("%d/%m %H:%M")
+        return f"{self.store_product_link} | R${self.price} @ {collected_at}"
 
 
 class NutritionFacts(BaseModel):
@@ -505,7 +517,7 @@ class NutritionFacts(BaseModel):
         max_length=200,
         blank=True,
         help_text=_(
-            "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin.",
+            "E.g. 'Saborizada' or 'Natural' to identify this table in the admin.",
         ),
     )
 
@@ -578,7 +590,7 @@ class NutritionFacts(BaseModel):
         """Return string representation."""
         return f"{self.description or 'Generic Nutrition Facts'}"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: object, **kwargs: object) -> None:
         """Save instance with hash generation."""
         # Automatically generate hash using centralized logic.
         # If micronutrients are not passed (e.g. admin), generate hash only from macros.
@@ -589,8 +601,8 @@ class NutritionFacts(BaseModel):
     @classmethod
     def generate_hash(
         cls,
-        source: Any,
-        micronutrients: list[dict[str, Any]] | None = None,
+        source: NutritionFacts | Mapping[str, object],
+        micronutrients: list[Micronutrient | MicronutrientHashInput] | None = None,
     ) -> str:
         """Single Source of Truth for Nutritional Hashing.
 
@@ -603,18 +615,18 @@ class NutritionFacts(BaseModel):
 
         """
 
-        def fmt(val: Any) -> str:
+        def fmt(val: object) -> str:
             try:
                 if val is None:
                     return "0.00"
-
-                d = Decimal(str(val))
-                return f"{d:.2f}"
             except (ValueError, TypeError, InvalidOperation):
                 return "0.00"
 
-        def get_val(key: str) -> Any:
-            if isinstance(source, dict):
+            d = Decimal(str(val))
+            return f"{d:.2f}"
+
+        def get_val(key: str) -> object:
+            if isinstance(source, Mapping):
                 return source.get(key)
             return getattr(source, key, None)
 
@@ -687,12 +699,12 @@ class Micronutrient(BaseModel):
 
         verbose_name = _("Micronutrient")
         verbose_name_plural = _("Micronutrients")
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["nutrition_facts", "name"],
                 name="unique_nutrient_per_facts",
             ),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -727,12 +739,12 @@ class ProductNutrition(BaseModel):
 
         verbose_name = _("Product Nutrition Profile")
         verbose_name_plural = _("Product Nutrition Profiles")
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["product", "nutrition_facts"],
                 name="unique_product_nutrition_facts",
             ),
-        ]
+        )
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -783,7 +795,7 @@ class APIKey(BaseModel):
         """Return string representation."""
         return f"{self.name} ({self.key[:8]}...)"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: object, **kwargs: object) -> None:
         """Generate key on save if missing."""
         if not self.key:
             self.key = secrets.token_urlsafe(32)

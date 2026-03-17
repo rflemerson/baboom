@@ -1,3 +1,5 @@
+"""VTEX search spider for Max Titanium."""
+
 import logging
 
 from .vtex_search_spider import VtexSearchSpider
@@ -12,7 +14,7 @@ class MaxTitaniumSpider(VtexSearchSpider):
     STORE_SLUG = "max_titanium"
     BASE_URL = "https://www.maxtitanium.com.br"
     API_TREE = "https://www.maxtitanium.com.br/api/catalog_system/pub/category/tree/3"
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "whey-protein",
         "proteinas",
         "creatina",
@@ -24,4 +26,4 @@ class MaxTitaniumSpider(VtexSearchSpider):
         "proteina-vegana",
         "albumina",
         "paginas-especiais",
-    ]
+    )

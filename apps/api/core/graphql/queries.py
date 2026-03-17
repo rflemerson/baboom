@@ -40,7 +40,7 @@ class CoreQuery:
         page: int = 1,
         per_page: int = 12,
     ) -> CatalogProductsResult:
-        """Return the public catalog list using the shared catalog selector and filter pipeline."""
+        """Return the public catalog list from the shared selector pipeline."""
         normalized_per_page = per_page if per_page in {12, 24, 48} else 12
         normalized_page = max(page, 1)
 
@@ -59,10 +59,13 @@ class CoreQuery:
             "concentration_min": concentration_min,
             "concentration_max": concentration_max,
         }
-
-        for key, value in optional_filters.items():
-            if value not in (None, ""):
-                filter_data[key] = value
+        filter_data.update(
+            {
+                key: value
+                for key, value in optional_filters.items()
+                if value not in (None, "")
+            },
+        )
 
         queryset = public_catalog_products_with_stats().filter(is_published=True)
         product_filter = ProductFilter(filter_data, queryset=queryset)

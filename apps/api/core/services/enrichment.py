@@ -1,4 +1,12 @@
+"""Services for deriving nutrient source metadata from product data."""
+
 from core.models import Nutrient, Product
+
+PROTEIN_GRAMS_THRESHOLD = 20
+PROTEIN_CONCENTRATION_THRESHOLD = 0.5
+CREATINE_GRAMS_THRESHOLD = 2.5
+CREATINE_MILLIGRAMS_THRESHOLD = 2500
+CAFFEINE_MILLIGRAMS_THRESHOLD = 50
 
 
 class EnrichmentService:
@@ -73,7 +81,10 @@ class EnrichmentService:
             if serving <= 0:
                 continue
 
-            if facts.proteins > 20 or (facts.proteins / serving) > 0.5:
+            if (
+                facts.proteins > PROTEIN_GRAMS_THRESHOLD
+                or (facts.proteins / serving) > PROTEIN_CONCENTRATION_THRESHOLD
+            ):
                 sources.add("protein")
 
             for micro in facts.micronutrients.all():
@@ -82,13 +93,16 @@ class EnrichmentService:
 
                 is_creatine = "creatina" in name_lower or "creatine" in name_lower
                 if is_creatine and (
-                    (micro.unit == "g" and val >= 2.5)
-                    or (micro.unit == "mg" and val >= 2500)
+                    (micro.unit == "g" and val >= CREATINE_GRAMS_THRESHOLD)
+                    or (
+                        micro.unit == "mg"
+                        and val >= CREATINE_MILLIGRAMS_THRESHOLD
+                    )
                 ):
                     sources.add("creatine")
 
                 if ("cafeina" in name_lower or "caffeine" in name_lower) and (
-                    micro.unit == "mg" and val >= 50
+                    micro.unit == "mg" and val >= CAFFEINE_MILLIGRAMS_THRESHOLD
                 ):
                     sources.add("caffeine")
 

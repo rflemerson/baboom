@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from ..services import ScraperService
 
 
 def is_http_url(value: str) -> bool:
     """Return True when value has an HTTP(S) scheme."""
-    return value.startswith("http://") or value.startswith("https://")
+    return value.startswith(("http://", "https://"))
 
 
 def parse_positive_price(
-    raw_price: Any,
+    raw_price: object,
     *,
     cents_for_int: bool = False,
     cents_for_digit_string: bool = False,
@@ -48,7 +47,7 @@ def parse_positive_price(
     return value
 
 
-def parse_optional_int(value: Any) -> int | None:
+def parse_optional_int(value: object) -> int | None:
     """Parse optional integer-like values from API payloads."""
     if value is None or value == "":
         return None
@@ -58,6 +57,9 @@ def parse_optional_int(value: Any) -> int | None:
         return None
 
 
-def persist_json_context(saved_item, context_payload: str) -> None:
+def persist_json_context(
+    saved_item: object | None,
+    context_payload: str,
+) -> None:
     """Persist structured JSON context in source page when available."""
     ScraperService.persist_item_context(saved_item, context_payload)

@@ -1,3 +1,5 @@
+"""Spider configuration for Black Skull."""
+
 import logging
 
 from .vtex_graphql_spider import VtexGraphqlSpider
@@ -16,11 +18,11 @@ class BlackSkullSpider(VtexGraphqlSpider):
     API_TREE = "https://www.blackskullusa.com.br/api/catalog_system/pub/category/tree/3"
     QUERY_HASH = "ee2478d319404f621c3e0426e79eba3997665d48cb277a53bf0c3276e8e53c22"
 
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "proteina",
         "aminoacidos",
         "vitaminas",
         "vestuario",
         "acessorios",
         "kits",
-    ]
+    )

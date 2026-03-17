@@ -119,7 +119,10 @@ class ProductInput:
 
     origin_scraped_item_id: int | None = strawberry.field(
         default=None,
-        description="ID of the ScrapedItem that generated this product (to link/complete)",
+        description=(
+            "ID of the ScrapedItem that generated this product "
+            "(to link/complete)"
+        ),
     )
 
     is_combo: bool = strawberry.field(

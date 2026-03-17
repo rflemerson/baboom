@@ -1,3 +1,5 @@
+"""VTEX search spider for Probiotica."""
+
 import logging
 
 from .vtex_search_spider import VtexSearchSpider
@@ -12,7 +14,7 @@ class ProbioticaSpider(VtexSearchSpider):
     STORE_SLUG = "probiotica"
     BASE_URL = "https://www.probiotica.com.br"
     API_TREE = "https://www.probiotica.com.br/api/catalog_system/pub/category/tree/3"
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "whey-protein",
         "proteinas",
         "creatina",
@@ -23,4 +25,4 @@ class ProbioticaSpider(VtexSearchSpider):
         "barras",
         "vegan",
         "kit",
-    ]
+    )

@@ -1,3 +1,9 @@
+"""Admin registrations for scraper-related models."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from django.contrib import admin, messages
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -7,9 +13,19 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from .models import OpenFoodFactsData, ScrapedItem
 
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from django.http import HttpRequest, HttpResponseRedirect
+
+NAME_SUMMARY_MAX_LENGTH = 40
+
 
 @admin.action(description="Create/Merge Product from selected item")
-def create_product_from_scraped_item(modeladmin, request, queryset):
+def create_product_from_scraped_item(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[ScrapedItem],
+) -> HttpResponseRedirect | None:
     """Admin action to create products from scraped items."""
     if queryset.count() > 1:
         modeladmin.message_user(
@@ -41,21 +57,28 @@ def create_product_from_scraped_item(modeladmin, request, queryset):
 
 
 @admin.action(description="Reset selected items to NEW")
-def reset_to_new(modeladmin, request, queryset):
-    """Action to manually retry failed items."""
+def reset_to_new(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[ScrapedItem],
+) -> None:
+    """Reset selected items to the NEW state."""
     updated = queryset.update(
         status=ScrapedItem.Status.NEW,
         error_count=0,
         last_error_log="",
     )
-    modeladmin.message_user(request, f"{updated} items reset to NEW for retrying.")
+    modeladmin.message_user(
+        request,
+        _("%(count)s items reset to NEW for retrying.") % {"count": updated},
+    )
 
 
 @admin.register(ScrapedItem)
 class ScrapedItemAdmin(SimpleHistoryAdmin):
     """Admin for scraped items."""
 
-    list_display = [
+    list_display = (
         "id",
         "store_slug",
         "name_summary",
@@ -63,30 +86,34 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
         "error_count",
         "stock_status",
         "updated_at",
-    ]
-    list_filter = ["status", "store_slug", "stock_status"]
-    search_fields = ["name", "external_id"]
+    )
+    list_filter = ("status", "store_slug", "stock_status")
+    search_fields = ("name", "external_id")
 
-    readonly_fields = [
+    readonly_fields = (
         "created_at",
         "updated_at",
         "last_attempt_at",
         "last_error_log",
         "product_store",
-    ]
+    )
 
-    actions = [create_product_from_scraped_item, reset_to_new]
+    actions = (create_product_from_scraped_item, reset_to_new)
 
     @admin.display(description="Name")
-    def name_summary(self, obj):
+    def name_summary(self, obj: ScrapedItem) -> str:
         """Truncate name for display."""
-        return (obj.name[:40] + "...") if obj.name and len(obj.name) > 40 else obj.name
+        return (
+            obj.name[:NAME_SUMMARY_MAX_LENGTH] + "..."
+            if obj.name and len(obj.name) > NAME_SUMMARY_MAX_LENGTH
+            else obj.name
+        )
 
 
 @admin.register(OpenFoodFactsData)
 class OpenFoodFactsDataAdmin(admin.ModelAdmin):
     """Admin for Open Food Facts Data."""
 
-    list_display = ["ean", "updated_at", "created_at"]
-    search_fields = ["ean"]
-    readonly_fields = ["created_at", "updated_at"]
+    list_display = ("ean", "updated_at", "created_at")
+    search_fields = ("ean",)
+    readonly_fields = ("created_at", "updated_at")

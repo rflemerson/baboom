@@ -1,7 +1,8 @@
+"""Base spider for Wap.Store-backed APIs."""
+
 import json
 import logging
 import os
-from typing import Any
 
 import urllib3
 
@@ -22,6 +23,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
+PAGE_SIZE = 30
+HTTP_FAILURE_LIMIT = 8
+HTTP_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+WAPSTORE_SUCCESS_CODE = 200
+
 
 class WapStoreApiSpider(CatalogApiSpider):
     """Template spider for Wap.Store catalog APIs."""
@@ -32,7 +38,7 @@ class WapStoreApiSpider(CatalogApiSpider):
     API_LISTING = ""
     API_MENU = ""
 
-    FALLBACK_CATEGORIES: list[str] = []
+    FALLBACK_CATEGORIES: tuple[str, ...] = ()
 
     def _initial_cursor(self) -> int:
         """Return initial offset for pagination."""
@@ -43,6 +49,7 @@ class WapStoreApiSpider(CatalogApiSpider):
         return cursor + page_size
 
     def __init__(self, categories: list[str] | None = None) -> None:
+        """Initialize Wap.Store spider state and HTTP client configuration."""
         super().__init__(categories)
         self.http_client = HttpClient(timeout=30)
         self.ssl_verify = os.getenv("GROWTH_SSL_VERIFY", "0") == "1"
@@ -57,7 +64,10 @@ class WapStoreApiSpider(CatalogApiSpider):
             "Content-Type": "application/json",
             "Origin": self.BASE_URL,
             "Referer": f"{self.BASE_URL}/",
-            "Sec-Ch-Ua": '"Chromium";v="120", "Google Chrome";v="120", "Not_A Brand";v="8"',
+            "Sec-Ch-Ua": (
+                '"Chromium";v="120", "Google Chrome";v="120", '
+                '"Not_A Brand";v="8"'
+            ),
             "Sec-Ch-Ua-Mobile": "?0",
             "Sec-Ch-Ua-Platform": '"Linux"',
             "Sec-Fetch-Dest": "empty",
@@ -66,15 +76,17 @@ class WapStoreApiSpider(CatalogApiSpider):
         }
 
     def _fetch_categories(self) -> list[str]:
+        """Fetch category paths from the menu endpoint."""
         logger.info("Fetching dynamic categories...")
         try:
             resp = self._http_client_get(
                 self.API_MENU,
                 verify=self.ssl_verify,
             )
-            if resp is None or resp.status_code != 200:
+            if resp is None or resp.status_code != WAPSTORE_SUCCESS_CODE:
                 logger.warning(
-                    f"Menu API failed: {resp.status_code if resp else 'No response'}",
+                    "Menu API failed: %s",
+                    resp.status_code if resp else "No response",
                 )
                 return []
 
@@ -82,7 +94,7 @@ class WapStoreApiSpider(CatalogApiSpider):
             items = data.get("data") or data.get("menu") or []
             slugs = set()
 
-            def extract_recursive(nodes: list[dict]) -> None:
+            def extract_recursive(nodes: list[dict[str, object]]) -> None:
                 for node in nodes:
                     url = node.get("url") or node.get("link")
                     if url:
@@ -102,16 +114,20 @@ class WapStoreApiSpider(CatalogApiSpider):
             extract_recursive(items if isinstance(items, list) else [])
             return list(slugs)
 
-        except Exception as e:
-            logger.error(f"Error fetching categories: {e}")
+        except Exception:
+            logger.exception("Error fetching categories")
             return []
 
-    def _crawl_category(self, category_path: str, processed_ids: set[str]) -> list[Any]:
+    def _crawl_category(
+        self,
+        category_path: str,
+        processed_ids: set[str],
+    ) -> list[object]:
         """Crawl a single category."""
-        logger.info(f"Crawling: {category_path}")
-        products = []
+        logger.info("Crawling: %s", category_path)
+        products: list[object] = []
         offset = self._initial_cursor()
-        limit = 30
+        limit = PAGE_SIZE
 
         while True:
             try:
@@ -135,8 +151,8 @@ class WapStoreApiSpider(CatalogApiSpider):
                 offset = self._next_cursor(offset, limit)
                 self.sleep_random(1, 2)
 
-            except Exception as e:
-                logger.error(f"Error crawling {category_path}: {e}")
+            except Exception:
+                logger.exception("Error crawling %s", category_path)
                 break
 
         return products
@@ -154,7 +170,7 @@ class WapStoreApiSpider(CatalogApiSpider):
             params=params,
             verify=self.ssl_verify,
         )
-        if resp is None or resp.status_code != 200:
+        if resp is None or resp.status_code != WAPSTORE_SUCCESS_CODE:
             return None
 
         data = resp.json()
@@ -164,12 +180,12 @@ class WapStoreApiSpider(CatalogApiSpider):
         self,
         url: str,
         *,
-        params: dict[str, Any] | None = None,
+        params: dict[str, object] | None = None,
         verify: bool = True,
-    ):
+    ) -> object | None:
         """Retry wrapper for HttpClient with simple circuit-breaker behavior."""
         # Prevent hammering blocked origins when consecutive failures keep happening.
-        if self._consecutive_http_failures >= 8:
+        if self._consecutive_http_failures >= HTTP_FAILURE_LIMIT:
             logger.error("Circuit breaker open for %s after repeated failures", url)
             return None
 
@@ -181,7 +197,10 @@ class WapStoreApiSpider(CatalogApiSpider):
                 headers=self.get_headers(),
                 verify=verify,
             )
-            if resp is not None and resp.status_code not in {429, 500, 502, 503, 504}:
+            if (
+                resp is not None
+                and resp.status_code not in HTTP_RETRYABLE_STATUS_CODES
+            ):
                 self._consecutive_http_failures = 0
                 return resp
             if attempt < attempts:
@@ -191,7 +210,10 @@ class WapStoreApiSpider(CatalogApiSpider):
         self._consecutive_http_failures += 1
         return resp
 
-    def _extract_products_list(self, data: dict) -> list[dict]:
+    def _extract_products_list(
+        self,
+        data: dict[str, object],
+    ) -> list[dict[str, object]]:
         """Extract product list from response."""
         if "conteudo" in data and "produtos" in data["conteudo"]:
             return data["conteudo"]["produtos"]
@@ -199,7 +221,11 @@ class WapStoreApiSpider(CatalogApiSpider):
             return data["data"]["list"]
         return []
 
-    def _process_and_save(self, item: dict, category: str) -> Any | None:
+    def _process_and_save(
+        self,
+        item: dict[str, object],
+        category: str,
+    ) -> object | None:
         """Normalize and persist one Wap.Store product."""
         try:
             external_id = str(item.get("id"))
@@ -211,14 +237,18 @@ class WapStoreApiSpider(CatalogApiSpider):
             product_url = self._build_product_url(item)
             if not is_http_url(product_url):
                 logger.warning(
-                    f"Skipping {self.BRAND_NAME} item without valid URL: {external_id}",
+                    "Skipping %s item without valid URL: %s",
+                    self.BRAND_NAME,
+                    external_id,
                 )
                 return None
 
             price_val = self._parse_price(self._extract_raw_price(item))
             if price_val is None:
                 logger.warning(
-                    f"Skipping {self.BRAND_NAME} item without valid price: {external_id}",
+                    "Skipping %s item without valid price: %s",
+                    self.BRAND_NAME,
+                    external_id,
                 )
                 return None
 
@@ -243,11 +273,11 @@ class WapStoreApiSpider(CatalogApiSpider):
             )
             saved = ScraperService.save_product(input_data)
             persist_json_context(saved, self._build_product_context(item))
-            return saved
-
-        except Exception as e:
-            logger.error(f"Error processing item {item.get('id')}: {e}")
+        except Exception:
+            logger.exception("Error processing item %s", item.get("id"))
             return None
+
+        return saved
 
     def _build_product_url(self, item: dict) -> str:
         """Build canonical product URL from payload."""
@@ -258,7 +288,7 @@ class WapStoreApiSpider(CatalogApiSpider):
             return str(link_slug)
         return f"{self.BASE_URL}/{str(link_slug).lstrip('/')}"
 
-    def _extract_raw_price(self, item: dict) -> Any:
+    def _extract_raw_price(self, item: dict[str, object]) -> object:
         """Extract raw price token from payload."""
         precos = item.get("precos")
         if isinstance(precos, dict):
@@ -286,10 +316,10 @@ class WapStoreApiSpider(CatalogApiSpider):
         lowered = path.lower()
         return not any(token in lowered for token in invalid_tokens)
 
-    def _parse_price(self, raw_price: Any) -> float | None:
+    def _parse_price(self, raw_price: object) -> float | None:
         return parse_positive_price(raw_price)
 
-    def _parse_stock(self, quantity: Any) -> int | None:
+    def _parse_stock(self, quantity: object) -> int | None:
         return parse_optional_int(quantity)
 
     def _build_product_context(self, item: dict) -> str:

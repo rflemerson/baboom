@@ -1,5 +1,9 @@
+"""Mutations for scraper control and item lifecycle operations."""
+
+from __future__ import annotations
+
 from datetime import timedelta
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import strawberry
 from django.db import transaction
@@ -9,7 +13,12 @@ from django.utils import timezone
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from scrapers.models import ScrapedItem, ScrapedPage
 
-from .types import ScrapedItemType
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
+    from .types import ScrapedItemType
+
+MAX_SCRAPED_ITEM_RETRIES = 3
 
 
 @strawberry.type
@@ -24,22 +33,25 @@ class ScrapersMutation:
     ) -> ScrapedItemType | None:
         """Reserves an item for the Agent to process.
 
-        Retrieves NEW items or ERROR items that have 'rested' for 30min (retry threshold).
-        If 'force' is True, also allows checkout of items in LINKED or REVIEW status.
-        If 'target_item_id' is provided, only that specific item will be checked out.
+        Retrieves NEW items or ERROR items that have rested for 30 minutes.
+        If `force` is True, also allows LINKED or REVIEW items.
+        If `target_item_id` is provided, only that specific item is checked out.
         """
         now = timezone.now()
         retry_threshold = now - timedelta(minutes=30)
 
         with transaction.atomic():
-            base_query = ScrapedItem.objects.select_for_update(skip_locked=True)
+            base_query = cast(
+                "QuerySet[ScrapedItem]",
+                ScrapedItem.objects.select_for_update(skip_locked=True),
+            )
 
             if target_item_id:
                 query = base_query.filter(id=target_item_id)
             else:
                 q_filters = Q(status=ScrapedItem.Status.NEW) | Q(
                     status=ScrapedItem.Status.ERROR,
-                    error_count__lt=3,
+                    error_count__lt=MAX_SCRAPED_ITEM_RETRIES,
                     last_attempt_at__lt=retry_threshold,
                 )
                 if force:
@@ -81,14 +93,15 @@ class ScrapersMutation:
                 item.error_count += 1
                 item.last_error_log = message
 
-                if item.error_count >= 3:
+                if item.error_count >= MAX_SCRAPED_ITEM_RETRIES:
                     item.status = ScrapedItem.Status.REVIEW
                     item.last_error_log += " (Max retries reached)"
 
             item.save()
-            return True
         except ScrapedItem.DoesNotExist:
             return False
+
+        return True
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def discard_scraped_item(self, item_id: int, reason: str) -> bool:
@@ -98,9 +111,10 @@ class ScrapersMutation:
             item.status = ScrapedItem.Status.DISCARDED
             item.last_error_log = f"Discarded by Agent: {reason}"
             item.save()
-            return True
         except ScrapedItem.DoesNotExist:
             return False
+
+        return True
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def ensure_scraped_item_source_page(

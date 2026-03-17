@@ -1,3 +1,5 @@
+"""Spider configuration for Dark Lab."""
+
 import logging
 
 from .shopify_api_spider import ShopifyApiSpider
@@ -12,7 +14,7 @@ class DarkLabSpider(ShopifyApiSpider):
     STORE_SLUG = "dark_lab"
     BASE_URL = "https://www.darklabsuplementos.com.br"
 
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "best-sellers",
         "whey-protein",
         "creatina",
@@ -23,7 +25,7 @@ class DarkLabSpider(ShopifyApiSpider):
         "kits",
         "vegan",
         "vitaminas",
-    ]
+    )
 
     USE_PRODUCT_DETAIL = False
     PRICE_INT_IS_CENTS = False

@@ -1,5 +1,9 @@
+"""Tests for the public catalog selector annotations."""
+
+from __future__ import annotations
+
 from decimal import Decimal
-from typing import Any
+from typing import Protocol, cast
 
 from django.test import TestCase
 
@@ -15,10 +19,20 @@ from core.models import (
 from core.selectors import public_catalog_products_with_stats
 
 
+class AnnotatedCatalogProduct(Protocol):
+    """Protocol for selector results with catalog annotations."""
+
+    concentration: Decimal | None
+    total_protein: Decimal | None
+    price_per_gram: Decimal | None
+    external_link: str | None
+    last_price: Decimal | None
+
+
 class ProductStatsTest(TestCase):
     """Tests for the public catalog selector annotations."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test data."""
         self.brand = Brand.objects.create(name="Test Brand", display_name="Test Brand")
         self.store = Store.objects.create(name="Test Store", display_name="Test Store")
@@ -54,7 +68,7 @@ class ProductStatsTest(TestCase):
             price=Decimal("100.00"),
         )
 
-    def test_protein_calculations(self):
+    def test_protein_calculations(self) -> None:
         """Verify if the public catalog selector correctly calculates derived fields.
 
         - Concentration (should be 80.0%)
@@ -62,7 +76,10 @@ class ProductStatsTest(TestCase):
         - Price per gram of protein (R$ 100 / 800g = R$ 0.125)
         """
         # Act
-        p: Any = public_catalog_products_with_stats().first()
+        p = cast(
+            "AnnotatedCatalogProduct | None",
+            public_catalog_products_with_stats().first(),
+        )
 
         # Assert
         if p is None:
@@ -77,14 +94,14 @@ class ProductStatsTest(TestCase):
 
         self.assertEqual(p.external_link, "http://example.com")
 
-    def test_missing_price_handling(self):
+    def test_missing_price_handling(self) -> None:
         """Ensure products without price don't crash the queryset."""
         # Create a product without price
         p2 = Product.objects.create(name="No Price Whey", brand=self.brand, weight=500)
 
         # Act
         qs = public_catalog_products_with_stats().filter(pk=p2.pk)
-        result: Any = qs.first()
+        result = cast("AnnotatedCatalogProduct | None", qs.first())
 
         # Assert
         if result is None:

@@ -1,3 +1,5 @@
+"""Tests for scraper spiders and ingestion helpers."""
+
 import logging
 import os
 from decimal import Decimal
@@ -18,6 +20,8 @@ from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
 from scrapers.types import ProductIngestionInput
 
+EXPECTED_EXTERNAL_STOCK_QUANTITY = 100
+
 # Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
 
@@ -32,7 +36,7 @@ class ScraperIntegrationTests(TestCase):
     Tests hitting REAL APIs.
     """
 
-    def test_blackskull_spider(self):
+    def test_blackskull_spider(self) -> None:
         """Test BlackSkull spider execution."""
         spider = BlackSkullSpider(categories=["proteina"])
 
@@ -46,7 +50,7 @@ class ScraperIntegrationTests(TestCase):
         first = ScrapedItem.objects.filter(store_slug="black_skull").first()
         self.assertIsNotNone(first)
 
-    def test_darklab_spider(self):
+    def test_darklab_spider(self) -> None:
         """Test DarkLab spider execution."""
         spider = DarkLabSpider(categories=["whey-protein"])
 
@@ -58,10 +62,10 @@ class ScraperIntegrationTests(TestCase):
         first = ScrapedItem.objects.filter(store_slug="dark_lab").first()
         self.assertIsNotNone(first)
 
-        if first and first.stock_quantity == 100:
+        if first and first.stock_quantity == EXPECTED_EXTERNAL_STOCK_QUANTITY:
             pass
 
-    def test_dux_spider(self):
+    def test_dux_spider(self) -> None:
         """Test Dux spider execution."""
         spider = DuxSpider(categories=["proteinas"])
 
@@ -75,7 +79,7 @@ class ScraperIntegrationTests(TestCase):
         first = ScrapedItem.objects.filter(store_slug="dux_nutrition").first()
         self.assertIsNotNone(first)
 
-    def test_growth_spider(self):
+    def test_growth_spider(self) -> None:
         """Test Growth spider execution."""
         spider = GrowthSpider(categories=["/vegano/"])
 
@@ -91,7 +95,7 @@ class ScraperIntegrationTests(TestCase):
 class SyncPriceToCoreTests(TestCase):
     """Unit tests for ScraperService logic (save_product and sync_price_to_core)."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test data."""
         self.brand = Brand.objects.create(name="test_brand", display_name="Test Brand")
         self.store = Store.objects.create(name="test_store", display_name="Test Store")
@@ -107,7 +111,7 @@ class SyncPriceToCoreTests(TestCase):
             product_link="https://test.com/product",
         )
 
-    def test_save_product_creates_price_history_for_linked_item(self):
+    def test_save_product_creates_price_history_for_linked_item(self) -> None:
         """Test that saving a product creates a price history record."""
         ScrapedItem.objects.create(
             store_slug="test_store",
@@ -134,7 +138,7 @@ class SyncPriceToCoreTests(TestCase):
 
         self.assertEqual(price_record.price, Decimal("199.90"))
 
-    def test_sync_logic_skips_if_price_unchanged(self):
+    def test_sync_logic_skips_if_price_unchanged(self) -> None:
         """Test that sync skips if price is unchanged."""
         ProductPriceHistory.objects.create(
             store_product_link=self.product_store,
@@ -156,7 +160,7 @@ class SyncPriceToCoreTests(TestCase):
         self.assertFalse(result)
         self.assertEqual(ProductPriceHistory.objects.count(), 1)
 
-    def test_sync_logic_creates_new_record_on_price_change(self):
+    def test_sync_logic_creates_new_record_on_price_change(self) -> None:
         """Test that sync creates a new record on price change."""
         item = ScrapedItem.objects.create(
             store_slug="test_store",
@@ -188,7 +192,7 @@ class SyncPriceToCoreTests(TestCase):
 class ScraperServiceContextPersistenceTests(SimpleTestCase):
     """Unit tests for Django-side context persistence helper."""
 
-    def test_persist_item_context_updates_source_page_json_fields(self):
+    def test_persist_item_context_updates_source_page_json_fields(self) -> None:
         """Writes JSON payload into source page and persists both fields."""
         fake_page = MagicMock()
         fake_item = MagicMock()
@@ -207,7 +211,7 @@ class ScraperServiceContextPersistenceTests(SimpleTestCase):
 class DarkLabSpiderUnitTests(SimpleTestCase):
     """Unit tests for DarkLab Shopify parsing behavior."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Create reusable Shopify fixture item."""
         self.spider = DarkLabSpider()
         self.base_item: dict[str, Any] = {
@@ -234,7 +238,9 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
         }
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_skips_item_without_handle(self, mock_save):
+    def test_process_and_save_skips_item_without_handle(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Should skip item when Shopify handle is missing."""
         item = dict(self.base_item)
         item["handle"] = ""
@@ -245,7 +251,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_skips_invalid_price(self, mock_save):
+    def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Should skip item when selected variant has invalid price."""
         item = dict(self.base_item)
         base_variants = cast("list[dict[str, Any]]", self.base_item["variants"])
@@ -256,13 +262,15 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
         self.assertIsNone(result)
         mock_save.assert_not_called()
 
-    def test_parse_price_handles_comma_decimal(self):
+    def test_parse_price_handles_comma_decimal(self) -> None:
         """Parses prices with comma decimal separator."""
         value = self.spider._parse_price("149,90")
         self.assertEqual(value, 149.9)
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_persists_shopify_context(self, mock_save):
+    def test_process_and_save_persists_shopify_context(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Writes structured Shopify context into source_page raw_content."""
         fake_source_page = MagicMock()
         fake_obj = MagicMock()
@@ -284,7 +292,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
 class SoldiersSpiderUnitTests(SimpleTestCase):
     """Unit tests for Soldiers Shopify API spider behavior."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Create reusable Shopify fixture item."""
         self.spider = SoldiersSpider()
         self.base_item: dict[str, Any] = {
@@ -313,7 +321,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         }
 
     @patch("scrapers.spiders.catalog_api_spider.requests.get")
-    def test_fetch_categories_from_collections_api(self, mock_get):
+    def test_fetch_categories_from_collections_api(self, mock_get: MagicMock) -> None:
         """Loads category handles from collections endpoint."""
         response = MagicMock()
         response.status_code = 200
@@ -328,7 +336,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         self.assertIn("creatina", categories)
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_skips_without_handle(self, mock_save):
+    def test_process_and_save_skips_without_handle(self, mock_save: MagicMock) -> None:
         """Skips item when handle is missing."""
         item = dict(self.base_item)
         item["handle"] = ""
@@ -339,7 +347,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_skips_invalid_price(self, mock_save):
+    def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Skips item when selected variant has invalid price."""
         item = dict(self.base_item)
         base_variants = cast("list[dict[str, Any]]", self.base_item["variants"])
@@ -351,7 +359,9 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_persists_shopify_context(self, mock_save):
+    def test_process_and_save_persists_shopify_context(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Writes structured Shopify context into source_page raw_content."""
         fake_source_page = MagicMock()
         fake_obj = MagicMock()
@@ -369,7 +379,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
             update_fields=["raw_content", "content_type"],
         )
 
-    def test_parse_price_handles_shopify_js_cents(self):
+    def test_parse_price_handles_shopify_js_cents(self) -> None:
         """Converts integer cents from product.js into decimal reais."""
         self.assertEqual(self.spider._parse_price(1390), 13.9)
         self.assertEqual(self.spider._parse_price("1390"), 13.9)
@@ -378,7 +388,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
 class GrowthSpiderUnitTests(SimpleTestCase):
     """Unit tests for Growth API parsing behavior."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Create reusable Growth fixture item."""
         self.spider = GrowthSpider()
         self.base_item: dict[str, Any] = {
@@ -392,7 +402,9 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         }
 
     @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
-    def test_process_and_save_skips_without_valid_url(self, mock_save):
+    def test_process_and_save_skips_without_valid_url(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Skips items when URL is missing/invalid."""
         item = dict(self.base_item)
         item["link"] = ""
@@ -403,7 +415,7 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
-    def test_process_and_save_skips_invalid_price(self, mock_save):
+    def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Skips item when price is not parseable."""
         item = dict(self.base_item)
         item["precos"] = {"por": "N/A"}
@@ -414,7 +426,9 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
-    def test_process_and_save_keeps_available_on_unknown_stock(self, mock_save):
+    def test_process_and_save_keeps_available_on_unknown_stock(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Unknown stock should not be forced to out-of-stock."""
         item = dict(self.base_item)
         item["estoque"] = "unknown"
@@ -425,20 +439,22 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         self.assertIsNone(payload.stock_quantity)
         self.assertEqual(payload.stock_status, ScrapedItem.StockStatus.AVAILABLE)
 
-    def test_parse_price_supports_currency_formats(self):
+    def test_parse_price_supports_currency_formats(self) -> None:
         """Parses price tokens from common API payload formats."""
         self.assertEqual(self.spider._parse_price("139,90"), 139.9)
         self.assertEqual(self.spider._parse_price("R$ 89.50"), 89.5)
         self.assertIsNone(self.spider._parse_price("N/A"))
 
-    def test_category_path_filter_rejects_non_product_routes(self):
+    def test_category_path_filter_rejects_non_product_routes(self) -> None:
         """Rejects account/checkout-like paths from dynamic menu."""
         self.assertFalse(self.spider._is_valid_category_path("/conta/meus-pedidos/"))
         self.assertFalse(self.spider._is_valid_category_path("/checkout/"))
         self.assertTrue(self.spider._is_valid_category_path("/proteina/"))
 
     @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
-    def test_process_and_save_persists_structured_context(self, mock_save):
+    def test_process_and_save_persists_structured_context(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Writes structured Growth context into source_page raw_content."""
         fake_source_page = MagicMock()
         fake_obj = MagicMock()
@@ -467,7 +483,7 @@ class _DummyVtexSpider(VtexSearchSpider):
 class VtexSpiderUnitTests(SimpleTestCase):
     """Unit tests for VTEX base spider parsing behavior."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Create reusable VTEX fixture item."""
         self.spider = _DummyVtexSpider()
         self.base_item: dict[str, Any] = {
@@ -492,7 +508,9 @@ class VtexSpiderUnitTests(SimpleTestCase):
         }
 
     @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
-    def test_process_and_save_skips_without_valid_url(self, mock_save):
+    def test_process_and_save_skips_without_valid_url(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Skips item when linkText is missing."""
         item = dict(self.base_item)
         item["linkText"] = ""
@@ -503,7 +521,7 @@ class VtexSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
-    def test_process_and_save_skips_invalid_price(self, mock_save):
+    def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Skips item when price is not parseable."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["Price"] = "N/A"
@@ -514,7 +532,9 @@ class VtexSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
-    def test_process_and_save_keeps_available_on_unknown_stock(self, mock_save):
+    def test_process_and_save_keeps_available_on_unknown_stock(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Unknown stock should keep item available by default."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["AvailableQuantity"] = "x"
@@ -525,14 +545,16 @@ class VtexSpiderUnitTests(SimpleTestCase):
         self.assertIsNone(payload.stock_quantity)
         self.assertEqual(payload.stock_status, ScrapedItem.StockStatus.AVAILABLE)
 
-    def test_parse_price_supports_common_formats(self):
+    def test_parse_price_supports_common_formats(self) -> None:
         """Parses decimal strings and rejects invalid price."""
         self.assertEqual(self.spider._parse_price("99,90"), 99.9)
         self.assertEqual(self.spider._parse_price(55), 55.0)
         self.assertIsNone(self.spider._parse_price("N/A"))
 
     @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
-    def test_process_and_save_persists_structured_context(self, mock_save):
+    def test_process_and_save_persists_structured_context(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Writes structured VTEX context into source_page raw_content."""
         fake_source_page = MagicMock()
         fake_obj = MagicMock()
@@ -553,7 +575,7 @@ class VtexSpiderUnitTests(SimpleTestCase):
 class BlackSkullSpiderUnitTests(SimpleTestCase):
     """Unit tests for BlackSkull VTEX GraphQL parsing behavior."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Create reusable BlackSkull fixture item."""
         self.spider = BlackSkullSpider()
         self.base_item: dict[str, Any] = {
@@ -578,7 +600,9 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         }
 
     @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
-    def test_process_and_save_skips_without_valid_url(self, mock_save):
+    def test_process_and_save_skips_without_valid_url(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Skips item when linkText is missing."""
         item = dict(self.base_item)
         item["linkText"] = ""
@@ -589,7 +613,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
-    def test_process_and_save_skips_invalid_price(self, mock_save):
+    def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Skips item when price is not parseable."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["Price"] = "N/A"
@@ -600,7 +624,9 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         mock_save.assert_not_called()
 
     @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
-    def test_process_and_save_keeps_available_on_unknown_stock(self, mock_save):
+    def test_process_and_save_keeps_available_on_unknown_stock(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Unknown stock should keep item available by default."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["AvailableQuantity"] = "x"
@@ -612,7 +638,9 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         self.assertEqual(payload.stock_status, ScrapedItem.StockStatus.AVAILABLE)
 
     @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
-    def test_process_and_save_persists_structured_context(self, mock_save):
+    def test_process_and_save_persists_structured_context(
+        self, mock_save: MagicMock,
+    ) -> None:
         """Writes structured VTEX GraphQL context into source_page raw_content."""
         fake_source_page = MagicMock()
         fake_obj = MagicMock()

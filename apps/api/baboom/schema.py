@@ -16,7 +16,7 @@ class Query(
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def hello(self) -> str:
-        """Simple health check field."""
+        """Return a simple health check response."""
         return "Baboom GraphQL API is Online"
 
 

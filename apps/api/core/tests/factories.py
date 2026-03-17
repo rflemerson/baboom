@@ -1,3 +1,7 @@
+"""Factory helpers for core app tests."""
+
+from __future__ import annotations
+
 import factory
 from factory.django import DjangoModelFactory
 
@@ -66,7 +70,12 @@ class TagFactory(DjangoModelFactory):
     description = factory.Faker("sentence")
 
     @classmethod
-    def _create(cls, model_class, *args, **kwargs):
+    def _create(
+        cls,
+        model_class: type[Tag],
+        *_args: object,
+        **kwargs: object,
+    ) -> Tag:
         """Override to use treebeard's add_root method."""
         return model_class.add_root(**kwargs)
 
@@ -83,7 +92,12 @@ class CategoryFactory(DjangoModelFactory):
     description = factory.Faker("sentence")
 
     @classmethod
-    def _create(cls, model_class, *args, **kwargs):
+    def _create(
+        cls,
+        model_class: type[Category],
+        *_args: object,
+        **kwargs: object,
+    ) -> Category:
         """Override to use treebeard's add_root method."""
         return model_class.add_root(**kwargs)
 

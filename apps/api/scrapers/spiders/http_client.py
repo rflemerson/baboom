@@ -1,4 +1,4 @@
-"""HTTP Client with WAF Bypass Support.
+"""HTTP client helpers with optional WAF bypass support.
 
 This module provides a generic HTTP client that can bypass Sucuri WAF
 and other bot protection systems using TLS fingerprint impersonation.
@@ -15,9 +15,11 @@ Usage:
 
 import functools
 import logging
-from typing import Any
 
 logger = logging.getLogger(__name__)
+
+HTTP_SUCCESS_CODE = 200
+HTTP_FORBIDDEN_CODE = 403
 
 # Try to import curl_cffi (preferred for WAF bypass)
 try:
@@ -41,13 +43,14 @@ class HttpClient:
     """
 
     # Browser impersonations to try (in order of preference)
-    IMPERSONATIONS = ["chrome120", "chrome119", "chrome116", "safari17_0"]
+    IMPERSONATIONS = ("chrome120", "chrome119", "chrome116", "safari17_0")
 
     def __init__(
         self,
         default_impersonate: str = "chrome120",
         timeout: int = 30,
-    ):
+    ) -> None:
+        """Initialize the HTTP client with a default browser fingerprint."""
         self.default_impersonate = default_impersonate
         self.timeout = timeout
 
@@ -66,11 +69,11 @@ class HttpClient:
         self,
         url: str,
         headers: dict[str, str] | None = None,
-        params: dict[str, Any] | None = None,
+        params: dict[str, object] | None = None,
         verify: bool = True,
         impersonate: str | None = None,
         try_all_impersonations: bool = False,
-    ) -> Any | None:
+    ) -> object | None:
         """Perform GET request with WAF bypass.
 
         Args:
@@ -103,17 +106,17 @@ class HttpClient:
         self,
         url: str,
         headers: dict[str, str],
-        params: dict[str, Any] | None,
+        params: dict[str, object] | None,
         verify: bool,
         impersonate: str,
         try_all: bool,
-    ) -> Any | None:
+    ) -> object | None:
         """Use curl_cffi with TLS fingerprint impersonation."""
         impersonations = self.IMPERSONATIONS if try_all else [impersonate]
 
         for browser in impersonations:
             try:
-                logger.debug(f"Trying {browser} impersonation for: {url}")
+                logger.debug("Trying %s impersonation for: %s", browser, url)
 
                 response = cffi_requests.get(
                     url,
@@ -124,29 +127,35 @@ class HttpClient:
                     verify=verify,
                 )
 
-                if response.status_code == 200 and not self._is_blocked(response.text):
-                    logger.debug(f"Success with {browser}")
+                if (
+                    response.status_code == HTTP_SUCCESS_CODE
+                    and not self._is_blocked(response.text)
+                ):
+                    logger.debug("Success with %s", browser)
                     return response
-                if response.status_code == 403:
-                    logger.debug(f"{browser} blocked (403)")
+                if response.status_code == HTTP_FORBIDDEN_CODE:
+                    logger.debug("%s blocked (403)", browser)
                     continue
-                # Return non-403 responses even if they might be errors
+                # Return non-403 responses even if they might be errors.
                 return response
 
-            except Exception as e:
-                logger.debug(f"{browser} error: {e}")
+            except Exception as exc:
+                logger.debug("%s error: %s", browser, exc)
                 continue
+            else:
+                # Return non-403 responses even if they might be errors.
+                return response
 
-        logger.warning(f"All impersonations failed for: {url}")
+        logger.warning("All impersonations failed for: %s", url)
         return None
 
     def _get_with_requests(
         self,
         url: str,
         headers: dict[str, str],
-        params: dict[str, Any] | None,
+        params: dict[str, object] | None,
         verify: bool,
-    ) -> Any | None:
+    ) -> object | None:
         """Fallback to standard requests library."""
         try:
             return std_requests.get(
@@ -156,8 +165,8 @@ class HttpClient:
                 timeout=self.timeout,
                 verify=verify,
             )
-        except Exception as e:
-            logger.error(f"Request failed: {e}")
+        except Exception:
+            logger.exception("Request failed")
             return None
 
 

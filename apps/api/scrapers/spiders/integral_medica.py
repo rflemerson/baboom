@@ -1,3 +1,5 @@
+"""VTEX search spider for Integralmedica."""
+
 import logging
 
 from .vtex_search_spider import VtexSearchSpider
@@ -14,11 +16,11 @@ class IntegralMedicaSpider(VtexSearchSpider):
     API_TREE = (
         "https://www.integralmedica.com.br/api/catalog_system/pub/category/tree/3"
     )
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "proteina",
         "creatina",
         "aminoacidos",
         "massa-muscular",
         "energia",
         "emagrecimento",
-    ]
+    )

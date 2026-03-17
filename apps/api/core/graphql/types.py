@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import auto
 from strawberry.django import type as django_type
 
-from baboom.utils import ValidationError
 from core.models import (
     Brand,
     Category,
@@ -22,6 +21,11 @@ from core.models import (
     Store,
     Tag,
 )
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from baboom.utils import ValidationError
 
 
 @django_type(Brand)

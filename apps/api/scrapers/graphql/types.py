@@ -1,3 +1,5 @@
+"""GraphQL types exposed for scraper-managed entities."""
+
 from typing import cast
 
 import strawberry

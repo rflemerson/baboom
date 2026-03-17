@@ -1,3 +1,5 @@
+"""Selectors for public catalog querysets and annotations."""
+
 from django.db.models import (
     DecimalField,
     ExpressionWrapper,

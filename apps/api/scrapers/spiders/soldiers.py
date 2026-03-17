@@ -1,3 +1,5 @@
+"""Shopify API spider for Soldiers Nutrition."""
+
 import logging
 
 from .shopify_api_spider import ShopifyApiSpider
@@ -12,14 +14,14 @@ class SoldiersSpider(ShopifyApiSpider):
     STORE_SLUG = "soldiers_nutrition"
     BASE_URL = "https://soldiersnutrition.com.br"
 
-    FALLBACK_CATEGORIES = [
+    FALLBACK_CATEGORIES = (
         "creatina",
         "whey-protein-soldiers",
         "glutamina",
         "pre-treino",
         "vitaminas-e-minerais",
         "acessorios",
-    ]
+    )
 
     USE_PRODUCT_DETAIL = True
     PRICE_INT_IS_CENTS = True

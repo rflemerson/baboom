@@ -1,3 +1,5 @@
+"""Application services for core catalog and alert workflows."""
+
 import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -38,7 +40,7 @@ def alert_subscriber_create(*, email: str) -> AlertSubscriber:
     subscriber.full_clean()
     subscriber.save()
 
-    logger.info(f"New subscriber created: {email}")
+    logger.info("New subscriber created: %s", email)
 
     return subscriber
 
@@ -187,7 +189,7 @@ def product_update_content(
     packaging: str | None = None,
     tags: list[str] | None = None,
 ) -> Product:
-    """Updates product metadata (description, category, tags) without modifying price data."""
+    """Update product metadata without modifying price data."""
     try:
         with transaction.atomic():
             # Update basic fields if provided
@@ -216,7 +218,7 @@ def product_update_content(
                     if not tag:
                         tag = Tag.add_root(name=tag_name)
                     tag_objects.append(tag)
-                # This replaces all tags, which seems to be the intended behavior for "syncing"
+                # This replaces all tags, which matches the intended sync behavior.
                 product.tags.set(tag_objects)
 
             # Mark as enriched by LLM

@@ -1,6 +1,7 @@
+"""Base spider for VTEX legacy search APIs."""
+
 import json
 import logging
-from typing import Any
 
 from ..models import ScrapedItem
 from ..services import ScraperService
@@ -15,6 +16,10 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 
+VTEX_CATEGORY_TREE_SUCCESS_CODE = 200
+VTEX_SUCCESS_CODES = (VTEX_CATEGORY_TREE_SUCCESS_CODE, 206)
+VTEX_PAGE_SIZE = 50
+
 
 class VtexSearchSpider(CatalogApiSpider):
     """Base Spider for VTEX Legacy / Search API stores."""
@@ -24,7 +29,7 @@ class VtexSearchSpider(CatalogApiSpider):
     BASE_URL = ""
     API_TREE = ""
 
-    FALLBACK_CATEGORIES: list[str] = []
+    FALLBACK_CATEGORIES: tuple[str, ...] = ()
 
     def _initial_cursor(self) -> int:
         """Return initial offset for pagination."""
@@ -35,12 +40,13 @@ class VtexSearchSpider(CatalogApiSpider):
         return cursor + page_size
 
     def _fetch_categories(self) -> list[str]:
+        """Fetch category slugs from the VTEX category tree."""
         try:
             resp = self._request_get(self.API_TREE, timeout=10)
             if resp is None:
                 return []
-            if resp.status_code != 200:
-                logger.warning(f"Failed to fetch category tree: {resp.status_code}")
+            if resp.status_code != VTEX_CATEGORY_TREE_SUCCESS_CODE:
+                logger.warning("Failed to fetch category tree: %s", resp.status_code)
                 return []
 
             tree = resp.json()
@@ -61,8 +67,8 @@ class VtexSearchSpider(CatalogApiSpider):
             extract_slugs(tree)
             return list(slugs)
 
-        except Exception as e:
-            logger.error(f"Error fetching categories: {e}")
+        except Exception:
+            logger.exception("Error fetching categories")
             return []
 
     def _build_search_url(self, category_slug: str) -> str:
@@ -86,7 +92,7 @@ class VtexSearchSpider(CatalogApiSpider):
         response = self._request_get(search_url, params=params, timeout=30)
         if response is None:
             return None
-        if response.status_code not in [200, 206]:
+        if response.status_code not in VTEX_SUCCESS_CODES:
             return None
 
         data = response.json()
@@ -94,12 +100,16 @@ class VtexSearchSpider(CatalogApiSpider):
             return []
         return data
 
-    def _crawl_category(self, category_slug: str, processed_ids: set[str]) -> list[Any]:
+    def _crawl_category(
+        self,
+        category_slug: str,
+        processed_ids: set[str],
+    ) -> list[object]:
         """Crawl one VTEX category with offset pagination."""
-        logger.info(f"Crawling Category: {category_slug}")
-        products: list[Any] = []
+        logger.info("Crawling Category: %s", category_slug)
+        products: list[object] = []
         start = self._initial_cursor()
-        step = 50
+        step = VTEX_PAGE_SIZE
 
         while True:
             try:
@@ -117,8 +127,8 @@ class VtexSearchSpider(CatalogApiSpider):
                         saved_obj = self._process_and_save(item, category_slug)
                         if saved_obj:
                             products.append(saved_obj)
-                    except Exception as e:
-                        logger.debug(f"Skipping item: {e}")
+                    except Exception as exc:
+                        logger.debug("Skipping item: %s", exc)
 
                 if len(data) < step:
                     break
@@ -126,13 +136,17 @@ class VtexSearchSpider(CatalogApiSpider):
                 start = self._next_cursor(start, step)
                 self.sleep_random(0.5, 1.0)
 
-            except Exception as e:
-                logger.error(f"Error crawling {category_slug}: {e}")
+            except Exception:
+                logger.exception("Error crawling %s", category_slug)
                 break
 
         return products
 
-    def _process_and_save(self, item: dict, category: str) -> Any | None:
+    def _process_and_save(
+        self,
+        item: dict[str, object],
+        category: str,
+    ) -> object | None:
         try:
             skus = item.get("items", [])
             first_sku = self._extract_first_sku(skus) if skus else None
@@ -178,10 +192,11 @@ class VtexSearchSpider(CatalogApiSpider):
             )
             saved = ScraperService.save_product(input_data)
             persist_json_context(saved, self._build_product_context(item))
-            return saved
-        except Exception as e:
-            logger.debug(f"Item parse error: {e}")
+        except Exception as exc:
+            logger.debug("Item parse error: %s", exc)
             return None
+
+        return saved
 
     def _extract_first_sku(self, skus: list[dict]) -> dict | None:
         """Find the first valid SKU with a default seller."""
@@ -200,11 +215,11 @@ class VtexSearchSpider(CatalogApiSpider):
                 return seller
         return sellers[0] if sellers else None
 
-    def _parse_stock(self, quantity: Any) -> int | None:
+    def _parse_stock(self, quantity: object) -> int | None:
         """Parse stock quantity to integer."""
         return parse_optional_int(quantity)
 
-    def _parse_price(self, raw_price: Any) -> float | None:
+    def _parse_price(self, raw_price: object) -> float | None:
         return parse_positive_price(raw_price)
 
     def _build_product_context(self, item: dict) -> str:

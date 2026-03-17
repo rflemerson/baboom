@@ -1,7 +1,8 @@
+"""Base spider for VTEX GraphQL catalog backends."""
+
 import base64
 import json
 import logging
-from typing import Any
 
 from ..models import ScrapedItem
 from ..services import ScraperService
@@ -16,6 +17,9 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 
+PAGE_SIZE = 50
+VTEX_GRAPHQL_SUCCESS_CODE = 200
+
 
 class VtexGraphqlSpider(CatalogApiSpider):
     """Template spider for VTEX GraphQL stores."""
@@ -27,7 +31,7 @@ class VtexGraphqlSpider(CatalogApiSpider):
     API_TREE = ""
     QUERY_HASH = ""
 
-    FALLBACK_CATEGORIES: list[str] = []
+    FALLBACK_CATEGORIES: tuple[str, ...] = ()
 
     def _initial_cursor(self) -> int:
         """Return initial offset for pagination."""
@@ -38,13 +42,14 @@ class VtexGraphqlSpider(CatalogApiSpider):
         return cursor + page_size
 
     def _fetch_categories(self) -> list[str]:
+        """Fetch category slugs from the VTEX category tree."""
         try:
-            logger.info(f"Fetching categories for {self.BRAND_NAME}...")
+            logger.info("Fetching categories for %s...", self.BRAND_NAME)
             response = self._request_get(self.API_TREE, timeout=10)
             if response is None:
                 return []
-            if response.status_code != 200:
-                logger.error(f"Failed to fetch categories: {response.status_code}")
+            if response.status_code != VTEX_GRAPHQL_SUCCESS_CODE:
+                logger.error("Failed to fetch categories: %s", response.status_code)
                 return []
 
             categories = []
@@ -55,18 +60,18 @@ class VtexGraphqlSpider(CatalogApiSpider):
                     if slug:
                         categories.append(slug)
 
-            return categories
-
-        except Exception as e:
-            logger.error(f"Error fetching categories: {e}")
+        except Exception:
+            logger.exception("Error fetching categories")
             return []
 
-    def _crawl_category(self, category: str, processed_ids: set[str]) -> list[Any]:
+        return categories
+
+    def _crawl_category(self, category: str, processed_ids: set[str]) -> list[object]:
         """Crawl one category with GraphQL pagination."""
-        logger.info(f"Crawling Category: {category}")
-        products = []
+        logger.info("Crawling Category: %s", category)
+        products: list[object] = []
         start = self._initial_cursor()
-        step = 50
+        step = PAGE_SIZE
 
         while True:
             items = self._fetch_page_items(category, start, step)
@@ -83,8 +88,8 @@ class VtexGraphqlSpider(CatalogApiSpider):
                     saved_obj = self._process_and_save(item, category)
                     if saved_obj:
                         products.append(saved_obj)
-                except Exception as e:
-                    logger.debug(f"Skipping item: {e}")
+                except Exception as exc:
+                    logger.debug("Skipping item: %s", exc)
 
             if len(items) < step:
                 break
@@ -107,7 +112,12 @@ class VtexGraphqlSpider(CatalogApiSpider):
             return None
         return self._parse_graphql_response(data)
 
-    def _build_variables_payload(self, category: str, start: int, end: int) -> dict:
+    def _build_variables_payload(
+        self,
+        category: str,
+        start: int,
+        end: int,
+    ) -> dict[str, object]:
         """Build VTEX search variables payload."""
         return {
             "hideUnavailableItems": False,
@@ -158,7 +168,12 @@ class VtexGraphqlSpider(CatalogApiSpider):
             "extensions": extensions_json,
         }
 
-    def _fetch_graphql_data(self, category: str, start: int, end: int) -> dict | None:
+    def _fetch_graphql_data(
+        self,
+        category: str,
+        start: int,
+        end: int,
+    ) -> dict[str, object] | None:
         """Execute GraphQL query for one page."""
         params = self._build_graphql_params(category, start, end)
 
@@ -167,23 +182,27 @@ class VtexGraphqlSpider(CatalogApiSpider):
             if response is None:
                 return None
 
-            if response.status_code != 200:
-                logger.error(f"GraphQL Error: {response.text[:200]}")
+            if response.status_code != VTEX_GRAPHQL_SUCCESS_CODE:
+                logger.error("GraphQL Error: %s", response.text[:200])
                 return None
 
             data = response.json()
             if "errors" in data:
-                logger.error(f"GraphQL Body Errors: {data['errors']}")
+                logger.error("GraphQL Body Errors: %s", data["errors"])
                 return None
 
-            return data
-        except Exception as e:
-            logger.error(f"Crawl error for {category}: {e}")
+        except Exception:
+            logger.exception("Crawl error for %s", category)
             return None
 
-    def _parse_graphql_response(self, data: dict) -> list[dict]:
+        return data
+
+    def _parse_graphql_response(
+        self,
+        data: dict[str, object],
+    ) -> list[dict[str, object]]:
         """Extract product list from GraphQL response."""
-        products_list = []
+        products_list: list[dict[str, object]] = []
         p_search = data.get("data", {}).get("productSearch")
         if p_search and isinstance(p_search, dict):
             products_list = p_search.get("products", [])
@@ -197,7 +216,11 @@ class VtexGraphqlSpider(CatalogApiSpider):
 
         return products_list
 
-    def _process_and_save(self, item: dict, category_name: str) -> Any | None:
+    def _process_and_save(
+        self,
+        item: dict[str, object],
+        category_name: str,
+    ) -> object | None:
         """Normalize and persist one VTEX GraphQL product."""
         try:
             pid = item.get("productId")
@@ -254,16 +277,16 @@ class VtexGraphqlSpider(CatalogApiSpider):
             )
             saved = ScraperService.save_product(input_data)
             persist_json_context(saved, self._build_product_context(item))
-            return saved
-
-        except Exception as e:
-            logger.debug(f"Item parse error: {e}")
+        except Exception as exc:
+            logger.debug("Item parse error: %s", exc)
             return None
 
-    def _parse_stock(self, quantity: Any) -> int | None:
+        return saved
+
+    def _parse_stock(self, quantity: object) -> int | None:
         return parse_optional_int(quantity)
 
-    def _parse_price(self, raw_price: Any) -> float | None:
+    def _parse_price(self, raw_price: object) -> float | None:
         return parse_positive_price(raw_price)
 
     def _build_product_context(self, item: dict) -> str:

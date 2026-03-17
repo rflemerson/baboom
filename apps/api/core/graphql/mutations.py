@@ -1,7 +1,9 @@
 """Mutation definitions for the core GraphQL schema."""
 
+from __future__ import annotations
+
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -20,13 +22,16 @@ from core.types import ProductCreateInput
 from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
 
-from .inputs import (
-    ProductContentUpdateInput,
-    ProductInput,
-    ProductNutritionInput,
-    ProductStoreInput,
-)
-from .types import AlertSubscriptionResult, ProductResult, ProductType
+from .types import AlertSubscriptionResult, ProductResult
+
+if TYPE_CHECKING:
+    from .inputs import (
+        ProductContentUpdateInput,
+        ProductInput,
+        ProductNutritionInput,
+        ProductStoreInput,
+    )
+    from .types import ProductType
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +127,7 @@ class CoreMutation:
                         item.status = ScrapedItem.Status.LINKED
                         item.save()
 
-                        # 4. Sync initial price/stock from ScrapedItem to PriceHistory immediately
+                        # Sync initial price and stock from ScrapedItem to PriceHistory.
                         ScraperService.sync_price_to_core(item)
 
                 except ScrapedItem.DoesNotExist:
@@ -185,10 +190,10 @@ class CoreMutation:
             facts = n.nutrition_facts
             micronutrients_data = []
             if facts.micronutrients:
-                for m in facts.micronutrients:
-                    micronutrients_data.append(
-                        {"name": m.name, "value": m.value, "unit": m.unit},
-                    )
+                micronutrients_data.extend(
+                    {"name": m.name, "value": m.value, "unit": m.unit}
+                    for m in facts.micronutrients
+                )
 
             result.append(
                 {

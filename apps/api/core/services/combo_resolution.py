@@ -1,7 +1,17 @@
+"""Services for resolving combo products into concrete components."""
+
+from __future__ import annotations
+
 from difflib import SequenceMatcher
+from typing import TYPE_CHECKING
 
 from core.models import Product, ProductComponent
-from core.types import ProductComponentInput
+
+if TYPE_CHECKING:
+    from core.types import ProductComponentInput
+
+
+MATCH_SCORE_THRESHOLD = 0.6
 
 
 class ComboResolutionService:
@@ -12,7 +22,7 @@ class ComboResolutionService:
         parent_product: Product,
         components_data: list[ProductComponentInput],
     ) -> list[ProductComponent]:
-        """Resolves a list of component DTOs to existing Products or creates placeholders."""
+        """Resolve component DTOs to existing products or placeholders."""
         created_links = []
 
         # Clear existing links to avoid duplication if re-running
@@ -85,7 +95,7 @@ class ComboResolutionService:
                 best_candidate = cand
 
         # Threshold for acceptance
-        if best_score > 0.6:  # 60% similarity
+        if best_score > MATCH_SCORE_THRESHOLD:
             return best_candidate
 
         return None
@@ -95,7 +105,7 @@ class ComboResolutionService:
         comp_data: ProductComponentInput,
         parent: Product,
     ) -> Product:
-        """Creates a placeholder product if no match found."""
+        """Create a placeholder product when no match is found."""
         return Product.objects.create(
             name=f"[Placeholder] {comp_data.name}",
             brand=parent.brand,  # Assume same brand or we can't save

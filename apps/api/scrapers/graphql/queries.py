@@ -1,11 +1,16 @@
-from typing import cast
+"""GraphQL queries for scraper-facing workflows."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
 
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from scrapers.models import ScrapedItem
 
-from .types import ScrapedItemType
+if TYPE_CHECKING:
+    from .types import ScrapedItemType
 
 
 @strawberry.type

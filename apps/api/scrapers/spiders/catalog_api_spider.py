@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
 
 import requests
 
@@ -12,17 +11,20 @@ from .base_spider import BaseSpider
 
 logger = logging.getLogger(__name__)
 
+HTTP_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
 
 class CatalogApiSpider(BaseSpider):
     """Template method for category-based API crawlers."""
 
     BRAND_NAME = ""
-    FALLBACK_CATEGORIES: list[str] = []
+    FALLBACK_CATEGORIES: tuple[str, ...] = ()
     HTTP_TIMEOUT_SECONDS = 30
     HTTP_RETRIES = 3
     HTTP_RETRY_BACKOFF_SECONDS = 0.6
 
     def __init__(self, categories: list[str] | None = None) -> None:
+        """Initialize shared metrics for category-driven API spiders."""
         super().__init__(categories)
         self.metrics: dict[str, int | float] = {
             "categories_discovered": 0,
@@ -39,7 +41,11 @@ class CatalogApiSpider(BaseSpider):
         """Fetch categories dynamically from the target platform."""
         raise NotImplementedError
 
-    def _crawl_category(self, category: str, processed_ids: set[str]) -> list[Any]:
+    def _crawl_category(
+        self,
+        category: str,
+        processed_ids: set[str],
+    ) -> list[object]:
         """Crawl one category and return saved product objects."""
         raise NotImplementedError
 
@@ -52,14 +58,14 @@ class CatalogApiSpider(BaseSpider):
         self.metrics["categories_discovered"] = len(categories)
         return categories
 
-    def crawl(self) -> list[Any]:
+    def crawl(self) -> list[object]:
         """Template crawl flow for category-based API sources."""
         started = time.perf_counter()
-        logger.info(f"Starting API crawl for {self.BRAND_NAME}...")
-        all_products: list[Any] = []
+        logger.info("Starting API crawl for %s...", self.BRAND_NAME)
+        all_products: list[object] = []
         processed_ids = self._new_processed_registry()
         categories = self._resolve_categories()
-        logger.info(f"Discovered {len(categories)} categories to crawl.")
+        logger.info("Discovered %s categories to crawl.", len(categories))
 
         for category in categories:
             results = self._crawl_category(category, processed_ids)
@@ -86,7 +92,7 @@ class CatalogApiSpider(BaseSpider):
         self,
         url: str,
         *,
-        params: dict[str, Any] | None = None,
+        params: dict[str, object] | None = None,
         headers: dict[str, str] | None = None,
         timeout: int | None = None,
     ) -> requests.Response | None:
@@ -101,15 +107,15 @@ class CatalogApiSpider(BaseSpider):
                     headers=headers or self.get_headers(),
                     timeout=timeout_value,
                 )
-                if response.status_code not in {429, 500, 502, 503, 504}:
+                if response.status_code not in HTTP_RETRYABLE_STATUS_CODES:
                     return response
                 if attempt == attempts:
                     return response
                 backoff = self.HTTP_RETRY_BACKOFF_SECONDS * attempt
                 self.sleep_random(backoff, backoff + 0.2)
-            except Exception as exc:
+            except Exception:
                 if attempt == attempts:
-                    logger.error("HTTP GET failed for %s: %s", url, exc)
+                    logger.exception("HTTP GET failed for %s", url)
                     return None
                 backoff = self.HTTP_RETRY_BACKOFF_SECONDS * attempt
                 self.sleep_random(backoff, backoff + 0.2)
