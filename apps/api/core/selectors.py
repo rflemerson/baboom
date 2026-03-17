@@ -15,8 +15,7 @@ from .models import NutritionFacts, Product, ProductPriceHistory
 
 
 def public_catalog_products_with_stats() -> QuerySet[Product]:
-    """
-    Return the public catalog queryset annotated with catalog-facing statistics.
+    """Return the public catalog queryset annotated with catalog-facing statistics.
 
     Annotations:
     - last_price
@@ -25,11 +24,11 @@ def public_catalog_products_with_stats() -> QuerySet[Product]:
     - price_per_gram
     """
     latest_prices = ProductPriceHistory.objects.filter(
-        store_product_link__product=OuterRef("pk")
+        store_product_link__product=OuterRef("pk"),
     ).order_by("-collected_at")
 
     nutrition_info = NutritionFacts.objects.filter(
-        product_profiles__product=OuterRef("pk")
+        product_profiles__product=OuterRef("pk"),
     ).values("proteins", "serving_size_grams")[:1]
 
     # 1. Protect serving size against zero

@@ -5,14 +5,16 @@ class EnrichmentService:
     """Service to enrich products with metadata (Nutrient Sources)."""
 
     def enrich_product(
-        self, product: Product, extra_claims: list[str] | None = None
+        self,
+        product: Product,
+        extra_claims: list[str] | None = None,
     ) -> None:
-        """
-        Analyzes product nutrition/components and updates `nutrient_sources` M2M.
+        """Analyzes product nutrition/components and updates `nutrient_sources` M2M.
 
         Args:
             product: The product to enrich.
             extra_claims: List of nutrient slugs from external sources (LLM/Scraper).
+
         """
         sources = set()
 
@@ -49,7 +51,8 @@ class EnrichmentService:
             if heuristic_slugs:
                 for h_slug in heuristic_slugs:
                     nutr_obj, _ = Nutrient.objects.get_or_create(
-                        slug=h_slug, defaults={"name": h_slug.title()}
+                        slug=h_slug,
+                        defaults={"name": h_slug.title()},
                     )
                     nutrient_objects.append(nutr_obj)
 

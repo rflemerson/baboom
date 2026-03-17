@@ -102,8 +102,7 @@ class ProductAdmin(nested_admin.NestedModelAdmin):
         return obj.category.name if obj.category else "-"
 
     def get_changeform_initial_data(self, request):
-        """
-        Populate initial form data.
+        """Populate initial form data.
 
         Populate initial form data from GET parameters.
         Example: /admin/core/product/add/?initial_name=Whey&initial_ean=123

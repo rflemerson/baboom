@@ -7,85 +7,340 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('core', '0001_initial'),
+        ("core", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='OpenFoodFactsData',
+            name="OpenFoodFactsData",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('ean', models.CharField(db_index=True, help_text='European Article Number / GTIN', max_length=14, unique=True, verbose_name='EAN')),
-                ('raw_data', models.JSONField(blank=True, help_text='Full JSON response from Open Food Facts API', null=True, verbose_name='Raw Open Food Facts Data')),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "ean",
+                    models.CharField(
+                        db_index=True,
+                        help_text="European Article Number / GTIN",
+                        max_length=14,
+                        unique=True,
+                        verbose_name="EAN",
+                    ),
+                ),
+                (
+                    "raw_data",
+                    models.JSONField(
+                        blank=True,
+                        help_text="Full JSON response from Open Food Facts API",
+                        null=True,
+                        verbose_name="Raw Open Food Facts Data",
+                    ),
+                ),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
-                'verbose_name': 'Open Food Facts Data',
-                'verbose_name_plural': 'Open Food Facts Data',
+                "verbose_name": "Open Food Facts Data",
+                "verbose_name_plural": "Open Food Facts Data",
             },
         ),
         migrations.CreateModel(
-            name='HistoricalScrapedItem',
+            name="HistoricalScrapedItem",
             fields=[
-                ('id', models.BigIntegerField(auto_created=True, blank=True, db_index=True, verbose_name='ID')),
-                ('store_slug', models.CharField(db_index=True, help_text='Store identifier', max_length=100)),
-                ('external_id', models.CharField(db_index=True, help_text='Unique ID from Store', max_length=100)),
-                ('product_link', models.URLField(blank=True, help_text='URL to product page', max_length=500)),
-                ('name', models.CharField(blank=True, help_text='Name extracted from source', max_length=255)),
-                ('category', models.CharField(blank=True, help_text='Category/Department extracted from source', max_length=255)),
-                ('price', models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True)),
-                ('stock_quantity', models.IntegerField(blank=True, help_text='Available quantity in stock', null=True)),
-                ('stock_status', models.CharField(blank=True, choices=[('A', 'Available'), ('L', 'Last Units'), ('O', 'Out of Stock')], default='A', max_length=1)),
-                ('pid', models.CharField(blank=True, help_text='Product ID extracted from source', max_length=100)),
-                ('ean', models.CharField(blank=True, db_index=True, help_text='EAN/GTIN extracted from source', max_length=14)),
-                ('sku', models.CharField(blank=True, db_index=True, help_text='SKU extracted from source', max_length=100)),
-                ('status', models.CharField(choices=[('new', 'New'), ('linked', 'Linked'), ('ignored', 'Ignored')], db_index=True, default='new', max_length=20)),
-                ('created_at', models.DateTimeField(blank=True, editable=False)),
-                ('updated_at', models.DateTimeField(blank=True, editable=False)),
-                ('history_id', models.AutoField(primary_key=True, serialize=False)),
-                ('history_date', models.DateTimeField(db_index=True)),
-                ('history_change_reason', models.CharField(max_length=100, null=True)),
-                ('history_type', models.CharField(choices=[('+', 'Created'), ('~', 'Changed'), ('-', 'Deleted')], max_length=1)),
-                ('history_user', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('product_store', models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', to='core.productstore')),
+                (
+                    "id",
+                    models.BigIntegerField(
+                        auto_created=True, blank=True, db_index=True, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "store_slug",
+                    models.CharField(
+                        db_index=True, help_text="Store identifier", max_length=100
+                    ),
+                ),
+                (
+                    "external_id",
+                    models.CharField(
+                        db_index=True, help_text="Unique ID from Store", max_length=100
+                    ),
+                ),
+                (
+                    "product_link",
+                    models.URLField(
+                        blank=True, help_text="URL to product page", max_length=500
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        blank=True,
+                        help_text="Name extracted from source",
+                        max_length=255,
+                    ),
+                ),
+                (
+                    "category",
+                    models.CharField(
+                        blank=True,
+                        help_text="Category/Department extracted from source",
+                        max_length=255,
+                    ),
+                ),
+                (
+                    "price",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=10, null=True
+                    ),
+                ),
+                (
+                    "stock_quantity",
+                    models.IntegerField(
+                        blank=True, help_text="Available quantity in stock", null=True
+                    ),
+                ),
+                (
+                    "stock_status",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("A", "Available"),
+                            ("L", "Last Units"),
+                            ("O", "Out of Stock"),
+                        ],
+                        default="A",
+                        max_length=1,
+                    ),
+                ),
+                (
+                    "pid",
+                    models.CharField(
+                        blank=True,
+                        help_text="Product ID extracted from source",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "ean",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="EAN/GTIN extracted from source",
+                        max_length=14,
+                    ),
+                ),
+                (
+                    "sku",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="SKU extracted from source",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("new", "New"),
+                            ("linked", "Linked"),
+                            ("ignored", "Ignored"),
+                        ],
+                        db_index=True,
+                        default="new",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(blank=True, editable=False)),
+                ("updated_at", models.DateTimeField(blank=True, editable=False)),
+                ("history_id", models.AutoField(primary_key=True, serialize=False)),
+                ("history_date", models.DateTimeField(db_index=True)),
+                ("history_change_reason", models.CharField(max_length=100, null=True)),
+                (
+                    "history_type",
+                    models.CharField(
+                        choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")],
+                        max_length=1,
+                    ),
+                ),
+                (
+                    "history_user",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "product_store",
+                    models.ForeignKey(
+                        blank=True,
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        related_name="+",
+                        to="core.productstore",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'historical scraped item',
-                'verbose_name_plural': 'historical scraped items',
-                'ordering': ('-history_date', '-history_id'),
-                'get_latest_by': ('history_date', 'history_id'),
+                "verbose_name": "historical scraped item",
+                "verbose_name_plural": "historical scraped items",
+                "ordering": ("-history_date", "-history_id"),
+                "get_latest_by": ("history_date", "history_id"),
             },
             bases=(simple_history.models.HistoricalChanges, models.Model),
         ),
         migrations.CreateModel(
-            name='ScrapedItem',
+            name="ScrapedItem",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('store_slug', models.CharField(db_index=True, help_text='Store identifier', max_length=100)),
-                ('external_id', models.CharField(db_index=True, help_text='Unique ID from Store', max_length=100)),
-                ('product_link', models.URLField(blank=True, help_text='URL to product page', max_length=500)),
-                ('name', models.CharField(blank=True, help_text='Name extracted from source', max_length=255)),
-                ('category', models.CharField(blank=True, help_text='Category/Department extracted from source', max_length=255)),
-                ('price', models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True)),
-                ('stock_quantity', models.IntegerField(blank=True, help_text='Available quantity in stock', null=True)),
-                ('stock_status', models.CharField(blank=True, choices=[('A', 'Available'), ('L', 'Last Units'), ('O', 'Out of Stock')], default='A', max_length=1)),
-                ('pid', models.CharField(blank=True, help_text='Product ID extracted from source', max_length=100)),
-                ('ean', models.CharField(blank=True, db_index=True, help_text='EAN/GTIN extracted from source', max_length=14)),
-                ('sku', models.CharField(blank=True, db_index=True, help_text='SKU extracted from source', max_length=100)),
-                ('status', models.CharField(choices=[('new', 'New'), ('linked', 'Linked'), ('ignored', 'Ignored')], db_index=True, default='new', max_length=20)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('product_store', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='scraped_items', to='core.productstore')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "store_slug",
+                    models.CharField(
+                        db_index=True, help_text="Store identifier", max_length=100
+                    ),
+                ),
+                (
+                    "external_id",
+                    models.CharField(
+                        db_index=True, help_text="Unique ID from Store", max_length=100
+                    ),
+                ),
+                (
+                    "product_link",
+                    models.URLField(
+                        blank=True, help_text="URL to product page", max_length=500
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        blank=True,
+                        help_text="Name extracted from source",
+                        max_length=255,
+                    ),
+                ),
+                (
+                    "category",
+                    models.CharField(
+                        blank=True,
+                        help_text="Category/Department extracted from source",
+                        max_length=255,
+                    ),
+                ),
+                (
+                    "price",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=10, null=True
+                    ),
+                ),
+                (
+                    "stock_quantity",
+                    models.IntegerField(
+                        blank=True, help_text="Available quantity in stock", null=True
+                    ),
+                ),
+                (
+                    "stock_status",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("A", "Available"),
+                            ("L", "Last Units"),
+                            ("O", "Out of Stock"),
+                        ],
+                        default="A",
+                        max_length=1,
+                    ),
+                ),
+                (
+                    "pid",
+                    models.CharField(
+                        blank=True,
+                        help_text="Product ID extracted from source",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "ean",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="EAN/GTIN extracted from source",
+                        max_length=14,
+                    ),
+                ),
+                (
+                    "sku",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="SKU extracted from source",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("new", "New"),
+                            ("linked", "Linked"),
+                            ("ignored", "Ignored"),
+                        ],
+                        db_index=True,
+                        default="new",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "product_store",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="scraped_items",
+                        to="core.productstore",
+                    ),
+                ),
             ],
             options={
-                'indexes': [models.Index(fields=['store_slug', 'external_id'], name='scrapers_sc_store_s_a44af4_idx'), models.Index(fields=['status'], name='scrapers_sc_status_99bac4_idx')],
-                'constraints': [models.UniqueConstraint(fields=('store_slug', 'external_id'), name='unique_scraped_item_identity')],
+                "indexes": [
+                    models.Index(
+                        fields=["store_slug", "external_id"],
+                        name="scrapers_sc_store_s_a44af4_idx",
+                    ),
+                    models.Index(
+                        fields=["status"], name="scrapers_sc_status_99bac4_idx"
+                    ),
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("store_slug", "external_id"),
+                        name="unique_scraped_item_identity",
+                    )
+                ],
             },
         ),
     ]

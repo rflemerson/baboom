@@ -44,7 +44,9 @@ def create_product_from_scraped_item(modeladmin, request, queryset):
 def reset_to_new(modeladmin, request, queryset):
     """Action to manually retry failed items."""
     updated = queryset.update(
-        status=ScrapedItem.Status.NEW, error_count=0, last_error_log=""
+        status=ScrapedItem.Status.NEW,
+        error_count=0,
+        last_error_log="",
     )
     modeladmin.message_user(request, f"{updated} items reset to NEW for retrying.")
 

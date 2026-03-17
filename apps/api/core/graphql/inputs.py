@@ -75,35 +75,44 @@ class ProductInput:
     name: str = strawberry.field(description="Product display name")
     weight: int = strawberry.field(description="Weight in grams")
     brand_name: str = strawberry.field(
-        description="Brand name (auto-created if not exists)"
+        description="Brand name (auto-created if not exists)",
     )
     category_name: str | None = strawberry.field(
-        default=None, description="Deprecated: Use category_path"
+        default=None,
+        description="Deprecated: Use category_path",
     )
     category_path: list[str] | None = strawberry.field(
-        default=None, description="Hierarchical category path"
+        default=None,
+        description="Hierarchical category path",
     )
     ean: str | None = strawberry.field(default=None, description="Barcode")
     description: str | None = strawberry.field(
-        default="", description="Marketing description"
+        default="",
+        description="Marketing description",
     )
     packaging: PackagingEnum = strawberry.field(
-        default=PackagingEnum.CONTAINER, description="Packaging type"
+        default=PackagingEnum.CONTAINER,
+        description="Packaging type",
     )
     is_published: bool = strawberry.field(
-        default=False, description="Visible on public site"
+        default=False,
+        description="Visible on public site",
     )
     tags: list[str] | None = strawberry.field(
-        default=None, description="Deprecated: Use tag_paths"
+        default=None,
+        description="Deprecated: Use tag_paths",
     )
     tag_paths: list[TagPathInput] | None = strawberry.field(
-        default=None, description="Hierarchical tag paths"
+        default=None,
+        description="Hierarchical tag paths",
     )
     stores: list[ProductStoreInput] | None = strawberry.field(
-        default=None, description="Store links"
+        default=None,
+        description="Store links",
     )
     nutrition: list[ProductNutritionInput] | None = strawberry.field(
-        default=None, description="Nutrition profiles"
+        default=None,
+        description="Nutrition profiles",
     )
 
     origin_scraped_item_id: int | None = strawberry.field(
@@ -112,14 +121,17 @@ class ProductInput:
     )
 
     is_combo: bool = strawberry.field(
-        default=False, description="Is this a combo/kit product?"
+        default=False,
+        description="Is this a combo/kit product?",
     )
     components: list[ProductComponentInput] | None = strawberry.field(
-        default=None, description="List of components if combo"
+        default=None,
+        description="List of components if combo",
     )
 
     nutrient_claims: list[str] | None = strawberry.field(
-        default=None, description="List of nutrient slugs claimed by source"
+        default=None,
+        description="List of nutrient slugs claimed by source",
     )
 
 

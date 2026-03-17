@@ -67,12 +67,13 @@ class CatalogApiSpider(BaseSpider):
                 int(self.metrics["categories_crawled"]) + 1
             )
             self.metrics["products_collected"] = int(
-                self.metrics["products_collected"]
+                self.metrics["products_collected"],
             ) + len(results)
             all_products.extend(results)
 
         self.metrics["crawl_duration_ms"] = round(
-            (time.perf_counter() - started) * 1000, 2
+            (time.perf_counter() - started) * 1000,
+            2,
         )
         logger.info(
             "Crawl finished. Total products: %s | metrics=%s",

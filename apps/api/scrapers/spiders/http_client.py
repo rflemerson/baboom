@@ -1,5 +1,4 @@
-"""
-HTTP Client with WAF Bypass Support.
+"""HTTP Client with WAF Bypass Support.
 
 This module provides a generic HTTP client that can bypass Sucuri WAF
 and other bot protection systems using TLS fingerprint impersonation.
@@ -31,13 +30,12 @@ except ImportError:
 
     logger.warning(
         "curl_cffi not installed. WAF bypass may not work. "
-        "Install with: pip install curl_cffi"
+        "Install with: pip install curl_cffi",
     )
 
 
 class HttpClient:
-    """
-    HTTP Client with automatic WAF bypass using TLS fingerprint impersonation.
+    """HTTP Client with automatic WAF bypass using TLS fingerprint impersonation.
 
     Falls back to standard requests if curl_cffi is not available.
     """
@@ -73,8 +71,7 @@ class HttpClient:
         impersonate: str | None = None,
         try_all_impersonations: bool = False,
     ) -> Any | None:
-        """
-        Perform GET request with WAF bypass.
+        """Perform GET request with WAF bypass.
 
         Args:
             url: URL to fetch
@@ -86,13 +83,19 @@ class HttpClient:
 
         Returns:
             Response object or None if all attempts failed
+
         """
         headers = headers or {}
         impersonate = impersonate or self.default_impersonate
 
         if HAS_CURL_CFFI:
             return self._get_with_curl_cffi(
-                url, headers, params, verify, impersonate, try_all_impersonations
+                url,
+                headers,
+                params,
+                verify,
+                impersonate,
+                try_all_impersonations,
             )
         return self._get_with_requests(url, headers, params, verify)
 

@@ -16,5 +16,5 @@ def env_to_enum(enum_cls, value):
             return x
 
     raise ImproperlyConfigured(
-        f"Env value {value!r} could not be found in {enum_cls!r}"
+        f"Env value {value!r} could not be found in {enum_cls!r}",
     )

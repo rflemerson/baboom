@@ -5,25 +5,58 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0002_nutritionfacts_content_hash_product_last_enriched_at_and_more'),
+        ("core", "0002_nutritionfacts_content_hash_product_last_enriched_at_and_more"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='APIKey',
+            name="APIKey",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(help_text='Who is this key for?', max_length=100, verbose_name='Client Name')),
-                ('key', models.CharField(db_index=True, editable=False, max_length=64, unique=True, verbose_name='API Key')),
-                ('is_active', models.BooleanField(default=True, verbose_name='Active')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Who is this key for?",
+                        max_length=100,
+                        verbose_name="Client Name",
+                    ),
+                ),
+                (
+                    "key",
+                    models.CharField(
+                        db_index=True,
+                        editable=False,
+                        max_length=64,
+                        unique=True,
+                        verbose_name="API Key",
+                    ),
+                ),
+                ("is_active", models.BooleanField(default=True, verbose_name="Active")),
             ],
             options={
-                'verbose_name': 'API Key',
-                'verbose_name_plural': 'API Keys',
+                "verbose_name": "API Key",
+                "verbose_name_plural": "API Keys",
             },
         ),
     ]

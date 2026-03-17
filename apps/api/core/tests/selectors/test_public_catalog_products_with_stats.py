@@ -39,20 +39,23 @@ class ProductStatsTest(TestCase):
             energy_kcal=120,
         )
         ProductNutrition.objects.create(
-            product=self.product, nutrition_facts=self.nutrition
+            product=self.product,
+            nutrition_facts=self.nutrition,
         )
 
         # Price: R$ 100.00
         self.link = ProductStore.objects.create(
-            product=self.product, store=self.store, product_link="http://example.com"
+            product=self.product,
+            store=self.store,
+            product_link="http://example.com",
         )
         ProductPriceHistory.objects.create(
-            store_product_link=self.link, price=Decimal("100.00")
+            store_product_link=self.link,
+            price=Decimal("100.00"),
         )
 
     def test_protein_calculations(self):
-        """
-        Verify if the public catalog selector correctly calculates derived fields.
+        """Verify if the public catalog selector correctly calculates derived fields.
 
         - Concentration (should be 80.0%)
         - Total Protein in package (Should be 800g for a 1kg package)

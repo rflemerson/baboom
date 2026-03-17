@@ -4,7 +4,7 @@ from django.test import RequestFactory, TestCase
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
-from core.models import APIKey, AlertSubscriber
+from core.models import AlertSubscriber, APIKey
 
 
 class GraphQLAlertSubscriptionTests(TestCase):
@@ -47,7 +47,8 @@ class GraphQLAlertSubscriptionTests(TestCase):
         self.assertTrue(result["data"]["subscribeAlerts"]["success"])
         self.assertFalse(result["data"]["subscribeAlerts"]["alreadySubscribed"])
         self.assertEqual(
-            result["data"]["subscribeAlerts"]["email"], "new-subscriber@example.com"
+            result["data"]["subscribeAlerts"]["email"],
+            "new-subscriber@example.com",
         )
 
     def test_subscribe_alerts_returns_duplicate_state(self):
@@ -67,5 +68,6 @@ class GraphQLAlertSubscriptionTests(TestCase):
         self.assertFalse(result["data"]["subscribeAlerts"]["success"])
         self.assertEqual(result["data"]["subscribeAlerts"]["email"], "not-an-email")
         self.assertEqual(
-            result["data"]["subscribeAlerts"]["errors"][0]["field"], "email"
+            result["data"]["subscribeAlerts"]["errors"][0]["field"],
+            "email",
         )

@@ -44,11 +44,11 @@ def alert_subscriber_create(*, email: str) -> AlertSubscriber:
 
 
 def product_create(data: ProductCreateInput) -> Product:
-    """
-    Create a product with all related data (nested creation).
+    """Create a product with all related data (nested creation).
 
     Raises:
         ValidationError: If business rules are violated (e.g. duplicate EAN).
+
     """
     if data.ean and Product.objects.filter(ean=data.ean).exists():
         raise ValidationError({"ean": _("A product with this EAN already exists.")})
@@ -89,7 +89,8 @@ def product_create(data: ProductCreateInput) -> Product:
             # 6. Combo Resolution or Nutrition Profiles
             if data.is_combo and data.components:
                 ComboResolutionService().resolve_combo_components(
-                    product, data.components
+                    product,
+                    data.components,
                 )
             elif data.nutrition:
                 # Only create direct nutrition profiles for Simple products
@@ -98,7 +99,8 @@ def product_create(data: ProductCreateInput) -> Product:
 
             # 7. Enrichment (Auto-tagging sources)
             EnrichmentService().enrich_product(
-                product, extra_claims=data.nutrient_claims
+                product,
+                extra_claims=data.nutrient_claims,
             )
 
             return product
@@ -228,10 +230,10 @@ def product_update_content(
 
 
 def _handle_nutrition_creation(
-    product: Product, nutrition_list: list[dict[str, Any]]
+    product: Product,
+    nutrition_list: list[dict[str, Any]],
 ) -> None:
-    """
-    Handle the complex logic of creating/linking nutrition profiles.
+    """Handle the complex logic of creating/linking nutrition profiles.
 
     Creates facts, micronutrients, and flavors.
     """
@@ -243,7 +245,8 @@ def _handle_nutrition_creation(
         # Now we call the Model to calculate the hash.
         # We pass the dict and list of micros explicitly.
         content_hash = NutritionFacts.generate_hash(
-            source=facts_data, micronutrients=micros_data
+            source=facts_data,
+            micronutrients=micros_data,
         )
         # -------------------------------
 
@@ -282,7 +285,8 @@ def _handle_nutrition_creation(
 
         # Smart grouping
         profile, _created = ProductNutrition.objects.get_or_create(
-            product=product, nutrition_facts=facts
+            product=product,
+            nutrition_facts=facts,
         )
 
         # Add flavors

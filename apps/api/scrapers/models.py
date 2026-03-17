@@ -170,7 +170,7 @@ class ScrapedItem(models.Model):
             models.UniqueConstraint(
                 fields=["store_slug", "external_id"],
                 name="unique_scraped_item_identity",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["store_slug", "external_id"]),

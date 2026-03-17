@@ -16,4 +16,4 @@ class ScrapersQuery:
     def scraped_item(self, item_id: int) -> ScrapedItemType | None:
         """Get a scraped item by id."""
         item = ScrapedItem.objects.filter(id=item_id).first()
-        return cast(ScrapedItemType | None, item)
+        return cast("ScrapedItemType | None", item)

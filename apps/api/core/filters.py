@@ -142,5 +142,5 @@ class ProductFilter(django_filters.FilterSet):
             | Q(category__name__icontains=value)
             | Q(tags__name__icontains=value)
             | Q(nutrition_profiles__flavors__name__icontains=value)
-            | Q(description__icontains=value)
+            | Q(description__icontains=value),
         ).distinct()

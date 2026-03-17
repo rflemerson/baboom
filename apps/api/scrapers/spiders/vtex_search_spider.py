@@ -75,7 +75,10 @@ class VtexSearchSpider(CatalogApiSpider):
         return {"_from": start, "_to": end}
 
     def _fetch_page_items(
-        self, category_slug: str, start: int, step: int
+        self,
+        category_slug: str,
+        start: int,
+        step: int,
     ) -> list[dict] | None:
         """Fetch one page and normalize response contract."""
         search_url = self._build_search_url(category_slug)

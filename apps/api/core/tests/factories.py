@@ -139,10 +139,16 @@ class NutritionFactsFactory(DjangoModelFactory):
     serving_size_grams = factory.Faker("random_int", min=20, max=50)
     proteins = factory.Faker("pydecimal", left_digits=2, right_digits=1, positive=True)
     carbohydrates = factory.Faker(
-        "pydecimal", left_digits=2, right_digits=1, positive=True
+        "pydecimal",
+        left_digits=2,
+        right_digits=1,
+        positive=True,
     )
     total_fats = factory.Faker(
-        "pydecimal", left_digits=1, right_digits=1, positive=True
+        "pydecimal",
+        left_digits=1,
+        right_digits=1,
+        positive=True,
     )
     energy_kcal = factory.Faker("random_int", min=80, max=200)
     description = factory.Faker("sentence")

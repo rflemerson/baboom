@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0004_alter_nutritionfacts_serving_size_grams'),
+        ("core", "0004_alter_nutritionfacts_serving_size_grams"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='productstore',
-            name='affiliate_link',
-            field=models.URLField(blank=True, default='', help_text='URL with affiliate tracking parameters', verbose_name='Affiliate Tracking URL'),
+            model_name="productstore",
+            name="affiliate_link",
+            field=models.URLField(
+                blank=True,
+                default="",
+                help_text="URL with affiliate tracking parameters",
+                verbose_name="Affiliate Tracking URL",
+            ),
         ),
     ]

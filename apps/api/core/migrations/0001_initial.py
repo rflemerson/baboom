@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -17,271 +16,902 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='AlertSubscriber',
+            name="AlertSubscriber",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('email', models.EmailField(max_length=254, unique=True, verbose_name='Email')),
-                ('is_active', models.BooleanField(default=True, verbose_name='Active')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "email",
+                    models.EmailField(
+                        max_length=254, unique=True, verbose_name="Email"
+                    ),
+                ),
+                ("is_active", models.BooleanField(default=True, verbose_name="Active")),
             ],
             options={
-                'verbose_name': 'Alert Subscriber',
-                'verbose_name_plural': 'Alert Subscribers',
+                "verbose_name": "Alert Subscriber",
+                "verbose_name_plural": "Alert Subscribers",
             },
         ),
         migrations.CreateModel(
-            name='Brand',
+            name="Brand",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
-                ('display_name', models.CharField(max_length=100, unique=True, verbose_name='Display Name')),
-                ('description', models.TextField(blank=True, help_text='Brand description', verbose_name='Description')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=100, unique=True, verbose_name="Name"),
+                ),
+                (
+                    "display_name",
+                    models.CharField(
+                        max_length=100, unique=True, verbose_name="Display Name"
+                    ),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Brand description",
+                        verbose_name="Description",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Brand',
-                'verbose_name_plural': 'Brands',
-                'ordering': ['name'],
+                "verbose_name": "Brand",
+                "verbose_name_plural": "Brands",
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='Category',
+            name="Category",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('path', models.CharField(max_length=255, unique=True)),
-                ('depth', models.PositiveIntegerField()),
-                ('numchild', models.PositiveIntegerField(default=0)),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(help_text='Unique category name', max_length=100, unique=True, verbose_name='Name')),
-                ('description', models.TextField(blank=True, help_text='Category description', verbose_name='Description')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("path", models.CharField(max_length=255, unique=True)),
+                ("depth", models.PositiveIntegerField()),
+                ("numchild", models.PositiveIntegerField(default=0)),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Unique category name",
+                        max_length=100,
+                        unique=True,
+                        verbose_name="Name",
+                    ),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Category description",
+                        verbose_name="Description",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Category',
-                'verbose_name_plural': 'Categories',
+                "verbose_name": "Category",
+                "verbose_name_plural": "Categories",
             },
         ),
         migrations.CreateModel(
-            name='Flavor',
+            name="Flavor",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
-                ('description', models.TextField(blank=True, help_text='Flavor description', verbose_name='Description')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=100, unique=True, verbose_name="Name"),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Flavor description",
+                        verbose_name="Description",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Flavor',
-                'verbose_name_plural': 'Flavors',
-                'ordering': ['name'],
+                "verbose_name": "Flavor",
+                "verbose_name_plural": "Flavors",
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='NutritionFacts',
+            name="NutritionFacts",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('description', models.CharField(blank=True, help_text="E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin.", max_length=200, verbose_name='Internal Label')),
-                ('serving_size_grams', models.PositiveSmallIntegerField(verbose_name='Serving Size (g)')),
-                ('energy_kcal', models.PositiveSmallIntegerField(verbose_name='Energy (kcal)')),
-                ('proteins', models.DecimalField(decimal_places=1, max_digits=5, verbose_name='Proteins (g)')),
-                ('carbohydrates', models.DecimalField(decimal_places=1, max_digits=5, verbose_name='Carbs (g)')),
-                ('total_sugars', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Total Sugars (g)')),
-                ('added_sugars', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Added Sugars (g)')),
-                ('total_fats', models.DecimalField(decimal_places=1, max_digits=5, verbose_name='Total Fats (g)')),
-                ('saturated_fats', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Saturated Fats (g)')),
-                ('trans_fats', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Trans Fats (g)')),
-                ('dietary_fiber', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Dietary Fiber (g)')),
-                ('sodium', models.PositiveIntegerField(default=0, verbose_name='Sodium (mg)')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "description",
+                    models.CharField(
+                        blank=True,
+                        help_text="E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin.",
+                        max_length=200,
+                        verbose_name="Internal Label",
+                    ),
+                ),
+                (
+                    "serving_size_grams",
+                    models.PositiveSmallIntegerField(verbose_name="Serving Size (g)"),
+                ),
+                (
+                    "energy_kcal",
+                    models.PositiveSmallIntegerField(verbose_name="Energy (kcal)"),
+                ),
+                (
+                    "proteins",
+                    models.DecimalField(
+                        decimal_places=1, max_digits=5, verbose_name="Proteins (g)"
+                    ),
+                ),
+                (
+                    "carbohydrates",
+                    models.DecimalField(
+                        decimal_places=1, max_digits=5, verbose_name="Carbs (g)"
+                    ),
+                ),
+                (
+                    "total_sugars",
+                    models.DecimalField(
+                        decimal_places=1,
+                        default=0,
+                        max_digits=5,
+                        verbose_name="Total Sugars (g)",
+                    ),
+                ),
+                (
+                    "added_sugars",
+                    models.DecimalField(
+                        decimal_places=1,
+                        default=0,
+                        max_digits=5,
+                        verbose_name="Added Sugars (g)",
+                    ),
+                ),
+                (
+                    "total_fats",
+                    models.DecimalField(
+                        decimal_places=1, max_digits=5, verbose_name="Total Fats (g)"
+                    ),
+                ),
+                (
+                    "saturated_fats",
+                    models.DecimalField(
+                        decimal_places=1,
+                        default=0,
+                        max_digits=5,
+                        verbose_name="Saturated Fats (g)",
+                    ),
+                ),
+                (
+                    "trans_fats",
+                    models.DecimalField(
+                        decimal_places=1,
+                        default=0,
+                        max_digits=5,
+                        verbose_name="Trans Fats (g)",
+                    ),
+                ),
+                (
+                    "dietary_fiber",
+                    models.DecimalField(
+                        decimal_places=1,
+                        default=0,
+                        max_digits=5,
+                        verbose_name="Dietary Fiber (g)",
+                    ),
+                ),
+                (
+                    "sodium",
+                    models.PositiveIntegerField(default=0, verbose_name="Sodium (mg)"),
+                ),
             ],
             options={
-                'verbose_name': 'Nutrition Facts',
-                'verbose_name_plural': 'Nutrition Facts',
+                "verbose_name": "Nutrition Facts",
+                "verbose_name_plural": "Nutrition Facts",
             },
         ),
         migrations.CreateModel(
-            name='Store',
+            name="Store",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
-                ('display_name', models.CharField(max_length=100, unique=True, verbose_name='Display Name')),
-                ('description', models.TextField(blank=True, help_text='Store description', verbose_name='Description')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=100, unique=True, verbose_name="Name"),
+                ),
+                (
+                    "display_name",
+                    models.CharField(
+                        max_length=100, unique=True, verbose_name="Display Name"
+                    ),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Store description",
+                        verbose_name="Description",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Store',
-                'verbose_name_plural': 'Stores',
-                'ordering': ['name'],
+                "verbose_name": "Store",
+                "verbose_name_plural": "Stores",
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='Tag',
+            name="Tag",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('path', models.CharField(max_length=255, unique=True)),
-                ('depth', models.PositiveIntegerField()),
-                ('numchild', models.PositiveIntegerField(default=0)),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(help_text='Unique tag name', max_length=100, unique=True, verbose_name='Name')),
-                ('description', models.TextField(blank=True, help_text='Tag description', verbose_name='Description')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("path", models.CharField(max_length=255, unique=True)),
+                ("depth", models.PositiveIntegerField()),
+                ("numchild", models.PositiveIntegerField(default=0)),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Unique tag name",
+                        max_length=100,
+                        unique=True,
+                        verbose_name="Name",
+                    ),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Tag description",
+                        verbose_name="Description",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Tag',
-                'verbose_name_plural': 'Tags',
+                "verbose_name": "Tag",
+                "verbose_name_plural": "Tags",
             },
         ),
         migrations.CreateModel(
-            name='Product',
+            name="Product",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(max_length=200, verbose_name='Product Name')),
-                ('description', models.TextField(blank=True, help_text='Marketing description', verbose_name='Description')),
-                ('weight', models.PositiveIntegerField(help_text='Total product weight in grams', verbose_name='Weight (grams)')),
-                ('ean', models.CharField(blank=True, db_index=True, help_text='European Article Number / Global Trade Item Number', max_length=14, null=True, unique=True, verbose_name='EAN/GTIN')),
-                ('packaging', models.CharField(choices=[('REFILL', 'Refill Package'), ('CONTAINER', 'Container Package'), ('BAR', 'Bar'), ('OTHER', 'Other')], default='CONTAINER', max_length=20, verbose_name='Packaging Type')),
-                ('is_published', models.BooleanField(default=False, help_text='If checked, this product will be visible on the public website.', verbose_name='Published')),
-                ('brand', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.brand', verbose_name='Brand')),
-                ('category', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='core.category', verbose_name='Product Category')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                ("name", models.CharField(max_length=200, verbose_name="Product Name")),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Marketing description",
+                        verbose_name="Description",
+                    ),
+                ),
+                (
+                    "weight",
+                    models.PositiveIntegerField(
+                        help_text="Total product weight in grams",
+                        verbose_name="Weight (grams)",
+                    ),
+                ),
+                (
+                    "ean",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="European Article Number / Global Trade Item Number",
+                        max_length=14,
+                        null=True,
+                        unique=True,
+                        verbose_name="EAN/GTIN",
+                    ),
+                ),
+                (
+                    "packaging",
+                    models.CharField(
+                        choices=[
+                            ("REFILL", "Refill Package"),
+                            ("CONTAINER", "Container Package"),
+                            ("BAR", "Bar"),
+                            ("OTHER", "Other"),
+                        ],
+                        default="CONTAINER",
+                        max_length=20,
+                        verbose_name="Packaging Type",
+                    ),
+                ),
+                (
+                    "is_published",
+                    models.BooleanField(
+                        default=False,
+                        help_text="If checked, this product will be visible on the public website.",
+                        verbose_name="Published",
+                    ),
+                ),
+                (
+                    "brand",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="core.brand",
+                        verbose_name="Brand",
+                    ),
+                ),
+                (
+                    "category",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="core.category",
+                        verbose_name="Product Category",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Product',
-                'verbose_name_plural': 'Products',
-                'ordering': ['brand__name', 'name'],
+                "verbose_name": "Product",
+                "verbose_name_plural": "Products",
+                "ordering": ["brand__name", "name"],
             },
         ),
         migrations.CreateModel(
-            name='ProductStore',
+            name="ProductStore",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('external_id', models.CharField(blank=True, help_text='Unique identifier in store system (e.g., SKU)', max_length=100, verbose_name='Store Product ID')),
-                ('product_link', models.URLField(help_text='Direct URL to product page in the store', verbose_name='Store Product URL')),
-                ('affiliate_link', models.URLField(blank=True, help_text='URL with affiliate tracking parameters', null=True, verbose_name='Affiliate Tracking URL')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='store_links', to='core.product', verbose_name='Related Product')),
-                ('store', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.store', verbose_name='Associated Store')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "external_id",
+                    models.CharField(
+                        blank=True,
+                        help_text="Unique identifier in store system (e.g., SKU)",
+                        max_length=100,
+                        verbose_name="Store Product ID",
+                    ),
+                ),
+                (
+                    "product_link",
+                    models.URLField(
+                        help_text="Direct URL to product page in the store",
+                        verbose_name="Store Product URL",
+                    ),
+                ),
+                (
+                    "affiliate_link",
+                    models.URLField(
+                        blank=True,
+                        help_text="URL with affiliate tracking parameters",
+                        null=True,
+                        verbose_name="Affiliate Tracking URL",
+                    ),
+                ),
+                (
+                    "product",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="store_links",
+                        to="core.product",
+                        verbose_name="Related Product",
+                    ),
+                ),
+                (
+                    "store",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="core.store",
+                        verbose_name="Associated Store",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Store Product Link',
-                'verbose_name_plural': 'Store Product Links',
-                'ordering': ['store__name', 'product__name'],
+                "verbose_name": "Store Product Link",
+                "verbose_name_plural": "Store Product Links",
+                "ordering": ["store__name", "product__name"],
             },
         ),
         migrations.CreateModel(
-            name='HistoricalProductPriceHistory',
+            name="HistoricalProductPriceHistory",
             fields=[
-                ('id', models.BigIntegerField(auto_created=True, blank=True, db_index=True, verbose_name='ID')),
-                ('price', models.DecimalField(decimal_places=2, max_digits=10, verbose_name='Current Price')),
-                ('stock_status', models.CharField(choices=[('A', 'Available'), ('L', 'Last Units'), ('O', 'Out of Stock')], default='A', max_length=1, verbose_name='Inventory Status')),
-                ('collected_at', models.DateTimeField(blank=True, editable=False, verbose_name='Collection Timestamp')),
-                ('history_id', models.AutoField(primary_key=True, serialize=False)),
-                ('history_date', models.DateTimeField(db_index=True)),
-                ('history_change_reason', models.CharField(max_length=100, null=True)),
-                ('history_type', models.CharField(choices=[('+', 'Created'), ('~', 'Changed'), ('-', 'Deleted')], max_length=1)),
-                ('history_user', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('store_product_link', models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', to='core.productstore', verbose_name='Store Product Link')),
+                (
+                    "id",
+                    models.BigIntegerField(
+                        auto_created=True, blank=True, db_index=True, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "price",
+                    models.DecimalField(
+                        decimal_places=2, max_digits=10, verbose_name="Current Price"
+                    ),
+                ),
+                (
+                    "stock_status",
+                    models.CharField(
+                        choices=[
+                            ("A", "Available"),
+                            ("L", "Last Units"),
+                            ("O", "Out of Stock"),
+                        ],
+                        default="A",
+                        max_length=1,
+                        verbose_name="Inventory Status",
+                    ),
+                ),
+                (
+                    "collected_at",
+                    models.DateTimeField(
+                        blank=True, editable=False, verbose_name="Collection Timestamp"
+                    ),
+                ),
+                ("history_id", models.AutoField(primary_key=True, serialize=False)),
+                ("history_date", models.DateTimeField(db_index=True)),
+                ("history_change_reason", models.CharField(max_length=100, null=True)),
+                (
+                    "history_type",
+                    models.CharField(
+                        choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")],
+                        max_length=1,
+                    ),
+                ),
+                (
+                    "history_user",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "store_product_link",
+                    models.ForeignKey(
+                        blank=True,
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        related_name="+",
+                        to="core.productstore",
+                        verbose_name="Store Product Link",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Version History',
-                'verbose_name_plural': 'historical Price Tracking Records',
-                'ordering': ('-history_date', '-history_id'),
-                'get_latest_by': ('history_date', 'history_id'),
+                "verbose_name": "Version History",
+                "verbose_name_plural": "historical Price Tracking Records",
+                "ordering": ("-history_date", "-history_id"),
+                "get_latest_by": ("history_date", "history_id"),
             },
             bases=(simple_history.models.HistoricalChanges, models.Model),
         ),
         migrations.AddField(
-            model_name='product',
-            name='stores',
-            field=models.ManyToManyField(blank=True, through='core.ProductStore', to='core.store', verbose_name='Available In Stores'),
+            model_name="product",
+            name="stores",
+            field=models.ManyToManyField(
+                blank=True,
+                through="core.ProductStore",
+                to="core.store",
+                verbose_name="Available In Stores",
+            ),
         ),
         migrations.AddField(
-            model_name='product',
-            name='tags',
-            field=models.ManyToManyField(blank=True, to='core.tag', verbose_name='Product Tags'),
+            model_name="product",
+            name="tags",
+            field=models.ManyToManyField(
+                blank=True, to="core.tag", verbose_name="Product Tags"
+            ),
         ),
         migrations.CreateModel(
-            name='Micronutrient',
+            name="Micronutrient",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(help_text='e.g., Vitamin C, Iron', max_length=100, verbose_name='Nutrient Name')),
-                ('value', models.DecimalField(decimal_places=3, max_digits=10, verbose_name='Quantity')),
-                ('unit', models.CharField(choices=[('g', 'g'), ('mg', 'mg'), ('mcg', 'mcg'), ('IU', 'IU'), ('%', '%')], default='mg', max_length=10, verbose_name='Unit')),
-                ('nutrition_facts', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='micronutrients', to='core.nutritionfacts')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="e.g., Vitamin C, Iron",
+                        max_length=100,
+                        verbose_name="Nutrient Name",
+                    ),
+                ),
+                (
+                    "value",
+                    models.DecimalField(
+                        decimal_places=3, max_digits=10, verbose_name="Quantity"
+                    ),
+                ),
+                (
+                    "unit",
+                    models.CharField(
+                        choices=[
+                            ("g", "g"),
+                            ("mg", "mg"),
+                            ("mcg", "mcg"),
+                            ("IU", "IU"),
+                            ("%", "%"),
+                        ],
+                        default="mg",
+                        max_length=10,
+                        verbose_name="Unit",
+                    ),
+                ),
+                (
+                    "nutrition_facts",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="micronutrients",
+                        to="core.nutritionfacts",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Micronutrient',
-                'verbose_name_plural': 'Micronutrients',
-                'constraints': [models.UniqueConstraint(fields=('nutrition_facts', 'name'), name='unique_nutrient_per_facts')],
+                "verbose_name": "Micronutrient",
+                "verbose_name_plural": "Micronutrients",
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("nutrition_facts", "name"),
+                        name="unique_nutrient_per_facts",
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='ProductNutrition',
+            name="ProductNutrition",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('flavors', models.ManyToManyField(blank=True, to='core.flavor', verbose_name='Flavors')),
-                ('nutrition_facts', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='product_profiles', to='core.nutritionfacts', verbose_name='Nutrition Facts')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='nutrition_profiles', to='core.product', verbose_name='Base Product')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "flavors",
+                    models.ManyToManyField(
+                        blank=True, to="core.flavor", verbose_name="Flavors"
+                    ),
+                ),
+                (
+                    "nutrition_facts",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="product_profiles",
+                        to="core.nutritionfacts",
+                        verbose_name="Nutrition Facts",
+                    ),
+                ),
+                (
+                    "product",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="nutrition_profiles",
+                        to="core.product",
+                        verbose_name="Base Product",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Product Nutrition Profile',
-                'verbose_name_plural': 'Product Nutrition Profiles',
-                'constraints': [models.UniqueConstraint(fields=('product', 'nutrition_facts'), name='unique_product_nutrition_facts')],
+                "verbose_name": "Product Nutrition Profile",
+                "verbose_name_plural": "Product Nutrition Profiles",
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("product", "nutrition_facts"),
+                        name="unique_product_nutrition_facts",
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='ProductPriceHistory',
+            name="ProductPriceHistory",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('price', models.DecimalField(decimal_places=2, max_digits=10, verbose_name='Current Price')),
-                ('stock_status', models.CharField(choices=[('A', 'Available'), ('L', 'Last Units'), ('O', 'Out of Stock')], default='A', max_length=1, verbose_name='Inventory Status')),
-                ('collected_at', models.DateTimeField(auto_now_add=True, verbose_name='Collection Timestamp')),
-                ('store_product_link', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='price_history', to='core.productstore', verbose_name='Store Product Link')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "price",
+                    models.DecimalField(
+                        decimal_places=2, max_digits=10, verbose_name="Current Price"
+                    ),
+                ),
+                (
+                    "stock_status",
+                    models.CharField(
+                        choices=[
+                            ("A", "Available"),
+                            ("L", "Last Units"),
+                            ("O", "Out of Stock"),
+                        ],
+                        default="A",
+                        max_length=1,
+                        verbose_name="Inventory Status",
+                    ),
+                ),
+                (
+                    "collected_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Collection Timestamp"
+                    ),
+                ),
+                (
+                    "store_product_link",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="price_history",
+                        to="core.productstore",
+                        verbose_name="Store Product Link",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Price Tracking Record',
-                'verbose_name_plural': 'Price Tracking Records',
-                'ordering': ['-collected_at'],
-                'get_latest_by': 'collected_at',
-                'indexes': [models.Index(fields=['collected_at'], name='core_produc_collect_27712c_idx'), models.Index(fields=['stock_status'], name='core_produc_stock_s_ac2b73_idx'), models.Index(fields=['store_product_link', 'collected_at'], name='core_produc_store_p_f30139_idx')],
+                "verbose_name": "Price Tracking Record",
+                "verbose_name_plural": "Price Tracking Records",
+                "ordering": ["-collected_at"],
+                "get_latest_by": "collected_at",
+                "indexes": [
+                    models.Index(
+                        fields=["collected_at"], name="core_produc_collect_27712c_idx"
+                    ),
+                    models.Index(
+                        fields=["stock_status"], name="core_produc_stock_s_ac2b73_idx"
+                    ),
+                    models.Index(
+                        fields=["store_product_link", "collected_at"],
+                        name="core_produc_store_p_f30139_idx",
+                    ),
+                ],
             },
         ),
         migrations.AddIndex(
-            model_name='productstore',
-            index=models.Index(fields=['external_id'], name='core_produc_externa_ae82e7_idx'),
+            model_name="productstore",
+            index=models.Index(
+                fields=["external_id"], name="core_produc_externa_ae82e7_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='productstore',
-            index=models.Index(fields=['store', 'product'], name='core_produc_store_i_e5d0b4_idx'),
+            model_name="productstore",
+            index=models.Index(
+                fields=["store", "product"], name="core_produc_store_i_e5d0b4_idx"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='productstore',
-            constraint=models.UniqueConstraint(fields=('product', 'store'), name='unique_product_store'),
+            model_name="productstore",
+            constraint=models.UniqueConstraint(
+                fields=("product", "store"), name="unique_product_store"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='productstore',
-            constraint=models.UniqueConstraint(condition=models.Q(('external_id__isnull', False), models.Q(('external_id', ''), _negated=True)), fields=('store', 'external_id'), name='unique_store_external_id'),
+            model_name="productstore",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(
+                    ("external_id__isnull", False),
+                    models.Q(("external_id", ""), _negated=True),
+                ),
+                fields=("store", "external_id"),
+                name="unique_store_external_id",
+            ),
         ),
         migrations.AddIndex(
-            model_name='product',
-            index=models.Index(fields=['name'], name='core_produc_name_be3252_idx'),
+            model_name="product",
+            index=models.Index(fields=["name"], name="core_produc_name_be3252_idx"),
         ),
         migrations.AddIndex(
-            model_name='product',
-            index=models.Index(fields=['brand', 'name'], name='core_produc_brand_i_8b60c4_idx'),
+            model_name="product",
+            index=models.Index(
+                fields=["brand", "name"], name="core_produc_brand_i_8b60c4_idx"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='product',
-            constraint=models.UniqueConstraint(fields=('brand', 'name', 'weight'), name='unique_product_brand_weight'),
+            model_name="product",
+            constraint=models.UniqueConstraint(
+                fields=("brand", "name", "weight"), name="unique_product_brand_weight"
+            ),
         ),
     ]

@@ -32,7 +32,9 @@ class BaseSpider:
         sleep(uniform(min_seconds, max_seconds))  # noqa: S311
 
     def check_category_discrepancy(
-        self, dynamic_categories: list[str], fallback_categories: list[str]
+        self,
+        dynamic_categories: list[str],
+        fallback_categories: list[str],
     ):
         """Compare dynamic categories with fallback categories and log warnings."""
         if not dynamic_categories or not fallback_categories:
@@ -46,9 +48,9 @@ class BaseSpider:
 
         if missing:
             self.logger.warning(
-                f"[{self.__class__.__name__}] Categories in FALLBACK but not in Dynamic: {missing}"
+                f"[{self.__class__.__name__}] Categories in FALLBACK but not in Dynamic: {missing}",
             )
         if extra:
             self.logger.warning(
-                f"[{self.__class__.__name__}] Categories in Dynamic but not in FALLBACK: {extra}"
+                f"[{self.__class__.__name__}] Categories in Dynamic but not in FALLBACK: {extra}",
             )

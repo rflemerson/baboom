@@ -95,7 +95,10 @@ class VtexGraphqlSpider(CatalogApiSpider):
         return products
 
     def _fetch_page_items(
-        self, category: str, cursor: int, page_size: int
+        self,
+        category: str,
+        cursor: int,
+        page_size: int,
     ) -> list[dict] | None:
         """Fetch and parse one GraphQL page into product items."""
         end = cursor + page_size - 1
@@ -124,7 +127,10 @@ class VtexGraphqlSpider(CatalogApiSpider):
         }
 
     def _build_graphql_params(
-        self, category: str, start: int, end: int
+        self,
+        category: str,
+        start: int,
+        end: int,
     ) -> dict[str, str]:
         """Build GraphQL persisted-query params."""
         variables_dict = self._build_variables_payload(category, start, end)

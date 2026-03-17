@@ -39,7 +39,9 @@ class Brand(BaseModel):
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
-        _("Description"), blank=True, help_text=_("Brand description")
+        _("Description"),
+        blank=True,
+        help_text=_("Brand description"),
     )
 
     class Meta:
@@ -60,7 +62,9 @@ class Store(BaseModel):
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
     description = models.TextField(
-        _("Description"), blank=True, help_text=_("Store description")
+        _("Description"),
+        blank=True,
+        help_text=_("Store description"),
     )
 
     class Meta:
@@ -80,7 +84,9 @@ class Flavor(BaseModel):
 
     name = models.CharField(_("Name"), max_length=100, unique=True)
     description = models.TextField(
-        _("Description"), blank=True, help_text=_("Flavor description")
+        _("Description"),
+        blank=True,
+        help_text=_("Flavor description"),
     )
 
     class Meta:
@@ -99,10 +105,15 @@ class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
     """Hierarchical tag model."""
 
     name: models.CharField = models.CharField(
-        _("Name"), max_length=100, unique=True, help_text=_("Unique tag name")
+        _("Name"),
+        max_length=100,
+        unique=True,
+        help_text=_("Unique tag name"),
     )
     description: models.TextField = models.TextField(
-        _("Description"), blank=True, help_text=_("Tag description")
+        _("Description"),
+        blank=True,
+        help_text=_("Tag description"),
     )
 
     node_order_by = ["name"]
@@ -129,7 +140,9 @@ class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
     )
 
     description: models.TextField = models.TextField(
-        _("Description"), blank=True, help_text=_("Category description")
+        _("Description"),
+        blank=True,
+        help_text=_("Category description"),
     )
 
     node_order_by = ["name"]
@@ -151,7 +164,9 @@ class Nutrient(BaseModel):
     name = models.CharField(_("Name"), max_length=100, unique=True)
     slug = models.SlugField(_("Slug"), max_length=100, unique=True)
     is_macro = models.BooleanField(
-        _("Is Macro?"), default=False, help_text=_("Is this a macronutrient?")
+        _("Is Macro?"),
+        default=False,
+        help_text=_("Is this a macronutrient?"),
     )
 
     class Meta:
@@ -193,11 +208,14 @@ class Product(BaseModel):
     name = models.CharField(_("Product Name"), max_length=200)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name=_("Brand"))
     description = models.TextField(
-        _("Description"), blank=True, help_text=_("Marketing description")
+        _("Description"),
+        blank=True,
+        help_text=_("Marketing description"),
     )
 
     weight = models.PositiveIntegerField(
-        _("Weight (grams)"), help_text=_("Total product weight in grams")
+        _("Weight (grams)"),
+        help_text=_("Total product weight in grams"),
     )
 
     ean = models.CharField(
@@ -233,11 +251,15 @@ class Product(BaseModel):
     )
 
     tags: models.ManyToManyField = models.ManyToManyField(
-        Tag, verbose_name=_("Product Tags"), blank=True
+        Tag,
+        verbose_name=_("Product Tags"),
+        blank=True,
     )
 
     nutrient_sources: models.ManyToManyField = models.ManyToManyField(
-        Nutrient, verbose_name=_("Nutrient Sources"), blank=True
+        Nutrient,
+        verbose_name=_("Nutrient Sources"),
+        blank=True,
     )
 
     components: models.ManyToManyField = models.ManyToManyField(
@@ -274,8 +296,9 @@ class Product(BaseModel):
 
         constraints = [
             models.UniqueConstraint(
-                fields=["brand", "name", "weight"], name="unique_product_brand_weight"
-            )
+                fields=["brand", "name", "weight"],
+                name="unique_product_brand_weight",
+            ),
         ]
 
         indexes = [
@@ -302,18 +325,20 @@ class Product(BaseModel):
                 qs = qs.exclude(pk=self.pk)
             if qs.exists():
                 raise ValidationError(
-                    {"ean": _("Product with this EAN already exists.")}
+                    {"ean": _("Product with this EAN already exists.")},
                 )
 
         if self.brand_id and self.name and self.weight:
             qs = Product.objects.filter(
-                brand_id=self.brand_id, name=self.name, weight=self.weight
+                brand_id=self.brand_id,
+                name=self.name,
+                weight=self.weight,
             )
             if self.pk:
                 qs = qs.exclude(pk=self.pk)
             if qs.exists():
                 raise ValidationError(
-                    _("Product with this brand, name, and weight already exists.")
+                    _("Product with this brand, name, and weight already exists."),
                 )
 
 
@@ -341,7 +366,8 @@ class ProductComponent(BaseModel):
         verbose_name_plural = _("Product Components")
         constraints = [
             models.UniqueConstraint(
-                fields=["parent", "component"], name="unique_product_component"
+                fields=["parent", "component"],
+                name="unique_product_component",
             ),
         ]
 
@@ -394,7 +420,8 @@ class ProductStore(BaseModel):
 
         constraints = [
             models.UniqueConstraint(
-                fields=["product", "store"], name="unique_product_store"
+                fields=["product", "store"],
+                name="unique_product_store",
             ),
             models.UniqueConstraint(
                 fields=["store", "external_id"],
@@ -476,36 +503,58 @@ class NutritionFacts(BaseModel):
         max_length=200,
         blank=True,
         help_text=_(
-            "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin."
+            "E.g. 'Saborizada' or 'Natural' - helps you identify this table in the admin.",
         ),
     )
 
     serving_size_grams = models.DecimalField(
-        _("Serving Size (g)"), max_digits=6, decimal_places=2
+        _("Serving Size (g)"),
+        max_digits=6,
+        decimal_places=2,
     )
     energy_kcal = models.PositiveSmallIntegerField(_("Energy (kcal)"))
     proteins = models.DecimalField(_("Proteins (g)"), max_digits=5, decimal_places=1)
     carbohydrates = models.DecimalField(_("Carbs (g)"), max_digits=5, decimal_places=1)
     total_sugars = models.DecimalField(
-        _("Total Sugars (g)"), max_digits=5, decimal_places=1, default=0
+        _("Total Sugars (g)"),
+        max_digits=5,
+        decimal_places=1,
+        default=0,
     )
     added_sugars = models.DecimalField(
-        _("Added Sugars (g)"), max_digits=5, decimal_places=1, default=0
+        _("Added Sugars (g)"),
+        max_digits=5,
+        decimal_places=1,
+        default=0,
     )
     total_fats = models.DecimalField(
-        _("Total Fats (g)"), max_digits=5, decimal_places=1
+        _("Total Fats (g)"),
+        max_digits=5,
+        decimal_places=1,
     )
     saturated_fats = models.DecimalField(
-        _("Saturated Fats (g)"), max_digits=5, decimal_places=1, default=0
+        _("Saturated Fats (g)"),
+        max_digits=5,
+        decimal_places=1,
+        default=0,
     )
     trans_fats = models.DecimalField(
-        _("Trans Fats (g)"), max_digits=5, decimal_places=1, default=0
+        _("Trans Fats (g)"),
+        max_digits=5,
+        decimal_places=1,
+        default=0,
     )
     dietary_fiber = models.DecimalField(
-        _("Dietary Fiber (g)"), max_digits=5, decimal_places=1, default=0
+        _("Dietary Fiber (g)"),
+        max_digits=5,
+        decimal_places=1,
+        default=0,
     )
     sodium = models.DecimalField(
-        _("Sodium (mg)"), max_digits=10, decimal_places=2, default=0
+        _("Sodium (mg)"),
+        max_digits=10,
+        decimal_places=2,
+        default=0,
     )
 
     content_hash = models.CharField(
@@ -537,10 +586,11 @@ class NutritionFacts(BaseModel):
 
     @classmethod
     def generate_hash(
-        cls, source: Any, micronutrients: list[dict[str, Any]] | None = None
+        cls,
+        source: Any,
+        micronutrients: list[dict[str, Any]] | None = None,
     ) -> str:
-        """
-        Single Source of Truth for Nutritional Hashing.
+        """Single Source of Truth for Nutritional Hashing.
 
         Generates deterministic hash based on Macros and (optionally) Micros.
 
@@ -548,6 +598,7 @@ class NutritionFacts(BaseModel):
             source: Can be a NutritionFacts instance OR a dictionary (from Service).
             micronutrients: List of dictionaries [{'name': '...', 'value': ...}, ...].
                             Required if 'source' is dict, or to complement the hash.
+
         """
 
         def fmt(val: Any) -> str:
@@ -605,7 +656,9 @@ class Micronutrient(BaseModel):
         PERCENT = "%", "%"
 
     nutrition_facts = models.ForeignKey(
-        NutritionFacts, on_delete=models.CASCADE, related_name="micronutrients"
+        NutritionFacts,
+        on_delete=models.CASCADE,
+        related_name="micronutrients",
     )
 
     name = models.CharField(
@@ -634,8 +687,9 @@ class Micronutrient(BaseModel):
         verbose_name_plural = _("Micronutrients")
         constraints = [
             models.UniqueConstraint(
-                fields=["nutrition_facts", "name"], name="unique_nutrient_per_facts"
-            )
+                fields=["nutrition_facts", "name"],
+                name="unique_nutrient_per_facts",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -675,7 +729,7 @@ class ProductNutrition(BaseModel):
             models.UniqueConstraint(
                 fields=["product", "nutrition_facts"],
                 name="unique_product_nutrition_facts",
-            )
+            ),
         ]
 
     def __str__(self) -> str:
@@ -704,10 +758,16 @@ class APIKey(BaseModel):
     """API Key for external client access."""
 
     name = models.CharField(
-        _("Client Name"), max_length=100, help_text=_("Who is this key for?")
+        _("Client Name"),
+        max_length=100,
+        help_text=_("Who is this key for?"),
     )
     key = models.CharField(
-        _("API Key"), max_length=64, unique=True, db_index=True, editable=False
+        _("API Key"),
+        max_length=64,
+        unique=True,
+        db_index=True,
+        editable=False,
     )
     is_active = models.BooleanField(_("Active"), default=True)
 

@@ -6,38 +6,82 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0007_populate_nutrients'),
+        ("core", "0007_populate_nutrients"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='productnutrition',
-            name='component_weight',
+            model_name="productnutrition",
+            name="component_weight",
         ),
         migrations.CreateModel(
-            name='ProductComponent',
+            name="ProductComponent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('quantity', models.PositiveIntegerField(default=1, verbose_name='Quantity')),
-                ('component', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='parent_links', to='core.product', verbose_name='Component Product')),
-                ('parent', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='component_links', to='core.product', verbose_name='Parent Combo')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "quantity",
+                    models.PositiveIntegerField(default=1, verbose_name="Quantity"),
+                ),
+                (
+                    "component",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="parent_links",
+                        to="core.product",
+                        verbose_name="Component Product",
+                    ),
+                ),
+                (
+                    "parent",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="component_links",
+                        to="core.product",
+                        verbose_name="Parent Combo",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Product Component',
-                'verbose_name_plural': 'Product Components',
+                "verbose_name": "Product Component",
+                "verbose_name_plural": "Product Components",
             },
         ),
         migrations.AddField(
-            model_name='product',
-            name='components',
-            field=models.ManyToManyField(blank=True, help_text='If this is a Combo, list the products it contains.', through='core.ProductComponent', to='core.product', verbose_name='Components'),
+            model_name="product",
+            name="components",
+            field=models.ManyToManyField(
+                blank=True,
+                help_text="If this is a Combo, list the products it contains.",
+                through="core.ProductComponent",
+                to="core.product",
+                verbose_name="Components",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='productcomponent',
-            constraint=models.UniqueConstraint(fields=('parent', 'component'), name='unique_product_component'),
+            model_name="productcomponent",
+            constraint=models.UniqueConstraint(
+                fields=("parent", "component"), name="unique_product_component"
+            ),
         ),
     ]

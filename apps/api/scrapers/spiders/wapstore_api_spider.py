@@ -74,7 +74,7 @@ class WapStoreApiSpider(CatalogApiSpider):
             )
             if resp is None or resp.status_code != 200:
                 logger.warning(
-                    f"Menu API failed: {resp.status_code if resp else 'No response'}"
+                    f"Menu API failed: {resp.status_code if resp else 'No response'}",
                 )
                 return []
 
@@ -142,7 +142,10 @@ class WapStoreApiSpider(CatalogApiSpider):
         return products
 
     def _fetch_page_items(
-        self, category_path: str, cursor: int, page_size: int
+        self,
+        category_path: str,
+        cursor: int,
+        page_size: int,
     ) -> list[dict] | None:
         """Fetch one category page from Wap.Store listing endpoint."""
         params = {"url": category_path, "offset": cursor, "limit": page_size}
@@ -208,19 +211,19 @@ class WapStoreApiSpider(CatalogApiSpider):
             product_url = self._build_product_url(item)
             if not is_http_url(product_url):
                 logger.warning(
-                    f"Skipping {self.BRAND_NAME} item without valid URL: {external_id}"
+                    f"Skipping {self.BRAND_NAME} item without valid URL: {external_id}",
                 )
                 return None
 
             price_val = self._parse_price(self._extract_raw_price(item))
             if price_val is None:
                 logger.warning(
-                    f"Skipping {self.BRAND_NAME} item without valid price: {external_id}"
+                    f"Skipping {self.BRAND_NAME} item without valid price: {external_id}",
                 )
                 return None
 
             stock_quantity = self._parse_stock(
-                item.get("estoque") or item.get("balance")
+                item.get("estoque") or item.get("balance"),
             )
             stock_status = self._resolve_stock_status(stock_quantity)
             ean = item.get("ean") or item.get("gtin") or ""

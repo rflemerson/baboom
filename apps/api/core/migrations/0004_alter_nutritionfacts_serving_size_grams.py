@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0003_apikey'),
+        ("core", "0003_apikey"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='nutritionfacts',
-            name='serving_size_grams',
-            field=models.DecimalField(decimal_places=2, max_digits=6, verbose_name='Serving Size (g)'),
+            model_name="nutritionfacts",
+            name="serving_size_grams",
+            field=models.DecimalField(
+                decimal_places=2, max_digits=6, verbose_name="Serving Size (g)"
+            ),
         ),
     ]

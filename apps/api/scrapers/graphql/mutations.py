@@ -18,10 +18,11 @@ class ScrapersMutation:
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def checkout_scraped_item(
-        self, force: bool = False, target_item_id: int | None = None
+        self,
+        force: bool = False,
+        target_item_id: int | None = None,
     ) -> ScrapedItemType | None:
-        """
-        Reserves an item for the Agent to process.
+        """Reserves an item for the Agent to process.
 
         Retrieves NEW items or ERROR items that have 'rested' for 30min (retry threshold).
         If 'force' is True, also allows checkout of items in LINKED or REVIEW status.
@@ -43,11 +44,12 @@ class ScrapersMutation:
                 )
                 if force:
                     q_filters |= Q(status=ScrapedItem.Status.LINKED) | Q(
-                        status=ScrapedItem.Status.REVIEW
+                        status=ScrapedItem.Status.REVIEW,
                     )
 
                 query = base_query.filter(
-                    q_filters, source_page__url__startswith="http"
+                    q_filters,
+                    source_page__url__startswith="http",
                 )
 
             item = query.order_by("updated_at").first()
@@ -56,13 +58,16 @@ class ScrapersMutation:
                 item.status = ScrapedItem.Status.PROCESSING
                 item.last_attempt_at = now
                 item.save()
-                return cast(ScrapedItemType, item)
+                return cast("ScrapedItemType", item)
 
             return None
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def report_scraped_item_error(
-        self, item_id: int, message: str, is_fatal: bool = False
+        self,
+        item_id: int,
+        message: str,
+        is_fatal: bool = False,
     ) -> bool:
         """Report an error for a scraped item."""
         try:
@@ -99,7 +104,10 @@ class ScrapersMutation:
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def ensure_scraped_item_source_page(
-        self, item_id: int, url: str, store_slug: str
+        self,
+        item_id: int,
+        url: str,
+        store_slug: str,
     ) -> ScrapedItemType | None:
         """Ensure item has source page linked, creating page by URL when needed."""
         try:
@@ -117,7 +125,7 @@ class ScrapersMutation:
                 changed = True
             if changed:
                 item.save()
-            return cast(ScrapedItemType, item)
+            return cast("ScrapedItemType", item)
         except ScrapedItem.DoesNotExist:
             return None
 
@@ -150,7 +158,7 @@ class ScrapersMutation:
                 changed = True
             if changed:
                 item.save()
-            return cast(ScrapedItemType, item)
+            return cast("ScrapedItemType", item)
         except ScrapedItem.DoesNotExist:
             return None
 
@@ -193,4 +201,4 @@ class ScrapersMutation:
                 "status": ScrapedItem.Status.PROCESSING,
             },
         )
-        return cast(ScrapedItemType, item)
+        return cast("ScrapedItemType", item)

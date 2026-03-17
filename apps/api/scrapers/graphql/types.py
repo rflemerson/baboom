@@ -23,7 +23,7 @@ class ScrapedItemType:
     @strawberry.field
     def product_link(self) -> str:
         """Backward-compatible URL field used by agent workers."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         if item.source_page:
             return item.source_page.url
         return ""
@@ -31,7 +31,7 @@ class ScrapedItemType:
     @strawberry.field
     def source_page_url(self) -> str:
         """Explicit URL field for page-first pipelines."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         if item.source_page:
             return item.source_page.url
         return ""
@@ -39,13 +39,13 @@ class ScrapedItemType:
     @strawberry.field
     def source_page_id(self) -> int | None:
         """Return source page id for storage bucket mapping."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         return item.source_page_id
 
     @strawberry.field
     def source_page_raw_content(self) -> str:
         """Return raw structured context saved by scraper."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         if item.source_page:
             return item.source_page.raw_content or ""
         return ""
@@ -53,7 +53,7 @@ class ScrapedItemType:
     @strawberry.field
     def source_page_content_type(self) -> str:
         """Return source page content type (HTML/JSON)."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         if item.source_page:
             return item.source_page.content_type
         return ""
@@ -61,13 +61,13 @@ class ScrapedItemType:
     @strawberry.field
     def product_store_id(self) -> int | None:
         """Return linked ProductStore id if exists."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         return item.product_store_id
 
     @strawberry.field
     def linked_product_id(self) -> int | None:
         """Return linked Product id if exists."""
-        item = cast(ScrapedItem, self)
+        item = cast("ScrapedItem", self)
         if item.product_store:
             return item.product_store.product_id
         return None

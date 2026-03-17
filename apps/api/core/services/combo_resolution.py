@@ -8,7 +8,9 @@ class ComboResolutionService:
     """Service to resolve and link components for Combo products."""
 
     def resolve_combo_components(
-        self, parent_product: Product, components_data: list[ProductComponentInput]
+        self,
+        parent_product: Product,
+        components_data: list[ProductComponentInput],
     ) -> list[ProductComponent]:
         """Resolves a list of component DTOs to existing Products or creates placeholders."""
         created_links = []
@@ -45,8 +47,7 @@ class ComboResolutionService:
         weight_hint: int | None,
         packaging_hint: str | None,
     ) -> Product | None:
-        """
-        Smart matching strategy.
+        """Smart matching strategy.
 
         1. Filter by Brand.
         2. Filter by Weight (if available).
@@ -90,7 +91,9 @@ class ComboResolutionService:
         return None
 
     def _create_placeholder(
-        self, comp_data: ProductComponentInput, parent: Product
+        self,
+        comp_data: ProductComponentInput,
+        parent: Product,
     ) -> Product:
         """Creates a placeholder product if no match found."""
         return Product.objects.create(

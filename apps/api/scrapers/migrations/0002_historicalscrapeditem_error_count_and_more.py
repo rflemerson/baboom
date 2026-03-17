@@ -4,50 +4,75 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('scrapers', '0001_initial'),
+        ("scrapers", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='historicalscrapeditem',
-            name='error_count',
+            model_name="historicalscrapeditem",
+            name="error_count",
             field=models.IntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='historicalscrapeditem',
-            name='last_attempt_at',
+            model_name="historicalscrapeditem",
+            name="last_attempt_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='historicalscrapeditem',
-            name='last_error_log',
+            model_name="historicalscrapeditem",
+            name="last_error_log",
             field=models.TextField(blank=True),
         ),
         migrations.AddField(
-            model_name='scrapeditem',
-            name='error_count',
+            model_name="scrapeditem",
+            name="error_count",
             field=models.IntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='scrapeditem',
-            name='last_attempt_at',
+            model_name="scrapeditem",
+            name="last_attempt_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='scrapeditem',
-            name='last_error_log',
+            model_name="scrapeditem",
+            name="last_error_log",
             field=models.TextField(blank=True),
         ),
         migrations.AlterField(
-            model_name='historicalscrapeditem',
-            name='status',
-            field=models.CharField(choices=[('new', 'New'), ('processing', 'Processing'), ('linked', 'Linked'), ('error', 'Error (Retry)'), ('discarded', 'Discarded (Junk)'), ('review', 'Needs Review'), ('ignored', 'Ignored')], db_index=True, default='new', max_length=20),
+            model_name="historicalscrapeditem",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("new", "New"),
+                    ("processing", "Processing"),
+                    ("linked", "Linked"),
+                    ("error", "Error (Retry)"),
+                    ("discarded", "Discarded (Junk)"),
+                    ("review", "Needs Review"),
+                    ("ignored", "Ignored"),
+                ],
+                db_index=True,
+                default="new",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='scrapeditem',
-            name='status',
-            field=models.CharField(choices=[('new', 'New'), ('processing', 'Processing'), ('linked', 'Linked'), ('error', 'Error (Retry)'), ('discarded', 'Discarded (Junk)'), ('review', 'Needs Review'), ('ignored', 'Ignored')], db_index=True, default='new', max_length=20),
+            model_name="scrapeditem",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("new", "New"),
+                    ("processing", "Processing"),
+                    ("linked", "Linked"),
+                    ("error", "Error (Retry)"),
+                    ("discarded", "Discarded (Junk)"),
+                    ("review", "Needs Review"),
+                    ("ignored", "Ignored"),
+                ],
+                db_index=True,
+                default="new",
+                max_length=20,
+            ),
         ),
     ]

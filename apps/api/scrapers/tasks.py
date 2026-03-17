@@ -99,8 +99,7 @@ def scrape_soldiers_monitor():
 
 @shared_task
 def release_stuck_items():
-    """
-    Unlock items stuck in PROCESSING state.
+    """Unlock items stuck in PROCESSING state.
 
     Cleaner: Unlocks items that have been in PROCESSING for too long
     (e.g., agent died or timed out without reporting).
@@ -108,7 +107,8 @@ def release_stuck_items():
     timeout = timezone.now() - timedelta(minutes=60)
 
     stuck_items = ScrapedItem.objects.filter(
-        status=ScrapedItem.Status.PROCESSING, last_attempt_at__lt=timeout
+        status=ScrapedItem.Status.PROCESSING,
+        last_attempt_at__lt=timeout,
     )
 
     count = stuck_items.count()

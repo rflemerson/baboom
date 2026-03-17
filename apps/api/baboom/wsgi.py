@@ -1,5 +1,4 @@
-"""
-WSGI config for baboom project.
+"""WSGI config for baboom project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

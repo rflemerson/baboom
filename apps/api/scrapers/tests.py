@@ -27,8 +27,7 @@ logging.getLogger("scrapers").setLevel(logging.CRITICAL)
     "External scraper integration tests are opt-in. Set RUN_EXTERNAL_SCRAPER_TESTS=1.",
 )
 class ScraperIntegrationTests(TestCase):
-    """
-    Integration tests for Spiders.
+    """Integration tests for Spiders.
 
     Tests hitting REAL APIs.
     """
@@ -41,7 +40,7 @@ class ScraperIntegrationTests(TestCase):
 
         self.assertTrue(len(items) > 0, "BlackSkull spider should return items")
         self.assertTrue(
-            ScrapedItem.objects.filter(store_slug="black_skull").count() > 0
+            ScrapedItem.objects.filter(store_slug="black_skull").count() > 0,
         )
 
         first = ScrapedItem.objects.filter(store_slug="black_skull").first()
@@ -70,7 +69,7 @@ class ScraperIntegrationTests(TestCase):
 
         self.assertTrue(len(items) > 0, "Dux spider should return items")
         self.assertTrue(
-            ScrapedItem.objects.filter(store_slug="dux_nutrition").count() > 0
+            ScrapedItem.objects.filter(store_slug="dux_nutrition").count() > 0,
         )
 
         first = ScrapedItem.objects.filter(store_slug="dux_nutrition").first()
@@ -201,7 +200,7 @@ class ScraperServiceContextPersistenceTests(SimpleTestCase):
         self.assertEqual(fake_page.raw_content, '{"platform":"shopify"}')
         self.assertEqual(fake_page.content_type, "JSON")
         fake_page.save.assert_called_once_with(
-            update_fields=["raw_content", "content_type"]
+            update_fields=["raw_content", "content_type"],
         )
 
 
@@ -230,7 +229,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
                     "price": "129.90",
                     "available": True,
                     "inventory_quantity": 7,
-                }
+                },
             ],
         }
 
@@ -249,7 +248,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
     def test_process_and_save_skips_invalid_price(self, mock_save):
         """Should skip item when selected variant has invalid price."""
         item = dict(self.base_item)
-        base_variants = cast(list[dict[str, Any]], self.base_item["variants"])
+        base_variants = cast("list[dict[str, Any]]", self.base_item["variants"])
         item["variants"] = [dict(base_variants[0], price="N/A")]
 
         result = self.spider._process_and_save(item, "whey-protein")
@@ -278,7 +277,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
         self.assertIn('"variants"', fake_source_page.raw_content)
         self.assertIn('"options"', fake_source_page.raw_content)
         fake_source_page.save.assert_called_once_with(
-            update_fields=["raw_content", "content_type"]
+            update_fields=["raw_content", "content_type"],
         )
 
 
@@ -309,7 +308,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
                     "inventory_quantity": None,
                     "barcode": "",
                     "sku": "3UA",
-                }
+                },
             ],
         }
 
@@ -319,7 +318,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         response = MagicMock()
         response.status_code = 200
         response.json.return_value = {
-            "collections": [{"handle": "whey"}, {"handle": "creatina"}]
+            "collections": [{"handle": "whey"}, {"handle": "creatina"}],
         }
         mock_get.return_value = response
 
@@ -343,7 +342,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
     def test_process_and_save_skips_invalid_price(self, mock_save):
         """Skips item when selected variant has invalid price."""
         item = dict(self.base_item)
-        base_variants = cast(list[dict[str, Any]], self.base_item["variants"])
+        base_variants = cast("list[dict[str, Any]]", self.base_item["variants"])
         item["variants"] = [dict(base_variants[0], price="N/A")]
 
         result = self.spider._process_and_save(item, "barra")
@@ -367,7 +366,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         self.assertIn('"variants"', fake_source_page.raw_content)
         self.assertIn('"options"', fake_source_page.raw_content)
         fake_source_page.save.assert_called_once_with(
-            update_fields=["raw_content", "content_type"]
+            update_fields=["raw_content", "content_type"],
         )
 
     def test_parse_price_handles_shopify_js_cents(self):
@@ -453,7 +452,7 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         self.assertIn('"platform": "uappi_wapstore"', fake_source_page.raw_content)
         self.assertIn('"prices"', fake_source_page.raw_content)
         fake_source_page.save.assert_called_once_with(
-            update_fields=["raw_content", "content_type"]
+            update_fields=["raw_content", "content_type"],
         )
 
 
@@ -486,9 +485,9 @@ class VtexSpiderUnitTests(SimpleTestCase):
                                 "Price": "99,90",
                                 "AvailableQuantity": 7,
                             },
-                        }
+                        },
                     ],
-                }
+                },
             ],
         }
 
@@ -547,7 +546,7 @@ class VtexSpiderUnitTests(SimpleTestCase):
         self.assertIn('"platform": "vtex_legacy"', fake_source_page.raw_content)
         self.assertIn('"items"', fake_source_page.raw_content)
         fake_source_page.save.assert_called_once_with(
-            update_fields=["raw_content", "content_type"]
+            update_fields=["raw_content", "content_type"],
         )
 
 
@@ -572,9 +571,9 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
                                 "Price": "119,90",
                                 "AvailableQuantity": 5,
                             },
-                        }
+                        },
                     ],
-                }
+                },
             ],
         }
 
@@ -627,5 +626,5 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         self.assertIn('"platform": "vtex_graphql"', fake_source_page.raw_content)
         self.assertIn('"items"', fake_source_page.raw_content)
         fake_source_page.save.assert_called_once_with(
-            update_fields=["raw_content", "content_type"]
+            update_fields=["raw_content", "content_type"],
         )

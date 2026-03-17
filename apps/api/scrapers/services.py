@@ -19,7 +19,8 @@ class ScraperService:
         """Create or update a ScrapedItem."""
         # Ensure ScrapedPage exists
         page, _ = ScrapedPage.objects.get_or_create(
-            url=data.url, defaults={"store_slug": data.store_slug}
+            url=data.url,
+            defaults={"store_slug": data.store_slug},
         )
 
         obj, created = ScrapedItem.objects.update_or_create(
@@ -60,7 +61,8 @@ class ScraperService:
             return False
 
         last_history = product_store.price_history.values(
-            "price", "stock_status"
+            "price",
+            "stock_status",
         ).first()
 
         price_changed = (
@@ -81,13 +83,14 @@ class ScraperService:
         )
 
         logger.info(
-            f"Synced Price for {scraped_item.store_slug}: R${scraped_item.price}"
+            f"Synced Price for {scraped_item.store_slug}: R${scraped_item.price}",
         )
         return True
 
     @staticmethod
     def persist_item_context(
-        saved_item: ScrapedItem | None, context_payload: str
+        saved_item: ScrapedItem | None,
+        context_payload: str,
     ) -> None:
         """Persist structured scraper context into source page when available."""
         if not saved_item or not saved_item.source_page_id:

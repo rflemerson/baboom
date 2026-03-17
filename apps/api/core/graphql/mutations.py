@@ -8,7 +8,11 @@ from baboom.utils import ValidationError as GqlValidationError
 from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import AlertSubscriber, Product, ProductStore
-from core.services import alert_subscriber_create, product_create, product_update_content
+from core.services import (
+    alert_subscriber_create,
+    product_create,
+    product_update_content,
+)
 from core.types import ProductComponentInput as ProductComponentDTO
 from core.types import ProductCreateInput
 from scrapers.models import ScrapedItem
@@ -108,7 +112,7 @@ class CoreMutation:
 
                     if not linked_store:
                         linked_store = ProductStore.objects.filter(
-                            product=product
+                            product=product,
                         ).first()
 
                     if linked_store:
@@ -122,22 +126,24 @@ class CoreMutation:
                 except ScrapedItem.DoesNotExist:
                     pass
 
-            return ProductResult(product=cast(ProductType, product))
+            return ProductResult(product=cast("ProductType", product))
 
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def update_product_content(
-        self, product_id: int, data: ProductContentUpdateInput
+        self,
+        product_id: int,
+        data: ProductContentUpdateInput,
     ) -> ProductResult:
         """Update product content (LLM enrichment)."""
         product = Product.objects.filter(id=product_id).first()
         if not product:
             return ProductResult(
                 errors=[
-                    GqlValidationError(field="product_id", message="Product not found")
-                ]
+                    GqlValidationError(field="product_id", message="Product not found"),
+                ],
             )
 
         try:
@@ -149,7 +155,7 @@ class CoreMutation:
                 packaging=data.packaging.value if data.packaging else None,
                 tags=data.tags,
             )
-            return ProductResult(product=cast(ProductType, updated_product))
+            return ProductResult(product=cast("ProductType", updated_product))
 
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
@@ -179,7 +185,7 @@ class CoreMutation:
             if facts.micronutrients:
                 for m in facts.micronutrients:
                     micronutrients_data.append(
-                        {"name": m.name, "value": m.value, "unit": m.unit}
+                        {"name": m.name, "value": m.value, "unit": m.unit},
                     )
 
             result.append(
@@ -200,6 +206,6 @@ class CoreMutation:
                         "sodium": facts.sodium,
                         "micronutrients": micronutrients_data,
                     },
-                }
+                },
             )
         return result

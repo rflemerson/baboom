@@ -14,7 +14,10 @@ class IsAuthenticatedWithAPIKey(BasePermission):
     message = "API Key required"
 
     def has_permission(
-        self, source: typing.Any, info: typing.Any, **kwargs: typing.Any
+        self,
+        source: typing.Any,
+        info: typing.Any,
+        **kwargs: typing.Any,
     ) -> bool:
         """Check if request has valid API Key."""
         request = info.context.request

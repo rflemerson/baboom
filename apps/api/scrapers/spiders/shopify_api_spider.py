@@ -65,7 +65,7 @@ class ShopifyApiSpider(CatalogApiSpider):
                     break
                 if response.status_code != 200:
                     logger.warning(
-                        f"Failed to fetch collections page {page}: {response.status_code}"
+                        f"Failed to fetch collections page {page}: {response.status_code}",
                     )
                     break
 
@@ -119,7 +119,9 @@ class ShopifyApiSpider(CatalogApiSpider):
         return detail if detail else listing_product
 
     def _crawl_category(
-        self, category_handle: str, processed_ids: set[str]
+        self,
+        category_handle: str,
+        processed_ids: set[str],
     ) -> list[Any]:
         """Crawl one Shopify collection and save products."""
         logger.info(f"Crawling category: {category_handle}")
@@ -159,7 +161,10 @@ class ShopifyApiSpider(CatalogApiSpider):
         return products
 
     def _fetch_page_items(
-        self, category_handle: str, cursor: int, page_size: int
+        self,
+        category_handle: str,
+        cursor: int,
+        page_size: int,
     ) -> list[dict] | None:
         """Fetch one Shopify collection page."""
         endpoint = f"{self.BASE_URL}/collections/{category_handle}/products.json"
@@ -172,7 +177,7 @@ class ShopifyApiSpider(CatalogApiSpider):
             return None
         if response.status_code != 200:
             logger.warning(
-                f"Failed category {category_handle} page {cursor}: {response.status_code}"
+                f"Failed category {category_handle} page {cursor}: {response.status_code}",
             )
             return None
         payload = response.json()

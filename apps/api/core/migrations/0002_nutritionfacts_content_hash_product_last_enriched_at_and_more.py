@@ -8,58 +8,175 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0001_initial'),
+        ("core", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='nutritionfacts',
-            name='content_hash',
-            field=models.CharField(blank=True, db_index=True, help_text='Auto-computed hash of nutritional values for deduplication', max_length=64, unique=True, verbose_name='Content Hash'),
+            model_name="nutritionfacts",
+            name="content_hash",
+            field=models.CharField(
+                blank=True,
+                db_index=True,
+                help_text="Auto-computed hash of nutritional values for deduplication",
+                max_length=64,
+                unique=True,
+                verbose_name="Content Hash",
+            ),
         ),
         migrations.AddField(
-            model_name='product',
-            name='last_enriched_at',
-            field=models.DateTimeField(blank=True, help_text='Timestamp of last content update by LLM agent', null=True, verbose_name='Last Enriched By LLM'),
+            model_name="product",
+            name="last_enriched_at",
+            field=models.DateTimeField(
+                blank=True,
+                help_text="Timestamp of last content update by LLM agent",
+                null=True,
+                verbose_name="Last Enriched By LLM",
+            ),
         ),
         migrations.AlterField(
-            model_name='nutritionfacts',
-            name='sodium',
-            field=models.DecimalField(decimal_places=2, default=0, max_digits=10, verbose_name='Sodium (mg)'),
+            model_name="nutritionfacts",
+            name="sodium",
+            field=models.DecimalField(
+                decimal_places=2, default=0, max_digits=10, verbose_name="Sodium (mg)"
+            ),
         ),
         migrations.CreateModel(
-            name='HistoricalProduct',
+            name="HistoricalProduct",
             fields=[
-                ('id', models.BigIntegerField(auto_created=True, blank=True, db_index=True, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(blank=True, editable=False, verbose_name='Updated At')),
-                ('name', models.CharField(max_length=200, verbose_name='Product Name')),
-                ('description', models.TextField(blank=True, help_text='Marketing description', verbose_name='Description')),
-                ('weight', models.PositiveIntegerField(help_text='Total product weight in grams', verbose_name='Weight (grams)')),
-                ('ean', models.CharField(blank=True, db_index=True, help_text='European Article Number / Global Trade Item Number', max_length=14, null=True, verbose_name='EAN/GTIN')),
-                ('packaging', models.CharField(choices=[('REFILL', 'Refill Package'), ('CONTAINER', 'Container Package'), ('BAR', 'Bar'), ('OTHER', 'Other')], default='CONTAINER', max_length=20, verbose_name='Packaging Type')),
-                ('is_published', models.BooleanField(default=False, help_text='If checked, this product will be visible on the public website.', verbose_name='Published')),
-                ('last_enriched_at', models.DateTimeField(blank=True, help_text='Timestamp of last content update by LLM agent', null=True, verbose_name='Last Enriched By LLM')),
-                ('history_id', models.AutoField(primary_key=True, serialize=False)),
-                ('history_date', models.DateTimeField(db_index=True)),
-                ('history_change_reason', models.CharField(max_length=100, null=True)),
-                ('history_type', models.CharField(choices=[('+', 'Created'), ('~', 'Changed'), ('-', 'Deleted')], max_length=1)),
-                ('brand', models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', to='core.brand', verbose_name='Brand')),
-                ('category', models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', to='core.category', verbose_name='Product Category')),
-                ('history_user', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigIntegerField(
+                        auto_created=True, blank=True, db_index=True, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created At",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        blank=True, editable=False, verbose_name="Updated At"
+                    ),
+                ),
+                ("name", models.CharField(max_length=200, verbose_name="Product Name")),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Marketing description",
+                        verbose_name="Description",
+                    ),
+                ),
+                (
+                    "weight",
+                    models.PositiveIntegerField(
+                        help_text="Total product weight in grams",
+                        verbose_name="Weight (grams)",
+                    ),
+                ),
+                (
+                    "ean",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="European Article Number / Global Trade Item Number",
+                        max_length=14,
+                        null=True,
+                        verbose_name="EAN/GTIN",
+                    ),
+                ),
+                (
+                    "packaging",
+                    models.CharField(
+                        choices=[
+                            ("REFILL", "Refill Package"),
+                            ("CONTAINER", "Container Package"),
+                            ("BAR", "Bar"),
+                            ("OTHER", "Other"),
+                        ],
+                        default="CONTAINER",
+                        max_length=20,
+                        verbose_name="Packaging Type",
+                    ),
+                ),
+                (
+                    "is_published",
+                    models.BooleanField(
+                        default=False,
+                        help_text="If checked, this product will be visible on the public website.",
+                        verbose_name="Published",
+                    ),
+                ),
+                (
+                    "last_enriched_at",
+                    models.DateTimeField(
+                        blank=True,
+                        help_text="Timestamp of last content update by LLM agent",
+                        null=True,
+                        verbose_name="Last Enriched By LLM",
+                    ),
+                ),
+                ("history_id", models.AutoField(primary_key=True, serialize=False)),
+                ("history_date", models.DateTimeField(db_index=True)),
+                ("history_change_reason", models.CharField(max_length=100, null=True)),
+                (
+                    "history_type",
+                    models.CharField(
+                        choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")],
+                        max_length=1,
+                    ),
+                ),
+                (
+                    "brand",
+                    models.ForeignKey(
+                        blank=True,
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        related_name="+",
+                        to="core.brand",
+                        verbose_name="Brand",
+                    ),
+                ),
+                (
+                    "category",
+                    models.ForeignKey(
+                        blank=True,
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        related_name="+",
+                        to="core.category",
+                        verbose_name="Product Category",
+                    ),
+                ),
+                (
+                    "history_user",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'historical Product',
-                'verbose_name_plural': 'historical Products',
-                'ordering': ('-history_date', '-history_id'),
-                'get_latest_by': ('history_date', 'history_id'),
+                "verbose_name": "historical Product",
+                "verbose_name_plural": "historical Products",
+                "ordering": ("-history_date", "-history_id"),
+                "get_latest_by": ("history_date", "history_id"),
             },
             bases=(simple_history.models.HistoricalChanges, models.Model),
         ),
         migrations.DeleteModel(
-            name='HistoricalProductPriceHistory',
+            name="HistoricalProductPriceHistory",
         ),
     ]

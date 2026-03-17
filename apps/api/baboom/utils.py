@@ -11,8 +11,7 @@ class ValidationError:
 
 
 def format_graphql_errors(e: DjangoValidationError) -> list[ValidationError]:
-    """
-    Converts a Django ValidationError into a list of strawberry ValidationErrors.
+    """Converts a Django ValidationError into a list of strawberry ValidationErrors.
 
     Handles both field-specific errors (error_dict) and non-field errors (error_list).
     """

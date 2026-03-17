@@ -25,7 +25,5 @@ class Mutation(
 ):
     """Root GraphQL Mutation."""
 
-    pass
-
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)

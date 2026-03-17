@@ -1,17 +1,17 @@
-from django.core.paginator import Paginator
 from typing import cast
 
 import strawberry
+from django.core.paginator import Paginator
 
-from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.filters import ProductFilter
+from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Category, Product, Tag
 from core.selectors import public_catalog_products_with_stats
 
 from .types import (
     CatalogPageInfo,
-    CatalogProductType,
     CatalogProductsResult,
+    CatalogProductType,
     CategoryType,
     ProductType,
     TagType,
@@ -68,7 +68,7 @@ class CoreQuery:
         page_obj = paginator.get_page(normalized_page)
 
         return CatalogProductsResult(
-            items=cast(list[CatalogProductType], list(page_obj.object_list)),
+            items=cast("list[CatalogProductType]", list(page_obj.object_list)),
             page_info=CatalogPageInfo(
                 current_page=page_obj.number,
                 per_page=normalized_per_page,
@@ -93,7 +93,7 @@ class CoreQuery:
             )
             .all()[offset : offset + limit]
         )
-        return cast(list[ProductType], qs)
+        return cast("list[ProductType]", qs)
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def product(self, product_id: int) -> ProductType | None:
@@ -110,14 +110,14 @@ class CoreQuery:
             .filter(id=product_id)
             .first()
         )
-        return cast(ProductType | None, obj)
+        return cast("ProductType | None", obj)
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def categories(self) -> list[CategoryType]:
         """List all categories."""
-        return cast(list[CategoryType], Category.objects.all())
+        return cast("list[CategoryType]", Category.objects.all())
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def tags(self) -> list[TagType]:
         """List all tags."""
-        return cast(list[TagType], Tag.objects.all())
+        return cast("list[TagType]", Tag.objects.all())
