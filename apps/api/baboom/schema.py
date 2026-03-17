@@ -1,3 +1,5 @@
+"""Root Strawberry schema for the Baboom API."""
+
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey

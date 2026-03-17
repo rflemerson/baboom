@@ -1,3 +1,5 @@
+"""Core catalog, alert, and pricing models."""
+
 import hashlib
 import logging
 import secrets

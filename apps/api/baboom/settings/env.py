@@ -1,3 +1,5 @@
+"""Environment helpers for Django settings."""
+
 from pathlib import Path
 
 import environ

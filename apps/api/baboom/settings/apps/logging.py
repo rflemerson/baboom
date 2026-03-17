@@ -1,3 +1,5 @@
+"""Logging configuration shared by the Django app."""
+
 # Logging Configuration
 # Best Practice: Structured/JSON logging recommended for Production.
 # Currently set to Console/Simple for Development.

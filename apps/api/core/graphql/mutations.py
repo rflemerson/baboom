@@ -1,3 +1,5 @@
+"""Mutation definitions for the core GraphQL schema."""
+
 import logging
 from typing import Any, cast
 

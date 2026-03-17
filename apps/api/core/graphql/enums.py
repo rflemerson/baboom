@@ -1,3 +1,5 @@
+"""Enum definitions exposed through the core GraphQL schema."""
+
 from enum import Enum
 
 import strawberry

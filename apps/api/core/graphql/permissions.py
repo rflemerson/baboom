@@ -1,3 +1,5 @@
+"""Permission helpers for GraphQL API access."""
+
 import logging
 import typing
 

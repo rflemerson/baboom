@@ -1,3 +1,5 @@
+"""Celery application bootstrap for the Django project."""
+
 import os
 
 from celery import Celery

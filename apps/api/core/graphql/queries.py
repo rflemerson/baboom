@@ -1,3 +1,5 @@
+"""Query definitions for the core GraphQL schema."""
+
 from typing import cast
 
 import strawberry

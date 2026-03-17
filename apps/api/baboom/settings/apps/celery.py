@@ -1,3 +1,5 @@
+"""Celery-related Django settings."""
+
 from baboom.settings.base import INSTALLED_APPS
 from baboom.settings.env import env
 

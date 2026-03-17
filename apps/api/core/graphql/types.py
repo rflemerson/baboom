@@ -1,3 +1,5 @@
+"""Object types exposed by the core GraphQL schema."""
+
 from __future__ import annotations
 
 from decimal import Decimal

@@ -1,3 +1,5 @@
+"""Production settings overrides for the Django project."""
+
 import os
 
 DEBUG = False

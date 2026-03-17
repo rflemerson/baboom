@@ -1,3 +1,5 @@
+"""Settings composition entrypoint for the Django project."""
+
 import importlib
 import os
 import pkgutil

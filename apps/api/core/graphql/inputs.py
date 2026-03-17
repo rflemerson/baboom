@@ -1,3 +1,5 @@
+"""Input objects exposed by the core GraphQL schema."""
+
 import strawberry
 
 from .enums import PackagingEnum, StockStatusEnum

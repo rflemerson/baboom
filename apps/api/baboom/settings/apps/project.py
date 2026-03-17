@@ -1,3 +1,5 @@
+"""Project-specific Django settings for installed apps and templates."""
+
 from baboom.settings.base import INSTALLED_APPS, MIDDLEWARE
 from baboom.settings.env import BASE_DIR
 

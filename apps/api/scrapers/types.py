@@ -1,3 +1,5 @@
+"""Typed DTOs shared by scraper ingestion workflows."""
+
 from decimal import Decimal
 
 from pydantic import BaseModel

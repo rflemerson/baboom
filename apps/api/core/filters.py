@@ -1,3 +1,5 @@
+"""Filter definitions for catalog-facing product queries."""
+
 from __future__ import annotations
 
 from typing import ClassVar

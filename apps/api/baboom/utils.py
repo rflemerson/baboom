@@ -1,3 +1,5 @@
+"""Shared utility types and helpers for the Django project."""
+
 import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
 

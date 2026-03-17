@@ -1,3 +1,5 @@
+"""Django admin configuration for the core domain."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar

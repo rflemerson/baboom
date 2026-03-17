@@ -1,3 +1,5 @@
+"""Development settings overrides for the Django project."""
+
 from .base import BASE_DIR
 
 # Quick-start development settings - unsuitable for production
