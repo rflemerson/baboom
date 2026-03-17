@@ -1,7 +1,9 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
+
 import nested_admin
 from django.contrib import admin
-from django.db.models import QuerySet
-from django.http import HttpRequest
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
@@ -20,6 +22,10 @@ from .models import (
     Tag,
 )
 
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from django.http import HttpRequest
+
 
 class MicronutrientInline(nested_admin.NestedTabularInline):
     """Inline for micronutrients."""
@@ -27,7 +33,7 @@ class MicronutrientInline(nested_admin.NestedTabularInline):
     model = Micronutrient
     extra = 0
     min_num = 0
-    classes = ["collapse"]
+    classes: ClassVar[list[str]] = ["collapse"]
 
 
 class ProductNutritionInline(nested_admin.NestedTabularInline):
@@ -35,9 +41,9 @@ class ProductNutritionInline(nested_admin.NestedTabularInline):
 
     model = ProductNutrition
     extra = 0
-    autocomplete_fields = ["nutrition_facts"]
-    filter_horizontal = ["flavors"]
-    classes = ["collapse"]
+    autocomplete_fields: ClassVar[list[str]] = ["nutrition_facts"]
+    filter_horizontal: ClassVar[list[str]] = ["flavors"]
+    classes: ClassVar[list[str]] = ["collapse"]
 
 
 class ProductPriceHistoryInline(nested_admin.NestedTabularInline):
@@ -45,7 +51,7 @@ class ProductPriceHistoryInline(nested_admin.NestedTabularInline):
 
     model = ProductPriceHistory
     extra = 0
-    readonly_fields = ["collected_at"]
+    readonly_fields: ClassVar[list[str]] = ["collected_at"]
     fields = ("price", "stock_status", "collected_at")
     ordering = ("-collected_at",)
     max_num = 5
@@ -81,10 +87,13 @@ class ProductAdmin(nested_admin.NestedModelAdmin):
     )
     list_filter = ("brand", "packaging", "category", "tags", "is_published")
     search_fields = ("name", "brand__name")
-    autocomplete_fields = ["brand", "tags", "category"]
-    inlines = [ProductStoreInline, ProductNutritionInline]
+    autocomplete_fields: ClassVar[list[str]] = ["brand", "tags", "category"]
+    inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
+        ProductStoreInline,
+        ProductNutritionInline,
+    ]
     list_per_page = 20
-    filter_horizontal = ["tags"]
+    filter_horizontal: ClassVar[list[str]] = ["tags"]
     save_on_top = True
 
     def get_queryset(self, request: HttpRequest) -> QuerySet:
@@ -101,7 +110,7 @@ class ProductAdmin(nested_admin.NestedModelAdmin):
         """Return category name."""
         return obj.category.name if obj.category else "-"
 
-    def get_changeform_initial_data(self, request):
+    def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, str]:
         """Populate initial form data.
 
         Populate initial form data from GET parameters.
@@ -122,7 +131,9 @@ class BrandAdmin(admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS
     list_display = ("name", "display_name")
     search_fields = ("name", "display_name")
-    prepopulated_fields = {"display_name": ("name",)}
+    prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {
+        "display_name": ("name",),
+    }
     list_per_page = 50
 
 
@@ -132,7 +143,9 @@ class StoreAdmin(admin.ModelAdmin):
 
     list_display = ("name", "display_name")
     search_fields = ("name", "display_name")
-    prepopulated_fields = {"display_name": ("name",)}
+    prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {
+        "display_name": ("name",),
+    }
     list_per_page = 50
 
 
@@ -173,7 +186,7 @@ class ProductStoreAdmin(admin.ModelAdmin):
     list_display = ("product", "store", "external_id", "get_last_price")
     list_filter = ("store",)
     search_fields = ("product__name", "store__name", "external_id")
-    autocomplete_fields = ["product", "store"]
+    autocomplete_fields: ClassVar[list[str]] = ["product", "store"]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet:
         """Optimize queryset."""
@@ -197,8 +210,8 @@ class ProductPriceHistoryAdmin(admin.ModelAdmin):
 
     list_display = ("store_product_link", "price", "stock_status", "collected_at")
     list_filter = ("stock_status", "collected_at", "store_product_link__store")
-    autocomplete_fields = ["store_product_link"]
-    readonly_fields = ["collected_at"]
+    autocomplete_fields: ClassVar[list[str]] = ["store_product_link"]
+    readonly_fields: ClassVar[list[str]] = ["collected_at"]
 
 
 @admin.register(NutritionFacts)
@@ -207,7 +220,9 @@ class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
 
     list_display = ("description", "serving_size_grams", "energy_kcal")
     search_fields = ("description",)
-    inlines = [MicronutrientInline]
+    inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
+        MicronutrientInline,
+    ]
     list_per_page = 20
 
 

@@ -1,6 +1,3 @@
-@.agent/context/TECH-STACK.md
-@.agent/context/PRE_COMMIT.md
-@.agent/context/SECURITY.md
 @.agent/context/AGENTS.md
 
 ---
@@ -10,21 +7,22 @@
 ## Context loading policy
 
 - Keep root context minimal to reduce prompt bloat.
-- Load additional docs from `.agent/context/` only when needed by the task.
+- Load additional docs from the nearest relevant `AGENTS.md` only when needed by the task.
 - Priority order:
   1. `.agent/context/AGENTS.md`
-  2. task-specific docs (framework/tool/security)
+  2. nearest subdirectory `AGENTS.md`
+  3. task-specific docs imported from that local `AGENTS.md`
 
 ## Extended context index (load on demand)
 
-- UI: `.agent/context/DAISYUI.md`, `.agent/context/HTMX.md`, `.agent/context/ALPINE.md`
-- Backend: `.agent/context/DJANGO.md`, `.agent/context/PYTHON.md`
-- Infra: `.agent/context/NIX.md`, `.agent/context/DOCKER.md`
+- API backend: `apps/api/AGENTS.md`
+- Infra and deploy: `infra/AGENTS.md`
+- Web frontend: `apps/web/AGENTS.md`
 
 ## 1. When in Doubt, Research
 If you are stuck, unsure about a syntax, or encountering a complex error:
 > **Consult Official Documentation/Styleguides immediately.**
-Do not guess. Use the `browser` tool to find the authoritative source (e.g., Django docs, HTMX references, Official Styleguides) before proceeding.
+Do not guess. Use the `browser` tool to find the authoritative source (e.g., Django docs, Vue docs, Official Styleguides) before proceeding.
 
 ## 2. Living Documentation Policy
 It is **YOUR RESPONSIBILITY** to keep `AGENTS.md` and its imports alive.

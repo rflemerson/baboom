@@ -4,12 +4,6 @@ from baboom.settings.env import BASE_DIR
 # Project apps
 INSTALLED_APPS += ["core", "scrapers"]
 
-# Whitenoise
-MIDDLEWARE.insert(
-    MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-)
-
 # Simple History
 INSTALLED_APPS += ["simple_history"]
 MIDDLEWARE += ["simple_history.middleware.HistoryRequestMiddleware"]
@@ -26,20 +20,9 @@ INSTALLED_APPS += ["django_filters"]
 # Strawberry GraphQL
 INSTALLED_APPS += ["strawberry.django"]
 
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
-
 # Media Files (User uploads)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
 
 # i18n: Supported languages
 LANGUAGE_CODE = "pt-br"

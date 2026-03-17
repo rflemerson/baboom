@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import ClassVar
+
 import django_filters
 from django import forms
 from django.db.models import F, Q, QuerySet
@@ -19,7 +23,7 @@ class ProductFilter(django_filters.FilterSet):
         ("asc", _("Low to High")),
         ("desc", _("High to Low")),
     )
-    VALID_SORT_FIELDS = {key for key, _ in SORT_CHOICES}
+    VALID_SORT_FIELDS: ClassVar[set[str]] = {key for key, _ in SORT_CHOICES}
 
     @property
     def sort_choices(self) -> list[tuple[str, str, bool]]:
@@ -95,7 +99,7 @@ class ProductFilter(django_filters.FilterSet):
         """Meta options."""
 
         model = Product
-        fields = [
+        fields = (
             "search",
             "brand",
             "price_min",
@@ -104,7 +108,7 @@ class ProductFilter(django_filters.FilterSet):
             "price_per_gram_max",
             "concentration_min",
             "concentration_max",
-        ]
+        )
 
     def filter_queryset(self, queryset: QuerySet[Product]) -> QuerySet[Product]:
         """Apply filters and sorting."""
@@ -132,7 +136,12 @@ class ProductFilter(django_filters.FilterSet):
 
         return queryset.order_by(f"{prefix}{sort_by}")
 
-    def filter_search(self, queryset, name, value):
+    def filter_search(
+        self,
+        queryset: QuerySet[Product],
+        _name: str,
+        value: str | None,
+    ) -> QuerySet[Product]:
         """Filter by search query."""
         if not value:
             return queryset

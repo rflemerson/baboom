@@ -45,8 +45,8 @@ Agents Image: docker build -f services/agents/Dockerfile -t baboom-agents .
 
 ### IV. Coding Standards (The "Rules")
 Use "Do" and "Don't" format.
-- **Do**: Use functional views for HTMX.
-- **Don't**: Use inline styles.
+- **Do**: Use explicit typing, small functions, and architecture-aligned boundaries.
+- **Don't**: Silence linters or reintroduce legacy frontend patterns.
 
 ## 4. Anti-Patterns to Avoid
 - **Duplication**: Don't copy-paste large docs. Import them.
@@ -60,6 +60,18 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 **CRITICAL RULE**: Documentation must never get stale.
 1.  **Update on Sight**: If you read this or any documentation (e.g., in `.context/`) and find it conflicts with the actual code/environment, **you must update it immediately** before proceeding with other tasks.
 2.  **Update on Change**: If you make *any* significant change to the code (e.g., adding a library, changing a workflow, refactoring architecture), you **must search for and update** the relevant documentation in the same step.
+
+## 6.1 Refactor Integrity Policy
+- Fix code to satisfy the active lint/type/test stack. Do not make progress by suppressing the tool.
+- Avoid local escapes such as `noqa`, `type: ignore`, `stylelint-disable`, broad `ignore` globs, or turning rules off unless the code is generated or a framework boundary truly requires it.
+- Prefer stronger types, smaller functions, `TYPE_CHECKING` imports, `ClassVar`, immutable metadata, and clearer names over rule suppression.
+- If the current docs still mention legacy patterns that are no longer the project direction, update the docs before continuing.
+- Do not be afraid to delete legacy files, remove stale abstractions, or rename old view-shaped APIs when the current architecture no longer uses them.
+- Prefer removing dead paths over documenting them forever.
+
+## 6.2 Frontend Direction Policy
+- Do not use legacy Django template UI patterns for new public frontend work.
+- The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/agents/`.
 
 ## 7. Agents Pipeline Contract (Dagster)
 - Scraper stage must stay lightweight and store artifacts only:

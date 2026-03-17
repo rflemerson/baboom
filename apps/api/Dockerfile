@@ -1,22 +1,3 @@
-# ============================================
-# Stage 1: Build Tailwind CSS with DaisyUI
-# ============================================
-FROM debian:bookworm-slim AS css-builder
-
-WORKDIR /build
-
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-RUN curl -sL daisyui.com/fast | bash
-
-COPY apps/api/ .
-
-RUN ./tailwindcss -i input.css -o output.css --minify
-
-
-# ============================================
-# Stage 2: Python Application
-# ============================================
 FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -36,8 +17,6 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY apps/api/ /app/
 RUN pip install --no-cache-dir .
 
-COPY --from=css-builder /build/output.css /app/static/css/output.css
-
 RUN chown -R appuser:appuser /app
 USER appuser
 
@@ -45,4 +24,4 @@ RUN python manage.py compilemessages --ignore=.venv || true
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py collectstatic --noinput --clear && python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 3 --access-logfile - baboom.wsgi:application"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 3 --access-logfile - baboom.wsgi:application"]
