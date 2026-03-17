@@ -18,7 +18,7 @@ Including another URLconf
 
 from django.conf import settings
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 from strawberry.django.views import GraphQLView
 
@@ -35,5 +35,4 @@ urlpatterns = [
             )
         ),
     ),
-    path("", include("core.urls")),
 ]

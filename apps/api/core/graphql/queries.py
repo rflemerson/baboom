@@ -4,9 +4,9 @@ from typing import cast
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.models import Category, Product, Tag
 from core.filters import ProductFilter
-from core.selectors import list_with_stats
+from core.models import Category, Product, Tag
+from core.selectors import public_catalog_products_with_stats
 
 from .types import (
     CatalogPageInfo,
@@ -38,7 +38,7 @@ class CoreQuery:
         page: int = 1,
         per_page: int = 12,
     ) -> CatalogProductsResult:
-        """Return the public catalog list using the same selector/filter pipeline as Django views."""
+        """Return the public catalog list using the shared catalog selector and filter pipeline."""
         normalized_per_page = per_page if per_page in {12, 24, 48} else 12
         normalized_page = max(page, 1)
 
@@ -62,7 +62,7 @@ class CoreQuery:
             if value not in (None, ""):
                 filter_data[key] = value
 
-        queryset = list_with_stats().filter(is_published=True)
+        queryset = public_catalog_products_with_stats().filter(is_published=True)
         product_filter = ProductFilter(filter_data, queryset=queryset)
         paginator = Paginator(product_filter.qs, normalized_per_page)
         page_obj = paginator.get_page(normalized_page)

@@ -14,9 +14,9 @@ from django.db.models.functions import Cast, NullIf
 from .models import NutritionFacts, Product, ProductPriceHistory
 
 
-def list_with_stats() -> QuerySet[Product]:
+def public_catalog_products_with_stats() -> QuerySet[Product]:
     """
-    Returns a Product QuerySet annotated with statistics.
+    Return the public catalog queryset annotated with catalog-facing statistics.
 
     Annotations:
     - last_price

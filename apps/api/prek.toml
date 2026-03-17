@@ -16,21 +16,6 @@ hooks = [
 ]
 
 [[repos]]
-repo = "https://github.com/riverside-healthcare/djlint"
-rev = "v1.36.4"
-hooks = [
-    { id = "djlint-reformat-django" },
-    { id = "djlint-django" },
-]
-
-[[repos]]
-repo = "https://github.com/rtts/djhtml"
-rev = "3.0.10"
-hooks = [
-    { id = "djhtml" },
-]
-
-[[repos]]
 repo = "https://github.com/fpgmaas/deptry"
 rev = "0.24.0"
 hooks = [

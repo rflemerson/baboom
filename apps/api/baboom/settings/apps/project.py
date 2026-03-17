@@ -23,16 +23,6 @@ INSTALLED_APPS += ["nested_admin"]
 # Django Filter
 INSTALLED_APPS += ["django_filters"]
 
-# HTMX
-INSTALLED_APPS += ["django_htmx"]
-MIDDLEWARE += ["django_htmx.middleware.HtmxMiddleware"]
-
-# Django Widget Tweaks
-INSTALLED_APPS += ["widget_tweaks"]
-
-# Django Components
-INSTALLED_APPS += ["django_components"]
-
 # Strawberry GraphQL
 INSTALLED_APPS += ["strawberry.django"]
 
@@ -74,10 +64,6 @@ TEMPLATES = [
             "loaders": [
                 "django.template.loaders.filesystem.Loader",
                 "django.template.loaders.app_directories.Loader",
-                "django_components.template_loader.Loader",
-            ],
-            "builtins": [
-                "django_components.templatetags.component_tags",
             ],
         },
     },

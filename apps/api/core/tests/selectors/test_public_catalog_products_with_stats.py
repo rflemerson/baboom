@@ -12,11 +12,11 @@ from core.models import (
     ProductStore,
     Store,
 )
-from core.selectors import list_with_stats
+from core.selectors import public_catalog_products_with_stats
 
 
 class ProductStatsTest(TestCase):
-    """Tests for list_with_stats selector logic."""
+    """Tests for the public catalog selector annotations."""
 
     def setUp(self):
         """Set up test data."""
@@ -52,14 +52,14 @@ class ProductStatsTest(TestCase):
 
     def test_protein_calculations(self):
         """
-        Verify if with_stats() correctly calculates derived fields.
+        Verify if the public catalog selector correctly calculates derived fields.
 
         - Concentration (should be 80.0%)
         - Total Protein in package (Should be 800g for a 1kg package)
         - Price per gram of protein (R$ 100 / 800g = R$ 0.125)
         """
         # Act
-        p: Any = list_with_stats().first()
+        p: Any = public_catalog_products_with_stats().first()
 
         # Assert
         if p is None:
@@ -80,7 +80,7 @@ class ProductStatsTest(TestCase):
         p2 = Product.objects.create(name="No Price Whey", brand=self.brand, weight=500)
 
         # Act
-        qs = list_with_stats().filter(pk=p2.pk)
+        qs = public_catalog_products_with_stats().filter(pk=p2.pk)
         result: Any = qs.first()
 
         # Assert
