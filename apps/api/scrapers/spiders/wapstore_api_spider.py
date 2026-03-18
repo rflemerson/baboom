@@ -16,7 +16,7 @@ from .common import (
     parse_positive_price,
     persist_json_context,
 )
-from .http_client import HttpClient
+from .http_client import HttpClient, HttpRequestOptions
 
 # Disable warnings for verify=False as per API strategy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -193,9 +193,11 @@ class WapStoreApiSpider(CatalogApiSpider):
         for attempt in range(1, attempts + 1):
             resp = self.http_client.get(
                 url,
-                params=params,
-                headers=self.get_headers(),
-                verify=verify,
+                options=HttpRequestOptions(
+                    params=params,
+                    headers=self.get_headers(),
+                    verify=verify,
+                ),
             )
             if (
                 resp is not None

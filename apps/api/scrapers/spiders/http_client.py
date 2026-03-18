@@ -15,6 +15,7 @@ Usage:
 
 import functools
 import logging
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,17 @@ except ImportError:
         "curl_cffi not installed. WAF bypass may not work. "
         "Install with: pip install curl_cffi",
     )
+
+
+@dataclass(slots=True)
+class HttpRequestOptions:
+    """Options for a single HTTP GET request."""
+
+    headers: dict[str, str] = field(default_factory=dict)
+    params: dict[str, object] | None = None
+    verify: bool = True
+    impersonate: str | None = None
+    try_all_impersonations: bool = False
 
 
 class HttpClient:
@@ -68,51 +80,59 @@ class HttpClient:
     def get(
         self,
         url: str,
-        headers: dict[str, str] | None = None,
-        params: dict[str, object] | None = None,
-        verify: bool = True,
-        impersonate: str | None = None,
-        try_all_impersonations: bool = False,
+        *,
+        options: HttpRequestOptions | None = None,
     ) -> object | None:
         """Perform GET request with WAF bypass.
 
         Args:
             url: URL to fetch
-            headers: Request headers
-            params: Query parameters
-            verify: Verify SSL certificates
-            impersonate: Browser to impersonate (chrome120, safari17_0, etc.)
-            try_all_impersonations: If True, try all browser impersonations on failure
+            options: Named request options including headers, params, SSL
+                verification, and impersonation strategy.
 
         Returns:
             Response object or None if all attempts failed
 
         """
-        headers = headers or {}
-        impersonate = impersonate or self.default_impersonate
+        resolved_options = options or HttpRequestOptions()
+        headers = resolved_options.headers
+        impersonate = resolved_options.impersonate or self.default_impersonate
 
         if HAS_CURL_CFFI:
             return self._get_with_curl_cffi(
                 url,
-                headers,
-                params,
-                verify,
-                impersonate,
-                try_all_impersonations,
+                options=HttpRequestOptions(
+                    headers=headers,
+                    params=resolved_options.params,
+                    verify=resolved_options.verify,
+                    impersonate=impersonate,
+                    try_all_impersonations=resolved_options.try_all_impersonations,
+                ),
             )
-        return self._get_with_requests(url, headers, params, verify)
+        return self._get_with_requests(
+            url,
+            options=HttpRequestOptions(
+                headers=headers,
+                params=resolved_options.params,
+                verify=resolved_options.verify,
+                impersonate=impersonate,
+                try_all_impersonations=resolved_options.try_all_impersonations,
+            ),
+        )
 
     def _get_with_curl_cffi(
         self,
         url: str,
-        headers: dict[str, str],
-        params: dict[str, object] | None,
-        verify: bool,
-        impersonate: str,
-        try_all: bool,
+        *,
+        options: HttpRequestOptions,
     ) -> object | None:
         """Use curl_cffi with TLS fingerprint impersonation."""
-        impersonations = self.IMPERSONATIONS if try_all else [impersonate]
+        impersonate = options.impersonate or self.default_impersonate
+        impersonations = (
+            self.IMPERSONATIONS
+            if options.try_all_impersonations
+            else [impersonate]
+        )
 
         for browser in impersonations:
             try:
@@ -120,11 +140,11 @@ class HttpClient:
 
                 response = cffi_requests.get(
                     url,
-                    headers=headers,
-                    params=params,
+                    headers=options.headers,
+                    params=options.params,
                     impersonate=browser,
                     timeout=self.timeout,
-                    verify=verify,
+                    verify=options.verify,
                 )
 
                 if (
@@ -139,7 +159,7 @@ class HttpClient:
                 # Return non-403 responses even if they might be errors.
                 return response
 
-            except Exception as exc:
+            except cffi_requests.exceptions.RequestException as exc:
                 logger.debug("%s error: %s", browser, exc)
                 continue
             else:
@@ -152,20 +172,19 @@ class HttpClient:
     def _get_with_requests(
         self,
         url: str,
-        headers: dict[str, str],
-        params: dict[str, object] | None,
-        verify: bool,
+        *,
+        options: HttpRequestOptions,
     ) -> object | None:
         """Fallback to standard requests library."""
         try:
             return std_requests.get(
                 url,
-                headers=headers,
-                params=params,
+                headers=options.headers,
+                params=options.params,
                 timeout=self.timeout,
-                verify=verify,
+                verify=options.verify,
             )
-        except Exception:
+        except std_requests.exceptions.RequestException:
             logger.exception("Request failed")
             return None
 

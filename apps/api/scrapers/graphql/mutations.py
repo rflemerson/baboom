@@ -15,6 +15,7 @@ from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from scrapers.models import ScrapedItem, ScrapedPage
 
 scraper_types = import_module("scrapers.graphql.types")
+graphql_inputs = import_module("scrapers.graphql.inputs")
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -29,8 +30,7 @@ class ScrapersMutation:
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def checkout_scraped_item(
         self,
-        force: bool = False,
-        target_item_id: int | None = None,
+        data: graphql_inputs.ScrapedItemCheckoutInput,
     ) -> scraper_types.ScrapedItemType | None:
         """Reserves an item for the Agent to process.
 
@@ -47,15 +47,15 @@ class ScrapersMutation:
                 ScrapedItem.objects.select_for_update(skip_locked=True),
             )
 
-            if target_item_id:
-                query = base_query.filter(id=target_item_id)
+            if data.target_item_id:
+                query = base_query.filter(id=data.target_item_id)
             else:
                 q_filters = Q(status=ScrapedItem.Status.NEW) | Q(
                     status=ScrapedItem.Status.ERROR,
                     error_count__lt=MAX_SCRAPED_ITEM_RETRIES,
                     last_attempt_at__lt=retry_threshold,
                 )
-                if force:
+                if data.force:
                     q_filters |= Q(status=ScrapedItem.Status.LINKED) | Q(
                         status=ScrapedItem.Status.REVIEW,
                     )
@@ -78,21 +78,19 @@ class ScrapersMutation:
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def report_scraped_item_error(
         self,
-        item_id: int,
-        message: str,
-        is_fatal: bool = False,
+        data: graphql_inputs.ScrapedItemErrorInput,
     ) -> bool:
         """Report an error for a scraped item."""
         try:
-            item = ScrapedItem.objects.get(id=item_id)
+            item = ScrapedItem.objects.get(id=data.item_id)
 
-            if is_fatal:
+            if data.is_fatal:
                 item.status = ScrapedItem.Status.REVIEW
-                item.last_error_log = f"FATAL: {message}"
+                item.last_error_log = f"FATAL: {data.message}"
             else:
                 item.status = ScrapedItem.Status.ERROR
                 item.error_count += 1
-                item.last_error_log = message
+                item.last_error_log = data.message
 
                 if item.error_count >= MAX_SCRAPED_ITEM_RETRIES:
                     item.status = ScrapedItem.Status.REVIEW
@@ -180,36 +178,30 @@ class ScrapersMutation:
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def upsert_scraped_item_variant(
         self,
-        origin_item_id: int,
-        external_id: str,
-        name: str,
-        page_url: str,
-        store_slug: str,
-        price: float | None = None,
-        stock_status: str | None = None,
+        data: graphql_inputs.ScrapedItemVariantInput,
     ) -> scraper_types.ScrapedItemType | None:
         """Create or update a variant ScrapedItem linked to the same source page."""
         try:
-            origin_item = ScrapedItem.objects.get(id=origin_item_id)
+            origin_item = ScrapedItem.objects.get(id=data.origin_item_id)
         except ScrapedItem.DoesNotExist:
             return None
 
         page, _ = ScrapedPage.objects.get_or_create(
-            url=page_url,
-            defaults={"store_slug": store_slug},
+            url=data.page_url,
+            defaults={"store_slug": data.store_slug},
         )
 
-        resolved_price = price if price is not None else origin_item.price
-        resolved_stock_status = stock_status or origin_item.stock_status
+        resolved_price = data.price if data.price is not None else origin_item.price
+        resolved_stock_status = data.stock_status or origin_item.stock_status
         valid_stock_values = {choice[0] for choice in ScrapedItem.StockStatus.choices}
         if resolved_stock_status not in valid_stock_values:
             resolved_stock_status = ScrapedItem.StockStatus.AVAILABLE
 
         item, _ = ScrapedItem.objects.update_or_create(
-            store_slug=store_slug,
-            external_id=external_id,
+            store_slug=data.store_slug,
+            external_id=data.external_id,
             defaults={
-                "name": name,
+                "name": data.name,
                 "source_page": page,
                 "price": resolved_price,
                 "stock_status": resolved_stock_status,

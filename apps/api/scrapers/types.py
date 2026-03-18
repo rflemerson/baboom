@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from importlib import import_module
 
 from pydantic import BaseModel
 
 from .models import ScrapedItem
 
-if TYPE_CHECKING:
-    from decimal import Decimal
+decimal = import_module("decimal")
 
 
 class ProductIngestionInput(BaseModel):
@@ -19,7 +18,7 @@ class ProductIngestionInput(BaseModel):
     external_id: str
     url: str = ""
     name: str = ""
-    price: str | float | Decimal | None = None
+    price: str | float | decimal.Decimal | None = None
     stock_quantity: int | None = None
     stock_status: str = ScrapedItem.StockStatus.AVAILABLE
     ean: str = ""
