@@ -35,3 +35,13 @@ class ProductCreateInput(BaseModel):
     is_combo: bool = False
     components: list[ProductComponentInput] | None = None
     nutrient_claims: list[str] | None = None
+
+
+class ProductContentUpdateInput(BaseModel):
+    """DTO for metadata-only product updates."""
+
+    name: str | None = None
+    description: str | None = None
+    category_name: str | None = None
+    packaging: str | None = None
+    tags: list[str] | None = None

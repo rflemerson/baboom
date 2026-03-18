@@ -19,6 +19,7 @@ from core.services import (
     product_update_content,
 )
 from core.types import ProductComponentInput as ProductComponentDTO
+from core.types import ProductContentUpdateInput as ProductContentUpdateDTO
 from core.types import ProductCreateInput
 from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
@@ -154,11 +155,13 @@ class CoreMutation:
         try:
             updated_product = product_update_content(
                 product=product,
-                name=data.name,
-                description=data.description,
-                category_name=data.category_name,
-                packaging=data.packaging.value if data.packaging else None,
-                tags=data.tags,
+                data=ProductContentUpdateDTO(
+                    name=data.name,
+                    description=data.description,
+                    category_name=data.category_name,
+                    packaging=data.packaging.value if data.packaging else None,
+                    tags=data.tags,
+                ),
             )
             return ProductResult(
                 product=cast("graphql_types.ProductType", updated_product),

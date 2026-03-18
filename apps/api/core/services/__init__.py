@@ -1,6 +1,7 @@
 """Application services for core catalog and alert workflows."""
 
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -29,7 +30,7 @@ from .combo_resolution import ComboResolutionService
 from .enrichment import EnrichmentService
 
 if TYPE_CHECKING:
-    from .types import ProductCreateInput
+    from .types import ProductContentUpdateInput, ProductCreateInput
 
 logger = logging.getLogger(__name__)
 
@@ -180,48 +181,87 @@ def _create_store_entries(product: Product, stores: list[dict[str, Any]]) -> Non
         )
 
 
+@dataclass(slots=True)
+class ProductContentUpdateResolved:
+    """Resolved metadata updates ready to be applied to a product."""
+
+    name: str | None
+    description: str | None
+    packaging: str | None
+    category: Category | None
+    replace_category: bool
+    tags: list[Tag] | None
+
+
+def _resolve_update_category(category_name: str | None) -> tuple[Category | None, bool]:
+    """Resolve the category update and whether it should replace current value."""
+    if category_name is None:
+        return None, False
+    if category_name == "":
+        return None, True
+
+    category = Category.objects.filter(name=category_name).first()
+    if not category:
+        category = Category.add_root(name=category_name)
+    return category, True
+
+
+def _resolve_update_tags(tags: list[str] | None) -> list[Tag] | None:
+    """Resolve flat tag names into persisted Tag objects."""
+    if tags is None:
+        return None
+
+    tag_objects = []
+    for tag_name in tags:
+        tag = Tag.objects.filter(name=tag_name).first()
+        if not tag:
+            tag = Tag.add_root(name=tag_name)
+        tag_objects.append(tag)
+    return tag_objects
+
+
+def _resolve_product_content_update(
+    data: ProductContentUpdateInput,
+) -> ProductContentUpdateResolved:
+    """Resolve category and tag references for a product content update."""
+    category, replace_category = _resolve_update_category(data.category_name)
+    return ProductContentUpdateResolved(
+        name=data.name,
+        description=data.description,
+        packaging=data.packaging,
+        category=category,
+        replace_category=replace_category,
+        tags=_resolve_update_tags(data.tags),
+    )
+
+
+def _apply_product_content_update(
+    product: Product,
+    resolved: ProductContentUpdateResolved,
+) -> None:
+    """Apply resolved metadata updates to the product instance."""
+    if resolved.name is not None:
+        product.name = resolved.name
+    if resolved.description is not None:
+        product.description = resolved.description
+    if resolved.packaging is not None:
+        product.packaging = resolved.packaging
+    if resolved.replace_category:
+        product.category = resolved.category
+    if resolved.tags is not None:
+        product.tags.set(resolved.tags)
+
+
 def product_update_content(
     *,
     product: Product,
-    name: str | None = None,
-    description: str | None = None,
-    category_name: str | None = None,
-    packaging: str | None = None,
-    tags: list[str] | None = None,
+    data: ProductContentUpdateInput,
 ) -> Product:
     """Update product metadata without modifying price data."""
     try:
         with transaction.atomic():
-            # Update basic fields if provided
-            if name is not None:
-                product.name = name
-            if description is not None:
-                product.description = description
-            if packaging is not None:
-                product.packaging = packaging
-
-            # Update category
-            if category_name is not None:
-                if category_name == "":
-                    product.category = None
-                else:
-                    category = Category.objects.filter(name=category_name).first()
-                    if not category:
-                        category = Category.add_root(name=category_name)
-                    product.category = category
-
-            # Update tags
-            if tags is not None:
-                tag_objects = []
-                for tag_name in tags:
-                    tag = Tag.objects.filter(name=tag_name).first()
-                    if not tag:
-                        tag = Tag.add_root(name=tag_name)
-                    tag_objects.append(tag)
-                # This replaces all tags, which matches the intended sync behavior.
-                product.tags.set(tag_objects)
-
-            # Mark as enriched by LLM
+            resolved = _resolve_product_content_update(data)
+            _apply_product_content_update(product, resolved)
             product.last_enriched_at = timezone.now()
             product.save()
 
