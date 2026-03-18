@@ -12,42 +12,46 @@ export const CATALOG_SORT_OPTIONS = [
 export const CATALOG_SEARCH_DEBOUNCE_MS = 250
 
 const DEFAULT_CATALOG_PRODUCTS_VARIABLES: CatalogProductsVariables = {
-  page: 1,
-  perPage: 12,
-  search: null,
-  brand: null,
-  priceMin: null,
-  priceMax: null,
-  pricePerGramMin: null,
-  pricePerGramMax: null,
-  concentrationMin: null,
-  concentrationMax: null,
-  sortBy: 'price_per_gram',
-  sortDir: 'asc',
+  filters: {
+    page: 1,
+    perPage: 12,
+    search: null,
+    brand: null,
+    priceMin: null,
+    priceMax: null,
+    pricePerGramMin: null,
+    pricePerGramMax: null,
+    concentrationMin: null,
+    concentrationMax: null,
+    sortBy: 'price_per_gram',
+    sortDir: 'asc',
+  },
 }
 
 export function useCatalogFilters() {
-  const search = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.search ?? '')
-  const debouncedSearch = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.search ?? '')
-  const brand = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.brand ?? '')
-  const priceMin = ref<number | null>(DEFAULT_CATALOG_PRODUCTS_VARIABLES.priceMin ?? null)
-  const priceMax = ref<number | null>(DEFAULT_CATALOG_PRODUCTS_VARIABLES.priceMax ?? null)
+  const defaultFilters = DEFAULT_CATALOG_PRODUCTS_VARIABLES.filters
+
+  const search = ref(defaultFilters?.search ?? '')
+  const debouncedSearch = ref(defaultFilters?.search ?? '')
+  const brand = ref(defaultFilters?.brand ?? '')
+  const priceMin = ref<number | null>(defaultFilters?.priceMin ?? null)
+  const priceMax = ref<number | null>(defaultFilters?.priceMax ?? null)
   const pricePerGramMin = ref<number | null>(
-    DEFAULT_CATALOG_PRODUCTS_VARIABLES.pricePerGramMin ?? null,
+    defaultFilters?.pricePerGramMin ?? null,
   )
   const pricePerGramMax = ref<number | null>(
-    DEFAULT_CATALOG_PRODUCTS_VARIABLES.pricePerGramMax ?? null,
+    defaultFilters?.pricePerGramMax ?? null,
   )
   const concentrationMin = ref<number | null>(
-    DEFAULT_CATALOG_PRODUCTS_VARIABLES.concentrationMin ?? null,
+    defaultFilters?.concentrationMin ?? null,
   )
   const concentrationMax = ref<number | null>(
-    DEFAULT_CATALOG_PRODUCTS_VARIABLES.concentrationMax ?? null,
+    defaultFilters?.concentrationMax ?? null,
   )
-  const sortBy = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.sortBy)
-  const sortDir = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.sortDir)
-  const page = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.page)
-  const perPage = ref(DEFAULT_CATALOG_PRODUCTS_VARIABLES.perPage)
+  const sortBy = ref(defaultFilters?.sortBy ?? 'price_per_gram')
+  const sortDir = ref(defaultFilters?.sortDir ?? 'asc')
+  const page = ref(defaultFilters?.page ?? 1)
+  const perPage = ref(defaultFilters?.perPage ?? 12)
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
   watch(
@@ -71,18 +75,20 @@ export function useCatalogFilters() {
   })
 
   const variables = computed<CatalogProductsVariables>(() => ({
-    page: page.value,
-    perPage: perPage.value,
-    search: debouncedSearch.value.trim() || null,
-    brand: brand.value.trim() || null,
-    priceMin: priceMin.value,
-    priceMax: priceMax.value,
-    pricePerGramMin: pricePerGramMin.value,
-    pricePerGramMax: pricePerGramMax.value,
-    concentrationMin: concentrationMin.value,
-    concentrationMax: concentrationMax.value,
-    sortBy: sortBy.value,
-    sortDir: sortDir.value,
+    filters: {
+      page: page.value,
+      perPage: perPage.value,
+      search: debouncedSearch.value.trim() || null,
+      brand: brand.value.trim() || null,
+      priceMin: priceMin.value,
+      priceMax: priceMax.value,
+      pricePerGramMin: pricePerGramMin.value,
+      pricePerGramMax: pricePerGramMax.value,
+      concentrationMin: concentrationMin.value,
+      concentrationMax: concentrationMax.value,
+      sortBy: sortBy.value,
+      sortDir: sortDir.value,
+    },
   }))
 
   function setSearch(value: string) {
@@ -125,7 +131,9 @@ export function useCatalogFilters() {
     page.value = 1
   }
 
-  function setSortBy(value: CatalogProductsVariables['sortBy']) {
+  function setSortBy(
+    value: NonNullable<NonNullable<CatalogProductsVariables['filters']>['sortBy']>,
+  ) {
     sortBy.value = value
     page.value = 1
   }
@@ -145,18 +153,18 @@ export function useCatalogFilters() {
   }
 
   function clearFilters() {
-    search.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.search ?? ''
-    brand.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.brand ?? ''
-    priceMin.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.priceMin ?? null
-    priceMax.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.priceMax ?? null
-    pricePerGramMin.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.pricePerGramMin ?? null
-    pricePerGramMax.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.pricePerGramMax ?? null
-    concentrationMin.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.concentrationMin ?? null
-    concentrationMax.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.concentrationMax ?? null
-    sortBy.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.sortBy
-    sortDir.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.sortDir
-    page.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.page
-    perPage.value = DEFAULT_CATALOG_PRODUCTS_VARIABLES.perPage
+    search.value = defaultFilters?.search ?? ''
+    brand.value = defaultFilters?.brand ?? ''
+    priceMin.value = defaultFilters?.priceMin ?? null
+    priceMax.value = defaultFilters?.priceMax ?? null
+    pricePerGramMin.value = defaultFilters?.pricePerGramMin ?? null
+    pricePerGramMax.value = defaultFilters?.pricePerGramMax ?? null
+    concentrationMin.value = defaultFilters?.concentrationMin ?? null
+    concentrationMax.value = defaultFilters?.concentrationMax ?? null
+    sortBy.value = defaultFilters?.sortBy ?? 'price_per_gram'
+    sortDir.value = defaultFilters?.sortDir ?? 'asc'
+    page.value = defaultFilters?.page ?? 1
+    perPage.value = defaultFilters?.perPage ?? 12
   }
 
   return {

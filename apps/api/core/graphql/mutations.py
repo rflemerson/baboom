@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from importlib import import_module
+from typing import Any, cast
 
 import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -24,14 +25,8 @@ from scrapers.services import ScraperService
 
 from .types import AlertSubscriptionResult, ProductResult
 
-if TYPE_CHECKING:
-    from .inputs import (
-        ProductContentUpdateInput,
-        ProductInput,
-        ProductNutritionInput,
-        ProductStoreInput,
-    )
-    from .types import ProductType
+graphql_inputs = import_module("core.graphql.inputs")
+graphql_types = import_module("core.graphql.types")
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +59,10 @@ class CoreMutation:
             )
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def create_product(self, data: ProductInput) -> ProductResult:
+    def create_product(
+        self,
+        data: graphql_inputs.ProductInput,
+    ) -> ProductResult:
         """Create a new product with all related data."""
         stores_data = CoreMutation._map_store_data(data.stores) if data.stores else []
         nutrition_data = (
@@ -133,7 +131,7 @@ class CoreMutation:
                 except ScrapedItem.DoesNotExist:
                     pass
 
-            return ProductResult(product=cast("ProductType", product))
+            return ProductResult(product=cast("graphql_types.ProductType", product))
 
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
@@ -142,7 +140,7 @@ class CoreMutation:
     def update_product_content(
         self,
         product_id: int,
-        data: ProductContentUpdateInput,
+        data: graphql_inputs.ProductContentUpdateInput,
     ) -> ProductResult:
         """Update product content (LLM enrichment)."""
         product = Product.objects.filter(id=product_id).first()
@@ -162,13 +160,17 @@ class CoreMutation:
                 packaging=data.packaging.value if data.packaging else None,
                 tags=data.tags,
             )
-            return ProductResult(product=cast("ProductType", updated_product))
+            return ProductResult(
+                product=cast("graphql_types.ProductType", updated_product),
+            )
 
         except DjangoValidationError as e:
             return ProductResult(errors=format_graphql_errors(e))
 
     @staticmethod
-    def _map_store_data(stores: list[ProductStoreInput]) -> list[dict[str, Any]]:
+    def _map_store_data(
+        stores: list[graphql_inputs.ProductStoreInput],
+    ) -> list[dict[str, Any]]:
         return [
             {
                 "store_name": s.store_name,
@@ -183,7 +185,7 @@ class CoreMutation:
 
     @staticmethod
     def _map_nutrition_data(
-        nutrition: list[ProductNutritionInput],
+        nutrition: list[graphql_inputs.ProductNutritionInput],
     ) -> list[dict[str, Any]]:
         result = []
         for n in nutrition:

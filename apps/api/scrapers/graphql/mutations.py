@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from importlib import import_module
 from typing import TYPE_CHECKING, cast
 
 import strawberry
@@ -13,10 +14,10 @@ from django.utils import timezone
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from scrapers.models import ScrapedItem, ScrapedPage
 
+scraper_types = import_module("scrapers.graphql.types")
+
 if TYPE_CHECKING:
     from django.db.models import QuerySet
-
-    from .types import ScrapedItemType
 
 MAX_SCRAPED_ITEM_RETRIES = 3
 
@@ -30,7 +31,7 @@ class ScrapersMutation:
         self,
         force: bool = False,
         target_item_id: int | None = None,
-    ) -> ScrapedItemType | None:
+    ) -> scraper_types.ScrapedItemType | None:
         """Reserves an item for the Agent to process.
 
         Retrieves NEW items or ERROR items that have rested for 30 minutes.
@@ -70,7 +71,7 @@ class ScrapersMutation:
                 item.status = ScrapedItem.Status.PROCESSING
                 item.last_attempt_at = now
                 item.save()
-                return cast("ScrapedItemType", item)
+                return cast("scraper_types.ScrapedItemType", item)
 
             return None
 
@@ -122,7 +123,7 @@ class ScrapersMutation:
         item_id: int,
         url: str,
         store_slug: str,
-    ) -> ScrapedItemType | None:
+    ) -> scraper_types.ScrapedItemType | None:
         """Ensure item has source page linked, creating page by URL when needed."""
         try:
             item = ScrapedItem.objects.get(id=item_id)
@@ -139,7 +140,7 @@ class ScrapersMutation:
                 changed = True
             if changed:
                 item.save()
-            return cast("ScrapedItemType", item)
+            return cast("scraper_types.ScrapedItemType", item)
         except ScrapedItem.DoesNotExist:
             return None
 
@@ -150,7 +151,7 @@ class ScrapersMutation:
         name: str | None = None,
         source_page_url: str | None = None,
         store_slug: str | None = None,
-    ) -> ScrapedItemType | None:
+    ) -> scraper_types.ScrapedItemType | None:
         """Update mutable fields of a scraped item used by agents pipeline."""
         try:
             item = ScrapedItem.objects.get(id=item_id)
@@ -172,7 +173,7 @@ class ScrapersMutation:
                 changed = True
             if changed:
                 item.save()
-            return cast("ScrapedItemType", item)
+            return cast("scraper_types.ScrapedItemType", item)
         except ScrapedItem.DoesNotExist:
             return None
 
@@ -186,7 +187,7 @@ class ScrapersMutation:
         store_slug: str,
         price: float | None = None,
         stock_status: str | None = None,
-    ) -> ScrapedItemType | None:
+    ) -> scraper_types.ScrapedItemType | None:
         """Create or update a variant ScrapedItem linked to the same source page."""
         try:
             origin_item = ScrapedItem.objects.get(id=origin_item_id)
@@ -215,4 +216,4 @@ class ScrapersMutation:
                 "status": ScrapedItem.Status.PROCESSING,
             },
         )
-        return cast("ScrapedItemType", item)
+        return cast("scraper_types.ScrapedItemType", item)

@@ -10,6 +10,7 @@ from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Category, Product, Tag
 from core.selectors import public_catalog_products_with_stats
 
+from .inputs import CatalogProductsFiltersInput
 from .types import (
     CatalogPageInfo,
     CatalogProductsResult,
@@ -27,37 +28,31 @@ class CoreQuery:
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def catalog_products(
         self,
-        search: str | None = None,
-        brand: str | None = None,
-        price_min: float | None = None,
-        price_max: float | None = None,
-        price_per_gram_min: float | None = None,
-        price_per_gram_max: float | None = None,
-        concentration_min: float | None = None,
-        concentration_max: float | None = None,
-        sort_by: str = "price_per_gram",
-        sort_dir: str = "asc",
-        page: int = 1,
-        per_page: int = 12,
+        filters: CatalogProductsFiltersInput | None = None,
     ) -> CatalogProductsResult:
         """Return the public catalog list from the shared selector pipeline."""
-        normalized_per_page = per_page if per_page in {12, 24, 48} else 12
-        normalized_page = max(page, 1)
+        resolved_filters = filters or CatalogProductsFiltersInput()
+        normalized_per_page = (
+            resolved_filters.per_page
+            if resolved_filters.per_page in {12, 24, 48}
+            else 12
+        )
+        normalized_page = max(resolved_filters.page, 1)
 
         filter_data: dict[str, str | float] = {
-            "sort_by": sort_by,
-            "sort_dir": sort_dir,
+            "sort_by": resolved_filters.sort_by,
+            "sort_dir": resolved_filters.sort_dir,
         }
 
         optional_filters = {
-            "search": search,
-            "brand": brand,
-            "price_min": price_min,
-            "price_max": price_max,
-            "price_per_gram_min": price_per_gram_min,
-            "price_per_gram_max": price_per_gram_max,
-            "concentration_min": concentration_min,
-            "concentration_max": concentration_max,
+            "search": resolved_filters.search,
+            "brand": resolved_filters.brand,
+            "price_min": resolved_filters.price_min,
+            "price_max": resolved_filters.price_max,
+            "price_per_gram_min": resolved_filters.price_per_gram_min,
+            "price_per_gram_max": resolved_filters.price_per_gram_max,
+            "concentration_min": resolved_filters.concentration_min,
+            "concentration_max": resolved_filters.concentration_max,
         }
         filter_data.update(
             {

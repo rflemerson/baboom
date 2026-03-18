@@ -7,18 +7,20 @@ describe('useCatalogFilters', () => {
     const { variables } = useCatalogFilters()
 
     expect(variables.value).toEqual({
-      brand: null,
-      concentrationMax: null,
-      concentrationMin: null,
-      page: 1,
-      perPage: 12,
-      priceMax: null,
-      priceMin: null,
-      pricePerGramMax: null,
-      pricePerGramMin: null,
-      search: null,
-      sortBy: 'price_per_gram',
-      sortDir: 'asc',
+      filters: {
+        brand: null,
+        concentrationMax: null,
+        concentrationMin: null,
+        page: 1,
+        perPage: 12,
+        priceMax: null,
+        priceMin: null,
+        pricePerGramMax: null,
+        pricePerGramMin: null,
+        search: null,
+        sortBy: 'price_per_gram',
+        sortDir: 'asc',
+      },
     })
   })
 
@@ -70,11 +72,11 @@ describe('useCatalogFilters', () => {
     const { setSearch, variables } = useCatalogFilters()
 
     setSearch('whey')
-    expect(variables.value.search).toBeNull()
+    expect(variables.value.filters?.search).toBeNull()
 
     await vi.advanceTimersByTimeAsync(CATALOG_SEARCH_DEBOUNCE_MS)
 
-    expect(variables.value.search).toBe('whey')
+    expect(variables.value.filters?.search).toBe('whey')
 
     vi.useRealTimers()
   })
