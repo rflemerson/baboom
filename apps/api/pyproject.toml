@@ -23,7 +23,6 @@ dependencies = [
   "curl_cffi",
   "django-celery-results",
   "django-celery-beat",
-  "strawberry-graphql-django",
   "strawberry-graphql",
   "pydantic",
 ]

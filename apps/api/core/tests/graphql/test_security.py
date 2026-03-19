@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import Any, cast
 
 from django.test import RequestFactory, TestCase
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
 from core.models import APIKey
-
-if TYPE_CHECKING:
-    from django.http import HttpResponse
 
 
 class GraphQLSecurityTests(TestCase):
@@ -39,7 +36,7 @@ class GraphQLSecurityTests(TestCase):
         )
         response = self.view(request)
         if hasattr(response, "content"):
-            return json.loads(cast("HttpResponse", response).content)
+            return json.loads(cast("Any", response).content)
         return json.loads(b"{}")
 
     def test_query_without_api_key(self) -> None:

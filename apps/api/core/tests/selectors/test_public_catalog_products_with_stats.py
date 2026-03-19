@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Protocol, cast
+from typing import Any, cast
 
 from django.test import TestCase
 
@@ -17,16 +17,6 @@ from core.models import (
     Store,
 )
 from core.selectors import public_catalog_products_with_stats
-
-
-class AnnotatedCatalogProduct(Protocol):
-    """Protocol for selector results with catalog annotations."""
-
-    concentration: Decimal | None
-    total_protein: Decimal | None
-    price_per_gram: Decimal | None
-    external_link: str | None
-    last_price: Decimal | None
 
 
 class ProductStatsTest(TestCase):
@@ -76,10 +66,7 @@ class ProductStatsTest(TestCase):
         - Price per gram of protein (R$ 100 / 800g = R$ 0.125)
         """
         # Act
-        p = cast(
-            "AnnotatedCatalogProduct | None",
-            public_catalog_products_with_stats().first(),
-        )
+        p = cast("Any | None", public_catalog_products_with_stats().first())
 
         # Assert
         if p is None:
@@ -101,7 +88,7 @@ class ProductStatsTest(TestCase):
 
         # Act
         qs = public_catalog_products_with_stats().filter(pk=p2.pk)
-        result = cast("AnnotatedCatalogProduct | None", qs.first())
+        result = cast("Any | None", qs.first())
 
         # Assert
         if result is None:

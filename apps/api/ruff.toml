@@ -51,3 +51,7 @@ select = [
     "TC",  # type-checking imports
     "D",   # pydocstyle
 ]
+
+[lint.per-file-ignores]
+"**/tests.py" = ["S101"]
+"**/tests/**/*.py" = ["S101"]

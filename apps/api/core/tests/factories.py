@@ -6,17 +6,11 @@ import factory
 from factory.django import DjangoModelFactory
 
 from core.models import (
-    AlertSubscriber,
     Brand,
-    Category,
-    Flavor,
     NutritionFacts,
     Product,
-    ProductNutrition,
-    ProductPriceHistory,
     ProductStore,
     Store,
-    Tag,
 )
 
 
@@ -44,62 +38,6 @@ class StoreFactory(DjangoModelFactory):
     name = factory.Sequence(lambda n: f"store-{n}")
     display_name = factory.Sequence(lambda n: f"Store {n}")
     description = factory.Faker("paragraph")
-
-
-class FlavorFactory(DjangoModelFactory):
-    """Factory for Flavor model."""
-
-    class Meta:
-        """Meta class."""
-
-        model = Flavor
-
-    name = factory.Sequence(lambda n: f"flavor-{n}")
-    description = factory.Faker("sentence")
-
-
-class TagFactory(DjangoModelFactory):
-    """Factory for Tag model."""
-
-    class Meta:
-        """Meta class."""
-
-        model = Tag
-
-    name = factory.Sequence(lambda n: f"tag-{n}")
-    description = factory.Faker("sentence")
-
-    @classmethod
-    def _create(
-        cls,
-        model_class: type[Tag],
-        *_args: object,
-        **kwargs: object,
-    ) -> Tag:
-        """Override to use treebeard's add_root method."""
-        return model_class.add_root(**kwargs)
-
-
-class CategoryFactory(DjangoModelFactory):
-    """Factory for Category model."""
-
-    class Meta:
-        """Meta class."""
-
-        model = Category
-
-    name = factory.Sequence(lambda n: f"category-{n}")
-    description = factory.Faker("sentence")
-
-    @classmethod
-    def _create(
-        cls,
-        model_class: type[Category],
-        *_args: object,
-        **kwargs: object,
-    ) -> Category:
-        """Override to use treebeard's add_root method."""
-        return model_class.add_root(**kwargs)
 
 
 class ProductFactory(DjangoModelFactory):
@@ -130,18 +68,6 @@ class ProductStoreFactory(DjangoModelFactory):
     product_link = factory.Faker("url")
 
 
-class ProductPriceHistoryFactory(DjangoModelFactory):
-    """Factory for ProductPriceHistory model."""
-
-    class Meta:
-        """Meta class."""
-
-        model = ProductPriceHistory
-
-    store_product_link = factory.SubFactory(ProductStoreFactory)
-    price = factory.Faker("pydecimal", left_digits=3, right_digits=2, positive=True)
-
-
 class NutritionFactsFactory(DjangoModelFactory):
     """Factory for NutritionFacts model."""
 
@@ -167,25 +93,3 @@ class NutritionFactsFactory(DjangoModelFactory):
     energy_kcal = factory.Faker("random_int", min=80, max=200)
     description = factory.Faker("sentence")
 
-
-class ProductNutritionFactory(DjangoModelFactory):
-    """Factory for ProductNutrition model."""
-
-    class Meta:
-        """Meta class."""
-
-        model = ProductNutrition
-
-    product = factory.SubFactory(ProductFactory)
-    nutrition_facts = factory.SubFactory(NutritionFactsFactory)
-
-
-class AlertSubscriberFactory(DjangoModelFactory):
-    """Factory for AlertSubscriber model."""
-
-    class Meta:
-        """Meta class."""
-
-        model = AlertSubscriber
-
-    email = factory.Faker("email")

@@ -13,7 +13,6 @@ Usage:
         data = response.json()
 """
 
-import functools
 import logging
 from dataclasses import dataclass, field
 
@@ -150,18 +149,16 @@ class HttpClient:
                 ):
                     logger.debug("Success with %s", browser)
                     return response
-                if response.status_code == HTTP_FORBIDDEN_CODE:
-                    logger.debug("%s blocked (403)", browser)
-                    continue
-                # Return non-403 responses even if they might be errors.
-                return response
 
             except cffi_requests.exceptions.RequestException as exc:
                 logger.debug("%s error: %s", browser, exc)
                 continue
-            else:
-                # Return non-403 responses even if they might be errors.
-                return response
+
+            if response.status_code == HTTP_FORBIDDEN_CODE:
+                logger.debug("%s blocked (403)", browser)
+                continue
+            # Return non-403 responses even if they might be errors.
+            return response
 
         logger.warning("All impersonations failed for: %s", url)
         return None
@@ -184,12 +181,3 @@ class HttpClient:
         except std_requests.exceptions.RequestException:
             logger.exception("Request failed")
             return None
-
-
-# Singleton instance for convenience
-
-
-@functools.lru_cache(maxsize=1)
-def get_client() -> HttpClient:
-    """Get or create the default HTTP client instance."""
-    return HttpClient()

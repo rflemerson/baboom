@@ -21,32 +21,7 @@ class ProductFilter(django_filters.FilterSet):
         ("total_protein", _("Protein")),
         ("concentration", _("Concentration")),
     )
-    SORT_DIR_CHOICES = (
-        ("asc", _("Low to High")),
-        ("desc", _("High to Low")),
-    )
     VALID_SORT_FIELDS: ClassVar[set[str]] = {key for key, _ in SORT_CHOICES}
-
-    @property
-    def sort_choices(self) -> list[tuple[str, str, bool]]:
-        """Return sort choices with selected state."""
-        current = self.data.get("sort_by", "price_per_gram")
-        return [(key, str(label), key == current) for key, label in self.SORT_CHOICES]
-
-    @property
-    def current_sort_label(self) -> str:
-        """Return the label of the currently selected sort field."""
-        return str(dict(self.SORT_CHOICES).get(self.current_sort_key, _("Price/g")))
-
-    @property
-    def current_sort_key(self) -> str:
-        """Return the current sort key with default fallback."""
-        return self.data.get("sort_by", "price_per_gram")
-
-    @property
-    def current_sort_dir(self) -> str:
-        """Return the current sort direction."""
-        return self.data.get("sort_dir", "asc")
 
     search = django_filters.CharFilter(
         method="filter_search",

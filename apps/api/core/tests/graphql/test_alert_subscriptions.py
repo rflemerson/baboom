@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import Any, cast
 
 from django.test import RequestFactory, TestCase
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
 from core.models import AlertSubscriber, APIKey
-
-if TYPE_CHECKING:
-    from django.http import HttpResponse
 
 
 class GraphQLAlertSubscriptionTests(TestCase):
@@ -47,7 +44,7 @@ class GraphQLAlertSubscriptionTests(TestCase):
             HTTP_X_API_KEY=self.valid_key,
         )
         response = self.view(request)
-        return json.loads(cast("HttpResponse", response).content)
+        return json.loads(cast("Any", response).content)
 
     def test_subscribe_alerts_creates_new_subscriber(self) -> None:
         """Test that a new email subscription succeeds."""
