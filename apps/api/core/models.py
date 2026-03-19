@@ -171,29 +171,6 @@ class Category(MP_Node, BaseModel):
         return self.name
 
 
-class Nutrient(BaseModel):
-    """Normalized nutrient definition (Macro or Micro)."""
-
-    name = models.CharField(_("Name"), max_length=100, unique=True)
-    slug = models.SlugField(_("Slug"), max_length=100, unique=True)
-    is_macro = models.BooleanField(
-        _("Is Macro?"),
-        default=False,
-        help_text=_("Is this a macronutrient?"),
-    )
-
-    class Meta:
-        """Meta options."""
-
-        verbose_name = _("Nutrient")
-        verbose_name_plural = _("Nutrients")
-        ordering = ("name",)
-
-    def __str__(self) -> str:
-        """Return name."""
-        return self.name
-
-
 class Product(BaseModel):
     """Main product model."""
 
@@ -266,12 +243,6 @@ class Product(BaseModel):
     tags: models.ManyToManyField = models.ManyToManyField(
         Tag,
         verbose_name=_("Product Tags"),
-        blank=True,
-    )
-
-    nutrient_sources: models.ManyToManyField = models.ManyToManyField(
-        Nutrient,
-        verbose_name=_("Nutrient Sources"),
         blank=True,
     )
 

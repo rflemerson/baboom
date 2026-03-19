@@ -27,7 +27,6 @@ from core.models import (
 )
 
 from .combo_resolution import ComboResolutionService
-from .enrichment import EnrichmentService
 
 if TYPE_CHECKING:
     from .types import ProductContentUpdateInput, ProductCreateInput
@@ -99,12 +98,6 @@ def product_create(data: ProductCreateInput) -> Product:
                 # Only create direct nutrition profiles for Simple products
                 # Or if Combo has explicit nutrition override (future proofing)
                 _handle_nutrition_creation(product, data.nutrition)
-
-            # 7. Enrichment (Auto-tagging sources)
-            EnrichmentService().enrich_product(
-                product,
-                extra_claims=data.nutrient_claims,
-            )
 
             return product
 

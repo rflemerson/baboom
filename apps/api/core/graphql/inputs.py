@@ -133,11 +133,6 @@ class ProductInput:
         description="List of components if combo",
     )
 
-    nutrient_claims: list[str] | None = strawberry.field(
-        default=None,
-        description="List of nutrient slugs claimed by source",
-    )
-
 
 @strawberry.input(description="Input for updating product content only")
 class ProductContentUpdateInput:

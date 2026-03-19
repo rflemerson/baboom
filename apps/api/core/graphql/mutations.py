@@ -102,7 +102,6 @@ class CoreMutation:
                 ]
                 if data.components
                 else None,
-                nutrient_claims=data.nutrient_claims,
             )
 
             product = product_create(data=input_data)

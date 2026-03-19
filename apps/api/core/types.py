@@ -34,7 +34,6 @@ class ProductCreateInput(BaseModel):
     # Combo fields
     is_combo: bool = False
     components: list[ProductComponentInput] | None = None
-    nutrient_claims: list[str] | None = None
 
 
 class ProductContentUpdateInput(BaseModel):
