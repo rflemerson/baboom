@@ -92,4 +92,3 @@ class NutritionFactsFactory(DjangoModelFactory):
     )
     energy_kcal = factory.Faker("random_int", min=80, max=200)
     description = factory.Faker("sentence")
-

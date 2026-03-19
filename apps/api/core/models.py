@@ -114,7 +114,7 @@ class Flavor(BaseModel):
         return self.name
 
 
-class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
+class Tag(MP_Node, BaseModel):
     """Hierarchical tag model."""
 
     name: models.CharField = models.CharField(
@@ -142,7 +142,7 @@ class Tag(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
         return self.name
 
 
-class Category(MP_Node, BaseModel):  # type: ignore[django-manager-missing]
+class Category(MP_Node, BaseModel):
     """Hierarchical category model."""
 
     name: models.CharField = models.CharField(
@@ -297,7 +297,6 @@ class Product(BaseModel):
         help_text=_("Timestamp of last content update by LLM agent"),
     )
 
-    # Product change history
     history = HistoricalRecords()
 
     class Meta:
@@ -512,6 +511,20 @@ class ProductPriceHistory(models.Model):
 class NutritionFacts(BaseModel):
     """Nutritional information model."""
 
+    HASH_FIELDS = (
+        "serving_size_grams",
+        "energy_kcal",
+        "proteins",
+        "carbohydrates",
+        "total_sugars",
+        "added_sugars",
+        "total_fats",
+        "saturated_fats",
+        "trans_fats",
+        "dietary_fiber",
+        "sodium",
+    )
+
     description = models.CharField(
         _("Internal Label"),
         max_length=200,
@@ -592,11 +605,46 @@ class NutritionFacts(BaseModel):
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Save instance with hash generation."""
-        # Automatically generate hash using centralized logic.
-        # If micronutrients are not passed (e.g. admin), generate hash only from macros.
         if not self.content_hash:
             self.content_hash = self.generate_hash(source=self)
         super().save(*args, **kwargs)
+
+    @staticmethod
+    def _format_hash_value(value: object) -> str:
+        if value is None:
+            return "0.00"
+
+        try:
+            decimal_value = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return "0.00"
+
+        return f"{decimal_value:.2f}"
+
+    @staticmethod
+    def _get_source_value(
+        source: NutritionFacts | Mapping[str, object],
+        key: str,
+    ) -> object:
+        if isinstance(source, Mapping):
+            return source.get(key)
+        return getattr(source, key, None)
+
+    @classmethod
+    def _serialize_micronutrient(
+        cls,
+        micronutrient: Micronutrient | MicronutrientHashInput,
+    ) -> str:
+        if isinstance(micronutrient, Mapping):
+            name = micronutrient.get("name")
+            value = micronutrient.get("value")
+            unit = micronutrient.get("unit", "mg")
+        else:
+            name = micronutrient.name
+            value = micronutrient.value
+            unit = micronutrient.unit
+
+        return f"{name}:{cls._format_hash_value(value)}:{unit}"
 
     @classmethod
     def generate_hash(
@@ -614,44 +662,21 @@ class NutritionFacts(BaseModel):
                             Required if 'source' is dict, or to complement the hash.
 
         """
-
-        def fmt(val: object) -> str:
-            try:
-                if val is None:
-                    return "0.00"
-            except (ValueError, TypeError, InvalidOperation):
-                return "0.00"
-
-            d = Decimal(str(val))
-            return f"{d:.2f}"
-
-        def get_val(key: str) -> object:
-            if isinstance(source, Mapping):
-                return source.get(key)
-            return getattr(source, key, None)
-
         parts = [
-            fmt(get_val("serving_size_grams")),
-            fmt(get_val("energy_kcal")),
-            fmt(get_val("proteins")),
-            fmt(get_val("carbohydrates")),
-            fmt(get_val("total_sugars")),
-            fmt(get_val("added_sugars")),
-            fmt(get_val("total_fats")),
-            fmt(get_val("saturated_fats")),
-            fmt(get_val("trans_fats")),
-            fmt(get_val("dietary_fiber")),
-            fmt(get_val("sodium")),
+            cls._format_hash_value(cls._get_source_value(source, field_name))
+            for field_name in cls.HASH_FIELDS
         ]
 
         if micronutrients:
-            micros_sorted = sorted(micronutrients, key=lambda x: x["name"])
-            for m in micros_sorted:
-                name = m.get("name") if isinstance(m, dict) else m.name
-                val = m.get("value") if isinstance(m, dict) else m.value
-                unit = m.get("unit", "mg") if isinstance(m, dict) else m.unit
-
-                parts.append(f"{name}:{fmt(val)}:{unit}")
+            parts.extend(
+                cls._serialize_micronutrient(micronutrient)
+                for micronutrient in sorted(
+                    micronutrients,
+                    key=lambda item: item["name"]
+                    if isinstance(item, Mapping)
+                    else item.name,
+                )
+            )
 
         raw_string = "|".join(parts)
         return hashlib.sha256(raw_string.encode()).hexdigest()
