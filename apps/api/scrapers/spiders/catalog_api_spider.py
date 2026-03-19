@@ -41,6 +41,10 @@ class CatalogApiSpider(BaseSpider):
         """Fetch categories dynamically from the target platform."""
         raise NotImplementedError
 
+    def fetch_categories(self) -> list[str]:
+        """Return categories using the spider discovery strategy."""
+        return self._fetch_categories()
+
     def _crawl_category(
         self,
         category: str,

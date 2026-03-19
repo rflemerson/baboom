@@ -53,11 +53,10 @@ class GraphQLAlertSubscriptionTests(TestCase):
         """Test that a new email subscription succeeds."""
         result = self._execute_mutation("new-subscriber@example.com")
 
-        self.assertTrue(result["data"]["subscribeAlerts"]["success"])
-        self.assertFalse(result["data"]["subscribeAlerts"]["alreadySubscribed"])
-        self.assertEqual(
-            result["data"]["subscribeAlerts"]["email"],
-            "new-subscriber@example.com",
+        assert result["data"]["subscribeAlerts"]["success"]
+        assert not result["data"]["subscribeAlerts"]["alreadySubscribed"]
+        assert (
+            result["data"]["subscribeAlerts"]["email"] == "new-subscriber@example.com"
         )
 
     def test_subscribe_alerts_returns_duplicate_state(self) -> None:
@@ -66,17 +65,14 @@ class GraphQLAlertSubscriptionTests(TestCase):
 
         result = self._execute_mutation(subscriber.email)
 
-        self.assertFalse(result["data"]["subscribeAlerts"]["success"])
-        self.assertTrue(result["data"]["subscribeAlerts"]["alreadySubscribed"])
-        self.assertEqual(result["data"]["subscribeAlerts"]["email"], subscriber.email)
+        assert not result["data"]["subscribeAlerts"]["success"]
+        assert result["data"]["subscribeAlerts"]["alreadySubscribed"]
+        assert result["data"]["subscribeAlerts"]["email"] == subscriber.email
 
     def test_subscribe_alerts_returns_validation_errors(self) -> None:
         """Test that invalid emails return formatted validation errors."""
         result = self._execute_mutation("not-an-email")
 
-        self.assertFalse(result["data"]["subscribeAlerts"]["success"])
-        self.assertEqual(result["data"]["subscribeAlerts"]["email"], "not-an-email")
-        self.assertEqual(
-            result["data"]["subscribeAlerts"]["errors"][0]["field"],
-            "email",
-        )
+        assert not result["data"]["subscribeAlerts"]["success"]
+        assert result["data"]["subscribeAlerts"]["email"] == "not-an-email"
+        assert result["data"]["subscribeAlerts"]["errors"][0]["field"] == "email"

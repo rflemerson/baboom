@@ -85,14 +85,14 @@ class ProductStatsTest(TestCase):
         if p is None:
             self.fail("Product not found")
 
-        self.assertEqual(p.concentration, Decimal("80.0"))
+        assert p.concentration == Decimal("80.0")
 
-        self.assertEqual(p.total_protein, Decimal("800.00"))
+        assert p.total_protein == Decimal("800.00")
 
         # Note: Database might round depending on precision, checking 2 places
-        self.assertEqual(round(p.price_per_gram, 3), Decimal("0.125"))
+        assert round(p.price_per_gram, 3) == Decimal("0.125")
 
-        self.assertEqual(p.external_link, "http://example.com")
+        assert p.external_link == "http://example.com"
 
     def test_missing_price_handling(self) -> None:
         """Ensure products without price don't crash the queryset."""
@@ -107,6 +107,6 @@ class ProductStatsTest(TestCase):
         if result is None:
             self.fail("Product not found")
 
-        self.assertIsNone(result.last_price)
-        self.assertIsNone(result.price_per_gram)
-        self.assertIsNone(result.external_link)
+        assert result.last_price is None
+        assert result.price_per_gram is None
+        assert result.external_link is None

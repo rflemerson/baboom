@@ -94,10 +94,7 @@ class EnrichmentService:
                 is_creatine = "creatina" in name_lower or "creatine" in name_lower
                 if is_creatine and (
                     (micro.unit == "g" and val >= CREATINE_GRAMS_THRESHOLD)
-                    or (
-                        micro.unit == "mg"
-                        and val >= CREATINE_MILLIGRAMS_THRESHOLD
-                    )
+                    or (micro.unit == "mg" and val >= CREATINE_MILLIGRAMS_THRESHOLD)
                 ):
                     sources.add("creatine")
 

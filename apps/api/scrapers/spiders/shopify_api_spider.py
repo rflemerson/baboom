@@ -198,6 +198,10 @@ class ShopifyApiSpider(CatalogApiSpider):
             cents_for_digit_string=self.PRICE_DIGIT_STR_IS_CENTS,
         )
 
+    def parse_price(self, raw_price: object) -> float | None:
+        """Expose Shopify price normalization for reuse and tests."""
+        return self._parse_price(raw_price)
+
     def _select_variant(self, variants: list[object]) -> dict[str, object] | None:
         """Select first available variant, fallback to first."""
         if not variants:
@@ -273,6 +277,14 @@ class ShopifyApiSpider(CatalogApiSpider):
             return None
 
         return saved
+
+    def process_item(
+        self,
+        data: dict[str, object],
+        category_name: str,
+    ) -> object | None:
+        """Normalize and persist one product from a category payload."""
+        return self._process_and_save(data, category_name)
 
     def _build_product_context(self, item: dict) -> str:
         """Build structured context for downstream agents."""

@@ -1,5 +1,7 @@
 """Base spider for VTEX GraphQL catalog backends."""
 
+from __future__ import annotations
+
 import base64
 import json
 import logging
@@ -19,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 50
 VTEX_GRAPHQL_SUCCESS_CODE = 200
+VTEX_GRAPHQL_ITEM_PROCESSING_EXCEPTIONS = (
+    KeyError,
+    TypeError,
+    ValueError,
+)
 
 
 class VtexGraphqlSpider(CatalogApiSpider):
@@ -88,7 +95,7 @@ class VtexGraphqlSpider(CatalogApiSpider):
                     saved_obj = self._process_and_save(item, category)
                     if saved_obj:
                         products.append(saved_obj)
-                except Exception as exc:
+                except VTEX_GRAPHQL_ITEM_PROCESSING_EXCEPTIONS as exc:
                     logger.debug("Skipping item: %s", exc)
 
             if len(items) < step:
@@ -277,7 +284,7 @@ class VtexGraphqlSpider(CatalogApiSpider):
             )
             saved = ScraperService.save_product(input_data)
             persist_json_context(saved, self._build_product_context(item))
-        except Exception as exc:
+        except VTEX_GRAPHQL_ITEM_PROCESSING_EXCEPTIONS as exc:
             logger.debug("Item parse error: %s", exc)
             return None
 
@@ -303,3 +310,11 @@ class VtexGraphqlSpider(CatalogApiSpider):
             "items": item.get("items") or [],
         }
         return json.dumps(payload, ensure_ascii=False)
+
+    def process_item(
+        self,
+        item: dict[str, object],
+        category_name: str,
+    ) -> object | None:
+        """Normalize and persist one VTEX GraphQL product."""
+        return self._process_and_save(item, category_name)

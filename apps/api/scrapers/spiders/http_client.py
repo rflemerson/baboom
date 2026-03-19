@@ -129,9 +129,7 @@ class HttpClient:
         """Use curl_cffi with TLS fingerprint impersonation."""
         impersonate = options.impersonate or self.default_impersonate
         impersonations = (
-            self.IMPERSONATIONS
-            if options.try_all_impersonations
-            else [impersonate]
+            self.IMPERSONATIONS if options.try_all_impersonations else [impersonate]
         )
 
         for browser in impersonations:
@@ -147,9 +145,8 @@ class HttpClient:
                     verify=options.verify,
                 )
 
-                if (
-                    response.status_code == HTTP_SUCCESS_CODE
-                    and not self._is_blocked(response.text)
+                if response.status_code == HTTP_SUCCESS_CODE and not self._is_blocked(
+                    response.text,
                 ):
                     logger.debug("Success with %s", browser)
                     return response

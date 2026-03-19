@@ -65,8 +65,7 @@ class WapStoreApiSpider(CatalogApiSpider):
             "Origin": self.BASE_URL,
             "Referer": f"{self.BASE_URL}/",
             "Sec-Ch-Ua": (
-                '"Chromium";v="120", "Google Chrome";v="120", '
-                '"Not_A Brand";v="8"'
+                '"Chromium";v="120", "Google Chrome";v="120", "Not_A Brand";v="8"'
             ),
             "Sec-Ch-Ua-Mobile": "?0",
             "Sec-Ch-Ua-Platform": '"Linux"',
@@ -199,10 +198,7 @@ class WapStoreApiSpider(CatalogApiSpider):
                     verify=verify,
                 ),
             )
-            if (
-                resp is not None
-                and resp.status_code not in HTTP_RETRYABLE_STATUS_CODES
-            ):
+            if resp is not None and resp.status_code not in HTTP_RETRYABLE_STATUS_CODES:
                 self._consecutive_http_failures = 0
                 return resp
             if attempt < attempts:
@@ -302,6 +298,10 @@ class WapStoreApiSpider(CatalogApiSpider):
             return ScrapedItem.StockStatus.AVAILABLE
         return ScrapedItem.StockStatus.OUT_OF_STOCK
 
+    def is_valid_category_path(self, path: str) -> bool:
+        """Return whether a menu path should be crawled as a category."""
+        return self._is_valid_category_path(path)
+
     def _is_valid_category_path(self, path: str) -> bool:
         """Filter menu paths to product category routes."""
         invalid_tokens = {
@@ -320,6 +320,10 @@ class WapStoreApiSpider(CatalogApiSpider):
 
     def _parse_price(self, raw_price: object) -> float | None:
         return parse_positive_price(raw_price)
+
+    def parse_price(self, raw_price: object) -> float | None:
+        """Expose Wap.Store price normalization for reuse and tests."""
+        return self._parse_price(raw_price)
 
     def _parse_stock(self, quantity: object) -> int | None:
         return parse_optional_int(quantity)
@@ -340,3 +344,11 @@ class WapStoreApiSpider(CatalogApiSpider):
             },
         }
         return json.dumps(payload, ensure_ascii=False)
+
+    def process_item(
+        self,
+        item: dict[str, object],
+        category: str,
+    ) -> object | None:
+        """Normalize and persist one Wap.Store product."""
+        return self._process_and_save(item, category)

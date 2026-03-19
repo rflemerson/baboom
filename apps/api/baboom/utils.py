@@ -29,8 +29,7 @@ def format_graphql_errors(e: DjangoValidationError) -> list[ValidationError]:
             errors.extend(ValidationError(field=field, message=msg) for msg in msgs)
     elif hasattr(e, "error_list"):
         errors.extend(
-            ValidationError(field="non_field_errors", message=msg)
-            for msg in e.messages
+            ValidationError(field="non_field_errors", message=msg) for msg in e.messages
         )
     else:
         errors.append(ValidationError(field="unknown", message=str(e)))

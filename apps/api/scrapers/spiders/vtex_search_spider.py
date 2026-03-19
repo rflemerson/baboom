@@ -1,5 +1,7 @@
 """Base spider for VTEX legacy search APIs."""
 
+from __future__ import annotations
+
 import json
 import logging
 
@@ -19,6 +21,11 @@ logger = logging.getLogger(__name__)
 VTEX_CATEGORY_TREE_SUCCESS_CODE = 200
 VTEX_SUCCESS_CODES = (VTEX_CATEGORY_TREE_SUCCESS_CODE, 206)
 VTEX_PAGE_SIZE = 50
+VTEX_ITEM_PROCESSING_EXCEPTIONS = (
+    KeyError,
+    TypeError,
+    ValueError,
+)
 
 
 class VtexSearchSpider(CatalogApiSpider):
@@ -127,7 +134,7 @@ class VtexSearchSpider(CatalogApiSpider):
                         saved_obj = self._process_and_save(item, category_slug)
                         if saved_obj:
                             products.append(saved_obj)
-                    except Exception as exc:
+                    except VTEX_ITEM_PROCESSING_EXCEPTIONS as exc:
                         logger.debug("Skipping item: %s", exc)
 
                 if len(data) < step:
@@ -192,7 +199,7 @@ class VtexSearchSpider(CatalogApiSpider):
             )
             saved = ScraperService.save_product(input_data)
             persist_json_context(saved, self._build_product_context(item))
-        except Exception as exc:
+        except VTEX_ITEM_PROCESSING_EXCEPTIONS as exc:
             logger.debug("Item parse error: %s", exc)
             return None
 
@@ -222,6 +229,10 @@ class VtexSearchSpider(CatalogApiSpider):
     def _parse_price(self, raw_price: object) -> float | None:
         return parse_positive_price(raw_price)
 
+    def parse_price(self, raw_price: object) -> float | None:
+        """Expose VTEX price normalization for reuse and tests."""
+        return self._parse_price(raw_price)
+
     def _build_product_context(self, item: dict) -> str:
         """Build structured VTEX context for downstream agents."""
         payload = {
@@ -237,3 +248,11 @@ class VtexSearchSpider(CatalogApiSpider):
             "items": item.get("items") or [],
         }
         return json.dumps(payload, ensure_ascii=False)
+
+    def process_item(
+        self,
+        item: dict[str, object],
+        category: str,
+    ) -> object | None:
+        """Normalize and persist one VTEX search product."""
+        return self._process_and_save(item, category)

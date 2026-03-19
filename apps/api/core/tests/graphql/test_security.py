@@ -45,20 +45,20 @@ class GraphQLSecurityTests(TestCase):
     def test_query_without_api_key(self) -> None:
         """Test that requests without API key are denied."""
         result = self._execute_query()
-        self.assertIn("errors", result)
-        self.assertEqual(result["errors"][0]["message"], "API Key required")
+        assert "errors" in result
+        assert result["errors"][0]["message"] == "API Key required"
 
     def test_query_with_valid_api_key(self) -> None:
         """Test that requests with valid API key are allowed."""
         result = self._execute_query(headers={"HTTP_X_API_KEY": self.valid_key})
-        self.assertIn("data", result)
-        self.assertEqual(result["data"]["hello"], "Baboom GraphQL API is Online")
+        assert "data" in result
+        assert result["data"]["hello"] == "Baboom GraphQL API is Online"
 
     def test_query_with_invalid_api_key(self) -> None:
         """Test that requests with invalid API key are denied."""
         result = self._execute_query(headers={"HTTP_X_API_KEY": "invalid-key"})
-        self.assertIn("errors", result)
-        self.assertEqual(result["errors"][0]["message"], "API Key required")
+        assert "errors" in result
+        assert result["errors"][0]["message"] == "API Key required"
 
     def test_query_with_disabled_api_key(self) -> None:
         """Test that requests with disabled API key are denied."""
@@ -66,5 +66,5 @@ class GraphQLSecurityTests(TestCase):
         self.api_key_obj.save()
 
         result = self._execute_query(headers={"HTTP_X_API_KEY": self.valid_key})
-        self.assertIn("errors", result)
-        self.assertEqual(result["errors"][0]["message"], "API Key required")
+        assert "errors" in result
+        assert result["errors"][0]["message"] == "API Key required"
