@@ -36,10 +36,6 @@ This document maps the main use cases to the current service layer.
 
 ## ComboResolutionService
 
-### Owns
-
-- [UC-04 Manage Combo Components From Agent](./use_cases/agent.md#uc-04-manage-combo-components-from-agent)
-
 ### Supports
 
 - [UC-03 Create Combo Product From Agent](./use_cases/agent.md#uc-03-create-combo-product-from-agent)
@@ -48,7 +44,8 @@ This document maps the main use cases to the current service layer.
 
 ### Owns
 
-- [UC-01 Link Scraped Item To Product](./use_cases/internal.md#uc-01-link-scraped-item-to-product)
+- [UC-04 Link Scraped Item To Product Store From Agent](./use_cases/agent.md#uc-04-link-scraped-item-to-product-store-from-agent)
+- [UC-01 Link Scraped Item To Product Store](./use_cases/internal.md#uc-01-link-scraped-item-to-product-store)
 
 ### Supports
 

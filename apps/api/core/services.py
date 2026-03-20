@@ -179,8 +179,105 @@ class ComboResolutionService:
         )
 
 
+class TaxonomyResolutionService:
+    """Resolve hierarchical catalog taxonomy references."""
+
+    def resolve_category(
+        self,
+        category_name: str | list[str] | None,
+    ) -> Category | None:
+        """Resolve a category from a flat name or hierarchical path."""
+        if not category_name:
+            return None
+
+        category_path = (
+            [category_name] if isinstance(category_name, str) else category_name
+        )
+
+        category = None
+        parent = None
+        for category_part in category_path:
+            category = Category.objects.filter(name=category_part).first()
+            if not category:
+                category = (
+                    parent.add_child(name=category_part)
+                    if parent
+                    else Category.add_root(name=category_part)
+                )
+            parent = category
+        return category
+
+    def resolve_update_category(
+        self,
+        category_name: str | list[str] | None,
+    ) -> tuple[Category | None, bool]:
+        """Resolve the category update and whether it should replace current value."""
+        if category_name is None:
+            return None, False
+        if category_name == "":
+            return None, True
+        return self.resolve_category(category_name), True
+
+    def resolve_tags(self, tags: list[str] | list[list[str]]) -> list[Tag]:
+        """Resolve flat or hierarchical tag inputs to persisted tags."""
+        tag_objects = []
+        for tag_entry in tags:
+            tag_path = [tag_entry] if isinstance(tag_entry, str) else tag_entry
+
+            parent = None
+            last_tag = None
+            for tag_part in tag_path:
+                tag = Tag.objects.filter(name=tag_part).first()
+                if not tag:
+                    tag = (
+                        parent.add_child(name=tag_part)
+                        if parent
+                        else Tag.add_root(name=tag_part)
+                    )
+                parent = tag
+                last_tag = tag
+
+            if last_tag:
+                tag_objects.append(last_tag)
+        return tag_objects
+
+    def resolve_update_tags(
+        self,
+        tags: list[str] | list[list[str]] | None,
+    ) -> list[Tag] | None:
+        """Resolve flat or hierarchical tag inputs for metadata updates."""
+        if tags is None:
+            return None
+        return self.resolve_tags(tags)
+
+
 class ProductNutritionService:
     """Attach typed nutrition profiles to a product."""
+
+    MODE_NONE = "none"
+    MODE_EXISTING = "existing"
+    MODE_NEW = "new"
+
+    def apply_selection(
+        self,
+        product: Product,
+        *,
+        nutrition_mode: str,
+        existing_facts: NutritionFacts | None = None,
+        nutrition_profiles_data: list[ProductNutritionPayload] | None = None,
+    ) -> None:
+        """Apply the nutrition workflow selected by the admin boundary."""
+        if nutrition_mode == self.MODE_NONE:
+            self.clear_profiles(product)
+            return
+
+        if nutrition_mode == self.MODE_EXISTING:
+            if existing_facts is not None:
+                self.replace_with_existing_facts(product, existing_facts)
+            return
+
+        if nutrition_mode == self.MODE_NEW and nutrition_profiles_data is not None:
+            self.replace_profiles(product, nutrition_profiles_data)
 
     def replace_profiles(
         self,
@@ -439,8 +536,13 @@ class ProductStoreService:
             if store_id not in desired_store_ids:
                 product_store.delete()
 
+
 class ProductCreateService:
     """Create products and their related catalog records."""
+
+    def __init__(self) -> None:
+        """Initialize collaborators used by the create workflow."""
+        self.taxonomy_resolution = TaxonomyResolutionService()
 
     def execute(self, data: ProductCreateInput) -> Product:
         """Create a product with all related data."""
@@ -449,7 +551,7 @@ class ProductCreateService:
         try:
             with transaction.atomic():
                 brand = self._resolve_brand(data.brand_name)
-                category = self._resolve_category(data.category_name)
+                category = self.taxonomy_resolution.resolve_category(data.category_name)
 
                 product = Product.objects.create(
                     name=data.name,
@@ -464,7 +566,7 @@ class ProductCreateService:
                 )
 
                 if data.tags:
-                    product.tags.set(self._resolve_tags(data.tags))
+                    product.tags.set(self.taxonomy_resolution.resolve_tags(data.tags))
 
                 if data.stores:
                     ProductStoreService().replace_listings(product, data.stores)
@@ -495,56 +597,6 @@ class ProductCreateService:
         )
         return brand
 
-    def _resolve_category(
-        self,
-        category_name: str | list[str] | None,
-    ) -> Category | None:
-        """Resolve a category from a flat name or hierarchical path."""
-        if not category_name:
-            return None
-
-        category_path = (
-            [category_name] if isinstance(category_name, str) else category_name
-        )
-
-        category = None
-        parent = None
-        for category_part in category_path:
-            category = Category.objects.filter(name=category_part).first()
-            if not category:
-                category = (
-                    parent.add_child(name=category_part)
-                    if parent
-                    else Category.add_root(name=category_part)
-                )
-            parent = category
-        return category
-
-    def _resolve_tags(self, tags: list[str] | list[list[str]]) -> list[Tag]:
-        """Resolve flat or hierarchical tag inputs to persisted tags."""
-        tag_objects = []
-        for tag_entry in tags:
-            tag_path = [tag_entry] if isinstance(tag_entry, str) else tag_entry
-
-            parent = None
-            last_tag = None
-            for tag_part in tag_path:
-                tag = Tag.objects.filter(name=tag_part).first()
-                if not tag:
-                    tag = (
-                        parent.add_child(name=tag_part)
-                        if parent
-                        else Tag.add_root(
-                            name=tag_part,
-                        )
-                    )
-                parent = tag
-                last_tag = tag
-
-            if last_tag:
-                tag_objects.append(last_tag)
-        return tag_objects
-
 
 @dataclass(slots=True)
 class ProductMetadataUpdateResolved:
@@ -560,6 +612,10 @@ class ProductMetadataUpdateResolved:
 
 class ProductMetadataUpdateService:
     """Apply metadata-only updates to existing products."""
+
+    def __init__(self) -> None:
+        """Initialize collaborators used by the metadata update workflow."""
+        self.taxonomy_resolution = TaxonomyResolutionService()
 
     def execute(
         self,
@@ -585,14 +641,16 @@ class ProductMetadataUpdateService:
         data: ProductMetadataUpdateInput,
     ) -> ProductMetadataUpdateResolved:
         """Resolve category and tag references for a product content update."""
-        category, replace_category = self._resolve_update_category(data.category_name)
+        category, replace_category = self.taxonomy_resolution.resolve_update_category(
+            data.category_name,
+        )
         return ProductMetadataUpdateResolved(
             name=data.name,
             description=data.description,
             packaging=data.packaging,
             category=category,
             replace_category=replace_category,
-            tags=self._resolve_update_tags(data.tags),
+            tags=self.taxonomy_resolution.resolve_update_tags(data.tags),
         )
 
     def _get_product(self, product_id: int) -> Product:
@@ -618,61 +676,3 @@ class ProductMetadataUpdateService:
             product.category = resolved.category
         if resolved.tags is not None:
             product.tags.set(resolved.tags)
-
-    def _resolve_update_category(
-        self,
-        category_name: str | list[str] | None,
-    ) -> tuple[Category | None, bool]:
-        """Resolve the category update and whether it should replace current value."""
-        if category_name is None:
-            return None, False
-        if category_name == "":
-            return None, True
-
-        category_path = (
-            [category_name] if isinstance(category_name, str) else category_name
-        )
-
-        category = None
-        parent = None
-        for category_part in category_path:
-            category = Category.objects.filter(name=category_part).first()
-            if not category:
-                category = (
-                    parent.add_child(name=category_part)
-                    if parent
-                    else Category.add_root(name=category_part)
-                )
-            parent = category
-        return category, True
-
-    def _resolve_update_tags(
-        self,
-        tags: list[str] | list[list[str]] | None,
-    ) -> list[Tag] | None:
-        """Resolve flat or hierarchical tag inputs into persisted tags."""
-        if tags is None:
-            return None
-
-        tag_objects = []
-        for tag_entry in tags:
-            tag_path = [tag_entry] if isinstance(tag_entry, str) else tag_entry
-
-            parent = None
-            last_tag = None
-            for tag_part in tag_path:
-                tag = Tag.objects.filter(name=tag_part).first()
-                if not tag:
-                    tag = (
-                        parent.add_child(name=tag_part)
-                        if parent
-                        else Tag.add_root(
-                            name=tag_part,
-                        )
-                    )
-                parent = tag
-                last_tag = tag
-
-            if last_tag:
-                tag_objects.append(last_tag)
-        return tag_objects

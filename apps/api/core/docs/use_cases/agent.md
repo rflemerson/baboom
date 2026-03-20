@@ -254,10 +254,6 @@ Link a scraped item to an explicitly chosen product store through the agent work
 
 - Linking is explicit; the service does not infer the target `ProductStore`.
 - This workflow is exposed through `scrapers/graphql`, not `core/graphql`.
-
-### Business rules
-
-- Component management uses exact identifiers only.
 - Fuzzy matching is intentionally not used.
 - Placeholder products are unpublished support records.
 - Component management is coordinated through `ComboResolutionService`.

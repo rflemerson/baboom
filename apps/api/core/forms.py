@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django import forms
 from django.core.exceptions import ValidationError
 
-from .models import NutritionFacts, Product, ProductPriceHistory, ProductStore
+from .models import NutritionFacts, Product, ProductPriceHistory, ProductStore, Store
+
+if TYPE_CHECKING:
+    from .models import ProductNutrition
 
 
 class ProductAdminForm(forms.ModelForm):
@@ -101,7 +106,7 @@ class ProductAdminForm(forms.ModelForm):
 
         return cleaned_data
 
-    def _get_existing_nutrition_profile(self) -> object | None:
+    def _get_existing_nutrition_profile(self) -> ProductNutrition | None:
         """Return the first persisted nutrition profile for the product."""
         return (
             self.instance.nutrition_profiles.select_related("nutrition_facts")
@@ -111,7 +116,7 @@ class ProductAdminForm(forms.ModelForm):
 
     def _build_existing_nutrition_initial_data(
         self,
-        existing_profile: object,
+        existing_profile: ProductNutrition,
     ) -> dict[str, object]:
         """Build initial field values from an existing nutrition profile."""
         facts = existing_profile.nutrition_facts
@@ -230,6 +235,7 @@ class ProductStoreInlineFormSet(forms.BaseInlineFormSet):
     def clean(self) -> None:
         """Require a current price for every non-deleted store listing row."""
         super().clean()
+        seen_store_ids: set[int] = set()
 
         for form in self.forms:
             cleaned_data = getattr(form, "cleaned_data", None)
@@ -238,6 +244,8 @@ class ProductStoreInlineFormSet(forms.BaseInlineFormSet):
 
             if not self._has_store_listing_data(cleaned_data):
                 continue
+
+            self._validate_unique_store(cleaned_data, seen_store_ids)
 
             if cleaned_data.get("price") in (None, ""):
                 error_message = "Each store listing requires a current price."
@@ -252,3 +260,19 @@ class ProductStoreInlineFormSet(forms.BaseInlineFormSet):
         return any(
             cleaned_data.get(field_name) for field_name in self.LISTING_INPUT_FIELDS
         )
+
+    def _validate_unique_store(
+        self,
+        cleaned_data: dict[str, object],
+        seen_store_ids: set[int],
+    ) -> None:
+        """Reject duplicate stores before the payload reaches the service layer."""
+        store = cleaned_data.get("store")
+        if not isinstance(store, Store):
+            return
+
+        if store.id in seen_store_ids:
+            error_message = "A store can only appear once per product."
+            raise ValidationError(error_message)
+
+        seen_store_ids.add(store.id)

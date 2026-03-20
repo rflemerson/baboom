@@ -37,10 +37,10 @@ literature-friendly format:
 
 ### AI agent
 
-- [UC-01 List Unlinked Scraped Items](./use_cases/agent.md#uc-01-list-unlinked-scraped-items)
+- [UC-01 Checkout Scraped Item For Processing](./use_cases/agent.md#uc-01-checkout-scraped-item-for-processing)
 - [UC-02 Create Simple Product From Agent](./use_cases/agent.md#uc-02-create-simple-product-from-agent)
 - [UC-03 Create Combo Product From Agent](./use_cases/agent.md#uc-03-create-combo-product-from-agent)
-- [UC-04 Manage Combo Components From Agent](./use_cases/agent.md#uc-04-manage-combo-components-from-agent)
+- [UC-04 Link Scraped Item To Product Store From Agent](./use_cases/agent.md#uc-04-link-scraped-item-to-product-store-from-agent)
 
 ### Public
 
@@ -49,7 +49,7 @@ literature-friendly format:
 
 ### Internal
 
-- [UC-01 Link Scraped Item To Product](./use_cases/internal.md#uc-01-link-scraped-item-to-product)
+- [UC-01 Link Scraped Item To Product Store](./use_cases/internal.md#uc-01-link-scraped-item-to-product-store)
 
 ## Scope notes
 

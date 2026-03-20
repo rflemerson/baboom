@@ -24,6 +24,8 @@
 - Treat `ProductAdmin` as the official manager-facing workflow for product metadata,
   nutrition, and store listings; use the technical child admins as support surfaces,
   not as the primary domain path.
+- Wrap official manager-facing admin save flows in a transaction when a single save
+  coordinates multiple services or related writes.
 
 ## Project patterns
 

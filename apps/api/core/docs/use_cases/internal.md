@@ -23,7 +23,7 @@ This document groups the internal automation use cases that support catalog main
 
 - link scraped items to chosen product store listings
 
-## UC-01 Link Scraped Item To Product
+## UC-01 Link Scraped Item To Product Store
 
 ### Goal
 

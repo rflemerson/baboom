@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import nested_admin
 from django.contrib import admin
+from django.db import transaction
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
@@ -41,7 +42,7 @@ from .services import (
 if TYPE_CHECKING:
     from django.db.models import QuerySet
     from django.forms import BaseInlineFormSet
-    from django.http import HttpRequest
+    from django.http import HttpRequest, HttpResponse
 
 
 class MicronutrientInline(nested_admin.NestedTabularInline):
@@ -76,6 +77,12 @@ class ProductStoreInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     """Admin for products."""
+
+    INITIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "name",
+        "ean",
+        "description",
+    )
 
     form = ProductAdminForm
     show_facets = admin.ShowFacets.ALWAYS
@@ -175,8 +182,20 @@ class ProductAdmin(admin.ModelAdmin):
         for key, value in request.GET.items():
             if key.startswith("initial_"):
                 field_name = key.replace("initial_", "")
-                initial[field_name] = value
+                if field_name in self.INITIAL_FIELDS:
+                    initial[field_name] = value
         return initial
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, object] | None = None,
+    ) -> HttpResponse:
+        """Wrap the manager-facing product workflow in a single transaction."""
+        with transaction.atomic():
+            return super().changeform_view(request, object_id, form_url, extra_context)
 
     def save_model(
         self,
@@ -187,13 +206,28 @@ class ProductAdmin(admin.ModelAdmin):
     ) -> None:
         """Persist product changes through the official service layer."""
         nutrition_service = ProductNutritionService()
+        nutrition_mode = (
+            form.cleaned_data.get("nutrition_mode")
+            or ProductAdminForm.NutritionMode.NONE
+        )
+        existing_nutrition_facts = get_selected_existing_nutrition_facts(form)
+        nutrition_payloads = (
+            build_product_nutrition_payloads(form)
+            if nutrition_mode == ProductAdminForm.NutritionMode.NEW
+            else None
+        )
 
         if change:
             updated_product = ProductMetadataUpdateService().execute(
                 product_id=obj.pk,
                 data=build_product_metadata_update_input(form),
             )
-            self._sync_product_nutrition(updated_product, form, nutrition_service)
+            nutrition_service.apply_selection(
+                updated_product,
+                nutrition_mode=nutrition_mode,
+                existing_facts=existing_nutrition_facts,
+                nutrition_profiles_data=nutrition_payloads,
+            )
             obj.pk = updated_product.pk
             obj.refresh_from_db()
             return
@@ -201,7 +235,12 @@ class ProductAdmin(admin.ModelAdmin):
         created_product = ProductCreateService().execute(
             build_product_create_input(form),
         )
-        self._sync_product_nutrition(created_product, form, nutrition_service)
+        nutrition_service.apply_selection(
+            created_product,
+            nutrition_mode=nutrition_mode,
+            existing_facts=existing_nutrition_facts,
+            nutrition_profiles_data=nutrition_payloads,
+        )
         obj.pk = created_product.pk
         obj.refresh_from_db()
 
@@ -214,33 +253,6 @@ class ProductAdmin(admin.ModelAdmin):
     ) -> None:
         """Persist service-backed relations after the product itself is saved."""
         self._sync_product_store_listings(form.instance, formsets)
-
-    def _sync_product_nutrition(
-        self,
-        product: Product,
-        form: ProductAdminForm,
-        nutrition_service: ProductNutritionService,
-    ) -> None:
-        """Apply the selected nutrition workflow to the saved product."""
-        nutrition_mode = (
-            form.cleaned_data.get("nutrition_mode")
-            or ProductAdminForm.NutritionMode.NONE
-        )
-
-        if nutrition_mode == ProductAdminForm.NutritionMode.NONE:
-            nutrition_service.clear_profiles(product)
-            return
-
-        if nutrition_mode == ProductAdminForm.NutritionMode.EXISTING:
-            facts = get_selected_existing_nutrition_facts(form)
-            if facts is not None:
-                nutrition_service.replace_with_existing_facts(product, facts)
-            return
-
-        nutrition_service.replace_profiles(
-            product,
-            build_product_nutrition_payloads(form),
-        )
 
     def _sync_product_store_listings(
         self,
@@ -265,9 +277,6 @@ class BrandAdmin(admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS
     list_display = ("name", "display_name")
     search_fields = ("name", "display_name")
-    prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {
-        "display_name": ("name",),
-    }
     list_per_page = 50
 
 
@@ -277,9 +286,6 @@ class StoreAdmin(admin.ModelAdmin):
 
     list_display = ("name", "display_name")
     search_fields = ("name", "display_name")
-    prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {
-        "display_name": ("name",),
-    }
     list_per_page = 50
 
 
