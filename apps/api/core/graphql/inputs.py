@@ -65,9 +65,9 @@ class ProductComponentInput:
     """Input for combo component."""
 
     name: str
+    ean: str | None = None
+    external_id: str | None = None
     quantity: int = 1
-    weight_hint: int | None = None
-    packaging_hint: str | None = None
 
 
 @strawberry.input(description="Input for creating a new product with all related data")

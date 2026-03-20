@@ -1,7 +1,5 @@
 """Typed DTOs shared by core services and ingestion workflows."""
 
-from typing import Any
-
 from pydantic import BaseModel
 
 from .models import Product
@@ -11,9 +9,53 @@ class ProductComponentInput(BaseModel):
     """DTO for combo component input."""
 
     name: str
+    ean: str | None = None
+    external_id: str | None = None
     quantity: int = 1
-    weight_hint: int | None = None
-    packaging_hint: str | None = None
+
+
+class MicronutrientPayload(BaseModel):
+    """DTO for a micronutrient entry within nutrition data."""
+
+    name: str
+    value: float
+    unit: str = "mg"
+
+
+class NutritionFactsPayload(BaseModel):
+    """DTO for a nutrition facts payload."""
+
+    serving_size_grams: float
+    energy_kcal: int
+    proteins: float
+    carbohydrates: float
+    total_fats: float
+    description: str | None = ""
+    total_sugars: float = 0.0
+    added_sugars: float = 0.0
+    saturated_fats: float = 0.0
+    trans_fats: float = 0.0
+    dietary_fiber: float = 0.0
+    sodium: float = 0.0
+    micronutrients: list[MicronutrientPayload] | None = None
+
+
+class ProductNutritionPayload(BaseModel):
+    """DTO for nutrition profile data linked to a product."""
+
+    nutrition_facts: NutritionFactsPayload
+    flavor_names: list[str] | None = None
+
+
+class ProductStorePayload(BaseModel):
+    """DTO for a store listing attached to a product."""
+
+    store_name: str
+    product_link: str
+    price: float
+    external_id: str | None = ""
+    affiliate_link: str | None = None
+    stock_status: str = "A"
 
 
 class ProductCreateInput(BaseModel):
@@ -28,19 +70,20 @@ class ProductCreateInput(BaseModel):
     packaging: str = Product.Packaging.CONTAINER
     is_published: bool = False
     tags: list[str] | list[list[str]] | None = None
-    stores: list[dict[str, Any]] | None = None
-    nutrition: list[dict[str, Any]] | None = None
+    stores: list[ProductStorePayload] | None = None
+    nutrition: list[ProductNutritionPayload] | None = None
+    origin_scraped_item_id: int | None = None
 
     # Combo fields
     is_combo: bool = False
     components: list[ProductComponentInput] | None = None
 
 
-class ProductContentUpdateInput(BaseModel):
+class ProductMetadataUpdateInput(BaseModel):
     """DTO for metadata-only product updates."""
 
     name: str | None = None
     description: str | None = None
-    category_name: str | None = None
+    category_name: str | list[str] | None = None
     packaging: str | None = None
-    tags: list[str] | None = None
+    tags: list[str] | list[list[str]] | None = None

@@ -33,3 +33,4 @@ cd apps/api && .venv/bin/python manage.py runserver
 
 - Keep Django, typing, QA, and security guidance in `apps/api/.agents/`.
 - Update these docs when refactors or tooling policy changes.
+- Prefer portfolio-quality architecture over convenience wrappers; document project patterns explicitly in `apps/api/.agents/DJANGO.md`.
