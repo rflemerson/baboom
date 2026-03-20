@@ -15,7 +15,26 @@ function debugLog(message: string, payload?: unknown) {
 }
 
 function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  if (!value || value.includes(' ')) {
+    return false
+  }
+
+  const parts = value.split('@')
+  if (parts.length !== 2) {
+    return false
+  }
+
+  const [localPart, domain] = parts
+  if (!localPart || !domain || domain.startsWith('.') || domain.endsWith('.')) {
+    return false
+  }
+
+  const domainParts = domain.split('.')
+  if (domainParts.length < 2 || domainParts.some((part) => part.length === 0)) {
+    return false
+  }
+
+  return true
 }
 
 export function useAlertSubscription() {

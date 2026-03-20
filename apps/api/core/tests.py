@@ -486,7 +486,7 @@ class ProductStatsTest(TestCase):
         self.link = ProductStore.objects.create(
             product=self.product,
             store=self.store,
-            product_link="http://example.com",
+            product_link="https://example.com",
         )
         ProductPriceHistory.objects.create(
             store_product_link=self.link,
@@ -504,7 +504,7 @@ class ProductStatsTest(TestCase):
         assert product.concentration == Decimal("80.0")
         assert product.total_protein == Decimal("800.00")
         assert round(product.price_per_protein_gram, 3) == Decimal("0.125")
-        assert product.external_link == "http://example.com"
+        assert product.external_link == "https://example.com"
 
     def test_missing_price_handling(self) -> None:
         """Products without price should keep nullable metrics."""
@@ -539,7 +539,7 @@ class ProductStatsTest(TestCase):
         second_link = ProductStore.objects.create(
             product=self.product,
             store=second_store,
-            product_link="http://example.com/second",
+            product_link="https://example.com/second",
         )
 
         first_history = ProductPriceHistory.objects.create(
@@ -562,7 +562,7 @@ class ProductStatsTest(TestCase):
 
         assert product is not None
         assert product.last_price == Decimal("150.00")
-        assert product.external_link == "http://example.com/second"
+        assert product.external_link == "https://example.com/second"
 
     def test_catalog_uses_most_protein_dense_nutrition_profile(self) -> None:
         """Catalog metrics should use the most protein-dense nutrition profile."""
@@ -615,12 +615,12 @@ class ProductStatsTest(TestCase):
         alpha_store = ProductStore.objects.create(
             product=alpha,
             store=self.store,
-            product_link="http://example.com/alpha",
+            product_link="https://example.com/alpha",
         )
         beta_store = ProductStore.objects.create(
             product=beta,
             store=self.store,
-            product_link="http://example.com/beta",
+            product_link="https://example.com/beta",
         )
         ProductPriceHistory.objects.create(
             store_product_link=alpha_store,
