@@ -72,7 +72,6 @@ class ProductCreateInput(BaseModel):
     tags: list[str] | list[list[str]] | None = None
     stores: list[StoreListingPayload] | None = None
     nutrition: list[ProductNutritionPayload] | None = None
-    origin_scraped_item_id: int | None = None
 
     is_combo: bool = False
     components: list[ComboComponentInput] | None = None

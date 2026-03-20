@@ -10,12 +10,7 @@ import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from baboom.utils import format_graphql_errors
-from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.services import (
-    AlertSubscriptionService,
-    ProductCreateService,
-    ProductMetadataUpdateService,
-)
+from core.dtos import ComboComponentInput as ProductComponentDTO
 from core.dtos import (
     MicronutrientPayload,
     NutritionFactsPayload,
@@ -23,8 +18,13 @@ from core.dtos import (
     ProductNutritionPayload,
     StoreListingPayload,
 )
-from core.dtos import ComboComponentInput as ProductComponentDTO
 from core.dtos import ProductMetadataUpdateInput as ProductMetadataUpdateDTO
+from core.graphql.permissions import IsAuthenticatedWithAPIKey
+from core.services import (
+    AlertSubscriptionService,
+    ProductCreateService,
+    ProductMetadataUpdateService,
+)
 
 from .types import AlertSubscriptionResult, ProductResult
 
@@ -86,7 +86,6 @@ class CoreMutation:
                 tags=tags_to_use,
                 stores=stores_data,
                 nutrition=nutrition_data,
-                origin_scraped_item_id=data.origin_scraped_item_id,
                 is_combo=data.is_combo,
                 components=[
                     ProductComponentDTO(

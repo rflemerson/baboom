@@ -10,11 +10,17 @@
 
 - Business logic goes in `core/services.py`.
 - Service DTOs go in `core/dtos.py`.
+- Admin-facing forms and formsets go in `core/forms.py`.
+- Admin-to-service DTO mapping helpers go in `core/admin_mappers.py`.
+- Domain use case documentation goes in `core/docs/use_cases/`.
 - Read/query composition goes in `selectors.py`.
 - Public catalog filtering and sorting stay in the catalog query layer, not in
   GraphQL boundaries and not in form-style `FilterSet` classes.
 - GraphQL boundary stays thin in `core/graphql/`.
 - Admin customizations should stay typed and light.
+- Treat `ProductAdmin` as the official manager-facing workflow for product metadata,
+  nutrition, and store listings; use the technical child admins as support surfaces,
+  not as the primary domain path.
 
 ## Project patterns
 

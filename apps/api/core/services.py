@@ -33,9 +33,9 @@ from scrapers.services import ScraperService
 
 if TYPE_CHECKING:
     from core.dtos import (
+        ComboComponentInput,
         MicronutrientPayload,
         NutritionFactsPayload,
-        ComboComponentInput,
         ProductCreateInput,
         ProductMetadataUpdateInput,
         ProductNutritionPayload,
@@ -123,12 +123,9 @@ class ComboResolutionService:
         component_data: ComboComponentInput,
     ) -> Product | None:
         """Resolve a component using exact identifiers only."""
-        return (
-            self._match_by_ean(component_data.ean)
-            or self._match_by_external_id(
-                parent_product,
-                component_data.external_id,
-            )
+        return self._match_by_ean(component_data.ean) or self._match_by_external_id(
+            parent_product,
+            component_data.external_id,
         )
 
     def _match_by_ean(self, ean: str | None) -> Product | None:
@@ -178,8 +175,7 @@ class ComboResolutionService:
             brand=parent_product.brand,
             weight=0,
             description=(
-                "Auto-generated placeholder for component of "
-                f"{parent_product.name}"
+                f"Auto-generated placeholder for component of {parent_product.name}"
             ),
             is_published=False,
         )
@@ -187,6 +183,28 @@ class ComboResolutionService:
 
 class ProductNutritionService:
     """Attach typed nutrition profiles to a product."""
+
+    def replace_profiles(
+        self,
+        product: Product,
+        nutrition_profiles_data: list[ProductNutritionPayload],
+    ) -> None:
+        """Replace current product nutrition profiles with typed payloads."""
+        product.nutrition_profiles.all().delete()
+        self.attach_profiles(product, nutrition_profiles_data)
+
+    def replace_with_existing_facts(
+        self,
+        product: Product,
+        facts: NutritionFacts,
+    ) -> None:
+        """Replace current product nutrition profiles with an existing facts table."""
+        product.nutrition_profiles.all().delete()
+        self._get_or_create_profile(product, facts)
+
+    def clear_profiles(self, product: Product) -> None:
+        """Remove all nutrition profiles linked to the product."""
+        product.nutrition_profiles.all().delete()
 
     def attach_profiles(
         self,
@@ -297,67 +315,151 @@ class ProductNutritionService:
             profile.flavors.add(flavor)
 
 
-class ScrapedItemLinkService:
-    """Link an origin scraped item to the product created from it."""
+class ProductStoreService:
+    """Manage product store listings through the official domain workflow."""
 
-    def link_created_product(
+    def replace_listings(
         self,
-        *,
         product: Product,
-        origin_scraped_item_id: int | None,
+        store_listings_data: list[StoreListingPayload],
     ) -> None:
-        """Link and sync the originating scraped item when available."""
-        if origin_scraped_item_id is None:
+        """Synchronize current product store listings with the desired admin state."""
+        with transaction.atomic():
+            existing_links = {
+                product_store.store_id: product_store
+                for product_store in product.store_links.select_related("store")
+            }
+            desired_store_ids: set[int] = set()
+
+            for store_payload in store_listings_data:
+                store = self._resolve_store(store_payload.store_name)
+                if store.id in desired_store_ids:
+                    raise ValidationError(
+                        {"store": _("A store can only appear once per product.")},
+                    )
+
+                desired_store_ids.add(store.id)
+                existing_listing = existing_links.get(store.id)
+                if existing_listing is None:
+                    self._create_listing(product, store, store_payload)
+                    continue
+
+                self._update_listing(existing_listing, store_payload)
+
+            self._remove_deleted_listings(existing_links, desired_store_ids)
+
+    def _create_listing(
+        self,
+        product: Product,
+        store: Store,
+        store_payload: StoreListingPayload,
+    ) -> ProductStore:
+        """Create a single store listing and its latest price snapshot."""
+        product_store = ProductStore(
+            product=product,
+            store=store,
+            external_id=store_payload.external_id or "",
+            product_link=store_payload.product_link,
+            affiliate_link=store_payload.affiliate_link or "",
+        )
+        product_store.full_clean()
+        product_store.save()
+
+        self._append_price_history_if_changed(product_store, store_payload)
+        return product_store
+
+    def _update_listing(
+        self,
+        product_store: ProductStore,
+        store_payload: StoreListingPayload,
+    ) -> None:
+        """Update a persisted listing and append a new price snapshot when needed."""
+        updated_fields: list[str] = []
+        resolved_external_id = store_payload.external_id or ""
+        resolved_affiliate_link = store_payload.affiliate_link or ""
+
+        if product_store.external_id != resolved_external_id:
+            product_store.external_id = resolved_external_id
+            updated_fields.append("external_id")
+        if product_store.product_link != store_payload.product_link:
+            product_store.product_link = store_payload.product_link
+            updated_fields.append("product_link")
+        if product_store.affiliate_link != resolved_affiliate_link:
+            product_store.affiliate_link = resolved_affiliate_link
+            updated_fields.append("affiliate_link")
+
+        if updated_fields:
+            product_store.full_clean()
+            product_store.save(update_fields=updated_fields)
+
+        self._append_price_history_if_changed(product_store, store_payload)
+
+    def _append_price_history_if_changed(
+        self,
+        product_store: ProductStore,
+        store_payload: StoreListingPayload,
+    ) -> None:
+        """Create a new price snapshot only when price or stock status changed."""
+        latest_price = product_store.price_history.first()
+        resolved_price = Decimal(str(store_payload.price))
+        resolved_stock_status = store_payload.stock_status
+
+        if latest_price is not None and (
+            latest_price.price == resolved_price
+            and latest_price.stock_status == resolved_stock_status
+        ):
             return
 
-        item = ScrapedItem.objects.filter(id=origin_scraped_item_id).first()
+        ProductPriceHistory.objects.create(
+            store_product_link=product_store,
+            price=resolved_price,
+            stock_status=resolved_stock_status,
+        )
+
+    def _resolve_store(self, store_name: str) -> Store:
+        """Resolve a store by display name or slug before creating a new one."""
+        store_slug = slugify(store_name)
+        store = (
+            Store.objects.filter(display_name=store_name).first()
+            or Store.objects.filter(name=store_slug).first()
+        )
+        if store is not None:
+            return store
+
+        return Store.objects.create(
+            name=store_slug,
+            display_name=store_name,
+        )
+
+    def _remove_deleted_listings(
+        self,
+        existing_links: dict[int, ProductStore],
+        desired_store_ids: set[int],
+    ) -> None:
+        """Delete store listings that were removed from the desired admin state."""
+        for store_id, product_store in existing_links.items():
+            if store_id not in desired_store_ids:
+                product_store.delete()
+
+
+class ScrapedItemLinkService:
+    """Link a scraped item to an explicitly selected product store listing."""
+
+    def link_to_product_store(
+        self,
+        *,
+        scraped_item_id: int,
+        product_store: ProductStore,
+    ) -> None:
+        """Link and sync a scraped item using an explicit target listing."""
+        item = ScrapedItem.objects.filter(id=scraped_item_id).first()
         if item is None:
             return
 
-        linked_store = self._find_linked_store(product, item)
-        if linked_store is None:
-            return
-
-        item.product_store = linked_store
+        item.product_store = product_store
         item.status = ScrapedItem.Status.LINKED
         item.save(update_fields=["product_store", "status"])
         ScraperService.sync_price_to_core(item)
-
-    def _find_linked_store(
-        self,
-        product: Product,
-        item: ScrapedItem,
-    ) -> ProductStore | None:
-        """Find the most appropriate store link for the scraped origin item."""
-        linked_store = self._match_store_link_by_identity(product, item)
-        if linked_store is not None:
-            return linked_store
-
-        source_url = item.source_page.url if item.source_page else ""
-        if source_url:
-            linked_store = ProductStore.objects.filter(
-                product=product,
-                product_link=source_url,
-            ).first()
-            if linked_store is not None:
-                return linked_store
-
-        return ProductStore.objects.filter(product=product).first()
-
-    def _match_store_link_by_identity(
-        self,
-        product: Product,
-        item: ScrapedItem,
-    ) -> ProductStore | None:
-        """Match the store link by store identity and external identifier."""
-        if not item.external_id:
-            return None
-
-        return ProductStore.objects.filter(
-            product=product,
-            store__name=item.store_slug,
-            external_id=item.external_id,
-        ).first()
 
 
 class ProductCreateService:
@@ -388,7 +490,7 @@ class ProductCreateService:
                     product.tags.set(self._resolve_tags(data.tags))
 
                 if data.stores:
-                    self._create_store_entries(product, data.stores)
+                    ProductStoreService().replace_listings(product, data.stores)
 
                 if data.is_combo and data.components:
                     ComboResolutionService().resolve_combo_components(
@@ -397,11 +499,6 @@ class ProductCreateService:
                     )
                 elif data.nutrition:
                     ProductNutritionService().attach_profiles(product, data.nutrition)
-
-                ScrapedItemLinkService().link_created_product(
-                    product=product,
-                    origin_scraped_item_id=data.origin_scraped_item_id,
-                )
 
                 return product
 
@@ -457,8 +554,12 @@ class ProductCreateService:
             for tag_part in tag_path:
                 tag = Tag.objects.filter(name=tag_part).first()
                 if not tag:
-                    tag = parent.add_child(name=tag_part) if parent else Tag.add_root(
-                        name=tag_part,
+                    tag = (
+                        parent.add_child(name=tag_part)
+                        if parent
+                        else Tag.add_root(
+                            name=tag_part,
+                        )
                     )
                 parent = tag
                 last_tag = tag
@@ -466,32 +567,6 @@ class ProductCreateService:
             if last_tag:
                 tag_objects.append(last_tag)
         return tag_objects
-
-    def _create_store_entries(
-        self,
-        product: Product,
-        stores: list[StoreListingPayload],
-    ) -> None:
-        """Create store links and initial price history for a product."""
-        for store_payload in stores:
-            store, _created = Store.objects.get_or_create(
-                display_name=store_payload.store_name,
-                defaults={"name": slugify(store_payload.store_name)},
-            )
-
-            product_store = ProductStore.objects.create(
-                product=product,
-                store=store,
-                external_id=store_payload.external_id or "",
-                product_link=store_payload.product_link,
-                affiliate_link=store_payload.affiliate_link or "",
-            )
-
-            ProductPriceHistory.objects.create(
-                store_product_link=product_store,
-                price=Decimal(str(store_payload.price)),
-                stock_status=store_payload.stock_status,
-            )
 
 
 @dataclass(slots=True)
@@ -611,8 +686,12 @@ class ProductMetadataUpdateService:
             for tag_part in tag_path:
                 tag = Tag.objects.filter(name=tag_part).first()
                 if not tag:
-                    tag = parent.add_child(name=tag_part) if parent else Tag.add_root(
-                        name=tag_part,
+                    tag = (
+                        parent.add_child(name=tag_part)
+                        if parent
+                        else Tag.add_root(
+                            name=tag_part,
+                        )
                     )
                 parent = tag
                 last_tag = tag
@@ -620,4 +699,3 @@ class ProductMetadataUpdateService:
             if last_tag:
                 tag_objects.append(last_tag)
         return tag_objects
-
