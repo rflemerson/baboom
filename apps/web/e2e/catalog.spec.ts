@@ -247,62 +247,21 @@ function filterProducts(variables: CatalogVariables) {
   const brand = normalize(variables.brand)
 
   const filtered = PRODUCTS.filter((product) => {
-    if (search) {
-      const haystack = [
-        product.name,
-        product.brand.name,
-        product.category.name,
-        ...product.tags.map((tag) => tag.name),
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      if (!haystack.includes(search)) {
-        return false
-      }
-    }
-
-    if (brand && !product.brand.name.toLowerCase().includes(brand)) {
-      return false
-    }
-
-    if (variables.priceMin != null && Number(product.lastPrice) < variables.priceMin) {
-      return false
-    }
-
-    if (variables.priceMax != null && Number(product.lastPrice) > variables.priceMax) {
-      return false
-    }
-
-    if (
-      variables.pricePerGramMin != null &&
-      Number(product.pricePerGram) < variables.pricePerGramMin
-    ) {
-      return false
-    }
-
-    if (
-      variables.pricePerGramMax != null &&
-      Number(product.pricePerGram) > variables.pricePerGramMax
-    ) {
-      return false
-    }
-
-    if (
-      variables.concentrationMin != null &&
-      Number(product.concentration) < variables.concentrationMin
-    ) {
-      return false
-    }
-
-    if (
-      variables.concentrationMax != null &&
-      Number(product.concentration) > variables.concentrationMax
-    ) {
-      return false
-    }
-
-    return true
+    return (
+      matchesSearch(product, search) &&
+      matchesBrand(product, brand) &&
+      matchesNumericRange(Number(product.lastPrice), variables.priceMin, variables.priceMax) &&
+      matchesNumericRange(
+        Number(product.pricePerGram),
+        variables.pricePerGramMin,
+        variables.pricePerGramMax,
+      ) &&
+      matchesNumericRange(
+        Number(product.concentration),
+        variables.concentrationMin,
+        variables.concentrationMax,
+      )
+    )
   })
 
   const sorted = sortProducts(filtered, variables.sortBy, variables.sortDir)
@@ -325,6 +284,37 @@ function filterProducts(variables: CatalogVariables) {
       items,
     },
   }
+}
+
+function matchesSearch(product: Product, search: string) {
+  if (!search) {
+    return true
+  }
+
+  const haystack = [
+    product.name,
+    product.brand.name,
+    product.category.name,
+    ...product.tags.map((tag) => tag.name),
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return haystack.includes(search)
+}
+
+function matchesBrand(product: Product, brand: string) {
+  return !brand || product.brand.name.toLowerCase().includes(brand)
+}
+
+function matchesNumericRange(value: number, min?: number | null, max?: number | null) {
+  if (min != null && value < min) {
+    return false
+  }
+  if (max != null && value > max) {
+    return false
+  }
+  return true
 }
 
 async function fulfillGraphql(route: Route) {
