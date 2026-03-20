@@ -16,7 +16,7 @@ class ProductFilter(django_filters.FilterSet):
     """Filter set for Products."""
 
     SORT_CHOICES = (
-        ("price_per_gram", _("Price/g")),
+        ("price_per_protein_gram", _("Price/protein g")),
         ("last_price", _("Price")),
         ("total_protein", _("Protein")),
         ("concentration", _("Concentration")),
@@ -47,16 +47,16 @@ class ProductFilter(django_filters.FilterSet):
         label=_("Max Price"),
         widget=forms.NumberInput(attrs={"placeholder": _("Max")}),
     )
-    price_per_gram_min = django_filters.NumberFilter(
-        field_name="price_per_gram",
+    price_per_protein_gram_min = django_filters.NumberFilter(
+        field_name="price_per_protein_gram",
         lookup_expr="gte",
-        label=_("Min Price/g"),
+        label=_("Min Price/protein g"),
         widget=forms.NumberInput(attrs={"placeholder": _("Min")}),
     )
-    price_per_gram_max = django_filters.NumberFilter(
-        field_name="price_per_gram",
+    price_per_protein_gram_max = django_filters.NumberFilter(
+        field_name="price_per_protein_gram",
         lookup_expr="lte",
-        label=_("Max Price/g"),
+        label=_("Max Price/protein g"),
         widget=forms.NumberInput(attrs={"placeholder": _("Max")}),
     )
     concentration_min = django_filters.NumberFilter(
@@ -81,8 +81,8 @@ class ProductFilter(django_filters.FilterSet):
             "brand",
             "price_min",
             "price_max",
-            "price_per_gram_min",
-            "price_per_gram_max",
+            "price_per_protein_gram_min",
+            "price_per_protein_gram_max",
             "concentration_min",
             "concentration_max",
         )
@@ -91,18 +91,18 @@ class ProductFilter(django_filters.FilterSet):
         """Apply filters and sorting."""
         queryset = super().filter_queryset(queryset)
 
-        sort_by = self.data.get("sort_by", "price_per_gram")
+        sort_by = self.data.get("sort_by", "price_per_protein_gram")
         sort_dir = self.data.get("sort_dir", "asc")
 
         if sort_by not in self.VALID_SORT_FIELDS:
-            sort_by = "price_per_gram"
+            sort_by = "price_per_protein_gram"
         if sort_dir not in ("asc", "desc"):
             sort_dir = "asc"
 
         prefix = "-" if sort_dir == "desc" else ""
 
         if sort_by in [
-            "price_per_gram",
+            "price_per_protein_gram",
             "last_price",
             "concentration",
             "total_protein",

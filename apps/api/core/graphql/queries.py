@@ -49,8 +49,8 @@ class CoreQuery:
             "brand": resolved_filters.brand,
             "price_min": resolved_filters.price_min,
             "price_max": resolved_filters.price_max,
-            "price_per_gram_min": resolved_filters.price_per_gram_min,
-            "price_per_gram_max": resolved_filters.price_per_gram_max,
+            "price_per_protein_gram_min": resolved_filters.price_per_protein_gram_min,
+            "price_per_protein_gram_max": resolved_filters.price_per_protein_gram_max,
             "concentration_min": resolved_filters.concentration_min,
             "concentration_max": resolved_filters.concentration_max,
         }

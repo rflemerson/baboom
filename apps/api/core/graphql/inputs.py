@@ -155,11 +155,11 @@ class CatalogProductsFiltersInput:
     brand: str | None = None
     price_min: float | None = None
     price_max: float | None = None
-    price_per_gram_min: float | None = None
-    price_per_gram_max: float | None = None
+    price_per_protein_gram_min: float | None = None
+    price_per_protein_gram_max: float | None = None
     concentration_min: float | None = None
     concentration_max: float | None = None
-    sort_by: str = "price_per_gram"
+    sort_by: str = "price_per_protein_gram"
     sort_dir: str = "asc"
     page: int = 1
     per_page: int = 12

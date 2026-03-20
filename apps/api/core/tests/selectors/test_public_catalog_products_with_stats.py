@@ -77,7 +77,7 @@ class ProductStatsTest(TestCase):
         assert p.total_protein == Decimal("800.00")
 
         # Note: Database might round depending on precision, checking 2 places
-        assert round(p.price_per_gram, 3) == Decimal("0.125")
+        assert round(p.price_per_protein_gram, 3) == Decimal("0.125")
 
         assert p.external_link == "http://example.com"
 
@@ -95,5 +95,5 @@ class ProductStatsTest(TestCase):
             self.fail("Product not found")
 
         assert result.last_price is None
-        assert result.price_per_gram is None
+        assert result.price_per_protein_gram is None
         assert result.external_link is None

@@ -172,7 +172,7 @@ class CatalogProductType:
     brand: BrandType
     category: CategoryType | None
     last_price: decimal.Decimal | None = None
-    price_per_gram: decimal.Decimal | None = None
+    price_per_protein_gram: decimal.Decimal | None = None
     concentration: decimal.Decimal | None = None
     total_protein: decimal.Decimal | None = None
     external_link: str | None = None
