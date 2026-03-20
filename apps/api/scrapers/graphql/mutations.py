@@ -6,12 +6,11 @@ import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import ProductStore
-from core.services import ScrapedItemLinkService
-from scrapers.models import ScrapedItem
 from scrapers.services import (
     ScrapedItemCheckoutService,
     ScrapedItemDiscardService,
     ScrapedItemErrorService,
+    ScrapedItemLinkService,
     ScrapedItemSourcePageService,
     ScrapedItemVariantService,
 )
@@ -78,11 +77,10 @@ class ScrapersMutation:
         """Explicitly link a scraped item to a chosen product store."""
         try:
             product_store = ProductStore.objects.get(id=data.product_store_id)
-            ScrapedItemLinkService().link_to_product_store(
+            item = ScrapedItemLinkService().execute(
                 scraped_item_id=data.item_id,
                 product_store=product_store,
             )
-            item = ScrapedItem.objects.filter(id=data.item_id).first()
             return item
         except ProductStore.DoesNotExist:
             return None

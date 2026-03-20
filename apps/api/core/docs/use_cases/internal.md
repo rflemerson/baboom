@@ -78,7 +78,7 @@ Link a scraped item to an explicitly selected product store listing.
 
 - The service does not try to infer the target listing.
 - The target `ProductStore` must be chosen by the admin workflow or the AI agent.
-- Linking is coordinated through `ScrapedItemLinkService`.
+- Linking is coordinated through `scrapers.services.ScrapedItemLinkService`.
 
 ## Notes
 

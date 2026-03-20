@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 
-from core.models import ProductPriceHistory
+from core.models import ProductPriceHistory, ProductStore
 
 from .models import ScrapedItem, ScrapedPage
 
@@ -246,6 +246,27 @@ class ScrapedItemVariantService:
                 "status": ScrapedItem.Status.PROCESSING,
             },
         )
+        return item
+
+
+class ScrapedItemLinkService:
+    """Link a scraped item to an explicitly selected product store listing."""
+
+    def execute(
+        self,
+        *,
+        scraped_item_id: int,
+        product_store: ProductStore,
+    ) -> ScrapedItem | None:
+        """Link and sync a scraped item using an explicit target listing."""
+        item = ScrapedItem.objects.filter(id=scraped_item_id).first()
+        if item is None:
+            return None
+
+        item.product_store = product_store
+        item.status = ScrapedItem.Status.LINKED
+        item.save(update_fields=["product_store", "status"])
+        ScraperService.sync_price_to_core(item)
         return item
 
 

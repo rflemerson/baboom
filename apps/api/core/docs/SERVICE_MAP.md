@@ -44,7 +44,7 @@ This document maps the main use cases to the current service layer.
 
 - [UC-03 Create Combo Product From Agent](./use_cases/agent.md#uc-03-create-combo-product-from-agent)
 
-## ScrapedItemLinkService
+## scrapers.services.ScrapedItemLinkService
 
 ### Owns
 

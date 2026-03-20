@@ -28,8 +28,6 @@ from core.models import (
     Store,
     Tag,
 )
-from scrapers.models import ScrapedItem
-from scrapers.services import ScraperService
 
 if TYPE_CHECKING:
     from core.dtos import (
@@ -440,27 +438,6 @@ class ProductStoreService:
         for store_id, product_store in existing_links.items():
             if store_id not in desired_store_ids:
                 product_store.delete()
-
-
-class ScrapedItemLinkService:
-    """Link a scraped item to an explicitly selected product store listing."""
-
-    def link_to_product_store(
-        self,
-        *,
-        scraped_item_id: int,
-        product_store: ProductStore,
-    ) -> None:
-        """Link and sync a scraped item using an explicit target listing."""
-        item = ScrapedItem.objects.filter(id=scraped_item_id).first()
-        if item is None:
-            return
-
-        item.product_store = product_store
-        item.status = ScrapedItem.Status.LINKED
-        item.save(update_fields=["product_store", "status"])
-        ScraperService.sync_price_to_core(item)
-
 
 class ProductCreateService:
     """Create products and their related catalog records."""
