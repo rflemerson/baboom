@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-from importlib import import_module
+from decimal import Decimal
 
 from pydantic import BaseModel
 
 from .models import ScrapedItem
 
-decimal = import_module("decimal")
 
-
-class ProductIngestionInput(BaseModel):
-    """DTO for saving scraped products."""
+class ScrapedItemIngestionInput(BaseModel):
+    """DTO for persisting scraped item snapshots."""
 
     store_slug: str
     external_id: str
     url: str = ""
     name: str = ""
-    price: str | float | decimal.Decimal | None = None
+    price: str | float | Decimal | None = None
     stock_quantity: int | None = None
     stock_status: str = ScrapedItem.StockStatus.AVAILABLE
     ean: str = ""

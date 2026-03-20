@@ -7,6 +7,7 @@ from celery.utils.log import get_task_logger
 from django.utils import timezone
 
 from .models import ScrapedItem
+from .spiders.base_spider import BaseSpider
 from .spiders.blackskull import BlackSkullSpider
 from .spiders.dark_lab import DarkLabSpider
 from .spiders.dux import DuxSpider
@@ -18,95 +19,68 @@ from .spiders.soldiers import SoldiersSpider
 
 logger = get_task_logger(__name__)
 
+STUCK_ITEM_TIMEOUT_MINUTES = 60
+
+
+def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
+    """Run a scraper spider and return a standardized status message."""
+    logger.info("Starting %s monitor task", label)
+    items = spider_class().crawl()
+    return f"{label} Monitor: Saved/Updated {len(items)} items."
+
 
 @shared_task
 def scrape_growth_monitor() -> str:
     """Scrape Growth Supplements via API."""
-    logger.info("Starting Growth Monitor Task (API)")
-    spider = GrowthSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Growth Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(GrowthSpider, "Growth")
 
 
 @shared_task
 def scrape_blackskull_monitor() -> str:
     """Scrape Black Skull via API."""
-    logger.info("Starting Black Skull Monitor Task (API)")
-    spider = BlackSkullSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Black Skull Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(BlackSkullSpider, "Black Skull")
 
 
 @shared_task
 def scrape_integral_monitor() -> str:
     """Scrape Integral Medica."""
-    logger.info("Starting Integral Medica Monitor Task")
-    spider = IntegralMedicaSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Integral Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(IntegralMedicaSpider, "Integral Medica")
 
 
 @shared_task
 def scrape_maxtitanium_monitor() -> str:
     """Scrape Max Titanium."""
-    logger.info("Starting Max Titanium Monitor Task")
-    spider = MaxTitaniumSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Max Titanium Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(MaxTitaniumSpider, "Max Titanium")
 
 
 @shared_task
 def scrape_probiotica_monitor() -> str:
     """Scrape Probiotica."""
-    logger.info("Starting Probiotica Monitor Task")
-    spider = ProbioticaSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Probiotica Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(ProbioticaSpider, "Probiotica")
 
 
 @shared_task
 def scrape_darklab_monitor() -> str:
     """Scrape Dark Lab."""
-    logger.info("Starting Dark Lab Monitor Task")
-    spider = DarkLabSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Dark Lab Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(DarkLabSpider, "Dark Lab")
 
 
 @shared_task
 def scrape_dux_monitor() -> str:
     """Scrape Dux Nutrition."""
-    logger.info("Starting Dux Monitor Task")
-    spider = DuxSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Dux Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(DuxSpider, "Dux")
 
 
 @shared_task
 def scrape_soldiers_monitor() -> str:
     """Scrape Soldiers Nutrition."""
-    logger.info("Starting Soldiers Nutrition Monitor Task")
-    spider = SoldiersSpider()
-    items = spider.crawl()
-    saved_count = len(items)
-    return f"Soldiers Monitor: Saved/Updated {saved_count} items."
+    return _run_spider_monitor(SoldiersSpider, "Soldiers")
 
 
 @shared_task
 def release_stuck_items() -> str:
-    """Unlock items stuck in PROCESSING state.
-
-    Cleaner: Unlocks items that have been in PROCESSING for too long
-    (e.g., agent died or timed out without reporting).
-    """
-    timeout = timezone.now() - timedelta(minutes=60)
+    """Move stale processing items back into the retry flow."""
+    timeout = timezone.now() - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
 
     stuck_items = ScrapedItem.objects.filter(
         status=ScrapedItem.Status.PROCESSING,

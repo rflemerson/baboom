@@ -6,9 +6,9 @@ import os
 
 import urllib3
 
+from ..dtos import ScrapedItemIngestionInput
 from ..models import ScrapedItem
 from ..services import ScraperService
-from ..types import ProductIngestionInput
 from .catalog_api_spider import CatalogApiSpider
 from .common import (
     is_http_url,
@@ -256,7 +256,7 @@ class WapStoreApiSpider(CatalogApiSpider):
             stock_status = self._resolve_stock_status(stock_quantity)
             ean = item.get("ean") or item.get("gtin") or ""
 
-            input_data = ProductIngestionInput(
+            input_data = ScrapedItemIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=external_id,
                 url=product_url,

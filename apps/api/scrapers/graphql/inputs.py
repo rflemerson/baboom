@@ -31,3 +31,11 @@ class ScrapedItemVariantInput:
     store_slug: str
     price: float | None = None
     stock_status: str | None = None
+
+
+@strawberry.input
+class ScrapedItemLinkInput:
+    """Input for explicitly linking a scraped item to a product store."""
+
+    item_id: int
+    product_store_id: int

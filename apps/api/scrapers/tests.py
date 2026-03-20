@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from django.test import SimpleTestCase, TestCase
 
 from core.models import Brand, Product, ProductPriceHistory, ProductStore, Store
+from scrapers.dtos import ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
 from scrapers.spiders.blackskull import BlackSkullSpider
@@ -18,7 +19,6 @@ from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
 from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
-from scrapers.types import ProductIngestionInput
 
 EXPECTED_EXTERNAL_STOCK_QUANTITY = 100
 EXPECTED_PRICE_HISTORY_RECORDS_AFTER_UPDATE = 2
@@ -124,7 +124,7 @@ class SyncPriceToCoreTests(TestCase):
             price=Decimal("100.00"),
         )
 
-        input_data = ProductIngestionInput(
+        input_data = ScrapedItemIngestionInput(
             store_slug="test_store",
             external_id="TEST123",
             price=Decimal("199.90"),

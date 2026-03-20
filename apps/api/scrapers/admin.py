@@ -11,7 +11,7 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import OpenFoodFactsData, ScrapedItem
+from .models import ScrapedItem
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -20,13 +20,22 @@ if TYPE_CHECKING:
 NAME_SUMMARY_MAX_LENGTH = 40
 
 
-@admin.action(description="Create/Merge Product from selected item")
+@admin.action(description="Open product creation from selected item")
 def create_product_from_scraped_item(
     modeladmin: admin.ModelAdmin,
     request: HttpRequest,
     queryset: QuerySet[ScrapedItem],
 ) -> HttpResponseRedirect | None:
-    """Admin action to create products from scraped items."""
+    """Open the product admin add form prefilled from a scraped item."""
+    item = queryset.first()
+    if item is None:
+        modeladmin.message_user(
+            request,
+            _("Please select one item first."),
+            level=messages.WARNING,
+        )
+        return None
+
     if queryset.count() > 1:
         modeladmin.message_user(
             request,
@@ -34,8 +43,6 @@ def create_product_from_scraped_item(
             level=messages.WARNING,
         )
         return None
-
-    item = queryset.first()
 
     params = {
         "initial_name": item.name,
@@ -66,6 +73,7 @@ def reset_to_new(
     updated = queryset.update(
         status=ScrapedItem.Status.NEW,
         error_count=0,
+        last_attempt_at=None,
         last_error_log="",
     )
     modeladmin.message_user(
@@ -108,12 +116,3 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
             if obj.name and len(obj.name) > NAME_SUMMARY_MAX_LENGTH
             else obj.name
         )
-
-
-@admin.register(OpenFoodFactsData)
-class OpenFoodFactsDataAdmin(admin.ModelAdmin):
-    """Admin for Open Food Facts Data."""
-
-    list_display = ("ean", "updated_at", "created_at")
-    search_fields = ("ean",)
-    readonly_fields = ("created_at", "updated_at")

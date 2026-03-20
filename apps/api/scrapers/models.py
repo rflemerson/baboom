@@ -77,8 +77,6 @@ class ScrapedItem(models.Model):
         help_text=_("Unique ID from Store"),
     )
 
-    # product_link removed
-
     name = models.CharField(
         max_length=255,
         blank=True,
@@ -142,7 +140,6 @@ class ScrapedItem(models.Model):
     last_attempt_at = models.DateTimeField(null=True, blank=True)
     last_error_log = models.TextField(blank=True)
 
-    # Lazy reference to avoid circular imports
     product_store = models.ForeignKey(
         "core.ProductStore",
         on_delete=models.SET_NULL,
@@ -185,35 +182,3 @@ class ScrapedItem(models.Model):
             f"[{self.store_slug}] {self.external_id} - "
             f"{self.get_stock_status_display()}"
         )
-
-
-class OpenFoodFactsData(models.Model):
-    """Enriched data from Open Food Facts API."""
-
-    ean = models.CharField(
-        "EAN",
-        max_length=14,
-        unique=True,
-        db_index=True,
-        help_text="European Article Number / GTIN",
-    )
-
-    raw_data = models.JSONField(
-        "Raw Open Food Facts Data",
-        blank=True,
-        null=True,
-        help_text="Full JSON response from Open Food Facts API",
-    )
-
-    updated_at = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        """Meta options."""
-
-        verbose_name = "Open Food Facts Data"
-        verbose_name_plural = "Open Food Facts Data"
-
-    def __str__(self) -> str:
-        """Return string representation."""
-        return f"OFF Data for {self.ean}"

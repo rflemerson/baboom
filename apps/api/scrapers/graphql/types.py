@@ -81,5 +81,4 @@ class ScrapedItemType:
         if store:
             return store.display_name
 
-        # Fallback to title-cased slug if Store object doesn't exist yet
         return self.store_slug.replace("_", " ").title()

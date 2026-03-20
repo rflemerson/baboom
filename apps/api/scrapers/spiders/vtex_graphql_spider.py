@@ -6,9 +6,9 @@ import base64
 import json
 import logging
 
+from ..dtos import ScrapedItemIngestionInput
 from ..models import ScrapedItem
 from ..services import ScraperService
-from ..types import ProductIngestionInput
 from .catalog_api_spider import CatalogApiSpider
 from .common import (
     is_http_url,
@@ -269,7 +269,7 @@ class VtexGraphqlSpider(CatalogApiSpider):
 
             ean = first_sku.get("ean", "")
             sku = first_sku.get("itemId", "")
-            input_data = ProductIngestionInput(
+            input_data = ScrapedItemIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=str(pid),
                 url=url,

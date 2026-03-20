@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import logging
 
+from ..dtos import ScrapedItemIngestionInput
 from ..models import ScrapedItem
 from ..services import ScraperService
-from ..types import ProductIngestionInput
 from .catalog_api_spider import CatalogApiSpider
 from .common import parse_positive_price, persist_json_context
 
@@ -257,7 +257,7 @@ class ShopifyApiSpider(CatalogApiSpider):
             sku = str(selected_variant.get("id") or selected_variant.get("sku") or "")
             ean = str(selected_variant.get("barcode") or "")
 
-            input_data = ProductIngestionInput(
+            input_data = ScrapedItemIngestionInput(
                 store_slug=self.STORE_SLUG,
                 external_id=pid,
                 url=url,

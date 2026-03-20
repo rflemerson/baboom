@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import logging
 
+from ..dtos import ScrapedItemIngestionInput
 from ..models import ScrapedItem
 from ..services import ScraperService
-from ..types import ProductIngestionInput
 from .catalog_api_spider import CatalogApiSpider
 from .common import (
     is_http_url,
@@ -184,7 +184,7 @@ class VtexSearchSpider(CatalogApiSpider):
             )
 
             store_slug = self.STORE_SLUG or self.BRAND_NAME.lower().replace(" ", "_")
-            input_data = ProductIngestionInput(
+            input_data = ScrapedItemIngestionInput(
                 store_slug=store_slug,
                 external_id=str(pid),
                 url=url,

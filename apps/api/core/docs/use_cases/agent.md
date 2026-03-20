@@ -13,6 +13,7 @@ This document groups the use cases handled by the AI Catalog Agent through Graph
 - inspect unlinked scraped items
 - decide whether to create a simple product or combo
 - create products through GraphQL
+- link scraped items to chosen product store listings
 - submit combo component data
 - drive catalog enrichment workflows from scraped context
 
@@ -24,16 +25,18 @@ This document groups the use cases handled by the AI Catalog Agent through Graph
 
 ## Scope
 
-- list unlinked scraped items
+- checkout scraped items for processing
 - create simple products from scraped context
 - create combo products from scraped context
+- link scraped items to chosen product store listings
 - manage combo components
 
-## UC-01 List Unlinked Scraped Items
+## UC-01 Checkout Scraped Item For Processing
 
 ### Goal
 
-Retrieve unlinked scraped items so the AI agent can decide what to create or enrich.
+Reserve the next eligible scraped item so the AI agent can inspect it and decide
+what to create or enrich.
 
 ### Primary actor
 
@@ -41,38 +44,43 @@ Retrieve unlinked scraped items so the AI agent can decide what to create or enr
 
 ### Supporting actors
 
-- GraphQL boundary
-- Scraper data access layer
+- Scrapers GraphQL boundary
+- Scraped item lifecycle rules
 
 ### Trigger
 
-- The agent asks for scraped items that are not yet linked to catalog products.
+- The agent asks the scrapers workflow for the next item to process.
 
 ### Preconditions
 
-- Unlinked scraped items exist in the scraping pipeline.
+- At least one scraped item is eligible for checkout.
 
 ### Postconditions
 
-- The agent receives the relevant unlinked scraped items and their context.
+- The agent receives one scraped item and that item is marked as `PROCESSING`.
 
 ### Main success flow
 
-1. The agent requests scraped items that are not linked.
-2. The system filters the scraping dataset for pending or unlinked candidates.
-3. The system returns identifying data and source context.
-4. The agent uses those items to decide whether to create a simple product or combo.
+1. The agent requests the next scraped item to process.
+2. The system filters the scraping dataset for eligible candidates.
+3. The system locks the selected row for checkout.
+4. The system marks the item as `PROCESSING` and updates `last_attempt_at`.
+5. The system returns identifying data and source context for that item.
+6. The agent uses that item to decide whether to create a simple product or combo.
 
 ### Alternate flows
 
-#### A1. No unlinked scraped items
+#### A1. No eligible scraped items
 
 1. The system finds no relevant candidates.
 2. The system returns an empty result.
 
 ### Business rules
 
-- The agent depends on unlinked scraped items to know what to inspect and where to look.
+- Checkout is implemented in `scrapers/graphql`, not in `core/graphql`.
+- Eligible items include `NEW` items and retryable `ERROR` items.
+- When `force = true`, the workflow may also revisit `LINKED` or `REVIEW` items.
+- Checkout marks the selected item as `PROCESSING` before returning it.
 
 ## UC-02 Create Simple Product From Agent
 
