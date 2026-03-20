@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
-from typing import Any, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase
@@ -41,6 +41,19 @@ from core.services import (
     ProductNutritionService,
     ProductStoreService,
 )
+
+if TYPE_CHECKING:
+    from django.http import HttpResponse
+
+
+class CatalogAnnotatedProduct(Protocol):
+    """Typed surface for selector rows with catalog annotations."""
+
+    concentration: Decimal | None
+    total_protein: Decimal | None
+    price_per_protein_gram: Decimal | None
+    external_link: str | None
+    last_price: Decimal | None
 
 
 class ProductStoreServiceTests(TestCase):
@@ -482,7 +495,10 @@ class ProductStatsTest(TestCase):
 
     def test_protein_calculations(self) -> None:
         """Derived protein metrics should be correctly annotated."""
-        product = cast("Any | None", public_catalog_products_with_stats().first())
+        product = cast(
+            "CatalogAnnotatedProduct | None",
+            public_catalog_products_with_stats().first(),
+        )
 
         if product is None:
             self.fail("Product not found")
@@ -501,7 +517,7 @@ class ProductStatsTest(TestCase):
         )
 
         result = cast(
-            "Any | None",
+            "CatalogAnnotatedProduct | None",
             public_catalog_products_with_stats()
             .filter(
                 pk=product_without_price.pk,
@@ -544,7 +560,7 @@ class ProductStatsTest(TestCase):
         ).update(collected_at=tied_timestamp)
 
         product = cast(
-            "Any | None",
+            "CatalogAnnotatedProduct | None",
             public_catalog_products_with_stats().get(pk=self.product.pk),
         )
 
@@ -570,7 +586,7 @@ class ProductStatsTest(TestCase):
         )
 
         product = cast(
-            "Any | None",
+            "CatalogAnnotatedProduct | None",
             public_catalog_products_with_stats().get(pk=self.product.pk),
         )
 
@@ -663,8 +679,8 @@ class GraphQLAlertSubscriptionTests(TestCase):
             content_type="application/json",
             HTTP_X_API_KEY=self.valid_key,
         )
-        response = self.view(request)
-        return json.loads(cast("Any", response).content)
+        response = cast("HttpResponse", self.view(request))
+        return json.loads(response.content)
 
     def test_subscribe_alerts_creates_new_subscriber(self) -> None:
         """A new email subscription should succeed."""
@@ -719,7 +735,7 @@ class GraphQLSecurityTests(TestCase):
         )
         response = self.view(request)
         if hasattr(response, "content"):
-            return json.loads(cast("Any", response).content)
+            return json.loads(cast("HttpResponse", response).content)
         return json.loads(b"{}")
 
     def test_query_without_api_key(self) -> None:

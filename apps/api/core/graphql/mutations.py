@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import strawberry
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -16,13 +15,12 @@ from core.services import (
     ProductMetadataUpdateService,
 )
 
+from .inputs import ProductContentUpdateInput, ProductInput
 from .mappers import build_product_create_input, build_product_metadata_update_input
 from .types import AlertSubscriptionResult, ProductResult
 
-if TYPE_CHECKING:
-    from .inputs import ProductContentUpdateInput, ProductInput
-
 logger = logging.getLogger(__name__)
+_STRAWBERRY_RUNTIME_TYPES = (ProductInput, ProductContentUpdateInput)
 
 
 @strawberry.type

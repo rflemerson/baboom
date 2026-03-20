@@ -3,7 +3,7 @@
 import logging
 import os
 from decimal import Decimal
-from typing import Any, cast
+from typing import cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +28,8 @@ EXPECTED_GROWTH_DECIMAL_PRICE = 139.9
 EXPECTED_GROWTH_CURRENCY_PRICE = 89.5
 EXPECTED_VTEX_DECIMAL_PRICE = 99.9
 EXPECTED_VTEX_INTEGER_PRICE = 55.0
+
+type ScrapedJsonObject = dict[str, object]
 
 # Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
@@ -220,7 +222,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
     def setUp(self) -> None:
         """Create reusable Shopify fixture item."""
         self.spider = DarkLabSpider()
-        self.base_item: dict[str, Any] = {
+        self.base_item: ScrapedJsonObject = {
             "id": 123,
             "title": "Whey Test",
             "handle": "whey-test",
@@ -261,7 +263,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
     def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Should skip item when selected variant has invalid price."""
         item = dict(self.base_item)
-        base_variants = cast("list[dict[str, Any]]", self.base_item["variants"])
+        base_variants = cast("list[ScrapedJsonObject]", self.base_item["variants"])
         item["variants"] = [dict(base_variants[0], price="N/A")]
 
         result = self.spider.process_item(item, "whey-protein")
@@ -303,7 +305,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
     def setUp(self) -> None:
         """Create reusable Shopify fixture item."""
         self.spider = SoldiersSpider()
-        self.base_item: dict[str, Any] = {
+        self.base_item: ScrapedJsonObject = {
             "id": 456,
             "title": "Elitebar 30g Protein Bar - Soldiers Nutrition",
             "handle": "elitebar-30g-barra-de-proteina-soldiers-nutrition",
@@ -358,7 +360,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
     def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Skips item when selected variant has invalid price."""
         item = dict(self.base_item)
-        base_variants = cast("list[dict[str, Any]]", self.base_item["variants"])
+        base_variants = cast("list[ScrapedJsonObject]", self.base_item["variants"])
         item["variants"] = [dict(base_variants[0], price="N/A")]
 
         result = self.spider.process_item(item, "barra")
@@ -400,7 +402,7 @@ class GrowthSpiderUnitTests(SimpleTestCase):
     def setUp(self) -> None:
         """Create reusable Growth fixture item."""
         self.spider = GrowthSpider()
-        self.base_item: dict[str, Any] = {
+        self.base_item: ScrapedJsonObject = {
             "id": 1001,
             "nome": "Whey Growth",
             "sku": "WHEY1001",
@@ -498,7 +500,7 @@ class VtexSpiderUnitTests(SimpleTestCase):
     def setUp(self) -> None:
         """Create reusable VTEX fixture item."""
         self.spider = _DummyVtexSpider()
-        self.base_item: dict[str, Any] = {
+        self.base_item: ScrapedJsonObject = {
             "productId": "9001",
             "productName": "VTEX Product",
             "linkText": "vtex-product",
@@ -593,7 +595,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
     def setUp(self) -> None:
         """Create reusable BlackSkull fixture item."""
         self.spider = BlackSkullSpider()
-        self.base_item: dict[str, Any] = {
+        self.base_item: ScrapedJsonObject = {
             "productId": "5001",
             "productName": "Whey Black Skull",
             "linkText": "whey-black-skull",

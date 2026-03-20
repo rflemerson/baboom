@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
@@ -16,14 +14,21 @@ from scrapers.services import (
     ScrapedItemVariantService,
 )
 
-if TYPE_CHECKING:
-    from .inputs import (
-        ScrapedItemCheckoutInput,
-        ScrapedItemErrorInput,
-        ScrapedItemLinkInput,
-        ScrapedItemVariantInput,
-    )
-    from .types import ScrapedItemType
+from .inputs import (
+    ScrapedItemCheckoutInput,
+    ScrapedItemErrorInput,
+    ScrapedItemLinkInput,
+    ScrapedItemVariantInput,
+)
+from .types import ScrapedItemType
+
+_STRAWBERRY_RUNTIME_TYPES = (
+    ScrapedItemCheckoutInput,
+    ScrapedItemErrorInput,
+    ScrapedItemLinkInput,
+    ScrapedItemVariantInput,
+    ScrapedItemType,
+)
 
 
 @strawberry.type
