@@ -5,10 +5,10 @@ from typing import cast
 import strawberry
 from django.core.paginator import Paginator
 
-from core.filters import ProductFilter
+from core.dtos import CatalogProductsFilters as CatalogProductsFiltersDTO
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from core.models import Category, Product, Tag
-from core.selectors import public_catalog_products_with_stats
+from core.selectors import public_catalog_products
 
 from .inputs import CatalogProductsFiltersInput
 from .types import (
@@ -39,32 +39,21 @@ class CoreQuery:
         )
         normalized_page = max(resolved_filters.page, 1)
 
-        filter_data: dict[str, str | float] = {
-            "sort_by": resolved_filters.sort_by,
-            "sort_dir": resolved_filters.sort_dir,
-        }
-
-        optional_filters = {
-            "search": resolved_filters.search,
-            "brand": resolved_filters.brand,
-            "price_min": resolved_filters.price_min,
-            "price_max": resolved_filters.price_max,
-            "price_per_protein_gram_min": resolved_filters.price_per_protein_gram_min,
-            "price_per_protein_gram_max": resolved_filters.price_per_protein_gram_max,
-            "concentration_min": resolved_filters.concentration_min,
-            "concentration_max": resolved_filters.concentration_max,
-        }
-        filter_data.update(
-            {
-                key: value
-                for key, value in optional_filters.items()
-                if value not in (None, "")
-            },
+        query_filters = CatalogProductsFiltersDTO(
+            search=resolved_filters.search,
+            brand=resolved_filters.brand,
+            price_min=resolved_filters.price_min,
+            price_max=resolved_filters.price_max,
+            price_per_protein_gram_min=resolved_filters.price_per_protein_gram_min,
+            price_per_protein_gram_max=resolved_filters.price_per_protein_gram_max,
+            concentration_min=resolved_filters.concentration_min,
+            concentration_max=resolved_filters.concentration_max,
+            sort_by=resolved_filters.sort_by,
+            sort_dir=resolved_filters.sort_dir,
         )
 
-        queryset = public_catalog_products_with_stats().filter(is_published=True)
-        product_filter = ProductFilter(filter_data, queryset=queryset)
-        paginator = Paginator(product_filter.qs, normalized_per_page)
+        queryset = public_catalog_products(query_filters)
+        paginator = Paginator(queryset, normalized_per_page)
         page_obj = paginator.get_page(normalized_page)
 
         return CatalogProductsResult(

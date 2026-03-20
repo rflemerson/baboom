@@ -32,14 +32,14 @@ from scrapers.models import ScrapedItem
 from scrapers.services import ScraperService
 
 if TYPE_CHECKING:
-    from core.types import (
+    from core.dtos import (
         MicronutrientPayload,
         NutritionFactsPayload,
-        ProductComponentInput,
+        ComboComponentInput,
         ProductCreateInput,
         ProductMetadataUpdateInput,
         ProductNutritionPayload,
-        ProductStorePayload,
+        StoreListingPayload,
     )
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ class ComboResolutionService:
     def resolve_combo_components(
         self,
         parent_product: Product,
-        components_data: list[ProductComponentInput],
+        components_data: list[ComboComponentInput],
     ) -> list[ProductComponent]:
         """Resolve component DTOs to concrete component links."""
         created_links = []
@@ -120,7 +120,7 @@ class ComboResolutionService:
     def _find_best_match(
         self,
         parent_product: Product,
-        component_data: ProductComponentInput,
+        component_data: ComboComponentInput,
     ) -> Product | None:
         """Resolve a component using exact identifiers only."""
         return (
@@ -169,7 +169,7 @@ class ComboResolutionService:
 
     def _create_placeholder(
         self,
-        component_data: ProductComponentInput,
+        component_data: ComboComponentInput,
         parent_product: Product,
     ) -> Product:
         """Create an unpublished placeholder when no component match is found."""
@@ -470,7 +470,7 @@ class ProductCreateService:
     def _create_store_entries(
         self,
         product: Product,
-        stores: list[ProductStorePayload],
+        stores: list[StoreListingPayload],
     ) -> None:
         """Create store links and initial price history for a product."""
         for store_payload in stores:

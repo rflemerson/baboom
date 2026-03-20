@@ -13,7 +13,6 @@ dependencies = [
   "psycopg",
   "requests",
   "django>=6.0",
-  "django-filter",
   "django-simple-history",
   "django-treebeard",
   "django-nested-admin",

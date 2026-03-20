@@ -16,15 +16,15 @@ from core.services import (
     ProductCreateService,
     ProductMetadataUpdateService,
 )
-from core.types import (
+from core.dtos import (
     MicronutrientPayload,
     NutritionFactsPayload,
     ProductCreateInput,
     ProductNutritionPayload,
-    ProductStorePayload,
+    StoreListingPayload,
 )
-from core.types import ProductComponentInput as ProductComponentDTO
-from core.types import ProductMetadataUpdateInput as ProductMetadataUpdateDTO
+from core.dtos import ComboComponentInput as ProductComponentDTO
+from core.dtos import ProductMetadataUpdateInput as ProductMetadataUpdateDTO
 
 from .types import AlertSubscriptionResult, ProductResult
 
@@ -140,9 +140,9 @@ class CoreMutation:
     @staticmethod
     def _map_store_data(
         stores: list[graphql_inputs.ProductStoreInput],
-    ) -> list[ProductStorePayload]:
+    ) -> list[StoreListingPayload]:
         return [
-            ProductStorePayload(
+            StoreListingPayload(
                 store_name=store_input.store_name,
                 product_link=store_input.product_link,
                 price=store_input.price,

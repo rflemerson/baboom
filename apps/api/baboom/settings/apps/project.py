@@ -16,9 +16,6 @@ INSTALLED_APPS += ["treebeard"]
 # Nested Admin
 INSTALLED_APPS += ["nested_admin"]
 
-# Django Filter
-INSTALLED_APPS += ["django_filters"]
-
 # Strawberry GraphQL
 INSTALLED_APPS += ["strawberry.django"]
 

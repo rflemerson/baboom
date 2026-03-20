@@ -9,8 +9,10 @@
 ## Architecture
 
 - Business logic goes in `core/services.py`.
+- Service DTOs go in `core/dtos.py`.
 - Read/query composition goes in `selectors.py`.
-- Filtering logic goes in `filters.py`.
+- Public catalog filtering and sorting stay in the catalog query layer, not in
+  GraphQL boundaries and not in form-style `FilterSet` classes.
 - GraphQL boundary stays thin in `core/graphql/`.
 - Admin customizations should stay typed and light.
 

@@ -61,7 +61,7 @@ class ProductStoreInput:
 
 
 @strawberry.input
-class ProductComponentInput:
+class ComboComponentInput:
     """Input for combo component."""
 
     name: str
@@ -128,7 +128,7 @@ class ProductInput:
         default=False,
         description="Is this a combo/kit product?",
     )
-    components: list[ProductComponentInput] | None = strawberry.field(
+    components: list[ComboComponentInput] | None = strawberry.field(
         default=None,
         description="List of components if combo",
     )

@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from .models import Product
 
 
-class ProductComponentInput(BaseModel):
-    """DTO for combo component input."""
+class ComboComponentInput(BaseModel):
+    """DTO for a combo component input."""
 
     name: str
     ean: str | None = None
@@ -47,7 +47,7 @@ class ProductNutritionPayload(BaseModel):
     flavor_names: list[str] | None = None
 
 
-class ProductStorePayload(BaseModel):
+class StoreListingPayload(BaseModel):
     """DTO for a store listing attached to a product."""
 
     store_name: str
@@ -70,13 +70,12 @@ class ProductCreateInput(BaseModel):
     packaging: str = Product.Packaging.CONTAINER
     is_published: bool = False
     tags: list[str] | list[list[str]] | None = None
-    stores: list[ProductStorePayload] | None = None
+    stores: list[StoreListingPayload] | None = None
     nutrition: list[ProductNutritionPayload] | None = None
     origin_scraped_item_id: int | None = None
 
-    # Combo fields
     is_combo: bool = False
-    components: list[ProductComponentInput] | None = None
+    components: list[ComboComponentInput] | None = None
 
 
 class ProductMetadataUpdateInput(BaseModel):
@@ -87,3 +86,18 @@ class ProductMetadataUpdateInput(BaseModel):
     category_name: str | list[str] | None = None
     packaging: str | None = None
     tags: list[str] | list[list[str]] | None = None
+
+
+class CatalogProductsFilters(BaseModel):
+    """DTO for public catalog filtering and sorting."""
+
+    search: str | None = None
+    brand: str | None = None
+    price_min: float | None = None
+    price_max: float | None = None
+    price_per_protein_gram_min: float | None = None
+    price_per_protein_gram_max: float | None = None
+    concentration_min: float | None = None
+    concentration_max: float | None = None
+    sort_by: str = "price_per_protein_gram"
+    sort_dir: str = "asc"
