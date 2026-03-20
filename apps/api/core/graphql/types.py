@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from importlib import import_module
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import auto
@@ -22,8 +22,10 @@ from core.models import (
     Tag,
 )
 
-baboom_utils = import_module("baboom.utils")
-decimal = import_module("decimal")
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from baboom.utils import ValidationError
 
 
 @django_type(Brand)
@@ -157,7 +159,7 @@ class ProductResult:
     """Result type for Product mutations."""
 
     product: ProductType | None = None
-    errors: list[baboom_utils.ValidationError] | None = None
+    errors: list[ValidationError] | None = None
 
 
 @strawberry.type
@@ -171,10 +173,10 @@ class CatalogProductType:
     is_published: bool
     brand: BrandType
     category: CategoryType | None
-    last_price: decimal.Decimal | None = None
-    price_per_protein_gram: decimal.Decimal | None = None
-    concentration: decimal.Decimal | None = None
-    total_protein: decimal.Decimal | None = None
+    last_price: Decimal | None = None
+    price_per_protein_gram: Decimal | None = None
+    concentration: Decimal | None = None
+    total_protein: Decimal | None = None
     external_link: str | None = None
 
     @strawberry.field
@@ -215,4 +217,4 @@ class AlertSubscriptionResult:
     success: bool
     already_subscribed: bool = False
     email: str | None = None
-    errors: list[baboom_utils.ValidationError] | None = None
+    errors: list[ValidationError] | None = None

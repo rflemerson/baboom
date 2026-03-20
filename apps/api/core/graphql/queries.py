@@ -1,6 +1,6 @@
 """Query definitions for the core GraphQL schema."""
 
-from typing import cast
+from typing import TYPE_CHECKING
 
 import strawberry
 from django.core.paginator import Paginator
@@ -14,11 +14,26 @@ from .inputs import CatalogProductsFiltersInput
 from .types import (
     CatalogPageInfo,
     CatalogProductsResult,
-    CatalogProductType,
     CategoryType,
     ProductType,
     TagType,
 )
+
+MAX_PRODUCTS_LIMIT = 100
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
+
+def _product_detail_queryset() -> QuerySet[Product]:
+    """Return the shared queryset used by product list and detail queries."""
+    return Product.objects.select_related("brand", "category").prefetch_related(
+        "tags",
+        "store_links__store",
+        "store_links__price_history",
+        "nutrition_profiles__nutrition_facts__micronutrients",
+        "nutrition_profiles__flavors",
+    )
 
 
 @strawberry.type
@@ -57,7 +72,7 @@ class CoreQuery:
         page_obj = paginator.get_page(normalized_page)
 
         return CatalogProductsResult(
-            items=cast("list[CatalogProductType]", list(page_obj.object_list)),
+            items=list(page_obj.object_list),
             page_info=CatalogPageInfo(
                 current_page=page_obj.number,
                 per_page=normalized_per_page,
@@ -69,44 +84,29 @@ class CoreQuery:
         )
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
-    def products(self, limit: int = 50, offset: int = 0) -> list[ProductType]:
+    def products(
+        self,
+        limit: int = MAX_PRODUCTS_LIMIT // 2,
+        offset: int = 0,
+    ) -> list[ProductType]:
         """List products with pagination."""
-        qs = (
-            Product.objects.select_related("brand", "category")
-            .prefetch_related(
-                "tags",
-                "store_links__store",
-                "store_links__price_history",
-                "nutrition_profiles__nutrition_facts__micronutrients",
-                "nutrition_profiles__flavors",
-            )
-            .all()[offset : offset + limit]
-        )
-        return cast("list[ProductType]", qs)
+        normalized_limit = min(max(limit, 1), MAX_PRODUCTS_LIMIT)
+        normalized_offset = max(offset, 0)
+        return _product_detail_queryset().all()[
+            normalized_offset : normalized_offset + normalized_limit
+        ]
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def product(self, product_id: int) -> ProductType | None:
         """Get single product by ID."""
-        obj = (
-            Product.objects.select_related("brand", "category")
-            .prefetch_related(
-                "tags",
-                "store_links__store",
-                "store_links__price_history",
-                "nutrition_profiles__nutrition_facts__micronutrients",
-                "nutrition_profiles__flavors",
-            )
-            .filter(id=product_id)
-            .first()
-        )
-        return cast("ProductType | None", obj)
+        return _product_detail_queryset().filter(id=product_id).first()
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def categories(self) -> list[CategoryType]:
         """List all categories."""
-        return cast("list[CategoryType]", Category.objects.all())
+        return Category.objects.all()
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
     def tags(self) -> list[TagType]:
         """List all tags."""
-        return cast("list[TagType]", Tag.objects.all())
+        return Tag.objects.all()

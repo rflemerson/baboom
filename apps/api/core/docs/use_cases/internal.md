@@ -56,11 +56,12 @@ Link a scraped item to an explicitly selected product store listing.
 
 ### Main success flow
 
-1. The system receives a scraped item id and a chosen `ProductStore`.
-2. The system loads the scraped item.
-3. The system links the scraped item to the selected `ProductStore`.
-4. The system updates the scraped item status to `LINKED`.
-5. The system triggers price synchronization into the core catalog.
+1. The system receives a scraped item id and a chosen `product_store_id`.
+2. The system loads the selected `ProductStore`.
+3. The system loads the scraped item.
+4. The system links the scraped item to the selected `ProductStore`.
+5. The system updates the scraped item status to `LINKED`.
+6. The system triggers price synchronization into the core catalog.
 
 ### Alternate flows
 
@@ -71,7 +72,7 @@ Link a scraped item to an explicitly selected product store listing.
 
 #### A2. Target product store does not exist
 
-1. The chosen `ProductStore` cannot be loaded.
+1. The chosen `product_store_id` does not resolve to a `ProductStore`.
 2. The system skips the linking workflow.
 
 ### Business rules

@@ -256,9 +256,13 @@ class ScrapedItemLinkService:
         self,
         *,
         scraped_item_id: int,
-        product_store: ProductStore,
+        product_store_id: int,
     ) -> ScrapedItem | None:
         """Link and sync a scraped item using an explicit target listing."""
+        product_store = ProductStore.objects.filter(id=product_store_id).first()
+        if product_store is None:
+            return None
+
         item = ScrapedItem.objects.filter(id=scraped_item_id).first()
         if item is None:
             return None

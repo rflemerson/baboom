@@ -5,7 +5,6 @@ from __future__ import annotations
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.models import ProductStore
 from scrapers.services import (
     ScrapedItemCheckoutService,
     ScrapedItemDiscardService,
@@ -75,15 +74,11 @@ class ScrapersMutation:
         data: ScrapedItemLinkInput,
     ) -> ScrapedItemType | None:
         """Explicitly link a scraped item to a chosen product store."""
-        try:
-            product_store = ProductStore.objects.get(id=data.product_store_id)
-            item = ScrapedItemLinkService().execute(
-                scraped_item_id=data.item_id,
-                product_store=product_store,
-            )
-            return item
-        except ProductStore.DoesNotExist:
-            return None
+        item = ScrapedItemLinkService().execute(
+            scraped_item_id=data.item_id,
+            product_store_id=data.product_store_id,
+        )
+        return item
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def update_scraped_item_data(

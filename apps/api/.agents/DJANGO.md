@@ -10,6 +10,9 @@
 
 - Business logic goes in `core/services.py`.
 - Service DTOs go in `core/dtos.py`.
+- Scraper ingestion DTOs go in `scrapers/dtos.py`.
+- Scraper-side workflows also go in `scrapers/services.py`; keep `scrapers/graphql/`
+  as a thin boundary.
 - Admin-facing forms and formsets go in `core/forms.py`.
 - Admin-to-service DTO mapping helpers go in `core/admin_mappers.py`.
 - Domain use case documentation goes in `core/docs/use_cases/`.

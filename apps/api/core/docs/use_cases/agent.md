@@ -29,7 +29,7 @@ This document groups the use cases handled by the AI Catalog Agent through Graph
 - create simple products from scraped context
 - create combo products from scraped context
 - link scraped items to chosen product store listings
-- manage combo components
+- submit combo components during combo creation
 
 ## UC-01 Checkout Scraped Item For Processing
 
@@ -201,11 +201,11 @@ Create a combo product through GraphQL from scraped context.
 - Fuzzy matching is intentionally not used.
 - Placeholder products are unpublished support records.
 
-## UC-04 Manage Combo Components From Agent
+## UC-04 Link Scraped Item To Product Store From Agent
 
 ### Goal
 
-Maintain combo components through an agent-driven GraphQL workflow.
+Link a scraped item to an explicitly chosen product store through the agent workflow.
 
 ### Primary actor
 
@@ -213,50 +213,47 @@ Maintain combo components through an agent-driven GraphQL workflow.
 
 ### Supporting actors
 
-- GraphQL boundary
-- ComboResolutionService
+- Scrapers GraphQL boundary
+- ScrapedItemLinkService
 
 ### Trigger
 
-- The agent submits the desired set of combo components for a combo product.
+- The agent chooses a scraped item and the target `ProductStore`.
 
 ### Preconditions
 
-- The parent combo product exists.
-- Component input rows are available.
+- The target `ProductStore` exists.
+- A scraped item id is available.
 
 ### Postconditions
 
-- The combo product has a synchronized set of `ProductComponent` links.
+- The scraped item is linked to the chosen `ProductStore`.
+- The scraped item status becomes `LINKED`.
 
 ### Main success flow
 
-1. The agent submits the desired component rows.
-2. The GraphQL boundary normalizes the component input.
-3. The system clears current component links for the combo.
-4. For each submitted component, the system tries to resolve an existing product by exact identifiers.
-5. If a product is found, the system links it as a component.
-6. If no product is found, the system creates an unpublished placeholder product.
-7. The system creates a `ProductComponent` row with the submitted quantity.
+1. The agent submits the scraped item id and target `product_store_id`.
+2. The system loads the selected `ProductStore`.
+3. The system links the scraped item to the selected `ProductStore`.
+4. The system marks the item as `LINKED`.
+5. The system synchronizes price and stock into the core catalog.
 
 ### Alternate flows
 
-#### A1. Component resolved by EAN
+#### A1. Product store does not exist
 
-1. The system finds a simple product with the provided EAN.
-2. The system links that product as a component.
+1. The chosen `product_store_id` does not resolve to a `ProductStore`.
+2. The system returns no linked item.
 
-#### A2. Component resolved by external id
+#### A2. Scraped item does not exist
 
-1. The system cannot resolve by EAN.
-2. The system resolves the component by `external_id` within the combo store context.
-3. The system links the resolved product.
+1. The chosen scraped item cannot be loaded.
+2. The system returns no linked item.
 
-#### A3. No exact match found
+### Business rules
 
-1. The system cannot resolve the component by exact identifiers.
-2. The system creates an unpublished placeholder product.
-3. The system links the placeholder as a component.
+- Linking is explicit; the service does not infer the target `ProductStore`.
+- This workflow is exposed through `scrapers/graphql`, not `core/graphql`.
 
 ### Business rules
 
