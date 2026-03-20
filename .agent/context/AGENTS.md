@@ -71,7 +71,7 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 
 ## 6.2 Frontend Direction Policy
 - Do not use legacy Django template UI patterns for new public frontend work.
-- The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/agents/`.
+- The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/.agents/`.
 
 ## 7. Agents Pipeline Contract (Dagster)
 - Scraper stage must stay lightweight and store artifacts only:

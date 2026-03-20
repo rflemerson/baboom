@@ -1,8 +1,8 @@
 @/AGENTS.md
-@/apps/web/agents/APOLLO.md
-@/apps/web/agents/GRAPHQL_CODEGEN.md
-@/apps/web/agents/STYLING.md
-@/apps/web/agents/VUE_PRACTICES.md
+@/apps/web/.agents/APOLLO.md
+@/apps/web/.agents/GRAPHQL_CODEGEN.md
+@/apps/web/.agents/STYLING.md
+@/apps/web/.agents/VUE_PRACTICES.md
 
 ---
 
@@ -77,9 +77,9 @@ cd apps/web && npm run format
 
 ## Documentation Policy
 
-- The files under `apps/web/agents/` are the focused frontend references.
+- The files under `apps/web/.agents/` are the focused frontend references.
 - Keep each file about one topic.
-- Every file in `apps/web/agents/` must include source links for the guidance it contains.
+- Every file in `apps/web/.agents/` must include source links for the guidance it contains.
 - If frontend tooling or integration patterns change, update the relevant topic file in the same task.
 - Do not hand-edit files under `src/gql/`; regenerate them with `npm run graphql-codegen`.
 - Keep frontend prek hooks in `apps/web/prek.toml`; use `npm`-backed local hooks for format, lint, type-check, and unit tests.
