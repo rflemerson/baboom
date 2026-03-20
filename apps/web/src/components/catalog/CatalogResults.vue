@@ -29,7 +29,8 @@ const loadingPlaceholders = computed(() =>
 </script>
 
 <template>
-  <section v-if="loading" class="mb-8 space-y-4" aria-live="polite" aria-busy="true" role="status">
+  <section v-if="loading" class="mb-8 space-y-4" aria-busy="true">
+    <output class="sr-only" aria-live="polite">Loading products...</output>
     <div class="app-meta-row flex items-center justify-between rounded-2xl px-1 text-sm">
       <p class="app-copy-muted">Loading products...</p>
       <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Fetching catalog</span>
@@ -121,12 +122,8 @@ const loadingPlaceholders = computed(() =>
     />
   </section>
 
-  <section
-    v-else
-    class="app-panel app-state-panel rounded-2xl px-6 py-12 text-center"
-    aria-live="polite"
-    role="status"
-  >
+  <section v-else class="app-panel app-state-panel rounded-2xl px-6 py-12 text-center">
+    <output class="sr-only" aria-live="polite">No products matched this search.</output>
     <SearchX class="app-copy-soft mx-auto h-8 w-8" />
     <h2 class="mt-4 text-xl font-semibold">No products matched this search</h2>
     <p class="app-copy-muted mx-auto mt-3 max-w-xl text-sm sm:text-base">

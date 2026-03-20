@@ -10,7 +10,7 @@ function applyTheme(theme: ThemeMode) {
 }
 
 function readStoredTheme(): ThemeMode | null {
-  if (typeof globalThis.localStorage === 'undefined') {
+  if (!('localStorage' in globalThis)) {
     return null
   }
 

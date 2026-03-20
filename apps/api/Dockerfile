@@ -10,17 +10,16 @@ RUN apt-get update && apt-get install -y \
     gcc \
     gettext \
     curl \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r appuser \
+    && useradd -r -g appuser appuser
 
 COPY apps/api/ /app/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+    && (python manage.py compilemessages --ignore=.venv || true) \
+    && chown -R appuser:appuser /app
 
-RUN chown -R appuser:appuser /app
 USER appuser
-
-RUN python manage.py compilemessages --ignore=.venv || true
 
 EXPOSE 8000
 
