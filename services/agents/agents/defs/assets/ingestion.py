@@ -23,18 +23,20 @@ def downloaded_assets(
         started = time.perf_counter()
         item = api.get_scraped_item(config.item_id)
         if not item:
-            raise Exception(f"Scraped item {config.item_id} not found")
+            raise RuntimeError(f"Scraped item {config.item_id} not found")
 
         page_url = item.get("sourcePageUrl") or item.get("productLink") or config.url
         store_slug = item.get("storeSlug") or config.store_slug
         ensured_item = api.ensure_source_page(config.item_id, page_url, store_slug)
         if not ensured_item:
-            raise Exception(f"Failed to ensure source page for item {config.item_id}")
+            raise RuntimeError(
+                f"Failed to ensure source page for item {config.item_id}",
+            )
 
         page_id = ensured_item.get("sourcePageId")
         ensured_page_url = ensured_item.get("sourcePageUrl") or page_url
         if not page_id:
-            raise Exception(f"Missing sourcePageId for item {config.item_id}")
+            raise RuntimeError(f"Missing sourcePageId for item {config.item_id}")
 
         storage_path = service.download_assets(int(page_id), ensured_page_url)
         source_page_raw_content = item.get("sourcePageRawContent") or ""
@@ -47,7 +49,7 @@ def downloaded_assets(
                 "origin_item_id": int(ensured_item["id"]),
                 "scraper_context_type": source_page_content_type or "unknown",
                 "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-            }
+            },
         )
         return {
             "storage_path": storage_path,

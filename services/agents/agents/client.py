@@ -65,6 +65,15 @@ productStoreId
 linkedProductId
 """
 
+GRAPHQL_SELECTION_CLOSE = """
+            }
+        }
+        """
+
+
+class AgentClientError(RuntimeError):
+    """Raised when the backend API returns an invalid or failed response."""
+
 
 class AgentClient:
     """Pure Python HTTP Client. Knows nothing about Django."""
@@ -105,10 +114,10 @@ class AgentClient:
 
                 if "errors" in data:
                     logger.error(f"GraphQL Error: {data['errors']}")
-                    raise Exception(f"API Error: {data['errors'][0]['message']}")
+                    raise AgentClientError(f"API Error: {data['errors'][0]['message']}")
 
                 return data
-            except Exception as e:
+            except (requests.RequestException, ValueError, AgentClientError) as e:
                 last_exception = e
                 if attempt < retries:
                     time.sleep(backoff * attempt)
@@ -148,10 +157,7 @@ class AgentClient:
             checkoutScrapedItem(force: $force, targetItemId: $targetItemId) {
         """
             + SCRAPED_ITEM_CHECKOUT_FIELDS
-            + """
-            }
-        }
-        """
+            + GRAPHQL_SELECTION_CLOSE
         )
         data = self._send(mutation, {"force": force, "targetItemId": target_item_id})
         return data.get("data", {}).get("checkoutScrapedItem")
@@ -190,13 +196,17 @@ class AgentClient:
         data = self._send(mutation, {"data": product_input})
         result = data.get("data", {}).get("createProduct")
         if not result:
-            raise Exception("Product creation failed: empty createProduct response")
-        if result and result.get("errors"):
+            raise AgentClientError(
+                "Product creation failed: empty createProduct response",
+            )
+        if result.get("errors"):
             logger.error(f"Product creation failed: {result['errors']}")
-            raise Exception(f"Product creation failed: {result['errors']}")
+            raise AgentClientError(f"Product creation failed: {result['errors']}")
         product = result.get("product")
         if not product or not product.get("id"):
-            raise Exception("Product creation failed: missing product id in response")
+            raise AgentClientError(
+                "Product creation failed: missing product id in response",
+            )
         return result
 
     def get_scraped_item(self, item_id: int):
@@ -207,10 +217,7 @@ class AgentClient:
             scrapedItem(itemId: $itemId) {
         """
             + SCRAPED_ITEM_DETAILS_FIELDS
-            + """
-            }
-        }
-        """
+            + GRAPHQL_SELECTION_CLOSE
         )
         data = self._send(query, {"itemId": int(item_id)})
         return data.get("data", {}).get("scrapedItem")
@@ -223,10 +230,7 @@ class AgentClient:
             ensureScrapedItemSourcePage(itemId: $itemId, url: $url, storeSlug: $storeSlug) {
         """
             + SCRAPED_ITEM_MUTATION_FIELDS
-            + """
-            }
-        }
-        """
+            + GRAPHQL_SELECTION_CLOSE
         )
         data = self._send(
             mutation,
@@ -248,10 +252,7 @@ class AgentClient:
             updateScrapedItemData(itemId: $itemId, name: $name, sourcePageUrl: $sourcePageUrl, storeSlug: $storeSlug) {
         """
             + SCRAPED_ITEM_MUTATION_FIELDS
-            + """
-            }
-        }
-        """
+            + GRAPHQL_SELECTION_CLOSE
         )
         data = self._send(
             mutation,
@@ -297,10 +298,7 @@ class AgentClient:
             ) {
             """
             + SCRAPED_ITEM_VARIANT_FIELDS
-            + """
-            }
-        }
-        """
+            + GRAPHQL_SELECTION_CLOSE
         )
         data = self._send(
             mutation,

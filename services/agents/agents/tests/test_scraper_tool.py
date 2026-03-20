@@ -5,8 +5,9 @@ from typing import cast
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from agents.tools.scraper import ScraperService
 from bs4 import BeautifulSoup, Tag
+
+from agents.tools.scraper import ScraperService
 
 
 class TestScraperToolHelpers(TestCase):
@@ -26,7 +27,7 @@ class TestScraperToolHelpers(TestCase):
         )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
         score, signal = self.service._score_by_keywords(tag, "https://x/facts.jpg")
 
         self.assertGreater(score, 0)
@@ -40,7 +41,7 @@ class TestScraperToolHelpers(TestCase):
         )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
         _score, signal = self.service._score_by_keywords(tag, "https://x/product.jpg")
 
         self.assertEqual(signal, 0)
@@ -120,7 +121,7 @@ class TestScraperToolHelpers(TestCase):
         soup = BeautifulSoup('<img class="a b c" />', "html.parser")
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
         self.assertEqual(self.service._get_attr(tag, "class"), "a b c")
 
     def test_calculate_image_score_handles_invalid_image(self):
@@ -128,12 +129,14 @@ class TestScraperToolHelpers(TestCase):
         soup = BeautifulSoup('<img alt="nutrition" />', "html.parser")
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
 
         with patch("agents.tools.scraper.Image.open", side_effect=OSError("bad")):
             score, width, height, signal, cv_score = (
                 self.service._calculate_image_score(
-                    tag, "https://x/nutrition.jpg", b"bad-bytes"
+                    tag,
+                    "https://x/nutrition.jpg",
+                    b"bad-bytes",
                 )
             )
 
@@ -200,7 +203,9 @@ class TestScraperToolService(TestCase):
         with (
             patch.object(self.service, "_download_html", return_value="<html></html>"),
             patch.object(
-                self.service, "_build_image_manifest", side_effect=RuntimeError("x")
+                self.service,
+                "_build_image_manifest",
+                side_effect=RuntimeError("x"),
             ),
             self.assertRaises(RuntimeError),
         ):
@@ -208,7 +213,8 @@ class TestScraperToolService(TestCase):
 
     @patch("agents.tools.scraper.requests.get")
     def test_materialize_candidates_downloads_and_scores_manifest_images(
-        self, mock_get
+        self,
+        mock_get,
     ):
         """Builds candidates.json from manifest in heavy Dagster-side step."""
         self.storage.upload(
@@ -223,9 +229,9 @@ class TestScraperToolService(TestCase):
                             "position": 1,
                             "url": "https://example.com/p1.png",
                             "metadata": {"alt": "Nutrition facts"},
-                        }
+                        },
                     ],
-                }
+                },
             ).encode("utf-8"),
             "application/json",
         )
@@ -243,7 +249,8 @@ class TestScraperToolService(TestCase):
             ),
         ):
             candidates = self.service.materialize_candidates(
-                "51", "https://example.com/p"
+                "51",
+                "https://example.com/p",
             )
 
         self.assertEqual(len(candidates), 1)
@@ -255,12 +262,13 @@ class TestScraperToolService(TestCase):
         """Dedupes repeated URLs and returns candidates sorted by score."""
         html = "<html><body></body></html>"
         soup = BeautifulSoup(
-            '<img src="/one.jpg" /><img src="/two.jpg" />', "html.parser"
+            '<img src="/one.jpg" /><img src="/two.jpg" />',
+            "html.parser",
         )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
-        second_tag = cast(Tag, soup.find_all("img")[1])
+        tag = cast("Tag", tag)
+        second_tag = cast("Tag", soup.find_all("img")[1])
 
         with (
             patch.object(
@@ -296,11 +304,12 @@ class TestScraperToolService(TestCase):
         mock_get.return_value = response
 
         soup = BeautifulSoup(
-            '<img alt="Nutrition table" src="/x.png" />', "html.parser"
+            '<img alt="Nutrition table" src="/x.png" />',
+            "html.parser",
         )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
 
         with (
             patch.object(self.service, "_check_hash", return_value=True),
@@ -319,7 +328,7 @@ class TestScraperToolService(TestCase):
             )
 
         self.assertIsNotNone(candidate)
-        candidate = cast(dict, candidate)
+        candidate = cast("dict", candidate)
         self.assertEqual(
             self.storage.content_types[("55", "images/image_1.png")],
             "image/png",
@@ -334,15 +343,20 @@ class TestScraperToolService(TestCase):
         response.content = b"svg-content"
         mock_get.return_value = response
         soup = BeautifulSoup(
-            '<img alt="Nutrition table" src="/x.svg" />', "html.parser"
+            '<img alt="Nutrition table" src="/x.svg" />',
+            "html.parser",
         )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
 
         with patch.object(self.service, "_check_hash", return_value=True):
             candidate = self.service._process_single_candidate(
-                2, "https://example.com/image.svg", tag, "9", set()
+                2,
+                "https://example.com/image.svg",
+                tag,
+                "9",
+                set(),
             )
 
         self.assertIsNone(candidate)
@@ -356,11 +370,12 @@ class TestScraperToolService(TestCase):
         response.content = b"raw-image"
         mock_get.return_value = response
         soup = BeautifulSoup(
-            '<img alt="Nutrition table" src="/x.abcdef" />', "html.parser"
+            '<img alt="Nutrition table" src="/x.abcdef" />',
+            "html.parser",
         )
         tag = soup.find("img")
         self.assertIsNotNone(tag)
-        tag = cast(Tag, tag)
+        tag = cast("Tag", tag)
 
         with (
             patch.object(self.service, "_check_hash", return_value=True),
@@ -371,11 +386,15 @@ class TestScraperToolService(TestCase):
             ),
         ):
             candidate = self.service._process_single_candidate(
-                5, "https://example.com/image.abcdef?x=1", tag, "19", set()
+                5,
+                "https://example.com/image.abcdef?x=1",
+                tag,
+                "19",
+                set(),
             )
 
         self.assertIsNotNone(candidate)
-        candidate = cast(dict, candidate)
+        candidate = cast("dict", candidate)
         self.assertEqual(candidate["file"], "images/image_5.jpg")
         self.assertEqual(
             self.storage.content_types[("19", "images/image_5.jpg")],
@@ -386,7 +405,9 @@ class TestScraperToolService(TestCase):
         """Allows candidate when hash calculation fails."""
         with patch.object(self.service, "_compute_phash", side_effect=OSError("bad")):
             result = self.service._check_hash(
-                b"img", "https://example.com/img.jpg", set()
+                b"img",
+                "https://example.com/img.jpg",
+                set(),
             )
         self.assertTrue(result)
 
@@ -404,10 +425,12 @@ class TestScraperToolService(TestCase):
         self.storage.upload("77", "source.html", html.encode("utf-8"), "text/html")
 
         with patch(
-            "agents.tools.scraper.extruct.extract", return_value={"json-ld": []}
+            "agents.tools.scraper.extruct.extract",
+            return_value={"json-ld": []},
         ):
             data = self.service.extract_metadata(
-                "77/source.html", "https://example.com/product"
+                "77/source.html",
+                "https://example.com/product",
             )
 
         self.assertIn("custom_nutrition_text", data)
@@ -451,7 +474,8 @@ class TestScraperToolService(TestCase):
         """Uses override and defaults when Product JSON-LD is absent."""
         metadata = {"json-ld": [], "opengraph": [{"og:title": "OG Product"}]}
         result = self.service.consolidate(
-            metadata, brand_name_override="Brand Override"
+            metadata,
+            brand_name_override="Brand Override",
         )
 
         self.assertEqual(result.name, "OG Product")
@@ -462,9 +486,10 @@ class TestScraperToolService(TestCase):
         """Handles brand/image fields represented as strings, lists and missing values."""
         self.assertEqual(self.service._extract_brand({"brand": "ABC"}), "ABC")
         self.assertEqual(self.service._extract_brand({"brand": 10}), "Unknown Brand")
-        self.assertEqual(
-            self.service._extract_image_url({"image": []}, {"opengraph": [{}]}), None
+        self.assertIsNone(
+            self.service._extract_image_url({"image": []}, {"opengraph": [{}]}),
         )
         self.assertEqual(
-            self.service._extract_image_url({}, {"opengraph": [{"og:image": "x"}]}), "x"
+            self.service._extract_image_url({}, {"opengraph": [{"og:image": "x"}]}),
+            "x",
         )

@@ -48,7 +48,7 @@ class TestAgentClient(TestCase):
 
         self.assertEqual(result, {"id": 7})
         kwargs = mock_post.call_args.kwargs
-        self.assertEqual(kwargs["json"]["variables"]["force"], True)
+        self.assertTrue(kwargs["json"]["variables"]["force"])
         self.assertEqual(kwargs["json"]["variables"]["targetItemId"], 99)
 
     def test_get_taxonomy_maps_category_and_tag_names(self):
@@ -61,7 +61,7 @@ class TestAgentClient(TestCase):
                 "data": {
                     "categories": [{"name": "Proteina"}],
                     "tags": [{"name": "Whey"}],
-                }
+                },
             },
         ):
             categories, tags = client.get_taxonomy()

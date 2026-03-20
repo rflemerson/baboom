@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 from dagster import Config
 
+NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
+
 
 class ItemConfig(Config):
     """Configuration for running a specific queued scraped item."""
@@ -17,7 +19,7 @@ class ItemConfig(Config):
 
 
 def _slugify(value: str) -> str:
-    normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    normalized = NON_ALNUM_PATTERN.sub("-", value.lower()).strip("-")
     return normalized or "item"
 
 
@@ -98,7 +100,7 @@ def _build_nutrition_payload(analysis_data: dict) -> list[dict]:
                 "sodium": _to_float(nutrition.get("sodium")),
                 "micronutrients": micronutrients,
             },
-        }
+        },
     ]
 
 
@@ -111,7 +113,7 @@ def _candidate_nutrition_signal(candidate: dict) -> int:
             str(metadata.get("title") or ""),
             str(metadata.get("class") or ""),
             str(metadata.get("id") or ""),
-        ]
+        ],
     ).lower()
     url_text = str(candidate.get("url") or "").lower()
     strong_keywords = [
@@ -163,7 +165,7 @@ def _candidate_product_relevance(candidate: dict, focus_tokens: set[str]) -> int
             str(metadata.get("alt") or ""),
             str(metadata.get("title") or ""),
             str(candidate.get("url") or ""),
-        ]
+        ],
     ).lower()
     return sum(1 for token in focus_tokens if token in candidate_text)
 
@@ -187,7 +189,7 @@ def _is_potential_table_candidate(candidate: dict) -> bool:
             str(metadata.get("alt") or ""),
             str(metadata.get("title") or ""),
             str(candidate.get("url") or ""),
-        ]
+        ],
     ).lower()
     table_keywords = [
         "tabela",
@@ -212,7 +214,7 @@ def _infer_candidate_kind(candidate: dict) -> str:
             str(metadata.get("alt") or ""),
             str(metadata.get("title") or ""),
             str(candidate.get("url") or ""),
-        ]
+        ],
     ).lower()
     nutrition_keywords = [
         "tabela",
@@ -233,7 +235,8 @@ def _infer_candidate_kind(candidate: dict) -> str:
 
 
 def _build_image_sequence_context(
-    candidates: list[dict], image_paths: list[str]
+    candidates: list[dict],
+    image_paths: list[str],
 ) -> str:
     if not image_paths:
         return ""
@@ -302,7 +305,8 @@ def _extract_expected_variant_signals(raw_text: str) -> set[str]:
             signals.add(label)
 
     for match in re.findall(
-        r"(?i)\b(?:sabor|flavor|variante|variation)\b[:\s-]+([^\n,;]{2,80})", raw_text
+        r"(?i)\b(?:sabor|flavor|variante|variation)\b[:\s-]+([^\n,;]{2,80})",
+        raw_text,
     ):
         label = re.sub(r"\s+", " ", match).strip(" .:-")
         if label:
@@ -362,7 +366,7 @@ def _extract_context_block(raw_text: str, block_name: str) -> dict | None:
 
 
 def _normalize_flavor_token(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+    return NON_ALNUM_PATTERN.sub(" ", value.lower()).strip()
 
 
 def _extract_allowed_variants_from_scraper_context(
@@ -424,21 +428,38 @@ def _count_invalid_variant_tokens(payload: dict, allowed_variants: set[str]) -> 
     for item in payload.get("items") or []:
         if not isinstance(item, dict):
             continue
-        candidates: list[str] = []
-        variant_name = item.get("variant_name")
-        if variant_name:
-            candidates.append(str(variant_name))
-        for flavor in item.get("flavor_names") or []:
-            candidates.append(str(flavor))
-        for value in candidates:
-            token = _normalize_flavor_token(value)
-            if not token:
-                continue
-            if token not in allowed_variants and not any(
-                token in allowed or allowed in token for allowed in allowed_variants
-            ):
-                invalid += 1
+        invalid += _count_item_invalid_variant_tokens(item, allowed_variants)
     return invalid
+
+
+def _count_item_invalid_variant_tokens(
+    item: dict,
+    allowed_variants: set[str],
+) -> int:
+    """Count invalid variant tokens for a single extracted item."""
+    return sum(
+        1
+        for token in _item_variant_tokens(item)
+        if _is_invalid_variant_token(token, allowed_variants)
+    )
+
+
+def _item_variant_tokens(item: dict) -> list[str]:
+    """Collect normalized variant/flavor tokens from one extracted item."""
+    raw_values: list[str] = []
+    variant_name = item.get("variant_name")
+    if variant_name:
+        raw_values.append(str(variant_name))
+    for flavor in item.get("flavor_names") or []:
+        raw_values.append(str(flavor))
+    return [token for value in raw_values if (token := _normalize_flavor_token(value))]
+
+
+def _is_invalid_variant_token(token: str, allowed_variants: set[str]) -> bool:
+    """Return True when one token is outside the allowed variant set."""
+    if token in allowed_variants:
+        return False
+    return not any(token in allowed or allowed in token for allowed in allowed_variants)
 
 
 def _build_context_guard_prompt(allowed_variants: set[str]) -> str:
@@ -463,7 +484,9 @@ def _apply_focus_filter(valid: list[dict], focus_tokens: set[str]) -> list[dict]
 
 
 def _append_file_once(
-    selected_files: list[str], seen_files: set[str], file_name: str
+    selected_files: list[str],
+    seen_files: set[str],
+    file_name: str,
 ) -> None:
     if file_name in seen_files:
         return
@@ -492,10 +515,12 @@ def _collect_likely_tables(
 
 
 def _add_neighbor_context(
-    selected_files: list[str], seen_files: set[str], ordered_files: list[str]
+    selected_files: list[str],
+    seen_files: set[str],
+    ordered_files: list[str],
 ) -> None:
     file_to_pos = {file_name: idx for idx, file_name in enumerate(ordered_files)}
-    for file_name in list(selected_files):
+    for file_name in selected_files.copy():
         pos = file_to_pos.get(file_name)
         if pos is None:
             continue
@@ -554,21 +579,57 @@ def _select_images_for_ocr(
         max_nutrition,
         max_table_candidates,
     )
-    for c in likely_tables:
-        _append_file_once(selected_files, seen_files, str(c["file"]))
+    _append_candidates(selected_files, seen_files, likely_tables)
 
     if include_all_tables:
         _add_neighbor_context(selected_files, seen_files, ordered_files)
 
-    for c in nutrition_candidates[:max_nutrition]:
-        _append_file_once(selected_files, seen_files, str(c["file"]))
+    _append_candidates(selected_files, seen_files, nutrition_candidates[:max_nutrition])
 
+    target_total = _resolve_target_total(
+        selected_files,
+        include_all_tables,
+        likely_tables,
+        max_total,
+        max_if_no_nutrition,
+    )
+    _fill_remaining_candidates(selected_files, seen_files, valid, target_total)
+
+    return [f"{bucket}/{file_name}" for file_name in selected_files]
+
+
+def _append_candidates(
+    selected_files: list[str],
+    seen_files: set[str],
+    candidates: list[dict],
+) -> None:
+    """Append candidate files once, preserving original order."""
+    for candidate in candidates:
+        _append_file_once(selected_files, seen_files, str(candidate["file"]))
+
+
+def _resolve_target_total(
+    selected_files: list[str],
+    include_all_tables: bool,
+    likely_tables: list[dict],
+    max_total: int,
+    max_if_no_nutrition: int,
+) -> int:
+    """Resolve final number of images to send for OCR."""
     target_total = max_total if selected_files else max_if_no_nutrition
     if include_all_tables and likely_tables:
         target_total = max(target_total, len(selected_files))
-    for c in valid:
+    return target_total
+
+
+def _fill_remaining_candidates(
+    selected_files: list[str],
+    seen_files: set[str],
+    valid: list[dict],
+    target_total: int,
+) -> None:
+    """Fill remaining OCR slots with best-scoring valid candidates."""
+    for candidate in valid:
         if len(selected_files) >= target_total:
             break
-        _append_file_once(selected_files, seen_files, str(c["file"]))
-
-    return [f"{bucket}/{file_name}" for file_name in selected_files]
+        _append_file_once(selected_files, seen_files, str(candidate["file"]))

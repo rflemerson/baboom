@@ -10,16 +10,15 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libglib2.0-0 \
     libgl1 \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r appuser \
+    && useradd -r -g appuser appuser
 
 COPY services/agents/ /app/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+    && chown -R appuser:appuser /app
 
-RUN chown -R appuser:appuser /app
 USER appuser
-
 EXPOSE 3000
 
 CMD ["dagster", "dev", "-m", "agents.definitions", "-h", "0.0.0.0", "-p", "3000"]

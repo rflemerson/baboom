@@ -22,6 +22,12 @@ from ..storage import get_storage
 
 logger = logging.getLogger(__name__)
 
+OG_IMAGE_PROPERTY = "og:image"
+JSON_CONTENT_TYPE = "application/json"
+HTML_PARSER = "html.parser"
+DEFAULT_IMAGE_CONTENT_TYPE = "image/jpeg"
+JPEG_CONTENT_TYPE = "image/jpeg"
+
 
 def _safe_int(value) -> int | None:
     """Parse optional integer-like values from HTML attributes."""
@@ -36,8 +42,8 @@ def _safe_int(value) -> int | None:
 def _infer_source_type(src: str) -> str:
     """Infer image source from raw src string."""
     lowered = src.lower()
-    if "og:image" in lowered:
-        return "og:image"
+    if OG_IMAGE_PROPERTY in lowered:
+        return OG_IMAGE_PROPERTY
     if "ld+json" in lowered:
         return "jsonld"
     return "img"
@@ -48,20 +54,26 @@ class ScraperService:
 
     def __init__(self):
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         }
         self.storage = get_storage()
         self.http_retries = max(1, int(os.getenv("AGENTS_HTTP_RETRIES", "3")))
         self.http_backoff = float(os.getenv("AGENTS_HTTP_RETRY_BACKOFF", "0.6"))
 
     def _request_get(
-        self, url: str, *, headers: dict[str, str] | None = None, timeout: int = 30
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: int = 30,
     ) -> requests.Response:
         """GET with retries for transient failures."""
         last_response: requests.Response | None = None
         for attempt in range(1, self.http_retries + 1):
             response = requests.get(
-                url, headers=headers or self.headers, timeout=timeout
+                url,
+                headers=headers or self.headers,
+                timeout=timeout,
             )
             last_response = response
             if response.status_code not in {429, 500, 502, 503, 504}:
@@ -73,7 +85,10 @@ class ScraperService:
         return last_response
 
     def download_assets(
-        self, item_id: int, url: str, html_content: str | None = None
+        self,
+        item_id: int,
+        url: str,
+        html_content: str | None = None,
     ) -> str:
         """Downloads page HTML and lightweight image manifest to storage."""
         bucket = str(item_id)
@@ -84,7 +99,10 @@ class ScraperService:
 
             html_key = "source.html"
             self.storage.upload(
-                bucket, html_key, html_content.encode("utf-8"), content_type="text/html"
+                bucket,
+                html_key,
+                html_content.encode("utf-8"),
+                content_type="text/html",
             )
 
             manifest = self._build_image_manifest(html_content, url)
@@ -94,18 +112,18 @@ class ScraperService:
                 bucket,
                 "image_manifest.json",
                 json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8"),
-                content_type="application/json",
+                content_type=JSON_CONTENT_TYPE,
             )
             self.storage.upload(
                 bucket,
                 "site_data.json",
                 json.dumps(site_data, indent=2, ensure_ascii=False).encode("utf-8"),
-                content_type="application/json",
+                content_type=JSON_CONTENT_TYPE,
             )
 
             images_count = len(manifest.get("images", []))
             logger.info(
-                f"Indexed {images_count} images for {item_id} (manifest-only mode)"
+                f"Indexed {images_count} images for {item_id} (manifest-only mode)",
             )
             return f"{bucket}/{html_key}"
 
@@ -121,7 +139,7 @@ class ScraperService:
 
     def _build_image_manifest(self, html_content: str, base_url: str) -> dict:
         """Extract image links/metadata quickly without downloading bytes."""
-        soup = BeautifulSoup(html_content, "html.parser")
+        soup = BeautifulSoup(html_content, HTML_PARSER)
         sources = self._extract_image_sources(soup)
 
         manifest: list[dict] = []
@@ -147,7 +165,7 @@ class ScraperService:
                         "class": self._get_attr(tag, "class"),
                         "title": self._get_attr(tag, "title"),
                     },
-                }
+                },
             )
         return {
             "page_url": base_url,
@@ -162,7 +180,7 @@ class ScraperService:
             extracted = extruct.extract(html_content, base_url=base_url)
         except Exception as e:
             logger.warning(
-                f"Failed to extract site_data via extruct for {page_url}: {e}"
+                f"Failed to extract site_data via extruct for {page_url}: {e}",
             )
             extracted = {}
         return {
@@ -175,7 +193,7 @@ class ScraperService:
         """Dagster-side heavy step: download image bytes and compute CV scores."""
         try:
             manifest_payload = json.loads(
-                self.storage.download(bucket, "image_manifest.json")
+                self.storage.download(bucket, "image_manifest.json"),
             )
         except Exception as e:
             logger.warning(f"No image manifest for bucket {bucket}: {e}")
@@ -215,16 +233,16 @@ class ScraperService:
             bucket,
             "candidates.json",
             json.dumps(candidates, indent=2).encode("utf-8"),
-            content_type="application/json",
+            content_type=JSON_CONTENT_TYPE,
         )
         logger.info(
-            f"Materialized {len(candidates)} OCR candidates for bucket {bucket} ({page_url})"
+            f"Materialized {len(candidates)} OCR candidates for bucket {bucket} ({page_url})",
         )
         return candidates
 
     def _tag_from_manifest_item(self, item: dict) -> Tag:
         """Create synthetic img Tag from manifest metadata for keyword scoring."""
-        soup = BeautifulSoup("", "html.parser")
+        soup = BeautifulSoup("", HTML_PARSER)
         tag = soup.new_tag("img")
         metadata = item.get("metadata") or {}
         for key in ("alt", "title", "id", "class"):
@@ -234,10 +252,13 @@ class ScraperService:
         return tag
 
     def _process_images(
-        self, html_content: str, base_url: str, bucket: str
+        self,
+        html_content: str,
+        base_url: str,
+        bucket: str,
     ) -> list[dict]:
         """Extract and score images from HTML."""
-        soup = BeautifulSoup(html_content, "html.parser")
+        soup = BeautifulSoup(html_content, HTML_PARSER)
         sources = self._extract_image_sources(soup)
 
         candidates = []
@@ -254,7 +275,11 @@ class ScraperService:
             seen_urls.add(img_url)
 
             candidate = self._process_single_candidate(
-                i, img_url, tag, bucket, seen_hashes
+                i,
+                img_url,
+                tag,
+                bucket,
+                seen_hashes,
             )
             if candidate:
                 candidates.append(candidate)
@@ -271,7 +296,7 @@ class ScraperService:
                     sources.append((src, img))
                     break
 
-        for meta in soup.find_all("meta", property="og:image"):
+        for meta in soup.find_all("meta", property=OG_IMAGE_PROPERTY):
             src = meta.get("content")
             if src and isinstance(src, str):
                 sources.append((src, meta))
@@ -282,21 +307,32 @@ class ScraperService:
     def _extract_json_ld_images(self, soup: BeautifulSoup, sources: list) -> None:
         for script in soup.find_all("script", type="application/ld+json"):
             try:
-                if not script.string:
-                    continue
-                data = json.loads(script.string)
-                if isinstance(data, dict) and "image" in data:
-                    imgs = data["image"]
-                    if isinstance(imgs, str):
-                        sources.append((imgs, script))
-                    elif isinstance(imgs, list):
-                        for img_url in imgs:
-                            sources.append((img_url, script))
+                for img_url in self._json_ld_image_urls(script):
+                    sources.append((img_url, script))
             except Exception as e:
                 logger.debug(f"JSON-LD parsing failed: {e}")
 
+    def _json_ld_image_urls(self, script: Tag) -> list[str]:
+        """Extract image URLs from one JSON-LD script block."""
+        if not script.string:
+            return []
+        data = json.loads(script.string)
+        if not isinstance(data, dict) or "image" not in data:
+            return []
+        images = data["image"]
+        if isinstance(images, str):
+            return [images]
+        if isinstance(images, list):
+            return [str(img_url) for img_url in images]
+        return []
+
     def _process_single_candidate(
-        self, index: int, img_url: str, tag: Tag, bucket: str, seen_hashes: set
+        self,
+        index: int,
+        img_url: str,
+        tag: Tag,
+        bucket: str,
+        seen_hashes: set,
     ) -> dict | None:
         try:
             img_resp = self._request_get(img_url, timeout=10)
@@ -322,8 +358,8 @@ class ScraperService:
 
             image_key = f"images/image_{index}.{ext}"
             content_type_map = {
-                "jpg": "image/jpeg",
-                "jpeg": "image/jpeg",
+                "jpg": JPEG_CONTENT_TYPE,
+                "jpeg": JPEG_CONTENT_TYPE,
                 "png": "image/png",
                 "webp": "image/webp",
             }
@@ -331,7 +367,7 @@ class ScraperService:
                 bucket,
                 image_key,
                 content,
-                content_type=content_type_map.get(ext, "image/jpeg"),
+                content_type=content_type_map.get(ext, DEFAULT_IMAGE_CONTENT_TYPE),
             )
 
             return {
@@ -382,7 +418,10 @@ class ScraperService:
         return hex(int(bits, 2))[2:].zfill(16)
 
     def _calculate_image_score(
-        self, img_tag: Tag, img_url: str, content: bytes
+        self,
+        img_tag: Tag,
+        img_url: str,
+        content: bytes,
     ) -> tuple[int, int, int, int, float]:
         score = 0
         keyword_score, nutrition_signal = self._score_by_keywords(img_tag, img_url)
@@ -443,7 +482,11 @@ class ScraperService:
         return float(min(1.0, max(0.0, score)))
 
     def _detect_horizontal_lines(
-        self, pixels, width: int, height: int, min_h_run: int
+        self,
+        pixels,
+        width: int,
+        height: int,
+        min_h_run: int,
     ) -> list[bool]:
         row_is_line = [False] * height
         for y in range(height):
@@ -462,7 +505,11 @@ class ScraperService:
         return row_is_line
 
     def _detect_vertical_lines(
-        self, pixels, width: int, height: int, min_v_run: int
+        self,
+        pixels,
+        width: int,
+        height: int,
+        min_v_run: int,
     ) -> list[bool]:
         col_is_line = [False] * width
         for x in range(width):
@@ -659,7 +706,7 @@ class ScraperService:
 
     def _extract_image_url(self, product_info: dict, metadata: dict) -> str | None:
         image_url = product_info.get("image") or metadata.get("opengraph", [{}])[0].get(
-            "og:image"
+            "og:image",
         )
         if isinstance(image_url, list):
             return image_url[0] if image_url else None
