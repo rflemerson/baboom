@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from core.dtos import ComboComponentInput as ProductComponentDTO
 from core.dtos import (
     MicronutrientPayload,
@@ -12,7 +14,12 @@ from core.dtos import (
 )
 from core.dtos import ProductMetadataUpdateInput as ProductMetadataUpdateDTO
 
-from .inputs import ProductContentUpdateInput, ProductInput, ProductNutritionInput
+if TYPE_CHECKING:
+    from .inputs import (
+        ProductContentUpdateInput,
+        ProductInput,
+        ProductNutritionInput,
+    )
 
 
 def build_product_create_input(data: ProductInput) -> ProductCreateInput:

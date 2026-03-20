@@ -1,13 +1,13 @@
 """Celery tasks for running scraper monitors and recovery jobs."""
 
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.utils import timezone
 
 from .models import ScrapedItem
-from .spiders.base_spider import BaseSpider
 from .spiders.blackskull import BlackSkullSpider
 from .spiders.dark_lab import DarkLabSpider
 from .spiders.dux import DuxSpider
@@ -16,6 +16,9 @@ from .spiders.integral_medica import IntegralMedicaSpider
 from .spiders.max_titanium import MaxTitaniumSpider
 from .spiders.probiotica import ProbioticaSpider
 from .spiders.soldiers import SoldiersSpider
+
+if TYPE_CHECKING:
+    from .spiders.base_spider import BaseSpider
 
 logger = get_task_logger(__name__)
 

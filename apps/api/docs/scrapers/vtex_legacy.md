@@ -26,15 +26,15 @@ while True:
     end = start + step - 1
     params = {"_from": start, "_to": end}
     resp = requests.get(url, params=params)
-    
+
     # VTEX quirks:
     # 1. Status 206 (Partial Content) is COMMON and successful.
     # 2. Status 500 might occur if requesting out of bounds (sometimes).
     # 3. An empty list [] indicates end of results.
-    
+
     if not resp.json():
         break
-    
+
     start += step
 ```
 

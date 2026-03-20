@@ -40,7 +40,7 @@ def _catalog_nutrition_facts_subquery() -> QuerySet[NutritionFacts]:
 
     return (
         NutritionFacts.objects.filter(
-        product_profiles__product=OuterRef("pk"),
+            product_profiles__product=OuterRef("pk"),
         )
         .annotate(
             protein_concentration=ExpressionWrapper(
@@ -93,31 +93,25 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
     serving_size_safe = NullIf(F("serving_size_grams_value"), Value(0))
     total_protein_safe = NullIf(F("total_protein"), Value(0))
 
-    return (
-        queryset.annotate(
-            total_protein=ExpressionWrapper(
-                (
-                    F("weight")
-                    * Cast(F("protein_per_serving"), output_field=FloatField())
-                )
-                / Cast(serving_size_safe, output_field=FloatField()),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            ),
-            concentration=ExpressionWrapper(
-                (
-                    Cast(F("protein_per_serving"), output_field=FloatField())
-                    / Cast(serving_size_safe, output_field=FloatField())
-                )
-                * 100,
-                output_field=DecimalField(max_digits=5, decimal_places=1),
-            ),
-        )
-        .annotate(
-            price_per_protein_gram=ExpressionWrapper(
-                F("last_price") / Cast(total_protein_safe, output_field=FloatField()),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            ),
-        )
+    return queryset.annotate(
+        total_protein=ExpressionWrapper(
+            (F("weight") * Cast(F("protein_per_serving"), output_field=FloatField()))
+            / Cast(serving_size_safe, output_field=FloatField()),
+            output_field=DecimalField(max_digits=10, decimal_places=2),
+        ),
+        concentration=ExpressionWrapper(
+            (
+                Cast(F("protein_per_serving"), output_field=FloatField())
+                / Cast(serving_size_safe, output_field=FloatField())
+            )
+            * 100,
+            output_field=DecimalField(max_digits=5, decimal_places=1),
+        ),
+    ).annotate(
+        price_per_protein_gram=ExpressionWrapper(
+            F("last_price") / Cast(total_protein_safe, output_field=FloatField()),
+            output_field=DecimalField(max_digits=10, decimal_places=2),
+        ),
     )
 
 
@@ -127,6 +121,7 @@ def public_catalog_products_with_stats() -> QuerySet[Product]:
         "tags",
     )
     return _annotate_catalog_metrics(_annotate_catalog_base_fields(queryset))
+
 
 SORTABLE_CATALOG_FIELDS = frozenset(
     {

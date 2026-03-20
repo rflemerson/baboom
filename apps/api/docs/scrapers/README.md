@@ -38,15 +38,15 @@ shared retry/backoff and crawl metrics logging (`categories_*`,
 ### 1. VTEX Ecosystem
 VTEX stores generally fall into two categories:
 *   **VTEX IO (New)**: Uses GraphQL with "Persisted Queries". Requests are `GET` but require a complex `extensions` parameter containing the Query Hash and Base64 encoded variables.
-    *   *Reference*: [VTEX GraphQL](vtex_graphql/README.md)
+    *   *Reference*: [VTEX GraphQL](./vtex_graphql.md)
 *   **VTEX Legacy (Classic)**: Uses the `/api/catalog_system/pub/products/search` endpoint (or similar path proxies). Pagination is done via `_from` and `_to` query parameters.
-    *   *Reference*: [VTEX Legacy](vtex_legacy/README.md)
+    *   *Reference*: [VTEX Legacy](./vtex_legacy.md)
 
 ### 2. Uappi (Wap.Store)
 This platform drives **Growth Supplements**. It exposes a robust public API meant for the frontend.
 *   **Key Endpoint**: `/api/v2/front/url/product/listing/category`
 *   **Quirks**: Strict Header requirements (`app-token`), SSL Verification issues (Sucuri WAF), and Rate/Limit caps (Max 30 items).
-*   *Reference*: [Growth Strategy](growth/README.md)
+*   *Reference*: [Growth Strategy](./growth.md)
 
 ### 3. Shopify
 **Dark Lab** and **Soldiers Nutrition** are Shopify stores.
@@ -56,4 +56,4 @@ This platform drives **Growth Supplements**. It exposes a robust public API mean
     * `/products/{handle}.js` (complete product context for variants/options/images)
 *   **Strategy**: Iterate pages (`page=1`, `page=2`...) with `limit=250`.
 *   **Structure**: JSON response contains `products` list with variations and prices clearly exposed.
-*   *Reference*: [Shopify Strategy](shopify/README.md)
+*   *Reference*: [Shopify Strategy](./shopify.md)

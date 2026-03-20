@@ -45,7 +45,7 @@ https://www.blackskullusa.com.br/_v/segment/graphql/v1
 ```json
 {
   "hideUnavailableItems": false,
-  "category": "", 
+  "category": "",
   "specificationFilters": [],
   "orderBy": "OrderByTopSaleDESC",
   "from": 0,    // <--- Pagination Start (Item Index)

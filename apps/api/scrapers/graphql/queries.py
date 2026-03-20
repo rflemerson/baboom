@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from scrapers.models import ScrapedItem
 
-from .types import ScrapedItemType
+if TYPE_CHECKING:
+    from .types import ScrapedItemType
 
 
 @strawberry.type
@@ -20,5 +23,4 @@ class ScrapersQuery:
         item_id: int,
     ) -> ScrapedItemType | None:
         """Get a scraped item by id."""
-        item = ScrapedItem.objects.filter(id=item_id).first()
-        return item
+        return ScrapedItem.objects.filter(id=item_id).first()

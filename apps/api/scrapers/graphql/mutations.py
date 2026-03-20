@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
@@ -14,13 +16,14 @@ from scrapers.services import (
     ScrapedItemVariantService,
 )
 
-from .inputs import (
-    ScrapedItemCheckoutInput,
-    ScrapedItemErrorInput,
-    ScrapedItemLinkInput,
-    ScrapedItemVariantInput,
-)
-from .types import ScrapedItemType
+if TYPE_CHECKING:
+    from .inputs import (
+        ScrapedItemCheckoutInput,
+        ScrapedItemErrorInput,
+        ScrapedItemLinkInput,
+        ScrapedItemVariantInput,
+    )
+    from .types import ScrapedItemType
 
 
 @strawberry.type
@@ -33,8 +36,7 @@ class ScrapersMutation:
         data: ScrapedItemCheckoutInput,
     ) -> ScrapedItemType | None:
         """Reserve one scraped item for agent processing."""
-        item = ScrapedItemCheckoutService().execute(data)
-        return item
+        return ScrapedItemCheckoutService().execute(data)
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def report_scraped_item_error(
@@ -61,12 +63,11 @@ class ScrapersMutation:
         store_slug: str,
     ) -> ScrapedItemType | None:
         """Ensure item has source page linked, creating page by URL when needed."""
-        item = ScrapedItemSourcePageService().ensure(
+        return ScrapedItemSourcePageService().ensure(
             item_id=item_id,
             url=url,
             store_slug=store_slug,
         )
-        return item
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def link_scraped_item_to_product_store(
@@ -74,11 +75,10 @@ class ScrapersMutation:
         data: ScrapedItemLinkInput,
     ) -> ScrapedItemType | None:
         """Explicitly link a scraped item to a chosen product store."""
-        item = ScrapedItemLinkService().execute(
+        return ScrapedItemLinkService().execute(
             scraped_item_id=data.item_id,
             product_store_id=data.product_store_id,
         )
-        return item
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def update_scraped_item_data(
@@ -89,13 +89,12 @@ class ScrapersMutation:
         store_slug: str | None = None,
     ) -> ScrapedItemType | None:
         """Update mutable fields of a scraped item used by agents pipeline."""
-        item = ScrapedItemSourcePageService().update_item_data(
+        return ScrapedItemSourcePageService().update_item_data(
             item_id=item_id,
             name=name,
             source_page_url=source_page_url,
             store_slug=store_slug,
         )
-        return item
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def upsert_scraped_item_variant(
@@ -103,5 +102,4 @@ class ScrapersMutation:
         data: ScrapedItemVariantInput,
     ) -> ScrapedItemType | None:
         """Create or update a variant ScrapedItem linked to the same source page."""
-        item = ScrapedItemVariantService().execute(data)
-        return item
+        return ScrapedItemVariantService().execute(data)

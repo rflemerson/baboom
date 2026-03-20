@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from .models import ScrapedItem
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 
 class ScrapedItemIngestionInput(BaseModel):
