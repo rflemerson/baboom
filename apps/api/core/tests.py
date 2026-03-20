@@ -500,9 +500,7 @@ class ProductStatsTest(TestCase):
             public_catalog_products_with_stats().first(),
         )
 
-        if product is None:
-            self.fail("Product not found")
-
+        assert product is not None
         assert product.concentration == Decimal("80.0")
         assert product.total_protein == Decimal("800.00")
         assert round(product.price_per_protein_gram, 3) == Decimal("0.125")
@@ -525,9 +523,7 @@ class ProductStatsTest(TestCase):
             .first(),
         )
 
-        if result is None:
-            self.fail("Product not found")
-
+        assert result is not None
         assert result.last_price is None
         assert result.price_per_protein_gram is None
         assert result.external_link is None
@@ -564,9 +560,7 @@ class ProductStatsTest(TestCase):
             public_catalog_products_with_stats().get(pk=self.product.pk),
         )
 
-        if product is None:
-            self.fail("Product not found")
-
+        assert product is not None
         assert product.last_price == Decimal("150.00")
         assert product.external_link == "http://example.com/second"
 
@@ -590,9 +584,7 @@ class ProductStatsTest(TestCase):
             public_catalog_products_with_stats().get(pk=self.product.pk),
         )
 
-        if product is None:
-            self.fail("Product not found")
-
+        assert product is not None
         assert product.concentration == Decimal("90.0")
         assert product.total_protein == Decimal("900.00")
         assert round(product.price_per_protein_gram, 3) == Decimal("0.111")

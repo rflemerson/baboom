@@ -55,3 +55,4 @@ cd apps/api && .venv/bin/python manage.py runserver
 - Keep GraphQL permissions explicit.
 - Do not log secrets, API keys, or sensitive personal data.
 - Keep production host/TLS/cookie settings explicit and strict.
+- Do not commit Django `SECRET_KEY` values; load them from env and only use generated runtime fallbacks for local development.

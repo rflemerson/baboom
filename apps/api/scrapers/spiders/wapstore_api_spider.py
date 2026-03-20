@@ -93,29 +93,40 @@ class WapStoreApiSpider(CatalogApiSpider):
             items = data.get("data") or data.get("menu") or []
             slugs = set()
 
-            def extract_recursive(nodes: list[dict[str, object]]) -> None:
-                for node in nodes:
-                    url = node.get("url") or node.get("link")
-                    if url:
-                        path = str(url).replace(self.BASE_URL, "")
-                        if not path.startswith("/"):
-                            path = f"/{path}"
-                        if not path.endswith("/"):
-                            path = f"{path}/"
-
-                        if len(path) > 1 and self._is_valid_category_path(path):
-                            slugs.add(path)
-
-                    children = node.get("children") or node.get("itens") or []
-                    if children:
-                        extract_recursive(children)
-
-            extract_recursive(items if isinstance(items, list) else [])
+            self._extract_recursive_category_paths(
+                items if isinstance(items, list) else [],
+                slugs,
+            )
             return list(slugs)
 
         except Exception:
             logger.exception("Error fetching categories")
             return []
+
+    def _extract_recursive_category_paths(
+        self,
+        nodes: list[dict[str, object]],
+        slugs: set[str],
+    ) -> None:
+        """Walk Wap.Store menu tree and collect valid category paths."""
+        for node in nodes:
+            self._add_category_path(node, slugs)
+            children = node.get("children") or node.get("itens") or []
+            if children:
+                self._extract_recursive_category_paths(children, slugs)
+
+    def _add_category_path(self, node: dict[str, object], slugs: set[str]) -> None:
+        """Normalize one menu URL into a valid category path."""
+        url = node.get("url") or node.get("link")
+        if not url:
+            return
+        path = str(url).replace(self.BASE_URL, "")
+        if not path.startswith("/"):
+            path = f"/{path}"
+        if not path.endswith("/"):
+            path = f"{path}/"
+        if len(path) > 1 and self._is_valid_category_path(path):
+            slugs.add(path)
 
     def _crawl_category(
         self,
@@ -134,15 +145,12 @@ class WapStoreApiSpider(CatalogApiSpider):
                 if products_list is None or not products_list:
                     break
 
-                for item in products_list:
-                    item_id = str(item.get("id"))
-                    if item_id in processed_ids:
-                        continue
-
-                    processed_ids.add(item_id)
-                    saved_obj = self._process_and_save(item, category_path)
-                    if saved_obj:
-                        products.append(saved_obj)
+                self._process_category_page(
+                    products_list,
+                    category_path,
+                    processed_ids,
+                    products,
+                )
 
                 if len(products_list) < limit:
                     break
@@ -155,6 +163,24 @@ class WapStoreApiSpider(CatalogApiSpider):
                 break
 
         return products
+
+    def _process_category_page(
+        self,
+        products_list: list[dict],
+        category_path: str,
+        processed_ids: set[str],
+        products: list[object],
+    ) -> None:
+        """Process one Wap.Store listing page and append saved products."""
+        for item in products_list:
+            item_id = str(item.get("id"))
+            if item_id in processed_ids:
+                continue
+
+            processed_ids.add(item_id)
+            saved_obj = self._process_and_save(item, category_path)
+            if saved_obj:
+                products.append(saved_obj)
 
     def _fetch_page_items(
         self,

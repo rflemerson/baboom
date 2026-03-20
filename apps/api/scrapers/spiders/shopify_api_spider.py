@@ -78,12 +78,7 @@ class ShopifyApiSpider(CatalogApiSpider):
                 if not collections:
                     break
 
-                for collection in collections:
-                    if not isinstance(collection, dict):
-                        continue
-                    handle = collection.get("handle")
-                    if handle:
-                        handles.add(str(handle))
+                self._collect_collection_handles(collections, handles)
 
                 if len(collections) < limit:
                     break
@@ -94,6 +89,19 @@ class ShopifyApiSpider(CatalogApiSpider):
             logger.exception("Error fetching categories")
 
         return list(handles)
+
+    def _collect_collection_handles(
+        self,
+        collections: list[object],
+        handles: set[str],
+    ) -> None:
+        """Collect valid Shopify collection handles from one page payload."""
+        for collection in collections:
+            if not isinstance(collection, dict):
+                continue
+            handle = collection.get("handle")
+            if handle:
+                handles.add(str(handle))
 
     def _fetch_product_detail(self, handle: str) -> dict | None:
         """Fetch one product detail JSON by Shopify handle."""
@@ -139,18 +147,12 @@ class ShopifyApiSpider(CatalogApiSpider):
                 if page_products is None or not page_products:
                     break
 
-                for product in page_products:
-                    if not isinstance(product, dict):
-                        continue
-                    product_id = str(product.get("id") or "")
-                    if not product_id or product_id in processed_ids:
-                        continue
-                    processed_ids.add(product_id)
-
-                    source_item = self._resolve_source_product(product)
-                    saved = self._process_and_save(source_item, category_handle)
-                    if saved:
-                        products.append(saved)
+                self._process_category_page(
+                    page_products,
+                    category_handle,
+                    processed_ids,
+                    products,
+                )
 
                 if len(page_products) < limit:
                     break
@@ -163,6 +165,27 @@ class ShopifyApiSpider(CatalogApiSpider):
                 break
 
         return products
+
+    def _process_category_page(
+        self,
+        page_products: list[object],
+        category_handle: str,
+        processed_ids: set[str],
+        products: list[object],
+    ) -> None:
+        """Process one Shopify category page and append saved products."""
+        for product in page_products:
+            if not isinstance(product, dict):
+                continue
+            product_id = str(product.get("id") or "")
+            if not product_id or product_id in processed_ids:
+                continue
+            processed_ids.add(product_id)
+
+            source_item = self._resolve_source_product(product)
+            saved = self._process_and_save(source_item, category_handle)
+            if saved:
+                products.append(saved)
 
     def _fetch_page_items(
         self,

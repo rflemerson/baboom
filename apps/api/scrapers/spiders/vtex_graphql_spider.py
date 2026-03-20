@@ -85,18 +85,7 @@ class VtexGraphqlSpider(CatalogApiSpider):
             if items is None or not items:
                 break
 
-            for item in items:
-                try:
-                    item_id = str(item.get("productId"))
-                    if item_id in processed_ids:
-                        continue
-
-                    processed_ids.add(item_id)
-                    saved_obj = self._process_and_save(item, category)
-                    if saved_obj:
-                        products.append(saved_obj)
-                except VTEX_GRAPHQL_ITEM_PROCESSING_EXCEPTIONS as exc:
-                    logger.debug("Skipping item: %s", exc)
+            self._process_category_items(items, category, processed_ids, products)
 
             if len(items) < step:
                 break
@@ -105,6 +94,27 @@ class VtexGraphqlSpider(CatalogApiSpider):
             self.sleep_random(0.5, 1.5)
 
         return products
+
+    def _process_category_items(
+        self,
+        items: list[dict],
+        category: str,
+        processed_ids: set[str],
+        products: list[object],
+    ) -> None:
+        """Process one VTEX GraphQL page of items."""
+        for item in items:
+            try:
+                item_id = str(item.get("productId"))
+                if item_id in processed_ids:
+                    continue
+
+                processed_ids.add(item_id)
+                saved_obj = self._process_and_save(item, category)
+                if saved_obj:
+                    products.append(saved_obj)
+            except VTEX_GRAPHQL_ITEM_PROCESSING_EXCEPTIONS as exc:
+                logger.debug("Skipping item: %s", exc)
 
     def _fetch_page_items(
         self,

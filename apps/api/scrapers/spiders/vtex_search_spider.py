@@ -124,18 +124,12 @@ class VtexSearchSpider(CatalogApiSpider):
                 if data is None or not data:
                     break
 
-                for item in data:
-                    try:
-                        item_id = str(item.get("productId"))
-                        if item_id in processed_ids:
-                            continue
-
-                        processed_ids.add(item_id)
-                        saved_obj = self._process_and_save(item, category_slug)
-                        if saved_obj:
-                            products.append(saved_obj)
-                    except VTEX_ITEM_PROCESSING_EXCEPTIONS as exc:
-                        logger.debug("Skipping item: %s", exc)
+                self._process_category_items(
+                    data,
+                    category_slug,
+                    processed_ids,
+                    products,
+                )
 
                 if len(data) < step:
                     break
@@ -148,6 +142,27 @@ class VtexSearchSpider(CatalogApiSpider):
                 break
 
         return products
+
+    def _process_category_items(
+        self,
+        data: list[dict],
+        category_slug: str,
+        processed_ids: set[str],
+        products: list[object],
+    ) -> None:
+        """Process one VTEX search page and append saved products."""
+        for item in data:
+            try:
+                item_id = str(item.get("productId"))
+                if item_id in processed_ids:
+                    continue
+
+                processed_ids.add(item_id)
+                saved_obj = self._process_and_save(item, category_slug)
+                if saved_obj:
+                    products.append(saved_obj)
+            except VTEX_ITEM_PROCESSING_EXCEPTIONS as exc:
+                logger.debug("Skipping item: %s", exc)
 
     def _process_and_save(
         self,

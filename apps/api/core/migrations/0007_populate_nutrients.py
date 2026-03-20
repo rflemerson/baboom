@@ -2,7 +2,7 @@ from django.db import migrations
 
 
 def populate_nutrients(apps, schema_editor):
-    Nutrient = apps.get_model("core", "Nutrient")
+    nutrient_model = apps.get_model("core", "Nutrient")
 
     # Macros
     macros = [
@@ -23,15 +23,15 @@ def populate_nutrients(apps, schema_editor):
     ]
 
     for n in macros + micros:
-        Nutrient.objects.get_or_create(
+        nutrient_model.objects.get_or_create(
             slug=n["slug"],
             defaults={"name": n["name"], "is_macro": n["is_macro"]},
         )
 
 
 def reverse_populate(apps, schema_editor):
-    Nutrient = apps.get_model("core", "Nutrient")
-    Nutrient.objects.all().delete()
+    nutrient_model = apps.get_model("core", "Nutrient")
+    nutrient_model.objects.all().delete()
 
 
 class Migration(migrations.Migration):

@@ -69,9 +69,6 @@ class ScraperIntegrationTests(TestCase):
         first = ScrapedItem.objects.filter(store_slug="dark_lab").first()
         assert first is not None
 
-        if first and first.stock_quantity == EXPECTED_EXTERNAL_STOCK_QUANTITY:
-            pass
-
     def test_dux_spider(self) -> None:
         """Test Dux spider execution."""
         spider = DuxSpider(categories=["proteinas"])
