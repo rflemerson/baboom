@@ -10,8 +10,8 @@ const props = defineProps<{
   modelValue: boolean
   priceMax: number | null
   priceMin: number | null
-  pricePerGramMax: number | null
-  pricePerGramMin: number | null
+  pricePerProteinGramMax: number | null
+  pricePerProteinGramMin: number | null
 }>()
 
 const emit = defineEmits<{
@@ -22,8 +22,8 @@ const emit = defineEmits<{
       concentrationMin: number | null
       priceMax: number | null
       priceMin: number | null
-      pricePerGramMax: number | null
-      pricePerGramMin: number | null
+      pricePerProteinGramMax: number | null
+      pricePerProteinGramMin: number | null
     },
   ]
   clear: []
@@ -33,8 +33,8 @@ const emit = defineEmits<{
 const draftBrand = ref('')
 const draftPriceMin = ref<number | null>(null)
 const draftPriceMax = ref<number | null>(null)
-const draftPricePerGramMin = ref<number | null>(null)
-const draftPricePerGramMax = ref<number | null>(null)
+const draftPricePerProteinGramMin = ref<number | null>(null)
+const draftPricePerProteinGramMax = ref<number | null>(null)
 const draftConcentrationMin = ref<number | null>(null)
 const draftConcentrationMax = ref<number | null>(null)
 
@@ -42,8 +42,8 @@ function syncDrafts() {
   draftBrand.value = props.brand
   draftPriceMin.value = props.priceMin
   draftPriceMax.value = props.priceMax
-  draftPricePerGramMin.value = props.pricePerGramMin
-  draftPricePerGramMax.value = props.pricePerGramMax
+  draftPricePerProteinGramMin.value = props.pricePerProteinGramMin
+  draftPricePerProteinGramMax.value = props.pricePerProteinGramMax
   draftConcentrationMin.value = props.concentrationMin
   draftConcentrationMax.value = props.concentrationMax
 }
@@ -69,8 +69,8 @@ function applyFilters() {
     concentrationMin: draftConcentrationMin.value,
     priceMax: draftPriceMax.value,
     priceMin: draftPriceMin.value,
-    pricePerGramMax: draftPricePerGramMax.value,
-    pricePerGramMin: draftPricePerGramMin.value,
+    pricePerProteinGramMax: draftPricePerProteinGramMax.value,
+    pricePerProteinGramMin: draftPricePerProteinGramMin.value,
   })
   emit('update:modelValue', false)
 }
@@ -79,8 +79,8 @@ function clearDrafts() {
   draftBrand.value = ''
   draftPriceMin.value = null
   draftPriceMax.value = null
-  draftPricePerGramMin.value = null
-  draftPricePerGramMax.value = null
+  draftPricePerProteinGramMin.value = null
+  draftPricePerProteinGramMax.value = null
   draftConcentrationMin.value = null
   draftConcentrationMax.value = null
   emit('clear')
@@ -155,25 +155,29 @@ const titleId = 'catalog-filters-drawer-title'
         </section>
 
         <section class="app-drawer__section space-y-3 rounded-2xl p-4">
-          <p class="app-section-title">Price per gram</p>
+          <p class="app-section-title">Price per protein gram</p>
           <div class="grid grid-cols-2 gap-3">
             <input
-              :value="draftPricePerGramMin ?? ''"
+              :value="draftPricePerProteinGramMin ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Min"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="draftPricePerGramMin = parseNumber(($event.target as HTMLInputElement).value)"
+              @input="
+                draftPricePerProteinGramMin = parseNumber(($event.target as HTMLInputElement).value)
+              "
             />
             <input
-              :value="draftPricePerGramMax ?? ''"
+              :value="draftPricePerProteinGramMax ?? ''"
               type="number"
               min="0"
               step="0.01"
               placeholder="Max"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="draftPricePerGramMax = parseNumber(($event.target as HTMLInputElement).value)"
+              @input="
+                draftPricePerProteinGramMax = parseNumber(($event.target as HTMLInputElement).value)
+              "
             />
           </div>
         </section>

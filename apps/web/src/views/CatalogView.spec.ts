@@ -29,7 +29,7 @@ describe('CatalogView', () => {
           packagingDisplay: 'Refill Package',
           weight: 900,
           lastPrice: '129.90',
-          pricePerGram: '0.18',
+          pricePerProteinGram: '0.18',
           concentration: '80',
           totalProtein: '720',
           externalLink: 'https://example.com/whey',

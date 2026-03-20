@@ -6,7 +6,7 @@ type Product = {
   packagingDisplay: string
   weight: number
   lastPrice: string
-  pricePerGram: string
+  pricePerProteinGram: string
   concentration: string
   totalProtein: string
   externalLink: string
@@ -22,8 +22,8 @@ type CatalogVariables = {
   brand?: string | null
   priceMin?: number | null
   priceMax?: number | null
-  pricePerGramMin?: number | null
-  pricePerGramMax?: number | null
+  pricePerProteinGramMin?: number | null
+  pricePerProteinGramMax?: number | null
   concentrationMin?: number | null
   concentrationMax?: number | null
   sortBy: string
@@ -37,7 +37,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Refill Package',
     weight: 900,
     lastPrice: '129.90',
-    pricePerGram: '0.14',
+    pricePerProteinGram: '0.14',
     concentration: '80',
     totalProtein: '720',
     externalLink: 'https://example.com/whey-prime',
@@ -51,7 +51,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 1000,
     lastPrice: '149.90',
-    pricePerGram: '0.16',
+    pricePerProteinGram: '0.16',
     concentration: '78',
     totalProtein: '780',
     externalLink: 'https://example.com/whey-core',
@@ -65,7 +65,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 1000,
     lastPrice: '219.90',
-    pricePerGram: '0.22',
+    pricePerProteinGram: '0.22',
     concentration: '86',
     totalProtein: '860',
     externalLink: 'https://example.com/isolate-gold',
@@ -79,7 +79,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 300,
     lastPrice: '89.90',
-    pricePerGram: '0.30',
+    pricePerProteinGram: '0.30',
     concentration: '0',
     totalProtein: '0',
     externalLink: 'https://example.com/creatine-pure',
@@ -93,7 +93,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Refill Package',
     weight: 900,
     lastPrice: '159.90',
-    pricePerGram: '0.18',
+    pricePerProteinGram: '0.18',
     concentration: '74',
     totalProtein: '666',
     externalLink: 'https://example.com/night-casein',
@@ -107,7 +107,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 2000,
     lastPrice: '239.90',
-    pricePerGram: '0.12',
+    pricePerProteinGram: '0.12',
     concentration: '70',
     totalProtein: '1400',
     externalLink: 'https://example.com/protein-blend',
@@ -121,7 +121,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Refill Package',
     weight: 900,
     lastPrice: '249.90',
-    pricePerGram: '0.28',
+    pricePerProteinGram: '0.28',
     concentration: '90',
     totalProtein: '810',
     externalLink: 'https://example.com/iso-hydro',
@@ -135,7 +135,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Refill Package',
     weight: 900,
     lastPrice: '99.90',
-    pricePerGram: '0.11',
+    pricePerProteinGram: '0.11',
     concentration: '68',
     totalProtein: '612',
     externalLink: 'https://example.com/whey-budget',
@@ -149,7 +149,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 300,
     lastPrice: '109.90',
-    pricePerGram: '0.37',
+    pricePerProteinGram: '0.37',
     concentration: '0',
     totalProtein: '0',
     externalLink: 'https://example.com/pre-rush',
@@ -163,7 +163,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Bag Package',
     weight: 3000,
     lastPrice: '199.90',
-    pricePerGram: '0.07',
+    pricePerProteinGram: '0.07',
     concentration: '24',
     totalProtein: '720',
     externalLink: 'https://example.com/mass-gainer',
@@ -177,7 +177,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 1000,
     lastPrice: '179.90',
-    pricePerGram: '0.19',
+    pricePerProteinGram: '0.19',
     concentration: '72',
     totalProtein: '720',
     externalLink: 'https://example.com/egg-protein',
@@ -191,7 +191,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Container Package',
     weight: 1000,
     lastPrice: '39.90',
-    pricePerGram: '0.04',
+    pricePerProteinGram: '0.04',
     concentration: '0',
     totalProtein: '250',
     externalLink: 'https://example.com/peanut-butter',
@@ -205,7 +205,7 @@ const PRODUCTS: Product[] = [
     packagingDisplay: 'Box Package',
     weight: 600,
     lastPrice: '69.90',
-    pricePerGram: '0.12',
+    pricePerProteinGram: '0.12',
     concentration: '20',
     totalProtein: '120',
     externalLink: 'https://example.com/bar-box',
@@ -226,14 +226,14 @@ function sortProducts(products: Product[], sortBy: string, sortDir: string) {
     switch (key) {
       case 'last_price':
         return Number(product.lastPrice)
-      case 'price_per_gram':
-        return Number(product.pricePerGram)
+      case 'price_per_protein_gram':
+        return Number(product.pricePerProteinGram)
       case 'total_protein':
         return Number(product.totalProtein)
       case 'concentration':
         return Number(product.concentration)
       default:
-        return Number(product.pricePerGram)
+        return Number(product.pricePerProteinGram)
     }
   }
 
@@ -252,9 +252,9 @@ function filterProducts(variables: CatalogVariables) {
       matchesBrand(product, brand) &&
       matchesNumericRange(Number(product.lastPrice), variables.priceMin, variables.priceMax) &&
       matchesNumericRange(
-        Number(product.pricePerGram),
-        variables.pricePerGramMin,
-        variables.pricePerGramMax,
+        Number(product.pricePerProteinGram),
+        variables.pricePerProteinGramMin,
+        variables.pricePerProteinGramMax,
       ) &&
       matchesNumericRange(
         Number(product.concentration),

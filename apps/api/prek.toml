@@ -34,7 +34,7 @@ args = [
     "--package-module-name-map",
     "factory-boy=factory",
     "--per-rule-ignores",
-    "DEP002=gunicorn|psycopg|django-celery-results|django-celery-beat,DEP004=factory",
+    "DEP002=gunicorn|psycopg|django-celery-results|django-celery-beat|strawberry-graphql-django,DEP004=factory",
 ]
 
 [[repos]]

@@ -19,7 +19,7 @@ const products = [
     packagingDisplay: 'Container Package',
     weight: 300,
     lastPrice: '89.90',
-    pricePerGram: null,
+    pricePerProteinGram: null,
     concentration: '0',
     totalProtein: '0',
     externalLink: 'https://example.com/creatina',

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable */
 import * as types from './graphql'
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core'
 
@@ -15,12 +15,12 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  */
 type Documents = {
   'mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}': typeof types.SubscribeAlertsDocument
-  'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}': typeof types.CatalogProductsDocument
+  'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerProteinGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}': typeof types.CatalogProductsDocument
 }
 const documents: Documents = {
   'mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}':
     types.SubscribeAlertsDocument,
-  'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}':
+  'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerProteinGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}':
     types.CatalogProductsDocument,
 }
 
@@ -48,8 +48,8 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: 'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}',
-): (typeof documents)['query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}']
+  source: 'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerProteinGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}',
+): (typeof documents)['query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerProteinGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}']
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {}

@@ -13,7 +13,7 @@ describe('CatalogListCard', () => {
           packagingDisplay: 'Container Package',
           weight: 1000,
           lastPrice: '199.90',
-          pricePerGram: '0.23',
+          pricePerProteinGram: '0.23',
           concentration: '86.6',
           totalProtein: '866',
           externalLink: 'https://example.com/whey-isolado',
@@ -27,8 +27,9 @@ describe('CatalogListCard', () => {
     expect(wrapper.text()).toContain('Whey Isolado 1kg')
     expect(wrapper.text()).toContain('integralmedica')
     expect(wrapper.text()).toContain('Container Package')
-    expect(wrapper.text()).toContain('Price / g')
+    expect(wrapper.text()).toContain('Price / protein g')
     expect(wrapper.text()).toContain('0.23')
+    expect(wrapper.text()).toContain('86.6% concentration')
     expect(wrapper.get('a[aria-label="View offer for Whey Isolado 1kg"]').attributes('href')).toBe(
       'https://example.com/whey-isolado',
     )

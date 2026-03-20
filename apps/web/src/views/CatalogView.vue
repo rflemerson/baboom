@@ -16,8 +16,8 @@ const {
   perPage,
   priceMax,
   priceMin,
-  pricePerGramMax,
-  pricePerGramMin,
+  pricePerProteinGramMax,
+  pricePerProteinGramMin,
   search,
   setBrand,
   setConcentrationMax,
@@ -26,8 +26,8 @@ const {
   setPerPage,
   setPriceMax,
   setPriceMin,
-  setPricePerGramMax,
-  setPricePerGramMin,
+  setPricePerProteinGramMax,
+  setPricePerProteinGramMin,
   setSearch,
   setSortBy,
   sortBy,
@@ -45,8 +45,8 @@ const advancedFiltersActive = computed(() => {
     brand.value ||
     priceMin.value !== null ||
     priceMax.value !== null ||
-    pricePerGramMin.value !== null ||
-    pricePerGramMax.value !== null ||
+    pricePerProteinGramMin.value !== null ||
+    pricePerProteinGramMax.value !== null ||
     concentrationMin.value !== null ||
     concentrationMax.value !== null,
   )
@@ -62,14 +62,14 @@ function applyAdvancedFilters(payload: {
   concentrationMin: number | null
   priceMax: number | null
   priceMin: number | null
-  pricePerGramMax: number | null
-  pricePerGramMin: number | null
+  pricePerProteinGramMax: number | null
+  pricePerProteinGramMin: number | null
 }) {
   setBrand(payload.brand)
   setPriceMin(payload.priceMin)
   setPriceMax(payload.priceMax)
-  setPricePerGramMin(payload.pricePerGramMin)
-  setPricePerGramMax(payload.pricePerGramMax)
+  setPricePerProteinGramMin(payload.pricePerProteinGramMin)
+  setPricePerProteinGramMax(payload.pricePerProteinGramMax)
   setConcentrationMin(payload.concentrationMin)
   setConcentrationMax(payload.concentrationMax)
 }
@@ -113,8 +113,8 @@ function applyAdvancedFilters(payload: {
       :brand="brand"
       :price-min="priceMin"
       :price-max="priceMax"
-      :price-per-gram-min="pricePerGramMin"
-      :price-per-gram-max="pricePerGramMax"
+      :price-per-protein-gram-min="pricePerProteinGramMin"
+      :price-per-protein-gram-max="pricePerProteinGramMax"
       :concentration-min="concentrationMin"
       :concentration-max="concentrationMax"
       @apply="applyAdvancedFilters"

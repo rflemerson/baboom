@@ -29,7 +29,7 @@ defineProps<{
             {{ product.category?.name ?? 'Uncategorized' }}
           </span>
           <span v-if="product.concentration" class="app-chip px-3 py-1 text-xs">
-            {{ product.concentration }}% concentration
+            {{ formatDecimal(product.concentration, 1) }}% concentration
           </span>
         </div>
 
@@ -57,8 +57,8 @@ defineProps<{
         <BaseMetricCard
           class="rounded-3xl"
           inline-action
-          label="Price / g"
-          :value="formatDecimal(product.pricePerGram)"
+          label="Price / protein g"
+          :value="formatDecimal(product.pricePerProteinGram)"
         >
           <template #action>
             <a

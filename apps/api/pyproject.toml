@@ -23,6 +23,7 @@ dependencies = [
   "django-celery-results",
   "django-celery-beat",
   "strawberry-graphql",
+  "strawberry-graphql-django",
   "pydantic",
 ]
 
@@ -46,3 +47,6 @@ dev = [
   "pytest-asyncio",
   "pytest-sugar",
 ]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["strawberry-graphql-django"]

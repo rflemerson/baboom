@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-condition */
+/* eslint-disable */
 import type {
   ResultOf,
   DocumentTypeDecoration,

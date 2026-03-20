@@ -13,7 +13,7 @@ describe('CatalogGridCard', () => {
           packagingDisplay: 'Container Package',
           weight: 1000,
           lastPrice: '199.90',
-          pricePerGram: '0.23',
+          pricePerProteinGram: '0.23',
           concentration: '86.6',
           totalProtein: '866',
           externalLink: 'https://example.com/whey-isolado',
@@ -29,5 +29,6 @@ describe('CatalogGridCard', () => {
     expect(wrapper.text()).toContain('1000 g')
     expect(wrapper.text()).toContain('Whey')
     expect(wrapper.text()).toContain('Isolado')
+    expect(wrapper.text()).toContain('86.6% concentration')
   })
 })

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable */
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core'
 export type Maybe<T> = T | null
 export type InputMaybe<T> = T | null | undefined
@@ -61,7 +61,7 @@ export type CatalogProductType = {
   name: Scalars['String']['output']
   packaging: Scalars['String']['output']
   packagingDisplay: Scalars['String']['output']
-  pricePerGram?: Maybe<Scalars['Decimal']['output']>
+  pricePerProteinGram?: Maybe<Scalars['Decimal']['output']>
   tags: Array<TagType>
   totalProtein?: Maybe<Scalars['Decimal']['output']>
   weight: Scalars['Int']['output']
@@ -75,8 +75,8 @@ export type CatalogProductsFiltersInput = {
   perPage?: Scalars['Int']['input']
   priceMax?: InputMaybe<Scalars['Float']['input']>
   priceMin?: InputMaybe<Scalars['Float']['input']>
-  pricePerGramMax?: InputMaybe<Scalars['Float']['input']>
-  pricePerGramMin?: InputMaybe<Scalars['Float']['input']>
+  pricePerProteinGramMax?: InputMaybe<Scalars['Float']['input']>
+  pricePerProteinGramMin?: InputMaybe<Scalars['Float']['input']>
   search?: InputMaybe<Scalars['String']['input']>
   sortBy?: Scalars['String']['input']
   sortDir?: Scalars['String']['input']
@@ -93,6 +93,13 @@ export type CategoryType = {
   description: Scalars['String']['output']
   id: Scalars['ID']['output']
   name: Scalars['String']['output']
+}
+
+export type ComboComponentInput = {
+  ean?: InputMaybe<Scalars['String']['input']>
+  externalId?: InputMaybe<Scalars['String']['input']>
+  name: Scalars['String']['input']
+  quantity?: Scalars['Int']['input']
 }
 
 export type FlavorType = {
@@ -121,6 +128,7 @@ export type Mutation = {
   createProduct: ProductResult
   discardScrapedItem: Scalars['Boolean']['output']
   ensureScrapedItemSourcePage?: Maybe<ScrapedItemType>
+  linkScrapedItemToProductStore?: Maybe<ScrapedItemType>
   reportScrapedItemError: Scalars['Boolean']['output']
   subscribeAlerts: AlertSubscriptionResult
   updateProductContent: ProductResult
@@ -129,8 +137,7 @@ export type Mutation = {
 }
 
 export type MutationCheckoutScrapedItemArgs = {
-  force?: Scalars['Boolean']['input']
-  targetItemId?: InputMaybe<Scalars['Int']['input']>
+  data: ScrapedItemCheckoutInput
 }
 
 export type MutationCreateProductArgs = {
@@ -148,10 +155,12 @@ export type MutationEnsureScrapedItemSourcePageArgs = {
   url: Scalars['String']['input']
 }
 
+export type MutationLinkScrapedItemToProductStoreArgs = {
+  data: ScrapedItemLinkInput
+}
+
 export type MutationReportScrapedItemErrorArgs = {
-  isFatal?: Scalars['Boolean']['input']
-  itemId: Scalars['Int']['input']
-  message: Scalars['String']['input']
+  data: ScrapedItemErrorInput
 }
 
 export type MutationSubscribeAlertsArgs = {
@@ -171,13 +180,7 @@ export type MutationUpdateScrapedItemDataArgs = {
 }
 
 export type MutationUpsertScrapedItemVariantArgs = {
-  externalId: Scalars['String']['input']
-  name: Scalars['String']['input']
-  originItemId: Scalars['Int']['input']
-  pageUrl: Scalars['String']['input']
-  price?: InputMaybe<Scalars['Float']['input']>
-  stockStatus?: InputMaybe<Scalars['String']['input']>
-  storeSlug: Scalars['String']['input']
+  data: ScrapedItemVariantInput
 }
 
 export type NutritionFactsInput = {
@@ -221,13 +224,6 @@ export enum PackagingEnum {
   Refill = 'REFILL',
 }
 
-export type ProductComponentInput = {
-  name: Scalars['String']['input']
-  packagingHint?: InputMaybe<Scalars['String']['input']>
-  quantity?: Scalars['Int']['input']
-  weightHint?: InputMaybe<Scalars['Int']['input']>
-}
-
 /** Input for updating product content only */
 export type ProductContentUpdateInput = {
   categoryName?: InputMaybe<Scalars['String']['input']>
@@ -248,7 +244,7 @@ export type ProductInput = {
   /** Hierarchical category path */
   categoryPath?: InputMaybe<Array<Scalars['String']['input']>>
   /** List of components if combo */
-  components?: InputMaybe<Array<ProductComponentInput>>
+  components?: InputMaybe<Array<ComboComponentInput>>
   /** Marketing description */
   description?: InputMaybe<Scalars['String']['input']>
   /** Barcode */
@@ -259,12 +255,8 @@ export type ProductInput = {
   isPublished?: Scalars['Boolean']['input']
   /** Product display name */
   name: Scalars['String']['input']
-  /** List of nutrient slugs claimed by source */
-  nutrientClaims?: InputMaybe<Array<Scalars['String']['input']>>
   /** Nutrition profiles */
   nutrition?: InputMaybe<Array<ProductNutritionInput>>
-  /** ID of the ScrapedItem that generated this product (to link/complete) */
-  originScrapedItemId?: InputMaybe<Scalars['Int']['input']>
   /** Packaging type */
   packaging?: PackagingEnum
   /** Store links */
@@ -370,6 +362,22 @@ export type QueryScrapedItemArgs = {
   itemId: Scalars['Int']['input']
 }
 
+export type ScrapedItemCheckoutInput = {
+  force?: Scalars['Boolean']['input']
+  targetItemId?: InputMaybe<Scalars['Int']['input']>
+}
+
+export type ScrapedItemErrorInput = {
+  isFatal?: Scalars['Boolean']['input']
+  itemId: Scalars['Int']['input']
+  message: Scalars['String']['input']
+}
+
+export type ScrapedItemLinkInput = {
+  itemId: Scalars['Int']['input']
+  productStoreId: Scalars['Int']['input']
+}
+
 export type ScrapedItemType = {
   __typename?: 'ScrapedItemType'
   externalId: Scalars['String']['output']
@@ -387,6 +395,16 @@ export type ScrapedItemType = {
   stockStatus: Scalars['String']['output']
   storeName: Scalars['String']['output']
   storeSlug: Scalars['String']['output']
+}
+
+export type ScrapedItemVariantInput = {
+  externalId: Scalars['String']['input']
+  name: Scalars['String']['input']
+  originItemId: Scalars['Int']['input']
+  pageUrl: Scalars['String']['input']
+  price?: InputMaybe<Scalars['Float']['input']>
+  stockStatus?: InputMaybe<Scalars['String']['input']>
+  storeSlug: Scalars['String']['input']
 }
 
 export enum StockStatusEnum {
@@ -457,7 +475,7 @@ export type CatalogProductsQuery = {
       packagingDisplay: string
       weight: number
       lastPrice?: any | null
-      pricePerGram?: any | null
+      pricePerProteinGram?: any | null
       concentration?: any | null
       totalProtein?: any | null
       externalLink?: string | null
@@ -579,7 +597,7 @@ export const CatalogProductsDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'packagingDisplay' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'weight' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'lastPrice' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'pricePerGram' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'pricePerProteinGram' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'concentration' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'totalProtein' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'externalLink' } },

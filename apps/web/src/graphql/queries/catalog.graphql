@@ -14,7 +14,7 @@ query CatalogProducts($filters: CatalogProductsFiltersInput) {
       packagingDisplay
       weight
       lastPrice
-      pricePerGram
+      pricePerProteinGram
       concentration
       totalProtein
       externalLink

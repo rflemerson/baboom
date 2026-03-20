@@ -7,12 +7,12 @@ describe('BaseMetricCard', () => {
   it('renders label and value', () => {
     const wrapper = mount(BaseMetricCard, {
       props: {
-        label: 'Price / g',
+        label: 'Price / protein g',
         value: '0.23',
       },
     })
 
-    expect(wrapper.text()).toContain('Price / g')
+    expect(wrapper.text()).toContain('Price / protein g')
     expect(wrapper.text()).toContain('0.23')
   })
 })
