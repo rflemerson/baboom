@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { RouterLinkStub } from '@vue/test-utils'
+import { RouterLinkStub, mount } from '@vue/test-utils'
 
 import AppHeader from './AppHeader.vue'
 

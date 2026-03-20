@@ -20,9 +20,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const activeIndex = computed(() =>
-  props.options[0].value === props.modelValue ? 0 : 1,
-)
+const activeIndex = computed(() => (props.options[0].value === props.modelValue ? 0 : 1))
 
 function toggle() {
   const nextValue = props.options[activeIndex.value === 0 ? 1 : 0].value
@@ -41,7 +39,9 @@ function toggle() {
   >
     <span
       class="app-binary-toggle__thumb"
-      :class="activeIndex === 0 ? 'app-binary-toggle__thumb--start' : 'app-binary-toggle__thumb--end'"
+      :class="
+        activeIndex === 0 ? 'app-binary-toggle__thumb--start' : 'app-binary-toggle__thumb--end'
+      "
     />
     <span
       v-for="(option, index) in options"

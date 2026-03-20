@@ -29,16 +29,10 @@ const loadingPlaceholders = computed(() =>
 </script>
 
 <template>
-  <section
-    v-if="loading"
-    class="mb-8 space-y-4"
-    aria-live="polite"
-    aria-busy="true"
-    role="status"
-  >
+  <section v-if="loading" class="mb-8 space-y-4" aria-live="polite" aria-busy="true" role="status">
     <div class="app-meta-row flex items-center justify-between rounded-2xl px-1 text-sm">
       <p class="app-copy-muted">Loading products...</p>
-      <span class="app-copy-soft text-xs uppercase tracking-[0.24em]">Fetching catalog</span>
+      <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Fetching catalog</span>
     </div>
 
     <div

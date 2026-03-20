@@ -1,6 +1,6 @@
 /* eslint-disable */
-import * as types from './graphql';
-import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
+import * as types from './graphql'
+import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core'
 
 /**
  * Map of all GraphQL operations in the project.
@@ -14,13 +14,15 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}": typeof types.SubscribeAlertsDocument,
-    "query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}": typeof types.CatalogProductsDocument,
-};
+  'mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}': typeof types.SubscribeAlertsDocument
+  'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}': typeof types.CatalogProductsDocument
+}
 const documents: Documents = {
-    "mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}": types.SubscribeAlertsDocument,
-    "query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}": types.CatalogProductsDocument,
-};
+  'mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}':
+    types.SubscribeAlertsDocument,
+  'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}':
+    types.CatalogProductsDocument,
+}
 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -34,19 +36,24 @@ const documents: Documents = {
  * The query argument is unknown!
  * Please regenerate the types.
  */
-export function graphql(source: string): unknown;
+export function graphql(source: string): unknown
 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}"): (typeof documents)["mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}"];
+export function graphql(
+  source: 'mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}',
+): (typeof documents)['mutation SubscribeAlerts($email: String!) {\n  subscribeAlerts(email: $email) {\n    success\n    alreadySubscribed\n    email\n    errors {\n      field\n      message\n    }\n  }\n}']
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}"): (typeof documents)["query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}"];
+export function graphql(
+  source: 'query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}',
+): (typeof documents)['query CatalogProducts($filters: CatalogProductsFiltersInput) {\n  catalogProducts(filters: $filters) {\n    pageInfo {\n      currentPage\n      perPage\n      totalPages\n      totalCount\n      hasPreviousPage\n      hasNextPage\n    }\n    items {\n      id\n      name\n      packagingDisplay\n      weight\n      lastPrice\n      pricePerGram\n      concentration\n      totalProtein\n      externalLink\n      brand {\n        name\n      }\n      category {\n        name\n      }\n      tags {\n        name\n      }\n    }\n  }\n}']
 
 export function graphql(source: string) {
-  return (documents as any)[source] ?? {};
+  return (documents as any)[source] ?? {}
 }
 
-export type DocumentType<TDocumentNode extends DocumentNode<any, any>> = TDocumentNode extends DocumentNode<  infer TType,  any>  ? TType  : never;
+export type DocumentType<TDocumentNode extends DocumentNode<any, any>> =
+  TDocumentNode extends DocumentNode<infer TType, any> ? TType : never

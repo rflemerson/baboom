@@ -39,7 +39,7 @@ defineEmits<{
         </RouterLink>
       </div>
 
-      <div class="flex items-center justify-self-end gap-2">
+      <div class="flex items-center gap-2 justify-self-end">
         <button
           type="button"
           aria-label="Open alerts"

@@ -11,13 +11,7 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "exclude": [
-    "src/gql/**/*",
-    "dist",
-    "coverage",
-    "playwright-report",
-    "test-results"
-  ],
+  "exclude": ["src/gql/**/*", "dist", "coverage", "playwright-report", "test-results"],
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"]

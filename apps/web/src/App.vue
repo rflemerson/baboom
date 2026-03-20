@@ -12,11 +12,7 @@ const { isDark, toggleTheme } = useThemeMode()
 
 <template>
   <div class="app-page">
-    <AppHeader
-      :is-dark="isDark"
-      @open-alerts="alertsOpen = true"
-      @toggle-theme="toggleTheme"
-    />
+    <AppHeader :is-dark="isDark" @open-alerts="alertsOpen = true" @toggle-theme="toggleTheme" />
     <RouterView />
     <AlertSubscribeDialog v-model="alertsOpen" />
   </div>

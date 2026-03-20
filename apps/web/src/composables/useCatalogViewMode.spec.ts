@@ -11,6 +11,6 @@ describe('useCatalogViewMode', () => {
     await nextTick()
 
     expect(viewMode.value).toBe('list')
-    expect(window.localStorage.getItem('baboom.catalog.viewMode')).toBe('list')
+    expect(globalThis.localStorage.getItem('baboom.catalog.viewMode')).toBe('list')
   })
 })

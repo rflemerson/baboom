@@ -8,7 +8,7 @@ export function useCatalogViewMode() {
   const viewMode = ref<CatalogViewMode>('grid')
 
   onMounted(() => {
-    const storedValue = window.localStorage.getItem(STORAGE_KEY)
+    const storedValue = globalThis.localStorage.getItem(STORAGE_KEY)
 
     if (storedValue === 'grid' || storedValue === 'list') {
       viewMode.value = storedValue
@@ -16,7 +16,7 @@ export function useCatalogViewMode() {
   })
 
   watch(viewMode, (value) => {
-    window.localStorage.setItem(STORAGE_KEY, value)
+    globalThis.localStorage.setItem(STORAGE_KEY, value)
   })
 
   function setViewMode(value: CatalogViewMode) {

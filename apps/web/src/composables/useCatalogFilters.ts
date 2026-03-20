@@ -36,18 +36,10 @@ export function useCatalogFilters() {
   const brand = ref(defaultFilters?.brand ?? '')
   const priceMin = ref<number | null>(defaultFilters?.priceMin ?? null)
   const priceMax = ref<number | null>(defaultFilters?.priceMax ?? null)
-  const pricePerGramMin = ref<number | null>(
-    defaultFilters?.pricePerGramMin ?? null,
-  )
-  const pricePerGramMax = ref<number | null>(
-    defaultFilters?.pricePerGramMax ?? null,
-  )
-  const concentrationMin = ref<number | null>(
-    defaultFilters?.concentrationMin ?? null,
-  )
-  const concentrationMax = ref<number | null>(
-    defaultFilters?.concentrationMax ?? null,
-  )
+  const pricePerGramMin = ref<number | null>(defaultFilters?.pricePerGramMin ?? null)
+  const pricePerGramMax = ref<number | null>(defaultFilters?.pricePerGramMax ?? null)
+  const concentrationMin = ref<number | null>(defaultFilters?.concentrationMin ?? null)
+  const concentrationMax = ref<number | null>(defaultFilters?.concentrationMax ?? null)
   const sortBy = ref(defaultFilters?.sortBy ?? 'price_per_gram')
   const sortDir = ref(defaultFilters?.sortDir ?? 'asc')
   const page = ref(defaultFilters?.page ?? 1)

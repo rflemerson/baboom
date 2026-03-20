@@ -6,8 +6,7 @@ export function formatDecimal(
     return '-'
   }
 
-  const numericValue =
-    typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const numericValue = typeof value === 'number' ? value : Number.parseFloat(String(value))
 
   if (Number.isNaN(numericValue)) {
     return '-'

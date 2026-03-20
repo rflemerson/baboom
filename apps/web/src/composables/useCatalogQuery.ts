@@ -5,9 +5,8 @@ import { CatalogProductsDocument } from '@/gql/graphql'
 import type { CatalogPageInfo, CatalogProduct, CatalogProductsVariables } from '@/types/catalog'
 
 export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVariables>) {
-  const { result, loading, error, refetch } = useQuery(
-    CatalogProductsDocument,
-    () => toValue(variables),
+  const { result, loading, error, refetch } = useQuery(CatalogProductsDocument, () =>
+    toValue(variables),
   )
 
   const pageInfo = computed<CatalogPageInfo | null>(

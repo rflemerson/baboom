@@ -1,9 +1,5 @@
 {
-  "entry": [
-    "env.d.ts",
-    "src/**/*.spec.ts",
-    "e2e/**/*.ts"
-  ],
+  "entry": ["env.d.ts", "src/**/*.spec.ts", "e2e/**/*.ts"],
   "project": [
     "src/**/*.{ts,vue,graphql,scss,css}",
     "e2e/**/*.ts",
@@ -11,7 +7,5 @@
     "index.html",
     "*.ts"
   ],
-  "ignore": [
-    "src/gql/**/*"
-  ]
+  "ignore": ["src/gql/**/*"]
 }

@@ -10,11 +10,11 @@ function applyTheme(theme: ThemeMode) {
 }
 
 function readStoredTheme(): ThemeMode | null {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.localStorage === 'undefined') {
     return null
   }
 
-  const storedTheme = window.localStorage.getItem(STORAGE_KEY)
+  const storedTheme = globalThis.localStorage.getItem(STORAGE_KEY)
 
   if (storedTheme === 'light' || storedTheme === 'dark') {
     return storedTheme
@@ -38,7 +38,7 @@ export function useThemeMode() {
     theme,
     (currentTheme) => {
       applyTheme(currentTheme)
-      window.localStorage.setItem(STORAGE_KEY, currentTheme)
+      globalThis.localStorage.setItem(STORAGE_KEY, currentTheme)
     },
     { immediate: true },
   )

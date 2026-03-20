@@ -100,7 +100,9 @@ const titleId = 'catalog-filters-drawer-title'
     @update:modelValue="emit('update:modelValue', $event)"
   >
     <aside class="flex h-full w-full flex-col">
-      <header class="app-drawer__header flex items-center justify-between border-b px-4 py-4 sm:px-6 sm:py-5">
+      <header
+        class="app-drawer__header flex items-center justify-between border-b px-4 py-4 sm:px-6 sm:py-5"
+      >
         <div>
           <p class="app-eyebrow">Catalog filters</p>
           <h2 :id="titleId" class="mt-2 text-xl font-semibold">Refine results</h2>
@@ -186,7 +188,9 @@ const titleId = 'catalog-filters-drawer-title'
               step="0.01"
               placeholder="Min"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="draftConcentrationMin = parseNumber(($event.target as HTMLInputElement).value)"
+              @input="
+                draftConcentrationMin = parseNumber(($event.target as HTMLInputElement).value)
+              "
             />
             <input
               :value="draftConcentrationMax ?? ''"
@@ -195,13 +199,17 @@ const titleId = 'catalog-filters-drawer-title'
               step="0.01"
               placeholder="Max"
               class="app-input rounded-xl px-4 py-3 text-sm"
-              @input="draftConcentrationMax = parseNumber(($event.target as HTMLInputElement).value)"
+              @input="
+                draftConcentrationMax = parseNumber(($event.target as HTMLInputElement).value)
+              "
             />
           </div>
         </section>
       </div>
 
-      <footer class="app-drawer__footer flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:px-6 sm:py-5">
+      <footer
+        class="app-drawer__footer flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:px-6 sm:py-5"
+      >
         <button
           type="button"
           class="app-button app-button--secondary app-button--control flex-1"

@@ -6,7 +6,7 @@ import { useThemeMode } from './useThemeMode'
 
 describe('useThemeMode', () => {
   beforeEach(() => {
-    window.localStorage.clear()
+    globalThis.localStorage.clear()
     delete document.documentElement.dataset.theme
   })
 
@@ -22,11 +22,11 @@ describe('useThemeMode', () => {
     await nextTick()
 
     expect(document.documentElement.dataset.theme).toBe('light')
-    expect(window.localStorage.getItem('baboom.theme')).toBe('light')
+    expect(globalThis.localStorage.getItem('baboom.theme')).toBe('light')
   })
 
   it('restores the stored theme and toggles it', async () => {
-    window.localStorage.setItem('baboom.theme', 'dark')
+    globalThis.localStorage.setItem('baboom.theme', 'dark')
 
     const TestComponent = defineComponent({
       setup() {
@@ -44,6 +44,6 @@ describe('useThemeMode', () => {
     await wrapper.get('button').trigger('click')
 
     expect(document.documentElement.dataset.theme).toBe('light')
-    expect(window.localStorage.getItem('baboom.theme')).toBe('light')
+    expect(globalThis.localStorage.getItem('baboom.theme')).toBe('light')
   })
 })

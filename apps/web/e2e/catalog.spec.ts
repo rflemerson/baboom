@@ -274,19 +274,31 @@ function filterProducts(variables: CatalogVariables) {
       return false
     }
 
-    if (variables.pricePerGramMin != null && Number(product.pricePerGram) < variables.pricePerGramMin) {
+    if (
+      variables.pricePerGramMin != null &&
+      Number(product.pricePerGram) < variables.pricePerGramMin
+    ) {
       return false
     }
 
-    if (variables.pricePerGramMax != null && Number(product.pricePerGram) > variables.pricePerGramMax) {
+    if (
+      variables.pricePerGramMax != null &&
+      Number(product.pricePerGram) > variables.pricePerGramMax
+    ) {
       return false
     }
 
-    if (variables.concentrationMin != null && Number(product.concentration) < variables.concentrationMin) {
+    if (
+      variables.concentrationMin != null &&
+      Number(product.concentration) < variables.concentrationMin
+    ) {
       return false
     }
 
-    if (variables.concentrationMax != null && Number(product.concentration) > variables.concentrationMax) {
+    if (
+      variables.concentrationMax != null &&
+      Number(product.concentration) > variables.concentrationMax
+    ) {
       return false
     }
 
@@ -333,7 +345,7 @@ async function fulfillGraphql(route: Route) {
   }
 
   if (body.operationName === 'SubscribeAlerts') {
-    const email = String(body.variables?.email ?? '')
+    const email = typeof body.variables?.email === 'string' ? body.variables.email : ''
     const alreadySubscribed = email.toLowerCase() === 'already@subscribed.com'
 
     await route.fulfill({
