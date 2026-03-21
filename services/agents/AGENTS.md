@@ -11,8 +11,13 @@ Treat this file as the target shape for future refactors.
 
 - Package entrypoint: `agents/definitions.py`
 - Dagster-facing modules: `agents/defs/**`
-- Non-Dagster domain logic: `agents/brain/**`, `agents/tools/**`,
-  `agents/schemas/**`, `agents/storage/**`
+- Shared contracts: `agents/contracts/**`
+- Deterministic acquisition logic: `agents/acquisition/**`
+- Non-deterministic extraction logic: `agents/extraction/**`
+- Agent/model wrappers: `agents/brain/**`
+- API publishing logic: `agents/publishing/**`
+- Shared non-Dagster support logic: `agents/tools/**`, `agents/schemas/**`,
+  `agents/storage/**`
 
 ## Official references
 
@@ -41,11 +46,15 @@ Treat this file as the target shape for future refactors.
 ```text
 agents/
   definitions.py
+  contracts/
   defs/
     assets/
     resources/
     sensors/
     jobs/
+  acquisition/
+  extraction/
+  publishing/
   brain/
   prompts/
   schemas/
@@ -57,6 +66,12 @@ agents/
 Notes:
 
 - `defs/` is for Dagster-facing objects only.
+- `contracts/` defines the value objects passed between stages.
+- `acquisition/` owns deterministic source preparation up to prepared OCR
+  inputs.
+- `extraction/` owns the non-deterministic OCR and structured-analysis flow.
+- `publishing/` owns API synchronization after analysis is finalized.
+- `brain/` is limited to agent/model wrappers and prompt-loading glue.
 - `brain/`, `tools/`, `schemas/`, and `storage/` should remain importable and
   testable outside Dagster.
 - We do not need to mimic the quickstart repo literally; we only want its good
@@ -148,12 +163,13 @@ Good rules:
 4. Share reusable helpers through plain modules, not through cross-calling
    assets.
 
-The intended step shape here is still roughly:
+The intended step shape here is now:
 
-- ingestion
+- acquisition
+- prepared extraction inputs
 - OCR / extraction
 - analysis / normalization
-- publish
+- publish / synchronize
 
 ## Resource best practices
 

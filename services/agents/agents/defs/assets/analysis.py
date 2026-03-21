@@ -7,16 +7,16 @@ from typing import TYPE_CHECKING
 
 from dagster import AssetExecutionContext, asset
 
-from ...brain.analysis_pipeline import (
+from ...brain.structured_agent import run_structured_extraction
+from ...extraction.structured_analysis import (
     MIN_EXPECTED_VARIANTS_FOR_RECONCILIATION,
     build_analysis_metadata,
     run_analysis_pipeline,
 )
-from ...brain.structured_agent import run_structured_extraction
 
 if TYPE_CHECKING:
+    from ..config import ItemConfig
     from ..resources import AgentClientResource
-    from .shared import ItemConfig
 
 
 @asset

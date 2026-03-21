@@ -51,6 +51,7 @@ At a high level, one run looks like this:
 6. the asset graph executes in this order:
    - `downloaded_assets`
    - `scraped_metadata`
+   - `prepared_extraction_inputs`
    - `ocr_extraction`
    - `product_analysis`
    - `upload_to_api`
@@ -70,17 +71,19 @@ flowchart TD
 
     G --> H["downloaded_assets"]
     H --> I["scraped_metadata"]
-    H --> J["ocr_extraction"]
+    H --> J["prepared_extraction_inputs"]
     I --> J
-    J --> K["product_analysis"]
-    I --> L["upload_to_api"]
-    K --> L
+    J --> K["ocr_extraction"]
+    K --> L["product_analysis"]
+    I --> M["upload_to_api"]
+    L --> M
 
     H --> X["On asset error: log + report_error + raise"]
     I --> X
     J --> X
     K --> X
     L --> X
+    M --> X
 ```
 
 ```mermaid
@@ -115,7 +118,7 @@ flowchart TD
 
 ## Pipeline Contract
 
-The shared launch contract lives in:
+The shared launch contract for queue-triggered runs lives in:
 
 - [pipeline.py](/home/rafael/Documents/baboom/services/agents/agents/defs/pipeline.py)
 
@@ -206,6 +209,23 @@ The sensor expects the backend checkout response to contain:
 - optionally `storeSlug`
 
 If neither `productLink` nor `sourcePageUrl` is present, the item is skipped.
+
+## Stage Boundaries
+
+The pipeline is now split into three logical parts:
+
+1. Acquisition / preparation
+   - `downloaded_assets`
+   - `scraped_metadata`
+   - `prepared_extraction_inputs`
+2. Non-deterministic extraction
+   - `ocr_extraction`
+   - `product_analysis`
+3. Publishing / synchronization
+   - `upload_to_api`
+
+The key boundary is `prepared_extraction_inputs`: it is the deterministic
+handoff between source acquisition and the LLM-driven extraction flow.
 
 ## External Systems
 
@@ -380,7 +400,7 @@ Source:
 3. load `site_data.json` from storage when available
 4. load `candidates.json` from storage when available
 5. if candidates do not exist, materialize them via `ScraperService.materialize_candidates(...)`
-6. choose the image paths to send to OCR using `_select_images_for_ocr(...)`
+6. choose the image paths to send to OCR using `select_images_for_ocr(...)`
 7. determine extraction mode:
    - `multimodal` when image paths exist
    - `text_only` otherwise
@@ -411,7 +431,7 @@ raw extraction text.
 Source:
 
 - [analysis.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/analysis.py)
-- [analysis_pipeline.py](/home/rafael/Documents/baboom/services/agents/agents/brain/analysis_pipeline.py)
+- [structured_analysis.py](/home/rafael/Documents/baboom/services/agents/agents/extraction/structured_analysis.py)
 
 #### Inputs
 
@@ -455,7 +475,7 @@ The Dagster asset itself is now intentionally thin. It is responsible for:
 
 The semantic retry policy now lives in the pure Python module:
 
-- [analysis_pipeline.py](/home/rafael/Documents/baboom/services/agents/agents/brain/analysis_pipeline.py)
+- [structured_analysis.py](/home/rafael/Documents/baboom/services/agents/agents/extraction/structured_analysis.py)
 
 Expected shape:
 

@@ -1,38 +1,57 @@
 from unittest import TestCase
 
-from agents.defs.assets.analysis import (
+from agents.acquisition.ingestion import (
+    build_download_result,
+    get_item_or_raise,
+    resolve_source_page_context,
+)
+from agents.acquisition.metadata import build_metadata_extraction_context
+from agents.acquisition.prepared_inputs import (
+    load_scraper_context,
+    resolve_extraction_mode,
+)
+from agents.contracts.acquisition import MetadataExtractionContext, SourcePageContext
+from agents.contracts.publishing import PublishOriginContext
+from agents.extraction.context_utils import count_invalid_variant_tokens
+from agents.extraction.structured_analysis import (
     StructuredAnalysisResult,
     VariantExtractionContext,
-    _build_analysis_metadata,
-    _count_context_invalid_variants,
+    build_analysis_metadata,
 )
-from agents.defs.assets.ingestion import (
-    SourcePageContext,
-    _build_download_result,
-    _get_item_or_raise,
-    _resolve_source_page_context,
+from agents.publishing.payload_utils import (
+    build_nutrition_payload,
+    slugify,
+    to_graphql_stock_status,
 )
-from agents.defs.assets.metadata import (
-    MetadataExtractionContext,
-    _build_metadata_extraction_context,
-)
-from agents.defs.assets.publish import (
-    PublishOriginContext,
-    _build_component_payloads,
-    _build_product_store_payload,
-    _build_skipped_linked_result,
-    _build_tag_paths,
-    _build_upload_metadata,
-    _build_variant_external_id,
-    _resolve_analysis_items,
-    _should_skip_linked_item,
-)
-from agents.defs.assets.shared import (
-    _build_nutrition_payload,
-    _slugify,
-    _to_graphql_stock_status,
+from agents.publishing.service import (
+    build_component_payloads,
+    build_product_store_payload,
+    build_skipped_linked_result,
+    build_tag_paths,
+    build_upload_metadata,
+    build_variant_external_id,
+    resolve_analysis_items,
+    should_skip_linked_item,
 )
 from agents.schemas.product import RawScrapedData
+
+
+class _FakeCandidateStorage:
+    """Small storage fake for prepared-input helper tests."""
+
+    def __init__(self, *, site_data: str | None = None):
+        self.site_data = site_data
+
+    def exists(self, bucket: str, key: str) -> bool:
+        if key == "site_data.json":
+            return self.site_data is not None
+        return False
+
+    def download(self, bucket: str, key: str) -> str:
+        if key != "site_data.json" or self.site_data is None:
+            message = "unexpected download"
+            raise AssertionError(message)
+        return self.site_data
 
 
 class TestAssetsHelpers(TestCase):
@@ -40,18 +59,18 @@ class TestAssetsHelpers(TestCase):
 
     def test_slugify(self):
         """Normalizes names to stable slugs."""
-        self.assertEqual(_slugify("Whey Protein 100%"), "whey-protein-100")
-        self.assertEqual(_slugify("###"), "item")
+        self.assertEqual(slugify("Whey Protein 100%"), "whey-protein-100")
+        self.assertEqual(slugify("###"), "item")
 
     def test_stock_status_mapping(self):
         """Maps scraper statuses to GraphQL enum values."""
-        self.assertEqual(_to_graphql_stock_status("A"), "AVAILABLE")
-        self.assertEqual(_to_graphql_stock_status("LAST_UNITS"), "LAST_UNITS")
-        self.assertEqual(_to_graphql_stock_status("unknown"), "AVAILABLE")
+        self.assertEqual(to_graphql_stock_status("A"), "AVAILABLE")
+        self.assertEqual(to_graphql_stock_status("LAST_UNITS"), "LAST_UNITS")
+        self.assertEqual(to_graphql_stock_status("unknown"), "AVAILABLE")
 
     def test_build_nutrition_payload(self):
         """Builds nutrition payload with converted numeric fields."""
-        payload = _build_nutrition_payload(
+        payload = build_nutrition_payload(
             {
                 "variant_name": "Chocolate",
                 "flavor_names": ["Chocolate"],
@@ -101,12 +120,12 @@ class TestIngestionHelpers(TestCase):
     def test_get_item_or_raise_returns_item(self):
         item = {"id": 1, "name": "Item"}
         api = _FakeApi(item=item)
-        self.assertEqual(_get_item_or_raise(api, 1), item)
+        self.assertEqual(get_item_or_raise(api, 1), item)
 
     def test_get_item_or_raise_raises_when_missing(self):
         api = _FakeApi(item=None)
         with self.assertRaisesRegex(RuntimeError, "Scraped item 7 not found"):
-            _get_item_or_raise(api, 7)
+            get_item_or_raise(api, 7)
 
     def test_resolve_source_page_context_returns_normalized_payload(self):
         api = _FakeApi(
@@ -129,7 +148,7 @@ class TestIngestionHelpers(TestCase):
             "sourcePageContentType": "HTML",
         }
 
-        page = _resolve_source_page_context(api, config, item)
+        page = resolve_source_page_context(api, config, item)
 
         self.assertEqual(page.page_id, 55)
         self.assertEqual(page.page_url, "https://example.com/p")
@@ -146,7 +165,7 @@ class TestIngestionHelpers(TestCase):
             source_page_content_type="HTML",
         )
 
-        result = _build_download_result("55/source.html", page)
+        result = build_download_result("55/source.html", page)
 
         self.assertEqual(result["origin_item_id"], 1)
         self.assertEqual(result["page_id"], 55)
@@ -159,20 +178,23 @@ class TestAnalysisHelpers(TestCase):
 
     def test_count_context_invalid_variants_is_zero_without_allowed_variants(self):
         payload = {"items": [{"variant_name": "Chocolate"}]}
-        self.assertEqual(_count_context_invalid_variants(payload, set()), 0)
+        self.assertEqual(count_invalid_variant_tokens(payload, set()), 0)
 
     def test_build_analysis_metadata_maps_structured_result(self):
         analysis = StructuredAnalysisResult(
             payload={"items": [{"name": "Whey"}]},
+            variant_context=VariantExtractionContext(
+                expected_variant_count=3,
+                allowed_variants={"chocolate", "vanilla"},
+            ),
             structured_variant_count=2,
             reconciliation_retry_used=True,
             context_guard_retry_used=False,
             context_invalid_variants=1,
         )
 
-        metadata = _build_analysis_metadata(
+        metadata = build_analysis_metadata(
             analysis=analysis,
-            expected_variant_count=3,
             started=0.0,
         )
 
@@ -197,7 +219,7 @@ class TestMetadataHelpers(TestCase):
     """Tests for small metadata helper functions."""
 
     def test_build_metadata_extraction_context_normalizes_downloaded_assets(self):
-        extraction = _build_metadata_extraction_context(
+        extraction = build_metadata_extraction_context(
             {
                 "storage_path": "55/source.html",
                 "url": "https://example.com/p",
@@ -216,12 +238,26 @@ class TestMetadataHelpers(TestCase):
             ),
         )
 
+    def test_load_scraper_context_parses_json_payloads_only(self):
+        context = load_scraper_context(
+            {
+                "source_page_raw_content": '{"variants":["Chocolate"]}',
+                "source_page_content_type": "JSON",
+            },
+        )
+        self.assertEqual(context, {"variants": ["Chocolate"]})
+
+    def test_resolve_extraction_mode_prefers_multimodal_when_images_exist(self):
+        mode, reason = resolve_extraction_mode([{"file": "image_1.jpg"}], ["1/a.jpg"])
+        self.assertEqual(mode, "multimodal")
+        self.assertEqual(reason, "")
+
 
 class TestPublishHelpers(TestCase):
     """Tests for small publish helper functions."""
 
     def test_resolve_analysis_items_falls_back_to_scraped_metadata_name(self):
-        items = _resolve_analysis_items(
+        items = resolve_analysis_items(
             product_analysis={"items": []},
             scraped_metadata=RawScrapedData(name="Fallback Product"),
             origin_item={"name": "Origin Product"},
@@ -231,18 +267,18 @@ class TestPublishHelpers(TestCase):
 
     def test_should_skip_linked_item_only_when_product_store_exists(self):
         self.assertTrue(
-            _should_skip_linked_item(
+            should_skip_linked_item(
                 {"status": "linked", "productStoreId": 77},
             ),
         )
         self.assertFalse(
-            _should_skip_linked_item(
+            should_skip_linked_item(
                 {"status": "linked", "productStoreId": None},
             ),
         )
 
     def test_build_skipped_linked_result_keeps_linked_product_id(self):
-        result = _build_skipped_linked_result({"linkedProductId": 99})
+        result = build_skipped_linked_result({"linkedProductId": 99})
         self.assertTrue(result["skipped"])
         self.assertEqual(result["product"]["id"], 99)
 
@@ -254,7 +290,7 @@ class TestPublishHelpers(TestCase):
             store_slug="demo-store",
             item={"externalId": "origin-1"},
         )
-        external_id = _build_variant_external_id(
+        external_id = build_variant_external_id(
             origin,
             1,
             {"name": "Whey Protein", "variant_name": "Chocolate"},
@@ -264,7 +300,7 @@ class TestPublishHelpers(TestCase):
         self.assertIn("whey-protein", external_id)
 
     def test_build_product_store_payload_prefers_scraped_metadata(self):
-        payload = _build_product_store_payload(
+        payload = build_product_store_payload(
             scraped_metadata=RawScrapedData(price=99.9, stock_status="A"),
             origin_item={"price": 88.0, "stockStatus": "LAST_UNITS"},
             scraped_item={"externalId": "ext-1"},
@@ -279,14 +315,14 @@ class TestPublishHelpers(TestCase):
         self.assertEqual(payload["stockStatus"], "AVAILABLE")
 
     def test_build_tag_paths_filters_empty_values(self):
-        payload = _build_tag_paths(["protein/whey", "", None, "goal/gain-mass"])
+        payload = build_tag_paths(["protein/whey", "", None, "goal/gain-mass"])
         self.assertEqual(
             payload,
             [{"path": "protein/whey"}, {"path": "goal/gain-mass"}],
         )
 
     def test_build_component_payloads_filters_unnamed_components(self):
-        payload = _build_component_payloads(
+        payload = build_component_payloads(
             [
                 {"name": "Dose", "quantity": "2 units", "weight_hint": "30g"},
                 {"name": ""},
@@ -307,7 +343,7 @@ class TestPublishHelpers(TestCase):
         )
 
     def test_build_upload_metadata_summarizes_publish_result(self):
-        metadata = _build_upload_metadata(
+        metadata = build_upload_metadata(
             results=[{"product": {"id": 1}}, {"product": {"id": 2}}],
             created_count=1,
             page_id=55,

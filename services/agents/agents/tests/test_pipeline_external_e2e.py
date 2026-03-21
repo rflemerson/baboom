@@ -6,7 +6,7 @@ from unittest import TestCase, skipUnless
 
 from agents.brain.raw_extraction_agent import run_raw_extraction
 from agents.brain.structured_agent import run_structured_extraction
-from agents.defs.assets.shared import _select_images_for_ocr
+from agents.extraction.image_selection import select_images_for_ocr
 from agents.tools.scraper import ScraperService
 
 
@@ -25,7 +25,7 @@ def _has_llm_credentials() -> bool:
         os.getenv("OPENAI_API_KEY")
         or os.getenv("GEMINI_API_KEY")
         or os.getenv("GOOGLE_API_KEY")
-        or os.getenv("GROQ_API_KEY")
+        or os.getenv("GROQ_API_KEY"),
     )
 
 
@@ -54,8 +54,11 @@ class ExternalPipelineE2ETests(TestCase):
 
         candidates = service.materialize_candidates(bucket, url)
         self.assertGreater(len(candidates), 0)
-        image_paths = _select_images_for_ocr(
-            candidates, bucket, product_name=scraped.name or "", page_url=url
+        image_paths = select_images_for_ocr(
+            candidates,
+            bucket,
+            product_name=scraped.name or "",
+            page_url=url,
         )
         self.assertGreater(len(image_paths), 0)
 

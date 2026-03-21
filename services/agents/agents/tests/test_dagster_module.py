@@ -8,8 +8,6 @@ from dagster import RunRequest, SkipReason, build_asset_context
 from agents.definitions import defs
 from agents.defs.assets import (
     ItemConfig,
-    _is_potential_table_candidate,
-    _select_images_for_ocr,
     downloaded_assets,
     ocr_extraction,
     product_analysis,
@@ -23,6 +21,10 @@ from agents.defs.pipeline import (
     build_item_run_request,
 )
 from agents.defs.sensors import work_queue_sensor
+from agents.extraction.image_selection import (
+    is_potential_table_candidate,
+    select_images_for_ocr,
+)
 from agents.schemas.analysis import ProductAnalysisList, ProductAnalysisResult
 from agents.schemas.product import RawScrapedData
 
@@ -285,7 +287,7 @@ class TestImageSelection(TestCase):
             {"file": "images/d.jpg", "score": 50, "nutrition_signal": 0},
             {"file": "images/e.jpg", "score": 10, "nutrition_signal": 0},
         ]
-        selected = _select_images_for_ocr(candidates, "77")
+        selected = select_images_for_ocr(candidates, "77")
         self.assertEqual(len(selected), 4)
         self.assertEqual(selected[0], "77/images/b.jpg")
         self.assertEqual(selected[1], "77/images/c.jpg")
@@ -306,7 +308,7 @@ class TestImageSelection(TestCase):
             {"file": f"images/{idx}.jpg", "score": 100 - idx, "nutrition_signal": 0}
             for idx in range(8)
         ]
-        selected = _select_images_for_ocr(candidates, "88")
+        selected = select_images_for_ocr(candidates, "88")
         self.assertEqual(len(selected), 6)
         self.assertEqual(selected[0], "88/images/0.jpg")
 
@@ -326,7 +328,7 @@ class TestImageSelection(TestCase):
             {"file": f"images/{idx}.jpg", "score": 100 - idx, "nutrition_signal": 3}
             for idx in range(8)
         ]
-        selected = _select_images_for_ocr(candidates, "99")
+        selected = select_images_for_ocr(candidates, "99")
         self.assertEqual(len(selected), 4)
 
     @patch.dict(
@@ -345,7 +347,7 @@ class TestImageSelection(TestCase):
             {"file": f"images/{idx}.jpg", "score": 100 - idx, "nutrition_signal": 3}
             for idx in range(8)
         ]
-        selected = _select_images_for_ocr(candidates, "99")
+        selected = select_images_for_ocr(candidates, "99")
         self.assertGreaterEqual(len(selected), 8)
 
     @patch.dict(
@@ -382,7 +384,7 @@ class TestImageSelection(TestCase):
                 "metadata": {"alt": "Elitebar 30g Protein Bar"},
             },
         ]
-        selected = _select_images_for_ocr(
+        selected = select_images_for_ocr(
             candidates,
             "9002",
             product_name="Elitebar 30g Protein Bar",
@@ -408,7 +410,7 @@ class TestImageSelection(TestCase):
             {"file": "images/a.jpg", "score": 20, "nutrition_signal": 1},
             {"file": "images/b.jpg", "score": 10, "nutrition_signal": 1},
         ]
-        selected = _select_images_for_ocr(
+        selected = select_images_for_ocr(
             candidates,
             "12",
             product_name="Missing Product",
@@ -427,7 +429,7 @@ class TestImageSelection(TestCase):
             "metadata": {"alt": "product image"},
             "url": "https://cdn/x/image.jpg",
         }
-        self.assertTrue(_is_potential_table_candidate(candidate))
+        self.assertTrue(is_potential_table_candidate(candidate))
 
 
 class TestUploadToApiErrorHandling(TestCase):

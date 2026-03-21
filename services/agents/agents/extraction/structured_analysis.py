@@ -1,4 +1,4 @@
-"""Pure analysis pipeline helpers for structured product extraction."""
+"""Pure structured-analysis pipeline helpers for non-deterministic extraction."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from ..defs.assets.shared import (
-    _build_context_guard_prompt,
-    _build_reconciliation_prompt,
-    _count_invalid_variant_tokens,
-    _count_structured_variant_signals,
-    _extract_allowed_variants_from_scraper_context,
-    _extract_context_block,
-    _extract_expected_variant_signals,
+from ..brain.structured_agent import run_structured_extraction
+from .context_utils import (
+    build_context_guard_prompt,
+    build_reconciliation_prompt,
+    count_invalid_variant_tokens,
+    count_structured_variant_signals,
+    extract_allowed_variants_from_scraper_context,
+    extract_context_block,
+    extract_expected_variant_signals,
 )
-from .structured_agent import run_structured_extraction
 
 MIN_EXPECTED_VARIANTS_FOR_RECONCILIATION = 2
 
@@ -24,7 +24,7 @@ StructuredExtractionRunner = Callable[..., object]
 
 @dataclass(frozen=True, slots=True)
 class VariantExtractionContext:
-    """Variant-related context derived from OCR text."""
+    """Variant-related context derived from OCR extraction text."""
 
     expected_variant_count: int
     allowed_variants: set[str]
@@ -53,9 +53,9 @@ class ContextGuardState:
 
 def build_variant_extraction_context(ocr_extraction: str) -> VariantExtractionContext:
     """Build shared variant expectations from the OCR extraction text."""
-    expected_variant_signals = _extract_expected_variant_signals(ocr_extraction)
-    scraper_context = _extract_context_block(ocr_extraction, "SCRAPER_CONTEXT")
-    allowed_variants = _extract_allowed_variants_from_scraper_context(scraper_context)
+    expected_variant_signals = extract_expected_variant_signals(ocr_extraction)
+    scraper_context = extract_context_block(ocr_extraction, "SCRAPER_CONTEXT")
+    allowed_variants = extract_allowed_variants_from_scraper_context(scraper_context)
     return VariantExtractionContext(
         expected_variant_count=len(expected_variant_signals),
         allowed_variants=allowed_variants,
@@ -99,7 +99,7 @@ def run_analysis_pipeline(
             extraction_runner=extraction_runner,
         )
     )
-    context_invalid_variants = _count_context_invalid_variants(
+    context_invalid_variants = count_invalid_variant_tokens(
         payload,
         variant_context.allowed_variants,
     )
@@ -131,7 +131,7 @@ def _run_initial_structured_extraction(
     """Run the base structured extraction and return payload plus variant count."""
     result = extraction_runner(ocr_extraction)
     payload = result.model_dump(by_alias=True)
-    return payload, _count_structured_variant_signals(payload)
+    return payload, count_structured_variant_signals(payload)
 
 
 def _apply_reconciliation_retry(
@@ -151,20 +151,13 @@ def _apply_reconciliation_retry(
 
     reconciled = extraction_runner(
         ocr_extraction,
-        prompt=_build_reconciliation_prompt(expected_variant_count),
+        prompt=build_reconciliation_prompt(expected_variant_count),
     )
     reconciled_payload = reconciled.model_dump(by_alias=True)
-    reconciled_variant_count = _count_structured_variant_signals(reconciled_payload)
+    reconciled_variant_count = count_structured_variant_signals(reconciled_payload)
     if reconciled_variant_count >= structured_variant_count:
         return reconciled_payload, reconciled_variant_count, True
     return payload, structured_variant_count, False
-
-
-def _count_context_invalid_variants(payload: dict, allowed_variants: set[str]) -> int:
-    """Count invalid structured variants relative to scraper context."""
-    if not allowed_variants:
-        return 0
-    return _count_invalid_variant_tokens(payload, allowed_variants)
 
 
 def _apply_context_guard_retry(
@@ -180,14 +173,14 @@ def _apply_context_guard_retry(
 
     guarded = extraction_runner(
         ocr_extraction,
-        prompt=_build_context_guard_prompt(variant_context.allowed_variants),
+        prompt=build_context_guard_prompt(variant_context.allowed_variants),
     )
     guarded_payload = guarded.model_dump(by_alias=True)
-    guarded_invalid = _count_invalid_variant_tokens(
+    guarded_invalid = count_invalid_variant_tokens(
         guarded_payload,
         variant_context.allowed_variants,
     )
-    guarded_variant_count = _count_structured_variant_signals(guarded_payload)
+    guarded_variant_count = count_structured_variant_signals(guarded_payload)
     if guarded_invalid < state.context_invalid_variants or (
         guarded_invalid == state.context_invalid_variants
         and guarded_variant_count >= state.structured_variant_count
