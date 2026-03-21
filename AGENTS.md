@@ -16,6 +16,7 @@
 ## Extended context index (load on demand)
 
 - API backend: `apps/api/AGENTS.md`
+- Agents service: `services/agents/AGENTS.md`
 - Infra and deploy: `infra/AGENTS.md`
 - Web frontend: `apps/web/AGENTS.md`
 

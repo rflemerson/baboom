@@ -1,57 +1,54 @@
 """Dagster sensor polling the work queue and launching the item pipeline."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from dagster import DefaultSensorStatus, RunRequest, SkipReason, sensor
 
-from ..resources import AgentClientResource
+from ..pipeline import PROCESS_ITEM_JOB_NAME, QueueWorkItem, build_item_run_request
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from ..resources import AgentClientResource
 
 
-@sensor(
-    job_name="process_item_job",
-    minimum_interval_seconds=10,
-    default_status=DefaultSensorStatus.RUNNING,
-)
-def work_queue_sensor(context, client: AgentClientResource):
-    """Poll API for new items to process."""
-    api = client.get_client()
-
-    work = api.checkout_work()
+def _parse_work_item(work: dict[str, Any] | None) -> QueueWorkItem | None:
+    """Normalize raw API queue payload into the minimum launchable shape."""
     if not work:
-        yield SkipReason("Queue empty. Sleeping...")
-        return
+        return None
 
     item_id = int(work["id"])
     url = work.get("productLink") or work.get("sourcePageUrl")
     if not url:
-        yield SkipReason(f"Item {item_id} has no source URL.")
-        return
+        return None
 
-    run_config = {
-        "ops": {
-            "downloaded_assets": {
-                "config": {
-                    "item_id": item_id,
-                    "url": url,
-                    "store_slug": work.get("storeSlug", "unknown"),
-                }
-            },
-            "product_analysis": {
-                "config": {
-                    "item_id": item_id,
-                    "url": url,
-                    "store_slug": work.get("storeSlug", "unknown"),
-                }
-            },
-            "upload_to_api": {
-                "config": {
-                    "item_id": item_id,
-                    "url": url,
-                    "store_slug": work.get("storeSlug", "unknown"),
-                }
-            },
-        }
-    }
-
-    yield RunRequest(
-        run_config=run_config,
-        tags={"item_id": str(item_id), "store": work.get("storeName", "unknown")},
+    return QueueWorkItem(
+        item_id=item_id,
+        url=url,
+        store_name=work.get("storeName", "unknown"),
+        store_slug=work.get("storeSlug", "unknown"),
     )
+
+
+@sensor(
+    job_name=PROCESS_ITEM_JOB_NAME,
+    minimum_interval_seconds=10,
+    default_status=DefaultSensorStatus.RUNNING,
+)
+def work_queue_sensor(
+    _context: object,
+    client: AgentClientResource,
+) -> Iterator[RunRequest | SkipReason]:
+    """Poll API for new items to process."""
+    api = client.get_client()
+    work = api.checkout_work()
+    item = _parse_work_item(work)
+    if not work:
+        yield SkipReason("Queue empty. Sleeping...")
+        return
+    if item is None:
+        yield SkipReason(f"Item {int(work['id'])} has no source URL.")
+        return
+    yield build_item_run_request(item)

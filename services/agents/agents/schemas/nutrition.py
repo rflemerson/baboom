@@ -32,13 +32,14 @@ class NutritionFacts(BaseModel):
     dietary_fiber: float | None = Field(None, description="Dietary fiber in grams")
     sodium: float | None = Field(None, description="Sodium in mg")
     flavor_names: list[str] = Field(
-        default_factory=list, description="Flavors identified on this specific label"
+        default_factory=list,
+        description="Flavors identified on this specific label",
     )
     micronutrients: list[MicronutrientItem] | None = None
 
     @pydantic.field_validator("micronutrients", mode="before")
     @classmethod
-    def parse_micros(cls, v):
+    def parse_micros(cls, v: object) -> object:
         """Handle 'null' string inputs from LLM."""
         if v == "null" or v is None:
             return []

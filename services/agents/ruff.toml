@@ -47,3 +47,9 @@ select = [
     "TC",  # type-checking imports
     "D",   # pydocstyle
 ]
+
+[lint.per-file-ignores]
+"agents/tests/*.py" = ["ANN", "ARG", "D", "E501", "FBT002", "INP001", "PLR0913", "PT", "SLF001"]
+"**/agents/tests/*.py" = ["ANN", "ARG", "D", "E501", "FBT002", "INP001", "PLR0913", "PT", "SLF001"]
+"agents/brain/analysis_pipeline.py" = ["PLR0913"]
+"agents/defs/assets/publish.py" = ["PLR0913"]

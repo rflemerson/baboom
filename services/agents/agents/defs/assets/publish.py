@@ -1,11 +1,16 @@
 """Dagster asset: publish analyzed items into the downstream API."""
 
+from __future__ import annotations
+
 import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
 
 from dagster import AssetExecutionContext, asset
 
-from ...schemas.product import RawScrapedData
-from ..resources import AgentClientResource
+if TYPE_CHECKING:
+    from ...schemas.product import RawScrapedData
+    from ..resources import AgentClientResource
 from .shared import (
     ItemConfig,
     _build_nutrition_payload,
@@ -16,6 +21,64 @@ from .shared import (
 )
 
 
+class PublishApi(Protocol):
+    """Backend API surface needed by the publish asset helpers."""
+
+    def get_scraped_item(self, item_id: int) -> dict | None:
+        """Return one scraped item snapshot."""
+
+    def ensure_source_page(
+        self,
+        item_id: int,
+        url: str,
+        store_slug: str,
+    ) -> dict | None:
+        """Ensure the scraped item is linked to a source page."""
+
+    def update_scraped_item_data(
+        self,
+        item_id: int,
+        name: str | None = None,
+        source_page_url: str | None = None,
+        store_slug: str | None = None,
+    ) -> dict | None:
+        """Update the mutable fields of one scraped item."""
+
+    def upsert_scraped_item_variant(
+        self,
+        origin_item_id: int,
+        external_id: str,
+        name: str,
+        page_url: str,
+        store_slug: str,
+        price: float | None = None,
+        stock_status: str | None = None,
+    ) -> dict | None:
+        """Create or update a derived scraped-item variant."""
+
+    def create_product(self, product_input: dict) -> dict | None:
+        """Create one downstream product record."""
+
+
+@dataclass(frozen=True, slots=True)
+class PublishOriginContext:
+    """Normalized source context used while publishing analyzed items."""
+
+    item_id: int
+    page_id: int | None
+    page_url: str
+    store_slug: str
+    item: dict
+
+
+@dataclass(frozen=True, slots=True)
+class PublishItemResult:
+    """Result of publishing one analyzed item plus bookkeeping metadata."""
+
+    result: dict
+    variant_created: bool
+
+
 @asset
 def upload_to_api(
     context: AssetExecutionContext,
@@ -24,99 +87,66 @@ def upload_to_api(
     product_analysis: dict,
     scraped_metadata: RawScrapedData,
 ) -> list[dict]:
-    """Creates one product per analyzed item and links generated scraped items."""
+    """Create one product per analyzed item and link generated scraped items."""
     api = client.get_client()
     try:
         started = time.perf_counter()
-        origin_item = _get_origin_item(api, config.item_id)
-        ensured_origin, page_url, origin_store_slug = _ensure_origin_page(
+        origin_context = _build_publish_origin_context(
             api,
             config,
-            origin_item,
         )
-        items = _resolve_analysis_items(product_analysis, scraped_metadata, origin_item)
+        items = _resolve_analysis_items(
+            product_analysis,
+            scraped_metadata,
+            origin_context.item,
+        )
 
         results: list[dict] = []
         created_count = 0
         for idx, analysis_data in enumerate(items):
-            scraped_item, variant_created = _resolve_scraped_item_for_analysis(
-                api,
-                idx,
-                analysis_data,
-                scraped_metadata,
-                origin_item,
-                ensured_origin,
-                page_url,
-                origin_store_slug,
+            item_result = _publish_analysis_item(
+                context=context,
+                api=api,
+                idx=idx,
+                analysis_data=analysis_data,
+                scraped_metadata=scraped_metadata,
+                origin=origin_context,
             )
-            if variant_created:
+            if item_result.variant_created:
                 created_count += 1
-
-            # Idempotency guard: skip only when LINKED item has a valid ProductStore.
-            status_value = str(scraped_item.get("status") or "").lower()
-            product_store_id = scraped_item.get("productStoreId")
-            if status_value == "linked" and product_store_id:
-                context.log.info(
-                    f"Skipping already linked item {scraped_item['id']} ({scraped_item.get('externalId')})",
-                )
-                linked_product_id = scraped_item.get("linkedProductId")
-                results.append(
-                    {
-                        "product": {"id": linked_product_id},
-                        "errors": [],
-                        "skipped": True,
-                    },
-                )
-                continue
-            if status_value == "linked":
-                context.log.warning(
-                    f"Item {scraped_item['id']} marked LINKED without product_store; reprocessing.",
-                )
-
-            payload = _build_product_payload(
-                analysis_data,
-                scraped_metadata,
-                origin_item,
-                scraped_item,
-                page_url,
-                origin_store_slug,
-            )
-
-            context.log.info(
-                f"Uploading product {idx + 1}/{len(items)} with origin item {scraped_item['id']}",
-            )
-            result = api.create_product(payload)
-            results.append(result or {})
+            results.append(item_result.result)
 
         context.add_output_metadata(
-            {
-                "items_uploaded": len(results),
-                "additional_scraped_items_created": created_count,
-                "page_id": ensured_origin.get("sourcePageId"),
-                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-            },
+            _build_upload_metadata(
+                results=results,
+                created_count=created_count,
+                page_id=origin_context.page_id,
+                started=started,
+            ),
         )
-        return results
-    except Exception as e:
-        context.log.error(f"Upload failed: {e}")
-        api.report_error(config.item_id, str(e), is_fatal=False)
+    except Exception as exc:
+        context.log.exception("Upload failed")
+        api.report_error(config.item_id, str(exc), is_fatal=False)
         raise
+    else:
+        return results
 
 
-def _get_origin_item(api, item_id: int) -> dict:
+def _get_origin_item(api: PublishApi, item_id: int) -> dict:
     """Fetch the origin scraped item or fail fast."""
     origin_item = api.get_scraped_item(item_id)
     if not origin_item:
-        raise RuntimeError(f"Scraped item {item_id} not found")
+        message = f"Scraped item {item_id} not found"
+        raise RuntimeError(message)
     return origin_item
 
 
-def _ensure_origin_page(
-    api,
+def _build_publish_origin_context(
+    api: PublishApi,
     config: ItemConfig,
-    origin_item: dict,
-) -> tuple[dict, str, str]:
+) -> PublishOriginContext:
     """Ensure the origin item has a source page and return normalized context."""
+    origin_item = _get_origin_item(api, config.item_id)
     origin_page_url = (
         origin_item.get("sourcePageUrl") or origin_item.get("productLink") or config.url
     )
@@ -127,9 +157,20 @@ def _ensure_origin_page(
         origin_store_slug,
     )
     if not ensured_origin:
-        raise RuntimeError(f"Failed to ensure source page for item {config.item_id}")
+        message = f"Failed to ensure source page for item {config.item_id}"
+        raise RuntimeError(message)
     page_url = ensured_origin.get("sourcePageUrl") or origin_page_url
-    return ensured_origin, page_url, origin_store_slug
+    return PublishOriginContext(
+        item_id=int(ensured_origin["id"]),
+        page_id=(
+            int(ensured_origin["sourcePageId"])
+            if ensured_origin.get("sourcePageId") is not None
+            else None
+        ),
+        page_url=page_url,
+        store_slug=origin_store_slug,
+        item=origin_item,
+    )
 
 
 def _resolve_analysis_items(
@@ -151,50 +192,48 @@ def _resolve_analysis_items(
 
 
 def _resolve_scraped_item_for_analysis(
-    api,
+    api: PublishApi,
     idx: int,
     analysis_data: dict,
     scraped_metadata: RawScrapedData,
-    origin_item: dict,
-    ensured_origin: dict,
-    page_url: str,
-    origin_store_slug: str,
+    origin: PublishOriginContext,
 ) -> tuple[dict, bool]:
     """Return the scraped item that should back one analyzed product."""
     if idx == 0:
         scraped_item = api.update_scraped_item_data(
-            item_id=int(ensured_origin["id"]),
+            item_id=origin.item_id,
             name=analysis_data.get("name"),
-            source_page_url=page_url,
-            store_slug=origin_store_slug,
+            source_page_url=origin.page_url,
+            store_slug=origin.store_slug,
         )
-        return scraped_item or ensured_origin, False
+        return scraped_item or origin.item, False
 
     scraped_item = api.upsert_scraped_item_variant(
-        origin_item_id=int(ensured_origin["id"]),
+        origin_item_id=origin.item_id,
         external_id=_build_variant_external_id(
-            ensured_origin,
+            origin,
             idx,
             analysis_data,
             scraped_metadata,
         ),
         name=analysis_data.get("name") or scraped_metadata.name or "product",
-        page_url=page_url,
-        store_slug=origin_store_slug,
+        page_url=origin.page_url,
+        store_slug=origin.store_slug,
         price=(
-            _to_float(origin_item.get("price"), default=0.0)
-            if origin_item.get("price") is not None
+            _to_float(origin.item.get("price"), default=0.0)
+            if origin.item.get("price") is not None
             else None
         ),
-        stock_status=origin_item.get("stockStatus"),
+        stock_status=origin.item.get("stockStatus"),
     )
     if not scraped_item:
-        raise RuntimeError("Failed to upsert scraped item variant")
+        message = "Failed to upsert scraped item variant"
+        raise RuntimeError(message)
     return scraped_item, True
 
 
 def _build_variant_external_id(
-    ensured_origin: dict,
+    origin: PublishOriginContext,
     idx: int,
     analysis_data: dict,
     scraped_metadata: RawScrapedData,
@@ -202,10 +241,98 @@ def _build_variant_external_id(
     """Build deterministic external id for one derived scraped variant."""
     base_name = analysis_data.get("name") or scraped_metadata.name or "product"
     variant_name = analysis_data.get("variant_name") or f"v{idx + 1}"
-    origin_external_id = str(ensured_origin.get("externalId") or "")
-    return (
-        f"{origin_external_id}::v{idx + 1}-{_slugify(base_name)}-{_slugify(variant_name)}"
-    )[:100]
+    origin_external_id = str(origin.item.get("externalId") or "")
+    external_id = (
+        f"{origin_external_id}::v{idx + 1}-"
+        f"{_slugify(base_name)}-{_slugify(variant_name)}"
+    )
+    return external_id[:100]
+
+
+def _build_skipped_linked_result(scraped_item: dict) -> dict:
+    """Build the synthetic result for an already linked scraped item."""
+    return {
+        "product": {"id": scraped_item.get("linkedProductId")},
+        "errors": [],
+        "skipped": True,
+    }
+
+
+def _should_skip_linked_item(scraped_item: dict) -> bool:
+    """Return whether one linked scraped item can be safely skipped."""
+    status_value = str(scraped_item.get("status") or "").lower()
+    product_store_id = scraped_item.get("productStoreId")
+    return status_value == "linked" and bool(product_store_id)
+
+
+def _build_upload_metadata(
+    *,
+    results: list[dict],
+    created_count: int,
+    page_id: int | None,
+    started: float,
+) -> dict:
+    """Build output metadata for the publish asset."""
+    return {
+        "items_uploaded": len(results),
+        "additional_scraped_items_created": created_count,
+        "page_id": page_id,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+
+
+def _publish_analysis_item(
+    *,
+    context: AssetExecutionContext,
+    api: PublishApi,
+    idx: int,
+    analysis_data: dict,
+    scraped_metadata: RawScrapedData,
+    origin: PublishOriginContext,
+) -> PublishItemResult:
+    """Publish one analyzed item and return result plus bookkeeping."""
+    scraped_item, variant_created = _resolve_scraped_item_for_analysis(
+        api,
+        idx,
+        analysis_data,
+        scraped_metadata,
+        origin,
+    )
+
+    if _should_skip_linked_item(scraped_item):
+        context.log.info(
+            "Skipping already linked item %s (%s)",
+            scraped_item["id"],
+            scraped_item.get("externalId"),
+        )
+        return PublishItemResult(
+            result=_build_skipped_linked_result(scraped_item),
+            variant_created=variant_created,
+        )
+
+    if str(scraped_item.get("status") or "").lower() == "linked":
+        context.log.warning(
+            "Item %s marked LINKED without product_store; reprocessing.",
+            scraped_item["id"],
+        )
+
+    payload = _build_product_payload(
+        analysis_data,
+        scraped_metadata,
+        origin.item,
+        scraped_item,
+        origin.page_url,
+        origin.store_slug,
+    )
+    context.log.info(
+        "Uploading product %s with origin item %s",
+        idx + 1,
+        scraped_item["id"],
+    )
+    return PublishItemResult(
+        result=api.create_product(payload) or {},
+        variant_created=variant_created,
+    )
 
 
 def _build_product_payload(
@@ -227,34 +354,62 @@ def _build_product_payload(
         "packaging": analysis_data.get("packaging") or "CONTAINER",
         "originScrapedItemId": int(scraped_item["id"]),
         "stores": [
-            {
-                "storeName": origin_store_slug,
-                "productLink": page_url,
-                "price": _to_float(
-                    scraped_metadata.price or origin_item.get("price") or 0.0,
-                ),
-                "externalId": scraped_item.get("externalId"),
-                "stockStatus": _to_graphql_stock_status(
-                    scraped_metadata.stock_status or origin_item.get("stockStatus"),
-                ),
-                "affiliateLink": "",
-            },
+            _build_product_store_payload(
+                scraped_metadata=scraped_metadata,
+                origin_item=origin_item,
+                scraped_item=scraped_item,
+                page_url=page_url,
+                origin_store_slug=origin_store_slug,
+            ),
         ],
         "nutrition": _build_nutrition_payload(analysis_data),
         "categoryPath": analysis_data.get("category_hierarchy") or [],
-        "tagPaths": [{"path": path} for path in tags_hierarchy if path],
+        "tagPaths": _build_tag_paths(tags_hierarchy),
         "tags": [],
         "isCombo": bool(analysis_data.get("is_combo")),
-        "components": [
-            {
-                "name": component.get("name"),
-                "quantity": _to_int(component.get("quantity"), default=1),
-                "weightHint": component.get("weight_hint"),
-                "packagingHint": component.get("packaging_hint"),
-            }
-            for component in (analysis_data.get("components") or [])
-            if component.get("name")
-        ],
+        "components": _build_component_payloads(analysis_data.get("components") or []),
         "nutrientClaims": analysis_data.get("nutrient_claims") or [],
         "isPublished": False,
     }
+
+
+def _build_product_store_payload(
+    *,
+    scraped_metadata: RawScrapedData,
+    origin_item: dict,
+    scraped_item: dict,
+    page_url: str,
+    origin_store_slug: str,
+) -> dict:
+    """Build the single-store payload for one published product."""
+    return {
+        "storeName": origin_store_slug,
+        "productLink": page_url,
+        "price": _to_float(
+            scraped_metadata.price or origin_item.get("price") or 0.0,
+        ),
+        "externalId": scraped_item.get("externalId"),
+        "stockStatus": _to_graphql_stock_status(
+            scraped_metadata.stock_status or origin_item.get("stockStatus"),
+        ),
+        "affiliateLink": "",
+    }
+
+
+def _build_tag_paths(tags_hierarchy: list[str]) -> list[dict]:
+    """Build tag-path payload entries from non-empty hierarchy values."""
+    return [{"path": path} for path in tags_hierarchy if path]
+
+
+def _build_component_payloads(components: list[dict]) -> list[dict]:
+    """Build component payload entries while filtering unnamed components."""
+    return [
+        {
+            "name": component.get("name"),
+            "quantity": _to_int(component.get("quantity"), default=1),
+            "weightHint": component.get("weight_hint"),
+            "packagingHint": component.get("packaging_hint"),
+        }
+        for component in components
+        if component.get("name")
+    ]

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from dagster import RunRequest, SkipReason, build_asset_context
 
+from agents.definitions import defs
 from agents.defs.assets import (
     ItemConfig,
     _is_potential_table_candidate,
@@ -14,6 +15,12 @@ from agents.defs.assets import (
     product_analysis,
     scraped_metadata,
     upload_to_api,
+)
+from agents.defs.pipeline import (
+    PROCESS_ITEM_JOB_NAME,
+    QueueWorkItem,
+    build_item_run_config,
+    build_item_run_request,
 )
 from agents.defs.sensors import work_queue_sensor
 from agents.schemas.analysis import ProductAnalysisList, ProductAnalysisResult
@@ -183,6 +190,10 @@ class _FakeClientResource:
 class TestDagsterSensor(TestCase):
     """Tests for work queue Dagster sensor logic."""
 
+    def test_definitions_validate_loadable(self):
+        """The Dagster code location remains structurally loadable."""
+        defs.validate_loadable()
+
     def test_sensor_skips_when_queue_empty(self):
         """Returns SkipReason when checkout has no pending item."""
         api = _FakeApiClient(work_payload=None)
@@ -211,6 +222,7 @@ class TestDagsterSensor(TestCase):
         self.assertEqual(len(results), 1)
         run = results[0]
         self.assertIsInstance(run, RunRequest)
+        self.assertEqual(run.run_key, "22")
         self.assertEqual(run.tags["item_id"], "22")
         ops = run.run_config["ops"]
         self.assertIn("downloaded_assets", ops)
@@ -221,6 +233,35 @@ class TestDagsterSensor(TestCase):
             ops["downloaded_assets"]["config"]["url"],
             "https://example.com/p",
         )
+
+
+class TestDagsterPipelineContract(TestCase):
+    """Tests for the shared Dagster pipeline contract."""
+
+    def test_build_item_run_request_uses_shared_job_payload(self):
+        """Run request is built from the normalized queue item contract."""
+        item = QueueWorkItem(
+            item_id=33,
+            url="https://example.com/item",
+            store_name="Example Store",
+            store_slug="example-store",
+        )
+
+        run_request = build_item_run_request(item)
+        run_config = build_item_run_config(item)
+
+        self.assertIsInstance(run_request, RunRequest)
+        self.assertEqual(run_request.run_key, "33")
+        self.assertEqual(run_request.tags["store"], "Example Store")
+        self.assertEqual(run_request.run_config, run_config)
+        self.assertEqual(
+            run_config["ops"]["downloaded_assets"]["config"]["store_slug"],
+            "example-store",
+        )
+
+    def test_process_item_job_name_stays_stable(self):
+        """Shared process item job name stays in one central location."""
+        self.assertEqual(PROCESS_ITEM_JOB_NAME, "process_item_job")
 
 
 class TestImageSelection(TestCase):
