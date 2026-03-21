@@ -1,30 +1,25 @@
 from unittest import TestCase
 
-from agents.acquisition.ingestion import (
+from agents.acquisition import (
+    SourcePageContext,
     build_download_result,
+    build_prepared_extraction_inputs,
+    extract_image_urls,
     get_item_or_raise,
+    load_scraper_context,
+    resolve_fallback_reason,
     resolve_source_page_context,
 )
-from agents.acquisition.metadata import build_metadata_extraction_context
-from agents.acquisition.prepared_inputs import (
-    load_scraper_context,
-    resolve_extraction_mode,
-)
-from agents.contracts.acquisition import MetadataExtractionContext, SourcePageContext
-from agents.contracts.publishing import PublishOriginContext
-from agents.extraction.context_utils import count_invalid_variant_tokens
-from agents.extraction.structured_analysis import (
+from agents.extraction import (
     StructuredAnalysisResult,
     VariantExtractionContext,
     build_analysis_metadata,
+    count_invalid_variant_tokens,
 )
-from agents.publishing.payload_utils import (
-    build_nutrition_payload,
-    slugify,
-    to_graphql_stock_status,
-)
-from agents.publishing.service import (
+from agents.publishing import (
+    PublishOriginContext,
     build_component_payloads,
+    build_nutrition_payload,
     build_product_store_payload,
     build_skipped_linked_result,
     build_tag_paths,
@@ -32,26 +27,9 @@ from agents.publishing.service import (
     build_variant_external_id,
     resolve_analysis_items,
     should_skip_linked_item,
+    slugify,
+    to_graphql_stock_status,
 )
-from agents.schemas.product import RawScrapedData
-
-
-class _FakeCandidateStorage:
-    """Small storage fake for prepared-input helper tests."""
-
-    def __init__(self, *, site_data: str | None = None):
-        self.site_data = site_data
-
-    def exists(self, bucket: str, key: str) -> bool:
-        if key == "site_data.json":
-            return self.site_data is not None
-        return False
-
-    def download(self, bucket: str, key: str) -> str:
-        if key != "site_data.json" or self.site_data is None:
-            message = "unexpected download"
-            raise AssertionError(message)
-        return self.site_data
 
 
 class TestAssetsHelpers(TestCase):
@@ -165,12 +143,11 @@ class TestIngestionHelpers(TestCase):
             source_page_content_type="HTML",
         )
 
-        result = build_download_result("55/source.html", page)
+        result = build_download_result(page)
 
         self.assertEqual(result["origin_item_id"], 1)
         self.assertEqual(result["page_id"], 55)
         self.assertEqual(result["url"], "https://example.com/p")
-        self.assertEqual(result["storage_path"], "55/source.html")
 
 
 class TestAnalysisHelpers(TestCase):
@@ -215,28 +192,8 @@ class TestAnalysisHelpers(TestCase):
         self.assertEqual(context.allowed_variants, {"chocolate", "vanilla"})
 
 
-class TestMetadataHelpers(TestCase):
-    """Tests for small metadata helper functions."""
-
-    def test_build_metadata_extraction_context_normalizes_downloaded_assets(self):
-        extraction = build_metadata_extraction_context(
-            {
-                "storage_path": "55/source.html",
-                "url": "https://example.com/p",
-                "store_slug": "demo-store",
-                "origin_item_id": "42",
-            },
-        )
-
-        self.assertEqual(
-            extraction,
-            MetadataExtractionContext(
-                storage_path="55/source.html",
-                page_url="https://example.com/p",
-                store_slug="demo-store",
-                origin_item_id=42,
-            ),
-        )
+class TestPreparedInputsHelpers(TestCase):
+    """Tests for deterministic preparation helpers."""
 
     def test_load_scraper_context_parses_json_payloads_only(self):
         context = load_scraper_context(
@@ -247,23 +204,52 @@ class TestMetadataHelpers(TestCase):
         )
         self.assertEqual(context, {"variants": ["Chocolate"]})
 
-    def test_resolve_extraction_mode_prefers_multimodal_when_images_exist(self):
-        mode, reason = resolve_extraction_mode([{"file": "image_1.jpg"}], ["1/a.jpg"])
-        self.assertEqual(mode, "multimodal")
+    def test_resolve_fallback_reason_is_empty_when_images_exist(self):
+        reason = resolve_fallback_reason(["https://cdn.example.com/a.jpg"])
         self.assertEqual(reason, "")
+
+    def test_extract_image_urls_reads_shopify_images(self):
+        image_urls = extract_image_urls(
+            {
+                "platform": "shopify",
+                "images": [{"src": "https://cdn.example.com/a.jpg", "alt": "front"}],
+            },
+        )
+
+        self.assertEqual(image_urls, ["https://cdn.example.com/a.jpg"])
+
+    def test_build_prepared_extraction_inputs_keeps_image_order_from_json(self):
+        prepared = build_prepared_extraction_inputs(
+            downloaded_assets={
+                "origin_item_id": 42,
+                "url": "https://example.com/p",
+                "source_page_raw_content": (
+                    '{"images":["https://cdn.example.com/1.jpg",'
+                    '"https://cdn.example.com/2.jpg"]}'
+                ),
+                "source_page_content_type": "JSON",
+            },
+        )
+
+        self.assertEqual(
+            prepared.image_urls,
+            [
+                "https://cdn.example.com/1.jpg",
+                "https://cdn.example.com/2.jpg",
+            ],
+        )
 
 
 class TestPublishHelpers(TestCase):
     """Tests for small publish helper functions."""
 
-    def test_resolve_analysis_items_falls_back_to_scraped_metadata_name(self):
+    def test_resolve_analysis_items_falls_back_to_origin_name(self):
         items = resolve_analysis_items(
             product_analysis={"items": []},
-            scraped_metadata=RawScrapedData(name="Fallback Product"),
             origin_item={"name": "Origin Product"},
         )
 
-        self.assertEqual(items, [{"name": "Fallback Product"}])
+        self.assertEqual(items, [{"name": "Origin Product"}])
 
     def test_should_skip_linked_item_only_when_product_store_exists(self):
         self.assertTrue(
@@ -294,14 +280,12 @@ class TestPublishHelpers(TestCase):
             origin,
             1,
             {"name": "Whey Protein", "variant_name": "Chocolate"},
-            RawScrapedData(name="Whey Protein"),
         )
         self.assertIn("origin-1::v2-", external_id)
         self.assertIn("whey-protein", external_id)
 
-    def test_build_product_store_payload_prefers_scraped_metadata(self):
+    def test_build_product_store_payload_uses_origin_item(self):
         payload = build_product_store_payload(
-            scraped_metadata=RawScrapedData(price=99.9, stock_status="A"),
             origin_item={"price": 88.0, "stockStatus": "LAST_UNITS"},
             scraped_item={"externalId": "ext-1"},
             page_url="https://example.com/p",
@@ -310,9 +294,9 @@ class TestPublishHelpers(TestCase):
 
         self.assertEqual(payload["storeName"], "demo-store")
         self.assertEqual(payload["productLink"], "https://example.com/p")
-        self.assertEqual(payload["price"], 99.9)
+        self.assertEqual(payload["price"], 88.0)
         self.assertEqual(payload["externalId"], "ext-1")
-        self.assertEqual(payload["stockStatus"], "AVAILABLE")
+        self.assertEqual(payload["stockStatus"], "LAST_UNITS")
 
     def test_build_tag_paths_filters_empty_values(self):
         payload = build_tag_paths(["protein/whey", "", None, "goal/gain-mass"])

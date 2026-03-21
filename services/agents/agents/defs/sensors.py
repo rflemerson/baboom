@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 from dagster import DefaultSensorStatus, RunRequest, SkipReason, sensor
 
-from ..pipeline import PROCESS_ITEM_JOB_NAME, QueueWorkItem, build_item_run_request
+from ..client import AgentClient
+from .pipeline import PROCESS_ITEM_JOB_NAME, QueueWorkItem, build_item_run_request
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from ..resources import AgentClientResource
 
 
 def _parse_work_item(work: dict[str, Any] | None) -> QueueWorkItem | None:
@@ -39,10 +38,9 @@ def _parse_work_item(work: dict[str, Any] | None) -> QueueWorkItem | None:
 )
 def work_queue_sensor(
     _context: object,
-    client: AgentClientResource,
 ) -> Iterator[RunRequest | SkipReason]:
     """Poll API for new items to process."""
-    api = client.get_client()
+    api = AgentClient()
     work = api.checkout_work()
     item = _parse_work_item(work)
     if not work:

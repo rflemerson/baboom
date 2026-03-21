@@ -5,28 +5,23 @@ from unittest.mock import patch
 
 from dagster import RunRequest, SkipReason, build_asset_context
 
+from agents.acquisition import PreparedExtractionInputs
 from agents.definitions import defs
 from agents.defs.assets import (
-    ItemConfig,
     downloaded_assets,
-    ocr_extraction,
     product_analysis,
-    scraped_metadata,
+    raw_extraction,
     upload_to_api,
 )
 from agents.defs.pipeline import (
     PROCESS_ITEM_JOB_NAME,
+    ItemConfig,
     QueueWorkItem,
     build_item_run_config,
     build_item_run_request,
 )
 from agents.defs.sensors import work_queue_sensor
-from agents.extraction.image_selection import (
-    is_potential_table_candidate,
-    select_images_for_ocr,
-)
-from agents.schemas.analysis import ProductAnalysisList, ProductAnalysisResult
-from agents.schemas.product import RawScrapedData
+from agents.schemas import ProductAnalysisList, ProductAnalysisResult
 
 
 class _FakeApiClient:
@@ -178,17 +173,6 @@ class _FakeApiClient:
         return existing
 
 
-class _FakeClientResource:
-    """Fake Dagster resource wrapper for AgentClientResource."""
-
-    def __init__(self, api):
-        self.api = api
-
-    def get_client(self):
-        """Return fake client."""
-        return self.api
-
-
 class TestDagsterSensor(TestCase):
     """Tests for work queue Dagster sensor logic."""
 
@@ -199,14 +183,16 @@ class TestDagsterSensor(TestCase):
     def test_sensor_skips_when_queue_empty(self):
         """Returns SkipReason when checkout has no pending item."""
         api = _FakeApiClient(work_payload=None)
-        results = list(work_queue_sensor(context=None, client=_FakeClientResource(api)))
+        with patch("agents.defs.sensors.AgentClient", return_value=api):
+            results = list(work_queue_sensor(context=None))
         self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0], SkipReason)
 
     def test_sensor_skips_when_item_has_no_url(self):
         """Returns SkipReason if item payload has no URL fields."""
         api = _FakeApiClient(work_payload={"id": 11})
-        results = list(work_queue_sensor(context=None, client=_FakeClientResource(api)))
+        with patch("agents.defs.sensors.AgentClient", return_value=api):
+            results = list(work_queue_sensor(context=None))
         self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0], SkipReason)
 
@@ -220,7 +206,8 @@ class TestDagsterSensor(TestCase):
                 "storeName": "Demo Store",
             },
         )
-        results = list(work_queue_sensor(context=None, client=_FakeClientResource(api)))
+        with patch("agents.defs.sensors.AgentClient", return_value=api):
+            results = list(work_queue_sensor(context=None))
         self.assertEqual(len(results), 1)
         run = results[0]
         self.assertIsInstance(run, RunRequest)
@@ -266,172 +253,6 @@ class TestDagsterPipelineContract(TestCase):
         self.assertEqual(PROCESS_ITEM_JOB_NAME, "process_item_job")
 
 
-class TestImageSelection(TestCase):
-    """Tests for OCR image selection strategy."""
-
-    @patch.dict(
-        "os.environ",
-        {
-            "OCR_MAX_IMAGES": "4",
-            "OCR_MAX_NUTRITION_IMAGES": "2",
-            "OCR_MAX_IMAGES_NO_NUTRITION": "6",
-        },
-        clear=False,
-    )
-    def test_selection_prioritizes_nutrition_and_completes_with_context(self):
-        """Keeps nutrition-like images first, then fills with highest score."""
-        candidates = [
-            {"file": "images/a.jpg", "score": 40, "nutrition_signal": 0},
-            {"file": "images/b.jpg", "score": 20, "nutrition_signal": 4},
-            {"file": "images/c.jpg", "score": 30, "nutrition_signal": 2},
-            {"file": "images/d.jpg", "score": 50, "nutrition_signal": 0},
-            {"file": "images/e.jpg", "score": 10, "nutrition_signal": 0},
-        ]
-        selected = select_images_for_ocr(candidates, "77")
-        self.assertEqual(len(selected), 4)
-        self.assertEqual(selected[0], "77/images/b.jpg")
-        self.assertEqual(selected[1], "77/images/c.jpg")
-        self.assertIn("77/images/d.jpg", selected)
-
-    @patch.dict(
-        "os.environ",
-        {
-            "OCR_MAX_IMAGES": "4",
-            "OCR_MAX_NUTRITION_IMAGES": "2",
-            "OCR_MAX_IMAGES_NO_NUTRITION": "6",
-        },
-        clear=False,
-    )
-    def test_selection_uses_fallback_limit_without_nutrition_signal(self):
-        """Uses broader fallback cap when no nutrition clue exists."""
-        candidates = [
-            {"file": f"images/{idx}.jpg", "score": 100 - idx, "nutrition_signal": 0}
-            for idx in range(8)
-        ]
-        selected = select_images_for_ocr(candidates, "88")
-        self.assertEqual(len(selected), 6)
-        self.assertEqual(selected[0], "88/images/0.jpg")
-
-    @patch.dict(
-        "os.environ",
-        {
-            "OCR_MAX_IMAGES": "4",
-            "OCR_MAX_NUTRITION_IMAGES": "10",
-            "OCR_MAX_IMAGES_NO_NUTRITION": "6",
-            "OCR_INCLUDE_ALL_TABLES": "0",
-        },
-        clear=False,
-    )
-    def test_selection_caps_nutrition_quota_to_total_limit(self):
-        """Never exceeds total limit even if nutrition quota is misconfigured."""
-        candidates = [
-            {"file": f"images/{idx}.jpg", "score": 100 - idx, "nutrition_signal": 3}
-            for idx in range(8)
-        ]
-        selected = select_images_for_ocr(candidates, "99")
-        self.assertEqual(len(selected), 4)
-
-    @patch.dict(
-        "os.environ",
-        {
-            "OCR_MAX_IMAGES": "4",
-            "OCR_MAX_NUTRITION_IMAGES": "10",
-            "OCR_MAX_IMAGES_NO_NUTRITION": "6",
-            "OCR_INCLUDE_ALL_TABLES": "1",
-        },
-        clear=False,
-    )
-    def test_selection_can_keep_all_table_candidates_in_high_recall_mode(self):
-        """High recall mode can exceed base cap to avoid losing nutrition tables."""
-        candidates = [
-            {"file": f"images/{idx}.jpg", "score": 100 - idx, "nutrition_signal": 3}
-            for idx in range(8)
-        ]
-        selected = select_images_for_ocr(candidates, "99")
-        self.assertGreaterEqual(len(selected), 8)
-
-    @patch.dict(
-        "os.environ",
-        {
-            "OCR_MAX_IMAGES": "6",
-            "OCR_MAX_NUTRITION_IMAGES": "6",
-            "OCR_MAX_IMAGES_NO_NUTRITION": "6",
-        },
-        clear=False,
-    )
-    def test_selection_filters_mixed_catalog_by_target_product(self):
-        """Keeps OCR focused on target product when page has related products."""
-        candidates = [
-            {
-                "file": "images/whey.jpg",
-                "score": 50,
-                "nutrition_signal": 2,
-                "url": "https://cdn/x/whey.jpg",
-                "metadata": {"alt": "Whey Protein 1kg Soldiers Nutrition"},
-            },
-            {
-                "file": "images/elite-1.jpg",
-                "score": 30,
-                "nutrition_signal": 2,
-                "url": "https://cdn/x/elitebar-chocolate.jpg",
-                "metadata": {"alt": "Elitebar 30g Protein Bar"},
-            },
-            {
-                "file": "images/elite-2.jpg",
-                "score": 25,
-                "nutrition_signal": 2,
-                "url": "https://cdn/x/elitebar-cookies.jpg",
-                "metadata": {"alt": "Elitebar 30g Protein Bar"},
-            },
-        ]
-        selected = select_images_for_ocr(
-            candidates,
-            "9002",
-            product_name="Elitebar 30g Protein Bar",
-            page_url="https://soldiersnutrition.com.br/products/elitebar-30g-barra-de-proteina-soldiers-nutrition",
-        )
-        self.assertEqual(
-            selected,
-            ["9002/images/elite-1.jpg", "9002/images/elite-2.jpg"],
-        )
-
-    @patch.dict(
-        "os.environ",
-        {
-            "OCR_MAX_IMAGES": "4",
-            "OCR_MAX_NUTRITION_IMAGES": "4",
-            "OCR_MAX_IMAGES_NO_NUTRITION": "4",
-        },
-        clear=False,
-    )
-    def test_selection_fallbacks_when_no_product_match_exists(self):
-        """Falls back to score-based selection if no product token matches."""
-        candidates = [
-            {"file": "images/a.jpg", "score": 20, "nutrition_signal": 1},
-            {"file": "images/b.jpg", "score": 10, "nutrition_signal": 1},
-        ]
-        selected = select_images_for_ocr(
-            candidates,
-            "12",
-            product_name="Missing Product",
-            page_url="https://example.com/products/missing-product",
-        )
-        self.assertEqual(selected, ["12/images/a.jpg", "12/images/b.jpg"])
-
-    @patch.dict("os.environ", {"OCR_CV_TABLE_THRESHOLD": "0.2"}, clear=False)
-    def test_potential_table_candidate_accepts_high_cv_score(self):
-        """Accepts table candidate using CV score even without keyword hints."""
-        candidate = {
-            "file": "images/cv.jpg",
-            "score": 2,
-            "nutrition_signal": 0,
-            "cv_table_score": 0.9,
-            "metadata": {"alt": "product image"},
-            "url": "https://cdn/x/image.jpg",
-        }
-        self.assertTrue(is_potential_table_candidate(candidate))
-
-
 class TestUploadToApiErrorHandling(TestCase):
     """Tests for upload asset error reporting behavior."""
 
@@ -452,7 +273,10 @@ class TestUploadToApiErrorHandling(TestCase):
             },
         )
 
-        with self.assertRaises(RuntimeError):
+        with (
+            self.assertRaises(RuntimeError),
+            patch("agents.defs.assets.AgentClient", return_value=api),
+        ):
             _ = upload_to_api(
                 context=build_asset_context(),
                 config=ItemConfig(
@@ -460,95 +284,16 @@ class TestUploadToApiErrorHandling(TestCase):
                     url="https://example.com/product",
                     store_slug="demo-store",
                 ),
-                client=_FakeClientResource(api),
                 product_analysis={
                     "items": [{"name": "Demo Product", "packaging": "CONTAINER"}],
                 },
-                scraped_metadata=RawScrapedData(
-                    name="Demo Product",
-                    brand_name="Demo Brand",
-                    description="Description",
-                    price=99.9,
-                    stock_status="A",
-                ),
+                downloaded_assets={"origin_item_id": 101},
             )
 
         self.assertEqual(len(api.report_error_calls), 1)
         reported_item_id, _message, is_fatal = api.report_error_calls[0]
         self.assertEqual(reported_item_id, 101)
         self.assertFalse(is_fatal)
-
-
-class _FakeScraperService:
-    """Test double for scraper resource methods."""
-
-    def __init__(self):
-        self.extract_metadata_result: dict = {"opengraph": []}
-        self.consolidate_result = RawScrapedData(name="N", brand_name="B")
-        self.extract_raises: Exception | None = None
-        self.download_assets_calls: list[tuple[int, str]] = []
-        self.materialize_calls: list[tuple[str, str]] = []
-
-    def download_assets(self, item_id: int, url: str):
-        """Track download call and return storage path."""
-        self.download_assets_calls.append((item_id, url))
-        return f"{item_id}/source.html"
-
-    def extract_metadata(self, _storage_path: str, _url: str):
-        """Return metadata or raise configured exception."""
-        if self.extract_raises:
-            raise self.extract_raises
-        return self.extract_metadata_result
-
-    def materialize_candidates(self, bucket: str, page_url: str):
-        """Track candidate materialization requests."""
-        self.materialize_calls.append((bucket, page_url))
-        return []
-
-    def consolidate(self, _meta: dict, brand_name_override: str):
-        """Return configured consolidated structure."""
-        return RawScrapedData(
-            name=self.consolidate_result.name,
-            brand_name=brand_name_override,
-            description=self.consolidate_result.description,
-        )
-
-
-class _FakeScraperResource:
-    """Resource wrapper returning fake scraper service."""
-
-    def __init__(self, service):
-        self.service = service
-
-    def get_service(self):
-        """Return fake service."""
-        return self.service
-
-
-class _FakeStorage:
-    """Storage test double for OCR asset."""
-
-    def __init__(self, data: dict[str, bytes]):
-        self.data = data
-
-    def exists(self, bucket: str, key: str) -> bool:
-        """Check if key exists in fake storage map."""
-        return f"{bucket}/{key}" in self.data
-
-    def download(self, bucket: str, key: str):
-        """Download bytes from fake storage map."""
-        return self.data[f"{bucket}/{key}"]
-
-
-class _FakeStorageResource:
-    """Resource wrapper returning fake storage."""
-
-    def __init__(self, storage):
-        self.storage = storage
-
-    def get_storage(self):
-        """Return fake storage."""
-        return self.storage
 
 
 class TestDagsterAssetsFlow(TestCase):
@@ -567,132 +312,108 @@ class TestDagsterAssetsFlow(TestCase):
                 "status": "new",
             },
         )
-        scraper = _FakeScraperService()
-        result = downloaded_assets(
-            context=build_asset_context(),
-            config=ItemConfig(
-                item_id=1,
-                url="https://example.com/p1",
-                store_slug="demo-store",
-            ),
-            scraper=_FakeScraperResource(scraper),
-            client=_FakeClientResource(api),
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = downloaded_assets(
+                context=build_asset_context(),
+                config=ItemConfig(
+                    item_id=1,
+                    url="https://example.com/p1",
+                    store_slug="demo-store",
+                ),
+            )
 
         seeded = api.get_scraped_item(1)
         self.assertIsNotNone(seeded["sourcePageId"])
         self.assertEqual(result["origin_item_id"], 1)
-        self.assertEqual(
-            result["storage_path"],
-            f"{seeded['sourcePageId']}/source.html",
+        self.assertEqual(result["page_id"], seeded["sourcePageId"])
+
+    @patch(
+        "agents.defs.assets.run_raw_extraction_step",
+        return_value=("RAW-TEXT", {"images_used": 2}),
+    )
+    def test_raw_extraction_uses_candidates_manifest(self, mock_raw):
+        """Selects image URLs from scraper context and forwards them to raw extraction."""
+        prepared = PreparedExtractionInputs(
+            origin_item_id=1,
+            page_url="https://x",
+            scraper_context={
+                "platform": "shopify",
+                "variants": [{"title": "Chocolate"}],
+            },
+            image_urls=[
+                "https://cdn.example.com/a.jpg",
+                "https://cdn.example.com/b.jpg",
+            ],
+            fallback_reason="",
         )
-
-    def test_scraped_metadata_reports_error_on_extraction_failure(self):
-        """Reports queue error when metadata extraction fails."""
-        api = _FakeApiClient()
-        scraper = _FakeScraperService()
-        scraper.extract_raises = RuntimeError("meta failed")
-
-        with self.assertRaisesRegex(RuntimeError, "meta failed"):
-            scraped_metadata(
+        with patch(
+            "agents.defs.assets.AgentClient",
+            return_value=_FakeApiClient(),
+        ):
+            result = raw_extraction(
                 context=build_asset_context(),
-                scraper=_FakeScraperResource(scraper),
-                client=_FakeClientResource(api),
-                downloaded_assets={
-                    "storage_path": "10/source.html",
-                    "url": "https://example.com/p",
-                    "store_slug": "demo-store",
-                    "origin_item_id": 10,
-                },
+                prepared_extraction_inputs=prepared,
             )
-
-        self.assertEqual(len(api.report_error_calls), 1)
-        self.assertEqual(api.report_error_calls[0][0], 10)
-
-    @patch("agents.defs.assets.ocr.run_raw_extraction", return_value="RAW-TEXT")
-    def test_ocr_extraction_uses_candidates_manifest(self, mock_raw):
-        """Selects image paths from candidates and forwards them to raw extraction."""
-        candidates = (
-            b'[{"file":"images/a.jpg","score":10,"nutrition_signal":3,"metadata":{"alt":"Nutrition table flavor chocolate"}},'
-            b' {"file":"images/b.jpg","score":8,"nutrition_signal":0,"metadata":{"alt":"Product flavor chocolate"}}]'
-        )
-        storage = _FakeStorage(
-            {
-                "15/candidates.json": candidates,
-                "15/site_data.json": b'{"page_url":"https://x","extracted":{"json-ld":[]}}',
-            },
-        )
-        result = ocr_extraction(
-            context=build_asset_context(),
-            scraper=_FakeScraperResource(_FakeScraperService()),
-            storage=_FakeStorageResource(storage),
-            client=_FakeClientResource(_FakeApiClient()),
-            scraped_metadata=RawScrapedData(
-                name="Product",
-                brand_name="Brand",
-                description="Desc",
-            ),
-            downloaded_assets={
-                "origin_item_id": 1,
-                "url": "https://x",
-                "storage_path": "15/source.html",
-                "source_page_raw_content": '{"platform":"shopify","variants":[{"title":"Chocolate"}]}',
-                "source_page_content_type": "JSON",
-            },
-        )
 
         self.assertEqual(result, "RAW-TEXT")
         call_kwargs = mock_raw.call_args.kwargs
-        self.assertEqual(call_kwargs["name"], "Product")
-        self.assertEqual(len(call_kwargs["image_paths"]), 2)
-        self.assertEqual(call_kwargs["image_paths"][0], "15/images/a.jpg")
-        self.assertIn("[IMAGE_SEQUENCE_CONTEXT]", call_kwargs["description"])
-        self.assertIn("[SITE_DATA]", call_kwargs["description"])
-        self.assertIn("[SCRAPER_CONTEXT]", call_kwargs["description"])
-        self.assertIn("kind=NUTRITION_TABLE", call_kwargs["description"])
-        self.assertIn("kind=PRODUCT_IMAGE", call_kwargs["description"])
-
-    @patch("agents.defs.assets.ocr.run_raw_extraction", return_value="RAW-TEXT")
-    def test_ocr_extraction_falls_back_to_text_only_when_no_candidates(self, mock_raw):
-        """Falls back to text-only extraction when no candidates are available."""
-        result = ocr_extraction(
-            context=build_asset_context(),
-            scraper=_FakeScraperResource(_FakeScraperService()),
-            storage=_FakeStorageResource(_FakeStorage({})),
-            client=_FakeClientResource(_FakeApiClient()),
-            scraped_metadata=RawScrapedData(
-                name="Product",
-                brand_name="Brand",
-                description="Desc",
-            ),
-            downloaded_assets={
-                "origin_item_id": 1,
-                "url": "https://x",
-                "storage_path": "15/source.html",
-            },
+        forwarded_inputs = call_kwargs["prepared_inputs"]
+        self.assertEqual(forwarded_inputs.page_url, "https://x")
+        self.assertEqual(len(forwarded_inputs.image_urls), 2)
+        self.assertEqual(
+            forwarded_inputs.image_urls[0],
+            "https://cdn.example.com/a.jpg",
+        )
+        self.assertEqual(
+            forwarded_inputs.scraper_context,
+            {"platform": "shopify", "variants": [{"title": "Chocolate"}]},
         )
 
-        self.assertEqual(result, "RAW-TEXT")
-        self.assertEqual(mock_raw.call_args.kwargs["image_paths"], [])
+    @patch(
+        "agents.defs.assets.run_raw_extraction_step",
+        return_value=("RAW-TEXT", {"images_used": 0}),
+    )
+    def test_raw_extraction_falls_back_to_text_only_when_no_candidates(self, mock_raw):
+        """Falls back to text-only extraction when no candidates are available."""
+        prepared = PreparedExtractionInputs(
+            origin_item_id=1,
+            page_url="https://x",
+            scraper_context=None,
+            image_urls=[],
+            fallback_reason="no_images_available",
+        )
+        with patch(
+            "agents.defs.assets.AgentClient",
+            return_value=_FakeApiClient(),
+        ):
+            result = raw_extraction(
+                context=build_asset_context(),
+                prepared_extraction_inputs=prepared,
+            )
 
-    @patch("agents.defs.assets.analysis.run_structured_extraction")
+        self.assertEqual(result, "RAW-TEXT")
+        self.assertEqual(mock_raw.call_args.kwargs["prepared_inputs"].image_urls, [])
+
+    @patch("agents.defs.assets.run_structured_extraction")
     def test_product_analysis_reports_error_on_failure(self, mock_structured):
         """Reports queue error when structured extraction raises."""
         mock_structured.side_effect = RuntimeError("structured failed")
         api = _FakeApiClient()
 
-        with self.assertRaisesRegex(RuntimeError, "structured failed"):
+        with (
+            self.assertRaisesRegex(RuntimeError, "structured failed"),
+            patch("agents.defs.assets.AgentClient", return_value=api),
+        ):
             product_analysis(
                 context=build_asset_context(),
                 config=ItemConfig(item_id=99, url="https://x", store_slug="demo"),
-                client=_FakeClientResource(api),
-                ocr_extraction="RAW",
+                raw_extraction="RAW",
             )
 
         self.assertEqual(len(api.report_error_calls), 1)
         self.assertEqual(api.report_error_calls[0][0], 99)
 
-    @patch("agents.defs.assets.analysis.run_structured_extraction")
+    @patch("agents.defs.assets.run_structured_extraction")
     def test_product_analysis_retries_when_raw_has_more_variants(self, mock_structured):
         """Retries structured extraction when OCR indicates more variants than output."""
         mock_structured.side_effect = [
@@ -726,18 +447,18 @@ class TestDagsterAssetsFlow(TestCase):
         api = _FakeApiClient()
         raw_text = "### 4. AVAILABLE FLAVORS\n- Peanut\n- Cookies & Cream\n- Coco\n"
 
-        result = product_analysis(
-            context=build_asset_context(),
-            config=ItemConfig(item_id=91, url="https://x", store_slug="demo"),
-            client=_FakeClientResource(api),
-            ocr_extraction=raw_text,
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = product_analysis(
+                context=build_asset_context(),
+                config=ItemConfig(item_id=91, url="https://x", store_slug="demo"),
+                raw_extraction=raw_text,
+            )
 
         self.assertEqual(mock_structured.call_count, 2)
         self.assertEqual(len(result["items"]), 2)
         self.assertEqual(result["items"][1]["variant_name"], "Cookies & Cream")
 
-    @patch("agents.defs.assets.analysis.run_structured_extraction")
+    @patch("agents.defs.assets.run_structured_extraction")
     def test_product_analysis_skips_retry_when_consistent(self, mock_structured):
         """Keeps single structured call when variant count is already consistent."""
         mock_structured.return_value = ProductAnalysisList(
@@ -759,17 +480,17 @@ class TestDagsterAssetsFlow(TestCase):
         api = _FakeApiClient()
         raw_text = "### 4. AVAILABLE FLAVORS\n- Chocolate\n- Vanilla\n"
 
-        result = product_analysis(
-            context=build_asset_context(),
-            config=ItemConfig(item_id=92, url="https://x", store_slug="demo"),
-            client=_FakeClientResource(api),
-            ocr_extraction=raw_text,
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = product_analysis(
+                context=build_asset_context(),
+                config=ItemConfig(item_id=92, url="https://x", store_slug="demo"),
+                raw_extraction=raw_text,
+            )
 
         self.assertEqual(mock_structured.call_count, 1)
         self.assertEqual(len(result["items"]), 2)
 
-    @patch("agents.defs.assets.analysis.run_structured_extraction")
+    @patch("agents.defs.assets.run_structured_extraction")
     def test_product_analysis_retries_when_flavor_outside_context(
         self,
         mock_structured,
@@ -804,12 +525,12 @@ class TestDagsterAssetsFlow(TestCase):
             "[/SCRAPER_CONTEXT]"
         )
 
-        result = product_analysis(
-            context=build_asset_context(),
-            config=ItemConfig(item_id=94, url="https://x", store_slug="demo"),
-            client=_FakeClientResource(api),
-            ocr_extraction=raw_text,
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = product_analysis(
+                context=build_asset_context(),
+                config=ItemConfig(item_id=94, url="https://x", store_slug="demo"),
+                raw_extraction=raw_text,
+            )
 
         self.assertEqual(mock_structured.call_count, 2)
         self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
@@ -818,7 +539,7 @@ class TestDagsterAssetsFlow(TestCase):
             mock_structured.call_args_list[1].kwargs["prompt"],
         )
 
-    @patch("agents.defs.assets.analysis.run_structured_extraction")
+    @patch("agents.defs.assets.run_structured_extraction")
     def test_product_analysis_retries_when_variant_outside_scraper_context(
         self,
         mock_structured,
@@ -853,12 +574,12 @@ class TestDagsterAssetsFlow(TestCase):
             "[/SCRAPER_CONTEXT]"
         )
 
-        result = product_analysis(
-            context=build_asset_context(),
-            config=ItemConfig(item_id=95, url="https://x", store_slug="demo"),
-            client=_FakeClientResource(api),
-            ocr_extraction=raw_text,
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = product_analysis(
+                context=build_asset_context(),
+                config=ItemConfig(item_id=95, url="https://x", store_slug="demo"),
+                raw_extraction=raw_text,
+            )
 
         self.assertEqual(mock_structured.call_count, 2)
         self.assertEqual(result["items"][0]["variant_name"], "Chocolate")
@@ -884,32 +605,26 @@ class TestDagsterAssetsFlow(TestCase):
             },
         )
 
-        result = upload_to_api(
-            context=build_asset_context(),
-            config=ItemConfig(
-                item_id=201,
-                url="https://example.com/product",
-                store_slug="demo-store",
-            ),
-            client=_FakeClientResource(api),
-            product_analysis={
-                "items": [
-                    {"name": "Base Product", "packaging": "CONTAINER"},
-                    {
-                        "name": "Base Product",
-                        "variant_name": "Chocolate",
-                        "packaging": "CONTAINER",
-                    },
-                ],
-            },
-            scraped_metadata=RawScrapedData(
-                name="Base Product",
-                brand_name="Brand",
-                description="Desc",
-                price=90,
-                stock_status="A",
-            ),
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = upload_to_api(
+                context=build_asset_context(),
+                config=ItemConfig(
+                    item_id=201,
+                    url="https://example.com/product",
+                    store_slug="demo-store",
+                ),
+                product_analysis={
+                    "items": [
+                        {"name": "Base Product", "packaging": "CONTAINER"},
+                        {
+                            "name": "Base Product",
+                            "variant_name": "Chocolate",
+                            "packaging": "CONTAINER",
+                        },
+                    ],
+                },
+                downloaded_assets={"origin_item_id": 201},
+            )
 
         self.assertEqual(len(result), 2)
         self.assertEqual(len(api.create_calls), 2)
@@ -936,23 +651,19 @@ class TestDagsterAssetsFlow(TestCase):
             },
         )
 
-        result = upload_to_api(
-            context=build_asset_context(),
-            config=ItemConfig(
-                item_id=301,
-                url="https://example.com/already-linked",
-                store_slug="demo-store",
-            ),
-            client=_FakeClientResource(api),
-            product_analysis={"items": [{"name": "Linked", "packaging": "CONTAINER"}]},
-            scraped_metadata=RawScrapedData(
-                name="Linked",
-                brand_name="Brand",
-                description="Desc",
-                price=90,
-                stock_status="A",
-            ),
-        )
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = upload_to_api(
+                context=build_asset_context(),
+                config=ItemConfig(
+                    item_id=301,
+                    url="https://example.com/already-linked",
+                    store_slug="demo-store",
+                ),
+                product_analysis={
+                    "items": [{"name": "Linked", "packaging": "CONTAINER"}],
+                },
+                downloaded_assets={"origin_item_id": 301},
+            )
 
         self.assertEqual(len(api.create_calls), 0)
         self.assertTrue(result[0]["skipped"])
@@ -974,46 +685,42 @@ class TestDagsterAssetsFlow(TestCase):
             },
         )
 
-        _ = upload_to_api(
-            context=build_asset_context(),
-            config=ItemConfig(
-                item_id=401,
-                url="https://example.com/product-numeric",
-                store_slug="demo-store",
-            ),
-            client=_FakeClientResource(api),
-            product_analysis={
-                "items": [
-                    {
-                        "name": "Numeric Product",
-                        "packaging": "CONTAINER",
-                        "weight_grams": "900g",
-                        "components": [{"name": "Dose", "quantity": "2 units"}],
-                        "nutrition_facts": {
-                            "serving_size_grams": "30g",
-                            "energy_kcal": "120 kcal",
-                            "proteins": "24g",
-                            "carbohydrates": "3g",
-                            "total_sugars": "1,5g",
-                            "added_sugars": "0g",
-                            "total_fats": "2g",
-                            "saturated_fats": "0.5g",
-                            "trans_fats": "0g",
-                            "dietary_fiber": "1g",
-                            "sodium": "150mg",
-                            "micronutrients": [{"name": "Vitamin C", "value": "45mg"}],
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            _ = upload_to_api(
+                context=build_asset_context(),
+                config=ItemConfig(
+                    item_id=401,
+                    url="https://example.com/product-numeric",
+                    store_slug="demo-store",
+                ),
+                product_analysis={
+                    "items": [
+                        {
+                            "name": "Numeric Product",
+                            "packaging": "CONTAINER",
+                            "weight_grams": "900g",
+                            "components": [{"name": "Dose", "quantity": "2 units"}],
+                            "nutrition_facts": {
+                                "serving_size_grams": "30g",
+                                "energy_kcal": "120 kcal",
+                                "proteins": "24g",
+                                "carbohydrates": "3g",
+                                "total_sugars": "1,5g",
+                                "added_sugars": "0g",
+                                "total_fats": "2g",
+                                "saturated_fats": "0.5g",
+                                "trans_fats": "0g",
+                                "dietary_fiber": "1g",
+                                "sodium": "150mg",
+                                "micronutrients": [
+                                    {"name": "Vitamin C", "value": "45mg"},
+                                ],
+                            },
                         },
-                    },
-                ],
-            },
-            scraped_metadata=RawScrapedData(
-                name="Numeric Product",
-                brand_name="Brand",
-                description="Desc",
-                price=99.9,
-                stock_status="A",
-            ),
-        )
+                    ],
+                },
+                downloaded_assets={"origin_item_id": 401},
+            )
 
         self.assertTrue(api.create_calls)
         payload = api.create_calls[0]

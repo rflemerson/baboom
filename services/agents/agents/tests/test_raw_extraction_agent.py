@@ -1,95 +1,49 @@
 """Tests for raw extraction agent behavior."""
 
 from unittest import TestCase
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
-from agents.brain.raw_extraction_agent import (
-    _get_default_prompt,
-    run_raw_extraction,
-)
-
-
-class _FakeStorage:
-    """Simple storage double for raw extraction tests."""
-
-    def __init__(self, files: dict[str, bytes]):
-        self.files = files
-
-    def exists(self, bucket: str, key: str) -> bool:
-        """Return if key exists in fake storage."""
-        return f"{bucket}/{key}" in self.files
-
-    def download(self, bucket: str, key: str) -> bytes:
-        """Download bytes for key."""
-        return self.files[f"{bucket}/{key}"]
+from agents.brain import run_raw_extraction
 
 
 class TestRawExtractionAgent(TestCase):
     """Tests for multimodal raw extraction helper."""
 
-    @patch("agents.brain.raw_extraction_agent.os.path.exists", return_value=False)
-    def test_default_prompt_fallback(self, _mock_exists):
-        """Uses fallback prompt when prompt file does not exist."""
-        prompt = _get_default_prompt()
-        self.assertEqual(prompt, "Extract product data from images and text.")
-
-    @patch("agents.brain.raw_extraction_agent.os.path.exists", return_value=True)
-    @patch(
-        "agents.brain.raw_extraction_agent.open",
-        new_callable=mock_open,
-        read_data="PROMPT",
-    )
-    def test_default_prompt_from_file(self, _mock_open, _mock_exists):
-        """Loads prompt from markdown file when present."""
-        prompt = _get_default_prompt()
-        self.assertEqual(prompt, "PROMPT")
-
-    @patch("agents.brain.raw_extraction_agent.get_model", return_value="model")
-    @patch("agents.brain.raw_extraction_agent.Agent")
-    @patch("agents.brain.raw_extraction_agent.get_storage")
+    @patch("agents.brain.requests.get")
+    @patch("agents.brain.Agent")
     def test_run_raw_extraction_uses_supported_images(
         self,
-        mock_get_storage,
         mock_agent_cls,
-        _mock_get_model,
+        mock_get,
     ):
         """Sends prompt text plus only supported image formats to agent."""
-        storage = _FakeStorage(
-            {
-                "1/images/a.jpg": b"img-a",
-                "1/images/b.gif": b"img-b",
-            }
-        )
-        mock_get_storage.return_value = storage
-
         agent = MagicMock()
-        agent.run_sync.return_value = type("R", (), {"data": "RAW"})()
+        agent.run_sync.return_value = type("R", (), {"output": "RAW"})()
         mock_agent_cls.return_value = agent
+        mock_get.side_effect = [
+            MagicMock(content=b"img-a", raise_for_status=MagicMock()),
+            MagicMock(content=b"img-b", raise_for_status=MagicMock()),
+        ]
 
         result = run_raw_extraction(
             name="Product",
             description="Description",
-            image_paths=["1/images/a.jpg", "1/images/b.gif"],
+            image_urls=[
+                "https://cdn.example.com/a.jpg",
+                "https://cdn.example.com/b.gif",
+            ],
             prompt="PROMPT",
             model_name="google-gla:gemini",
         )
 
         self.assertEqual(result, "RAW")
+        self.assertEqual(mock_agent_cls.call_args.args[0], "google-gla:gemini")
         call_args = agent.run_sync.call_args.args[0]
         self.assertEqual(len(call_args), 2)  # text + one supported image
 
-    @patch("agents.brain.raw_extraction_agent.get_model", return_value="model")
-    @patch("agents.brain.raw_extraction_agent.Agent")
-    @patch("agents.brain.raw_extraction_agent.get_storage")
-    def test_run_raw_extraction_returns_output_fallback(
-        self,
-        mock_get_storage,
-        mock_agent_cls,
-        _mock_get_model,
-    ):
-        """Returns .output when .data attribute is not present."""
-        mock_get_storage.return_value = _FakeStorage({})
-
+    @patch("agents.brain.Agent")
+    def test_run_raw_extraction_returns_output(self, mock_agent_cls):
+        """Returns the Agent output string."""
         agent = MagicMock()
         agent.run_sync.return_value = type("R", (), {"output": "RAW-OUT"})()
         mock_agent_cls.return_value = agent
@@ -97,24 +51,62 @@ class TestRawExtractionAgent(TestCase):
         result = run_raw_extraction(
             name="Product",
             description="",
-            image_paths=[],
+            image_urls=[],
+            prompt="PROMPT",
+            model_name="openai:gpt-5.2",
         )
         self.assertEqual(result, "RAW-OUT")
 
-    @patch("agents.brain.raw_extraction_agent.get_model", return_value="model")
-    @patch("agents.brain.raw_extraction_agent.Agent")
-    @patch("agents.brain.raw_extraction_agent.get_storage")
-    def test_run_raw_extraction_raises_on_agent_error(
-        self,
-        mock_get_storage,
-        mock_agent_cls,
-        _mock_get_model,
-    ):
+    @patch("agents.brain.Agent")
+    def test_run_raw_extraction_raises_on_agent_error(self, mock_agent_cls):
         """Re-raises exceptions from Agent execution."""
-        mock_get_storage.return_value = _FakeStorage({})
         agent = MagicMock()
         agent.run_sync.side_effect = RuntimeError("boom")
         mock_agent_cls.return_value = agent
 
         with self.assertRaisesRegex(RuntimeError, "boom"):
-            run_raw_extraction(name="Product", description="", image_paths=[])
+            run_raw_extraction(
+                name="Product",
+                description="",
+                image_urls=[],
+                prompt="PROMPT",
+                model_name="openai:gpt-5.2",
+            )
+
+    @patch.dict("os.environ", {"LLM_MODEL": "google-gla:gemini-3-flash-preview"})
+    @patch("agents.brain.Agent")
+    def test_run_raw_extraction_uses_env_model_when_argument_missing(
+        self,
+        mock_agent_cls,
+    ):
+        """Uses LLM_MODEL when caller does not pass a model id."""
+        agent = MagicMock()
+        agent.run_sync.return_value = type("R", (), {"output": "RAW"})()
+        mock_agent_cls.return_value = agent
+
+        result = run_raw_extraction(
+            name="Product",
+            description="",
+            image_urls=[],
+            prompt="PROMPT",
+        )
+
+        self.assertEqual(result, "RAW")
+        self.assertEqual(
+            mock_agent_cls.call_args.args[0],
+            "google-gla:gemini-3-flash-preview",
+        )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_run_raw_extraction_raises_without_argument_or_env(self):
+        """Fails fast when no model id is configured anywhere."""
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "LLM_MODEL must be set or passed explicitly",
+        ):
+            run_raw_extraction(
+                name="Product",
+                description="",
+                image_urls=[],
+                prompt="PROMPT",
+            )

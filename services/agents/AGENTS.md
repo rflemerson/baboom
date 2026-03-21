@@ -11,13 +11,11 @@ Treat this file as the target shape for future refactors.
 
 - Package entrypoint: `agents/definitions.py`
 - Dagster-facing modules: `agents/defs/**`
-- Shared contracts: `agents/contracts/**`
-- Deterministic acquisition logic: `agents/acquisition/**`
-- Non-deterministic extraction logic: `agents/extraction/**`
-- Agent/model wrappers: `agents/brain/**`
-- API publishing logic: `agents/publishing/**`
-- Shared non-Dagster support logic: `agents/tools/**`, `agents/schemas/**`,
-  `agents/storage/**`
+- Deterministic acquisition logic: `agents/acquisition.py`
+- Non-deterministic extraction logic: `agents/extraction.py`
+- Agent/model wrappers: `agents/brain.py`
+- API publishing logic: `agents/publishing.py`
+- Shared non-Dagster support logic: `agents/schemas.py`
 
 ## Official references
 
@@ -46,34 +44,29 @@ Treat this file as the target shape for future refactors.
 ```text
 agents/
   definitions.py
-  contracts/
   defs/
-    assets/
-    resources/
-    sensors/
-    jobs/
-  acquisition/
-  extraction/
-  publishing/
-  brain/
+    assets.py
+    pipeline.py
+    sensors.py
+  acquisition.py
+  extraction.py
+  publishing.py
   prompts/
-  schemas/
-  storage/
-  tools/
+  schemas.py
   tests/
 ```
 
 Notes:
 
 - `defs/` is for Dagster-facing objects only.
-- `contracts/` defines the value objects passed between stages.
-- `acquisition/` owns deterministic source preparation up to prepared OCR
-  inputs.
-- `extraction/` owns the non-deterministic OCR and structured-analysis flow.
-- `publishing/` owns API synchronization after analysis is finalized.
-- `brain/` is limited to agent/model wrappers and prompt-loading glue.
-- `brain/`, `tools/`, `schemas/`, and `storage/` should remain importable and
-  testable outside Dagster.
+- `acquisition.py` owns deterministic source preparation up to prepared OCR
+  inputs, using API-provided scraper context instead of re-scraping HTML.
+- `extraction.py` owns the non-deterministic OCR and structured-analysis flow.
+- `publishing.py` owns API synchronization after analysis is finalized.
+- `brain.py` is limited to agent/model wrappers only.
+- `extraction.py` owns loading prompt files from `agents/prompts/`.
+- `brain.py` and `schemas.py` should remain importable and testable outside
+  Dagster.
 - We do not need to mimic the quickstart repo literally; we only want its good
   defaults: a thin entrypoint and a loadable package layout.
 
@@ -176,8 +169,6 @@ The intended step shape here is now:
 Resources should represent external systems, for example:
 
 - API client
-- scraper service
-- storage backend
 
 Resources should be:
 
@@ -188,6 +179,13 @@ Resources should be:
 Resources should not accumulate data-shaping logic or orchestration decisions.
 Push that logic into plain Python functions or service modules instead.
 
+Current rule for this service:
+
+- the deterministic acquisition stage is API-first
+- it consumes `sourcePageRawContent` / `sourcePageContentType` from the backend
+- it does not re-download HTML, rebuild `site_data`, or materialize OCR
+  candidates from local scraper code
+
 ## Testing strategy
 
 Split tests by layer:
@@ -197,8 +195,7 @@ Split tests by layer:
    - sensor/job registration smoke tests
 
 2. Unit tests
-   - `brain/`
-   - `tools/`
+   - `brain.py`
    - shared helpers
    - pure data shaping
 

@@ -51,24 +51,6 @@ class TestAgentClient(TestCase):
         self.assertTrue(kwargs["json"]["variables"]["force"])
         self.assertEqual(kwargs["json"]["variables"]["targetItemId"], 99)
 
-    def test_get_taxonomy_maps_category_and_tag_names(self):
-        """Maps GraphQL categories/tags to flat lists."""
-        client = AgentClient()
-        with patch.object(
-            client,
-            "_send",
-            return_value={
-                "data": {
-                    "categories": [{"name": "Proteina"}],
-                    "tags": [{"name": "Whey"}],
-                },
-            },
-        ):
-            categories, tags = client.get_taxonomy()
-
-        self.assertEqual(categories, ["Proteina"])
-        self.assertEqual(tags, ["Whey"])
-
     def test_create_product_raises_on_empty_response(self):
         """Raises when createProduct payload is missing in API response."""
         client = AgentClient()

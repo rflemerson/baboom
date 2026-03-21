@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from dagster import RunRequest, define_asset_job
-
-if TYPE_CHECKING:
-    from ..contracts.queue import QueueWorkItem
+from dagster import Config, RunRequest, define_asset_job
 
 PROCESS_ITEM_JOB_NAME = "process_item_job"
 PROCESS_ITEM_OP_NAMES = (
@@ -15,6 +12,24 @@ PROCESS_ITEM_OP_NAMES = (
     "product_analysis",
     "upload_to_api",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class QueueWorkItem:
+    """Normalized queue item required to launch one Dagster run."""
+
+    item_id: int
+    url: str
+    store_name: str
+    store_slug: str
+
+
+class ItemConfig(Config):
+    """Configuration for running a specific queued scraped item."""
+
+    item_id: int
+    url: str
+    store_slug: str = "unknown"
 
 
 def build_item_run_config(item: QueueWorkItem) -> dict:

@@ -1,59 +1,86 @@
 """Tests for structured extraction agent behavior."""
 
 from unittest import TestCase
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
-from agents.brain.structured_agent import (
-    _get_default_prompt,
-    get_agent,
-    run_structured_extraction,
-)
+from agents.brain import run_structured_extraction
 
 
 class TestStructuredAgent(TestCase):
     """Tests for structured extraction wrapper."""
 
-    @patch("agents.brain.structured_agent.os.path.exists", return_value=False)
-    def test_default_prompt_fallback(self, _mock_exists):
-        """Uses fallback structured prompt when prompt file is missing."""
-        prompt = _get_default_prompt()
-        self.assertEqual(prompt, "Convert the following text to structured JSON.")
-
-    @patch("agents.brain.structured_agent.os.path.exists", return_value=True)
-    @patch("agents.brain.structured_agent.open", new_callable=mock_open, read_data="P")
-    def test_default_prompt_from_file(self, _mock_open, _mock_exists):
-        """Reads structured prompt from file when available."""
-        prompt = _get_default_prompt()
-        self.assertEqual(prompt, "P")
-
-    @patch("agents.brain.structured_agent.get_model", return_value="model")
-    @patch("agents.brain.structured_agent.Agent")
-    def test_get_agent_builds_agent_with_expected_output_schema(
-        self, mock_agent_cls, _mock_get_model
+    @patch("agents.brain.Agent")
+    def test_run_structured_extraction_builds_agent_with_expected_output_schema(
+        self,
+        mock_agent_cls,
     ):
         """Builds Agent using ProductAnalysisList output type."""
-        _agent = get_agent("gemini:model", "PROMPT")
+        agent = MagicMock()
+        agent.run_sync.return_value = type("R", (), {"output": {"items": []}})()
+        mock_agent_cls.return_value = agent
+
+        result = run_structured_extraction(
+            "RAW",
+            prompt="PROMPT",
+            model_name="gemini:model",
+        )
+
+        self.assertEqual(result, {"items": []})
         mock_agent_cls.assert_called_once()
+        self.assertEqual(mock_agent_cls.call_args.args[0], "gemini:model")
         kwargs = mock_agent_cls.call_args.kwargs
         self.assertEqual(kwargs["system_prompt"], "PROMPT")
 
-    @patch("agents.brain.structured_agent.get_agent")
-    def test_run_structured_extraction_returns_output(self, mock_get_agent):
+    @patch("agents.brain.Agent")
+    def test_run_structured_extraction_returns_output(self, mock_agent_cls):
         """Returns parsed schema from Agent run output."""
         agent = MagicMock()
         expected = {"items": [{"name": "Product"}]}
         agent.run_sync.return_value = type("R", (), {"output": expected})()
-        mock_get_agent.return_value = agent
+        mock_agent_cls.return_value = agent
 
-        result = run_structured_extraction("RAW", prompt="PROMPT")
+        result = run_structured_extraction(
+            "RAW",
+            prompt="PROMPT",
+            model_name="openai:gpt-5.2",
+        )
         self.assertEqual(result, expected)
 
-    @patch("agents.brain.structured_agent.get_agent")
-    def test_run_structured_extraction_raises_on_error(self, mock_get_agent):
+    @patch("agents.brain.Agent")
+    def test_run_structured_extraction_raises_on_error(self, mock_agent_cls):
         """Re-raises exceptions when structured extraction fails."""
         agent = MagicMock()
         agent.run_sync.side_effect = RuntimeError("bad-structured")
-        mock_get_agent.return_value = agent
+        mock_agent_cls.return_value = agent
 
         with self.assertRaisesRegex(RuntimeError, "bad-structured"):
-            run_structured_extraction("RAW")
+            run_structured_extraction(
+                "RAW",
+                prompt="PROMPT",
+                model_name="openai:gpt-5.2",
+            )
+
+    @patch.dict("os.environ", {"LLM_MODEL": "openai:gpt-5.2"})
+    @patch("agents.brain.Agent")
+    def test_run_structured_extraction_uses_env_model_when_argument_missing(
+        self,
+        mock_agent_cls,
+    ):
+        """Uses LLM_MODEL when caller does not pass a model id."""
+        agent = MagicMock()
+        agent.run_sync.return_value = type("R", (), {"output": {"items": []}})()
+        mock_agent_cls.return_value = agent
+
+        result = run_structured_extraction("RAW", prompt="PROMPT")
+
+        self.assertEqual(result, {"items": []})
+        self.assertEqual(mock_agent_cls.call_args.args[0], "openai:gpt-5.2")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_run_structured_extraction_raises_without_argument_or_env(self):
+        """Fails fast when no model id is configured anywhere."""
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "LLM_MODEL must be set or passed explicitly",
+        ):
+            run_structured_extraction("RAW", prompt="PROMPT")

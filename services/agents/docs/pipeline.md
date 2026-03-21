@@ -11,15 +11,15 @@ behavior into technical prose, not to describe an aspirational design.
 The agents pipeline processes one queued scraped item at a time and attempts to:
 
 1. normalize the source page relationship for the queued item
-2. download and persist lightweight source artifacts
-3. extract lightweight metadata from the page
+2. read backend-provided scraper context from the linked source page
+3. select ordered image URLs from that JSON context
 4. run OCR or text-only multimodal extraction
 5. convert raw extraction text into structured product analysis
 6. create or update downstream products in the backend API
 
 The pipeline is orchestrated by Dagster, but most of the domain work happens in
-plain Python modules under `agents/brain`, `agents/tools`, `agents/storage`, and
-`agents/client.py`.
+plain Python modules under `agents/acquisition.py`, `agents/extraction.py`,
+`agents/publishing.py`, `agents/brain.py`, and `agents/client.py`.
 
 ## Runtime Entry Point
 
@@ -29,13 +29,9 @@ The Dagster code location entrypoint is:
 
 That module assembles:
 
-- all assets via `load_assets_from_modules(ASSET_MODULES)`
+- all assets via `load_assets_from_modules([assets_module])`
 - one asset job: `process_item_job`
 - one sensor: `work_queue_sensor`
-- three shared resources:
-  - `client`
-  - `scraper`
-  - `storage`
 
 The effective code location object is `defs = Definitions(...)`.
 
@@ -50,9 +46,8 @@ At a high level, one run looks like this:
 5. Dagster launches `process_item_job`
 6. the asset graph executes in this order:
    - `downloaded_assets`
-   - `scraped_metadata`
    - `prepared_extraction_inputs`
-   - `ocr_extraction`
+   - `raw_extraction`
    - `product_analysis`
    - `upload_to_api`
 
@@ -70,16 +65,13 @@ flowchart TD
     F --> G["process_item_job"]
 
     G --> H["downloaded_assets"]
-    H --> I["scraped_metadata"]
     H --> J["prepared_extraction_inputs"]
-    I --> J
-    J --> K["ocr_extraction"]
+    J --> K["raw_extraction"]
     K --> L["product_analysis"]
-    I --> M["upload_to_api"]
+    H --> M["upload_to_api"]
     L --> M
 
     H --> X["On asset error: log + report_error + raise"]
-    I --> X
     J --> X
     K --> X
     L --> X
@@ -180,7 +172,7 @@ launches.
 
 The sensor lives in:
 
-- [work_queue.py](/home/rafael/Documents/baboom/services/agents/agents/defs/sensors/work_queue.py)
+- [sensors.py](/home/rafael/Documents/baboom/services/agents/agents/defs/sensors.py)
 
 ### What It Does
 
@@ -216,16 +208,35 @@ The pipeline is now split into three logical parts:
 
 1. Acquisition / preparation
    - `downloaded_assets`
-   - `scraped_metadata`
    - `prepared_extraction_inputs`
 2. Non-deterministic extraction
-   - `ocr_extraction`
+   - `raw_extraction`
    - `product_analysis`
 3. Publishing / synchronization
    - `upload_to_api`
 
 The key boundary is `prepared_extraction_inputs`: it is the deterministic
 handoff between source acquisition and the LLM-driven extraction flow.
+
+The deterministic stage is now API-first:
+
+- `downloaded_assets` does not download HTML
+- `prepared_extraction_inputs` does not materialize image candidates from local
+  storage
+- all three stages consume the JSON context already persisted by Django in
+  `ScrapedPage.raw_content`
+
+Prompt loading is part of the extraction layer, not the agent-wrapper layer:
+
+- [extraction.py](/home/rafael/Documents/baboom/services/agents/agents/extraction.py)
+  loads prompt files from `agents/prompts/`
+- [brain.py](/home/rafael/Documents/baboom/services/agents/agents/brain.py)
+  requires `prompt` explicitly
+  for both raw and structured extraction wrappers
+
+This means the `brain` modules can be executed directly from plain Python
+without Dagster UI or Dagster runtime, as long as the caller passes a prompt and
+model configuration.
 
 ## External Systems
 
@@ -236,10 +247,6 @@ The pipeline talks to three main infrastructure boundaries.
 Implemented by:
 
 - [client.py](/home/rafael/Documents/baboom/services/agents/agents/client.py)
-
-Used through the Dagster resource:
-
-- [api_client.py](/home/rafael/Documents/baboom/services/agents/agents/defs/resources/api_client.py)
 
 Important backend operations:
 
@@ -258,34 +265,18 @@ The client uses:
 
 It sends GraphQL requests over HTTP with retries for transient upstream errors.
 
-### Scraper Service
+### API-First Deterministic Inputs
 
-Used through the Dagster resource:
+Instead, it relies on fields already exposed by the backend GraphQL API:
 
-- [scraper_service.py](/home/rafael/Documents/baboom/services/agents/agents/defs/resources/scraper_service.py)
+- `sourcePageUrl`
+- `sourcePageId`
+- `sourcePageRawContent`
+- `sourcePageContentType`
 
-The underlying implementation is:
-
-- [scraper.py](/home/rafael/Documents/baboom/services/agents/agents/tools/scraper.py)
-
-This service is responsible for:
-
-- downloading source artifacts
-- extracting lightweight metadata
-- materializing OCR candidates
-
-### Storage Backend
-
-Used through the Dagster resource:
-
-- [storage.py](/home/rafael/Documents/baboom/services/agents/agents/defs/resources/storage.py)
-
-The storage backend is used to persist and read page artifacts such as:
-
-- `source.html`
-- `site_data.json`
-- `candidates.json`
-- derived image paths
+The expectation is that Django scrapers already persisted a structured JSON
+payload into `ScrapedPage.raw_content`, and the agents pipeline consumes that
+JSON directly.
 
 ## Asset-by-Asset Walkthrough
 
@@ -293,7 +284,8 @@ The storage backend is used to persist and read page artifacts such as:
 
 Source:
 
-- [ingestion.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/ingestion.py)
+- [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+- [acquisition.py](/home/rafael/Documents/baboom/services/agents/agents/acquisition.py)
 
 #### Inputs
 
@@ -302,7 +294,6 @@ Source:
   - `url`
   - `store_slug`
 - resources:
-  - `scraper`
   - `client`
 
 #### Step Logic
@@ -317,14 +308,13 @@ Source:
    - then run config `store_slug`
 4. call `ensure_source_page(...)` so the scraped item is linked to a source page
 5. read the resulting `sourcePageId`
-6. call `ScraperService.download_assets(page_id, page_url)`
+6. carry forward `sourcePageRawContent` and `sourcePageContentType`
 7. return a normalized payload for downstream assets
 
 #### Output Payload
 
 The asset returns a dict with:
 
-- `storage_path`
 - `url`
 - `page_id`
 - `origin_item_id`
@@ -340,77 +330,56 @@ On failure:
 - reports the error back to the backend via `report_error(item_id, ..., is_fatal=False)`
 - re-raises the exception
 
-### 2. `scraped_metadata`
+### 2. `prepared_extraction_inputs`
 
 Source:
 
-- [metadata.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/metadata.py)
+- [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+- [acquisition.py](/home/rafael/Documents/baboom/services/agents/agents/acquisition.py)
 
 #### Inputs
 
 - `downloaded_assets`
-- resources:
-  - `scraper`
-  - `client`
 
 #### Step Logic
 
-1. normalize the `downloaded_assets` payload into `MetadataExtractionContext`
-2. call `ScraperService.extract_metadata(storage_path, page_url)`
-3. call `ScraperService.consolidate(...)`
-4. use `store_slug` as `brand_name_override`
-5. publish lightweight metadata in Dagster output metadata
+1. parse `sourcePageRawContent` when `sourcePageContentType == "JSON"`
+2. extract image URLs directly from JSON fields such as:
+   - `images`
+   - `items[].images`
+3. preserve gallery order using the original image positions
+4. determine extraction mode:
+   - `multimodal` when image URLs exist
+   - `text_only` otherwise
 
 #### Output Type
 
 The asset returns:
 
-- `RawScrapedData`
+- `PreparedExtractionInputs`
 
-This object acts as the pipeline-wide lightweight product snapshot, used later
-by OCR and publishing.
-
-#### Error Behavior
-
-On failure:
-
-- logs the error
-- reports it against `origin_item_id`
-- re-raises
-
-### 3. `ocr_extraction`
+### 3. `raw_extraction`
 
 Source:
 
-- [ocr.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/ocr.py)
+- [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
 
 #### Inputs
 
-- `scraped_metadata`
-- `downloaded_assets`
+- `prepared_extraction_inputs`
 - resources:
-  - `scraper`
-  - `storage`
   - `client`
 
 #### Step Logic
 
-1. derive the storage bucket from `storage_path`
-2. load optional scraper JSON context from the downloaded source payload
-3. load `site_data.json` from storage when available
-4. load `candidates.json` from storage when available
-5. if candidates do not exist, materialize them via `ScraperService.materialize_candidates(...)`
-6. choose the image paths to send to OCR using `select_images_for_ocr(...)`
-7. determine extraction mode:
-   - `multimodal` when image paths exist
+1. read the selected image URLs from `prepared_extraction_inputs`
+2. determine extraction mode:
+   - `multimodal` when image URLs exist
    - `text_only` otherwise
-8. build the LLM description payload by concatenating:
-   - scraped metadata description
-   - image sequence context
-   - `[SITE_DATA]` context block
+3. build the LLM description payload by concatenating:
    - `[SCRAPER_CONTEXT]` context block
-9. call `run_raw_extraction(...)`
-10. store timing and extraction metadata in Dagster output metadata
+4. call `run_raw_extraction(...)`
+5. store timing and extraction metadata in Dagster output metadata
 
 #### Output Type
 
@@ -423,15 +392,15 @@ analysis.
 
 #### Notes
 
-The OCR asset is the stage that bridges persisted page artifacts and LLM-ready
-raw extraction text.
+The OCR asset is the stage that bridges API-provided JSON and image URLs into
+LLM-ready raw extraction text.
 
 ### 4. `product_analysis`
 
 Source:
 
-- [analysis.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/analysis.py)
-- [structured_analysis.py](/home/rafael/Documents/baboom/services/agents/agents/extraction/structured_analysis.py)
+- [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+- [extraction.py](/home/rafael/Documents/baboom/services/agents/agents/extraction.py)
 
 #### Inputs
 
@@ -439,10 +408,8 @@ Source:
   - `item_id`
   - `url`
   - `store_slug`
-- resource:
-  - `client`
 - upstream:
-  - `ocr_extraction`
+- `raw_extraction`
 
 #### Step Logic
 
@@ -475,7 +442,7 @@ The Dagster asset itself is now intentionally thin. It is responsible for:
 
 The semantic retry policy now lives in the pure Python module:
 
-- [structured_analysis.py](/home/rafael/Documents/baboom/services/agents/agents/extraction/structured_analysis.py)
+- [extraction.py](/home/rafael/Documents/baboom/services/agents/agents/extraction.py)
 
 Expected shape:
 
@@ -508,7 +475,7 @@ This stage contains semantic retries, not infra retries:
 
 Source:
 
-- [publish.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/publish.py)
+- [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
 
 #### Inputs
 
@@ -520,7 +487,7 @@ Source:
   - `client`
 - upstream:
   - `product_analysis`
-  - `scraped_metadata`
+  - `downloaded_assets`
 
 #### Step Logic
 
@@ -578,19 +545,22 @@ This prevents duplicate product creation for already linked scraped items.
 
 ## Shared Data Shapes
 
-Several normalized dataclasses are used inside the assets to reduce ambiguity.
+Several normalized dataclasses are used inside the pipeline to reduce
+ambiguity.
 
 ### `QueueWorkItem`
 
 Represents the minimum launchable queue item.
+It now lives in:
+
+- [pipeline.py](/home/rafael/Documents/baboom/services/agents/agents/defs/pipeline.py)
 
 ### `SourcePageContext`
 
 Represents the normalized source-page state needed by `downloaded_assets`.
+It now lives in:
 
-### `MetadataExtractionContext`
-
-Represents the normalized downloaded page context needed by `scraped_metadata`.
+- [acquisition.py](/home/rafael/Documents/baboom/services/agents/agents/acquisition.py)
 
 ### `VariantExtractionContext`
 
@@ -603,11 +573,17 @@ Represents the final structured payload plus retry metadata.
 ### `PublishOriginContext`
 
 Represents the normalized backend state needed while publishing items.
+It now lives in:
+
+- [publishing.py](/home/rafael/Documents/baboom/services/agents/agents/publishing.py)
 
 ### `PublishItemResult`
 
 Represents the per-item publish result plus bookkeeping about whether a variant
 scraped item was created.
+It now lives in:
+
+- [publishing.py](/home/rafael/Documents/baboom/services/agents/agents/publishing.py)
 
 ## Error Handling Model
 
@@ -621,20 +597,18 @@ Across the pipeline, the error strategy is consistent:
 This means the backend remains informed of processing failures even when Dagster
 marks the run as failed.
 
-## Storage Artifacts
+## Input Boundaries
 
-The pipeline relies on persisted artifacts as boundaries between stages.
+The main pipeline is now API-first.
 
-Examples:
+The deterministic half consumes:
 
-- source page HTML
-- site data JSON
-- OCR candidates JSON
-- image paths for multimodal OCR
+- `sourcePageRawContent` from the backend API
+- `sourcePageContentType`
+- image URLs already present in that JSON payload
 
-This is important because the pipeline does not recompute everything inside a
-single in-memory flow. Some stages read artifacts materialized by earlier work
-and use them to decide how much expensive processing is necessary.
+The agents service no longer relies on local scraper-produced HTML, site-data
+files, or persisted OCR candidate manifests in the main path.
 
 ## Technical Observations
 
@@ -644,7 +618,7 @@ The current pipeline shape is:
 - one queued item per Dagster run
 - mostly linear asset execution
 - backend API as the system of record
-- storage artifacts as intermediate boundary
+- API JSON as the deterministic boundary
 - LLM-assisted extraction in two stages:
   - raw extraction
   - structured extraction
@@ -653,7 +627,7 @@ The most important orchestration boundaries are:
 
 - queue checkout
 - source page normalization
-- artifact materialization
+- prepared extraction inputs
 - OCR/raw extraction
 - structured analysis with semantic retries
 - publish with origin/variant bookkeeping
@@ -664,10 +638,9 @@ For the shortest path to understanding the pipeline in code:
 
 1. [definitions.py](/home/rafael/Documents/baboom/services/agents/agents/definitions.py)
 2. [pipeline.py](/home/rafael/Documents/baboom/services/agents/agents/defs/pipeline.py)
-3. [work_queue.py](/home/rafael/Documents/baboom/services/agents/agents/defs/sensors/work_queue.py)
-4. [ingestion.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/ingestion.py)
-5. [metadata.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/metadata.py)
-6. [ocr.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/ocr.py)
-7. [analysis.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/analysis.py)
-8. [publish.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets/publish.py)
-9. [client.py](/home/rafael/Documents/baboom/services/agents/agents/client.py)
+3. [sensors.py](/home/rafael/Documents/baboom/services/agents/agents/defs/sensors.py)
+4. [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+5. [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+6. [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+7. [assets.py](/home/rafael/Documents/baboom/services/agents/agents/defs/assets.py)
+8. [client.py](/home/rafael/Documents/baboom/services/agents/agents/client.py)
