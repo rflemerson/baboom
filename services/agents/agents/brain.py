@@ -12,7 +12,6 @@ plain Python, tests, and Dagster assets with the same contract.
 from __future__ import annotations
 
 import logging
-import os
 
 import requests
 from pydantic_ai import Agent, BinaryContent
@@ -36,11 +35,11 @@ _REQUEST_HEADERS = {
 
 
 def _get_required_model_id(model_name: str | None) -> str:
-    """Return the explicit model id or the required environment override."""
-    model_id = (model_name or os.getenv("LLM_MODEL") or "").strip()
+    """Return the required explicit model id."""
+    model_id = (model_name or "").strip()
     if model_id:
         return model_id
-    message = "LLM_MODEL must be set or passed explicitly to the agent wrapper"
+    message = "model_name must be passed explicitly to the agent wrapper"
     raise RuntimeError(message)
 
 

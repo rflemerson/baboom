@@ -23,6 +23,21 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+Create a local env file from the example:
+
+```bash
+cp services/agents/.env.example services/agents/.env
+```
+
+The service reads variables from the process environment. For local runs, load
+the file before starting Dagster:
+
+```bash
+set -a
+source services/agents/.env
+set +a
+```
+
 Run from repository root so `services/agents/agents` is importable:
 
 ```bash
@@ -46,7 +61,16 @@ Minimum:
 
 - `AGENTS_API_URL`
 - `AGENTS_API_KEY`
+- `RAW_EXTRACTION_MODEL`
+- `STRUCTURED_EXTRACTION_MODEL`
 - LLM key(s) used by your provider (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`)
+
+Recommended split:
+
+- `RAW_EXTRACTION_MODEL`
+  multimodal model for `JSON + images -> raw text`
+- `STRUCTURED_EXTRACTION_MODEL`
+  cheaper text model for `raw text -> structured payload`
 
 Image selection tuning:
 

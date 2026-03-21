@@ -60,27 +60,10 @@ class TestStructuredAgent(TestCase):
                 model_name="openai:gpt-5.2",
             )
 
-    @patch.dict("os.environ", {"LLM_MODEL": "openai:gpt-5.2"})
-    @patch("agents.brain.Agent")
-    def test_run_structured_extraction_uses_env_model_when_argument_missing(
-        self,
-        mock_agent_cls,
-    ):
-        """Uses LLM_MODEL when caller does not pass a model id."""
-        agent = MagicMock()
-        agent.run_sync.return_value = type("R", (), {"output": {"items": []}})()
-        mock_agent_cls.return_value = agent
-
-        result = run_structured_extraction("RAW", prompt="PROMPT")
-
-        self.assertEqual(result, {"items": []})
-        self.assertEqual(mock_agent_cls.call_args.args[0], "openai:gpt-5.2")
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_run_structured_extraction_raises_without_argument_or_env(self):
-        """Fails fast when no model id is configured anywhere."""
+    def test_run_structured_extraction_raises_without_explicit_model(self):
+        """Fails fast when caller does not pass a model id."""
         with self.assertRaisesRegex(
             RuntimeError,
-            "LLM_MODEL must be set or passed explicitly",
+            "model_name must be passed explicitly",
         ):
             run_structured_extraction("RAW", prompt="PROMPT")

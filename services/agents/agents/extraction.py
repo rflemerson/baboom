@@ -13,6 +13,7 @@ about API platforms, local scraper artifacts, or Dagster resources.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -84,6 +85,7 @@ def run_raw_extraction_step(
         description=llm_description,
         image_urls=prepared_inputs.image_urls,
         prompt=load_raw_extraction_prompt(),
+        model_name=_get_configured_model("RAW_EXTRACTION_MODEL"),
     )
     return raw_text, build_raw_extraction_metadata(prepared_inputs=prepared_inputs)
 
@@ -318,6 +320,11 @@ def _load_prompt(filename: str) -> str:
     return (PROMPTS_DIR / filename).read_text(encoding="utf-8")
 
 
+def _get_configured_model(env_var_name: str) -> str | None:
+    """Return the model configured for one extraction stage."""
+    return os.getenv(env_var_name) or None
+
+
 def _run_initial_structured_extraction(
     raw_extraction_text: str,
     *,
@@ -327,6 +334,7 @@ def _run_initial_structured_extraction(
     result = extraction_runner(
         raw_extraction_text,
         prompt=load_structured_extraction_prompt(),
+        model_name=_get_configured_model("STRUCTURED_EXTRACTION_MODEL"),
     )
     payload = result.model_dump(by_alias=True)
     return payload, count_structured_variant_signals(payload)
@@ -350,6 +358,7 @@ def _apply_reconciliation_retry(
     reconciled = extraction_runner(
         raw_extraction_text,
         prompt=build_reconciliation_prompt(expected_variant_count),
+        model_name=_get_configured_model("STRUCTURED_EXTRACTION_MODEL"),
     )
     reconciled_payload = reconciled.model_dump(by_alias=True)
     reconciled_variant_count = count_structured_variant_signals(reconciled_payload)
@@ -372,6 +381,7 @@ def _apply_context_guard_retry(
     guarded = extraction_runner(
         raw_extraction_text,
         prompt=build_context_guard_prompt(variant_context.allowed_variants),
+        model_name=_get_configured_model("STRUCTURED_EXTRACTION_MODEL"),
     )
     guarded_payload = guarded.model_dump(by_alias=True)
     guarded_invalid = count_invalid_variant_tokens(

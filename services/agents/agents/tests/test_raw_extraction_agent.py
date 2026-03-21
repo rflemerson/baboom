@@ -73,36 +73,11 @@ class TestRawExtractionAgent(TestCase):
                 model_name="openai:gpt-5.2",
             )
 
-    @patch.dict("os.environ", {"LLM_MODEL": "google-gla:gemini-3-flash-preview"})
-    @patch("agents.brain.Agent")
-    def test_run_raw_extraction_uses_env_model_when_argument_missing(
-        self,
-        mock_agent_cls,
-    ):
-        """Uses LLM_MODEL when caller does not pass a model id."""
-        agent = MagicMock()
-        agent.run_sync.return_value = type("R", (), {"output": "RAW"})()
-        mock_agent_cls.return_value = agent
-
-        result = run_raw_extraction(
-            name="Product",
-            description="",
-            image_urls=[],
-            prompt="PROMPT",
-        )
-
-        self.assertEqual(result, "RAW")
-        self.assertEqual(
-            mock_agent_cls.call_args.args[0],
-            "google-gla:gemini-3-flash-preview",
-        )
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_run_raw_extraction_raises_without_argument_or_env(self):
-        """Fails fast when no model id is configured anywhere."""
+    def test_run_raw_extraction_raises_without_explicit_model(self):
+        """Fails fast when caller does not pass a model id."""
         with self.assertRaisesRegex(
             RuntimeError,
-            "LLM_MODEL must be set or passed explicitly",
+            "model_name must be passed explicitly",
         ):
             run_raw_extraction(
                 name="Product",
