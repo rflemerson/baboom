@@ -373,7 +373,6 @@ def build_product_payload(
         "tags": [],
         "isCombo": bool(analysis_data.get("is_combo")),
         "components": build_component_payloads(analysis_data.get("components") or []),
-        "nutrientClaims": analysis_data.get("nutrient_claims") or [],
         "isPublished": False,
     }
 
@@ -407,9 +406,9 @@ def build_component_payloads(components: list[dict]) -> list[dict]:
     return [
         {
             "name": component.get("name"),
+            "ean": component.get("ean"),
+            "externalId": component.get("external_id"),
             "quantity": parse_int(component.get("quantity"), default=1),
-            "weightHint": component.get("weight_hint"),
-            "packagingHint": component.get("packaging_hint"),
         }
         for component in components
         if component.get("name")

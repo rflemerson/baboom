@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
+from core.dtos import ProductCreateInput
 from core.models import (
     AlertSubscriber,
     Brand,
@@ -28,13 +29,14 @@ from core.models import (
     Store,
     Tag,
 )
+from scrapers.models import ScrapedItem
+from scrapers.services import ScrapedItemLinkService
 
 if TYPE_CHECKING:
     from core.dtos import (
         ComboComponentInput,
         MicronutrientPayload,
         NutritionFactsPayload,
-        ProductCreateInput,
         ProductMetadataUpdateInput,
         ProductNutritionPayload,
         StoreListingPayload,
@@ -100,7 +102,7 @@ class ComboResolutionService:
         for component_data in components_data:
             component_product = self._find_best_match(parent_product, component_data)
             if component_product is None:
-                component_product = self._create_placeholder(
+                component_product = self._create_component_product(
                     component_data,
                     parent_product,
                 )
@@ -162,20 +164,38 @@ class ComboResolutionService:
             .first()
         )
 
-    def _create_placeholder(
+    def _create_component_product(
         self,
         component_data: ComboComponentInput,
         parent_product: Product,
     ) -> Product:
-        """Create an unpublished placeholder when no component match is found."""
-        return Product.objects.create(
-            name=f"[Placeholder] {component_data.name}",
-            brand=parent_product.brand,
-            weight=0,
-            description=(
-                f"Auto-generated placeholder for component of {parent_product.name}"
+        """Create one unpublished simple product using the standard create flow."""
+        return ProductCreateService().execute(
+            self._build_component_create_input(
+                component_data=component_data,
+                parent_product=parent_product,
             ),
+        )
+
+    def _build_component_create_input(
+        self,
+        *,
+        component_data: ComboComponentInput,
+        parent_product: Product,
+    ) -> ProductCreateInput:
+        """Map one combo component into the standard product-create DTO."""
+        return ProductCreateInput(
+            name=component_data.name,
+            weight=component_data.weight or 0,
+            brand_name=component_data.brand_name or parent_product.brand.display_name,
+            category_name=component_data.category_name,
+            ean=component_data.ean,
+            description=component_data.description or "",
+            packaging=component_data.packaging,
             is_published=False,
+            tags=component_data.tags,
+            stores=component_data.stores or [],
+            nutrition=component_data.nutrition or [],
         )
 
 
@@ -571,6 +591,12 @@ class ProductCreateService:
                 if data.stores:
                     ProductStoreService().replace_listings(product, data.stores)
 
+                if data.origin_scraped_item_id is not None:
+                    self._link_origin_scraped_item(
+                        product=product,
+                        origin_scraped_item_id=data.origin_scraped_item_id,
+                    )
+
                 if data.is_combo and data.components:
                     ComboResolutionService().resolve_combo_components(
                         product,
@@ -596,6 +622,70 @@ class ProductCreateService:
             defaults={"display_name": brand_name},
         )
         return brand
+
+    def _link_origin_scraped_item(
+        self,
+        *,
+        product: Product,
+        origin_scraped_item_id: int,
+    ) -> None:
+        """Link the origin scraped item to the matching store listing."""
+        origin_item = ScrapedItem.objects.filter(id=origin_scraped_item_id).first()
+        if origin_item is None:
+            raise ValidationError(
+                {"origin_scraped_item_id": _("Scraped item not found.")},
+            )
+
+        product_store = self._resolve_origin_product_store(
+            product=product,
+            origin_item=origin_item,
+        )
+        linked_item = ScrapedItemLinkService().execute(
+            scraped_item_id=origin_scraped_item_id,
+            product_store_id=product_store.id,
+        )
+        if linked_item is None:
+            raise ValidationError(
+                {
+                    "origin_scraped_item_id": _(
+                        "Could not link the scraped item to the created product.",
+                    ),
+                },
+            )
+
+    def _resolve_origin_product_store(
+        self,
+        *,
+        product: Product,
+        origin_item: ScrapedItem,
+    ) -> ProductStore:
+        """Resolve the product store that should receive the origin link."""
+        matching_listing = product.store_links.filter(
+            store__name=origin_item.store_slug,
+        ).first()
+        if matching_listing is not None:
+            return matching_listing
+
+        store_links = list(product.store_links.all())
+        if len(store_links) == 1:
+            return store_links[0]
+
+        if not store_links:
+            raise ValidationError(
+                {
+                    "origin_scraped_item_id": _(
+                        "Store listings are required to link the scraped item.",
+                    ),
+                },
+            )
+
+        raise ValidationError(
+            {
+                "origin_scraped_item_id": _(
+                    "No matching store listing was created for the scraped item store.",
+                ),
+            },
+        )
 
 
 @dataclass(slots=True)

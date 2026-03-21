@@ -50,15 +50,15 @@ class ComboComponent(BaseModel):
     """A component product detected inside a combo/kit."""
 
     name: str = Field(..., description="Name of the component product e.g. 'Whey 900g'")
+    ean: str | None = Field(
+        None,
+        description="EAN/GTIN of the component when explicitly present",
+    )
+    external_id: str | None = Field(
+        None,
+        description="Store-specific external identifier when explicitly present",
+    )
     quantity: int = Field(1, description="Quantity of this component")
-    weight_hint: int | None = Field(
-        None,
-        description="Estimated weight of this component in grams if available",
-    )
-    packaging_hint: str | None = Field(
-        None,
-        description="Packaging type (REFILL/CONTAINER) if explicitly mentioned",
-    )
 
 
 class ProductAnalysisResult(BaseModel):
@@ -85,10 +85,6 @@ class ProductAnalysisResult(BaseModel):
     packaging: str = Field(
         "CONTAINER",
         description="Packaging type: CONTAINER, REFILL, BAR, OTHER",
-    )
-    nutrient_claims: list[str] = Field(
-        default_factory=list,
-        description="List of slugs for significant nutrient sources",
     )
     category_hierarchy: list[str] = Field(
         default_factory=list,

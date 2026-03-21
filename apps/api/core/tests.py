@@ -41,6 +41,7 @@ from core.services import (
     ProductNutritionService,
     ProductStoreService,
 )
+from scrapers.models import ScrapedItem, ScrapedPage
 
 if TYPE_CHECKING:
     from django.http import HttpResponse
@@ -225,6 +226,7 @@ class ProductCreateServiceTests(TestCase):
 
     EXPECTED_TAG_COUNT = 2
     EXPECTED_COMPONENT_COUNT = 2
+    COMPONENT_WEIGHT = 300
 
     def setUp(self) -> None:
         """Create reusable fixtures and services."""
@@ -280,10 +282,10 @@ class ProductCreateServiceTests(TestCase):
         assert listing is not None
         assert listing.price_history.count() == 1
 
-    def test_execute_creates_combo_and_placeholder_component_when_unmatched(
+    def test_execute_creates_combo_component_product_with_rich_payload_when_unmatched(
         self,
     ) -> None:
-        """Combo creation should create placeholder components when no match exists."""
+        """Combo creation should create component products with the submitted data."""
         product = self.service.execute(
             ProductCreateInput(
                 name="Combo Pré + Creatina",
@@ -292,24 +294,57 @@ class ProductCreateServiceTests(TestCase):
                 packaging=Product.Packaging.CONTAINER,
                 is_combo=True,
                 components=[
-                    ComboComponentInput(name="Pré-treino", quantity=1),
-                    ComboComponentInput(name="Creatina", quantity=1),
+                    ComboComponentInput(
+                        name="Pré-treino",
+                        weight=self.COMPONENT_WEIGHT,
+                        brand_name="Growth",
+                        category_name=["Energy", "Pre-Workout"],
+                        ean="7891000000001",
+                        description="Pré-treino do combo",
+                        packaging=Product.Packaging.CONTAINER,
+                        stores=[
+                            StoreListingPayload(
+                                store_name="Growth",
+                                external_id="pre-300",
+                                product_link="https://growth.example/pre-300",
+                                price=79.90,
+                            ),
+                        ],
+                        quantity=1,
+                    ),
+                    ComboComponentInput(
+                        name="Creatina",
+                        weight=self.COMPONENT_WEIGHT,
+                        category_name=["Energy", "Creatine"],
+                        description="Creatina do combo",
+                        packaging=Product.Packaging.REFILL,
+                        quantity=1,
+                    ),
                 ],
             ),
         )
-
-        component_names = list(
-            ProductComponent.objects.filter(parent=product)
-            .select_related("component")
-            .values_list("component__name", flat=True),
-        )
-
         assert product.type == Product.Type.COMBO
-        assert len(component_names) == self.EXPECTED_COMPONENT_COUNT
-        assert component_names == [
-            "[Placeholder] Pré-treino",
-            "[Placeholder] Creatina",
-        ]
+        component_links = list(
+            ProductComponent.objects.filter(parent=product).select_related("component"),
+        )
+        assert len(component_links) == self.EXPECTED_COMPONENT_COUNT
+
+        first_component = component_links[0].component
+        second_component = component_links[1].component
+
+        assert first_component.name == "Pré-treino"
+        assert first_component.weight == self.COMPONENT_WEIGHT
+        assert first_component.ean == "7891000000001"
+        assert first_component.packaging == Product.Packaging.CONTAINER
+        assert first_component.category is not None
+        assert first_component.category.name == "Pre-Workout"
+        assert first_component.store_links.count() == 1
+        assert first_component.is_published is False
+
+        assert second_component.name == "Creatina"
+        assert second_component.weight == self.COMPONENT_WEIGHT
+        assert second_component.packaging == Product.Packaging.REFILL
+        assert second_component.is_published is False
 
     def test_execute_rejects_duplicate_ean(self) -> None:
         """Product creation should reject duplicate EAN values."""
@@ -331,6 +366,82 @@ class ProductCreateServiceTests(TestCase):
                     weight=900,
                     brand_name="Growth",
                     ean="1234567890123",
+                ),
+            )
+        except ValidationError:
+            raised_validation_error = True
+
+        assert raised_validation_error
+
+    def test_execute_links_origin_scraped_item_to_created_store_listing(self) -> None:
+        """Origin scraped items should be linked during product creation."""
+        page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/whey",
+        )
+        origin_item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-origin-900",
+            name="Whey Isolate",
+            price=Decimal("149.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            source_page=page,
+        )
+
+        product = self.service.execute(
+            ProductCreateInput(
+                name="Whey Isolate",
+                weight=900,
+                brand_name="Growth",
+                origin_scraped_item_id=origin_item.id,
+                stores=[
+                    StoreListingPayload(
+                        store_name="Growth",
+                        external_id="growth-900",
+                        product_link="https://growth.example/whey",
+                        price=149.90,
+                    ),
+                ],
+            ),
+        )
+
+        origin_item.refresh_from_db()
+        listing = product.store_links.get(store=self.store)
+
+        assert origin_item.product_store_id == listing.id
+        assert origin_item.status == ScrapedItem.Status.LINKED
+
+    def test_execute_rejects_origin_link_without_matching_store_listing(self) -> None:
+        """Origin links should fail when no target listing can be resolved."""
+        origin_item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-origin-900",
+            name="Whey Isolate",
+        )
+
+        raised_validation_error = False
+
+        try:
+            self.service.execute(
+                ProductCreateInput(
+                    name="Whey Isolate",
+                    weight=900,
+                    brand_name="Growth",
+                    origin_scraped_item_id=origin_item.id,
+                    stores=[
+                        StoreListingPayload(
+                            store_name="Dux",
+                            external_id="dux-900",
+                            product_link="https://dux.example/whey",
+                            price=149.90,
+                        ),
+                        StoreListingPayload(
+                            store_name="Integralmedica",
+                            external_id="integral-900",
+                            product_link="https://integral.example/whey",
+                            price=159.90,
+                        ),
+                    ],
                 ),
             )
         except ValidationError:
@@ -701,6 +812,138 @@ class GraphQLAlertSubscriptionTests(TestCase):
         assert not result["data"]["subscribeAlerts"]["success"]
         assert result["data"]["subscribeAlerts"]["email"] == "not-an-email"
         assert result["data"]["subscribeAlerts"]["errors"][0]["field"] == "email"
+
+
+class GraphQLProductCreateTests(TestCase):
+    """Tests for the product creation mutation."""
+
+    def setUp(self) -> None:
+        """Set up test environment."""
+        self.factory = RequestFactory()
+        self.api_key_obj = APIKey.objects.create(name="Test Client")
+        self.valid_key = self.api_key_obj.key
+        self.view = GraphQLView.as_view(schema=schema)
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/whey",
+        )
+        self.origin_item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-origin-900",
+            name="Whey Isolate",
+            price=Decimal("149.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            source_page=self.page,
+        )
+
+    def test_create_product_accepts_origin_scraped_item_id(self) -> None:
+        """The mutation should link the origin scraped item when provided."""
+        mutation = """
+        mutation CreateProduct($data: ProductInput!) {
+          createProduct(data: $data) {
+            product {
+              id
+              storeLinks {
+                id
+              }
+            }
+            errors {
+              field
+              message
+            }
+          }
+        }
+        """
+        variables = {
+            "data": {
+                "name": "Whey Isolate",
+                "weight": 900,
+                "brandName": "Growth",
+                "originScrapedItemId": self.origin_item.id,
+                "stores": [
+                    {
+                        "storeName": "Growth",
+                        "externalId": "growth-900",
+                        "productLink": "https://growth.example/whey",
+                        "price": 149.9,
+                        "stockStatus": "AVAILABLE",
+                    },
+                ],
+            },
+        }
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": mutation, "variables": variables}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.valid_key,
+        )
+
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
+
+        self.origin_item.refresh_from_db()
+        assert payload["data"]["createProduct"]["errors"] is None
+        assert payload["data"]["createProduct"]["product"]["id"] is not None
+        assert self.origin_item.product_store_id is not None
+        assert self.origin_item.status == ScrapedItem.Status.LINKED
+
+    def test_create_product_accepts_rich_combo_component_payload(self) -> None:
+        """The mutation should accept full combo component payloads."""
+        mutation = """
+        mutation CreateProduct($data: ProductInput!) {
+          createProduct(data: $data) {
+            product {
+              id
+            }
+            errors {
+              field
+              message
+            }
+          }
+        }
+        """
+        variables = {
+            "data": {
+                "name": "Combo Whey + Creatina",
+                "weight": 1200,
+                "brandName": "Growth",
+                "isCombo": True,
+                "components": [
+                    {
+                        "name": "Creatina",
+                        "weight": 300,
+                        "brandName": "Growth",
+                        "categoryPath": ["Energy", "Creatine"],
+                        "description": "Creatina do combo",
+                        "packaging": "REFILL",
+                        "stores": [
+                            {
+                                "storeName": "Growth",
+                                "externalId": "creatina-300",
+                                "productLink": "https://growth.example/creatina-300",
+                                "price": 79.9,
+                                "stockStatus": "AVAILABLE",
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": mutation, "variables": variables}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.valid_key,
+        )
+
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
+
+        created_component = Product.objects.get(name="Creatina", weight=300)
+        assert payload["data"]["createProduct"]["errors"] is None
+        assert payload["data"]["createProduct"]["product"]["id"] is not None
+        assert created_component.packaging == Product.Packaging.REFILL
+        assert created_component.store_links.count() == 1
 
 
 class GraphQLSecurityTests(TestCase):

@@ -180,7 +180,9 @@ Create a combo product through GraphQL from scraped context.
 3. The GraphQL boundary normalizes the input.
 4. The system creates the combo through `ProductCreateService`.
 5. The system synchronizes optional store listings.
-6. The system resolves combo components.
+6. The system resolves combo components by exact identifiers.
+7. When a component is not found, the system creates an unpublished simple
+   product using the submitted component payload.
 
 ### Alternate flows
 
@@ -192,14 +194,19 @@ Create a combo product through GraphQL from scraped context.
 #### A2. Exact component match not found
 
 1. The system cannot resolve a component.
-2. The system creates an unpublished placeholder product.
-3. The system links the placeholder as a component.
+2. The system creates an unpublished simple product with the submitted
+   component data.
+3. The system links the created product as a component.
 
 ### Business rules
 
 - Combo creation uses exact identifier matching for components.
+- Component payloads may include the same creation data used for regular
+  products, including taxonomy, nutrition, and store listings.
+- When a component is not matched, the API reuses the standard product-creation
+  workflow to create the component as a simple unpublished product.
 - Fuzzy matching is intentionally not used.
-- Placeholder products are unpublished support records.
+- Auto-created component products are unpublished support records.
 
 ## UC-04 Link Scraped Item To Product Store From Agent
 
@@ -257,6 +264,66 @@ Link a scraped item to an explicitly chosen product store through the agent work
 - Fuzzy matching is intentionally not used.
 - Placeholder products are unpublished support records.
 - Component management is coordinated through `ComboResolutionService`.
+
+## UC-05 Create Product And Link Origin Scraped Item
+
+### Goal
+
+Allow the agent to create a product and immediately link the origin scraped item in a
+single mutation when `originScrapedItemId` is provided.
+
+### Primary actor
+
+- AI Catalog Agent
+
+### Supporting actors
+
+- Core GraphQL boundary
+- ProductCreateService
+- ScrapedItemLinkService
+
+### Trigger
+
+- The agent submits `createProduct` with `originScrapedItemId`.
+
+### Preconditions
+
+- The scraped item exists.
+- At least one store listing is created for the product.
+
+### Postconditions
+
+- The product is created.
+- The scraped item is linked to the resolved `ProductStore`.
+- The scraped item status becomes `LINKED`.
+
+### Main success flow
+
+1. The agent submits the product payload with `originScrapedItemId`.
+2. The system creates the product and synchronizes store listings.
+3. The system resolves the target `ProductStore` using the scraped item store slug.
+4. The system links the scraped item to that listing.
+5. The system synchronizes price and stock into the core catalog.
+
+### Alternate flows
+
+#### A1. Scraped item does not exist
+
+1. The provided id does not resolve to a scraped item.
+2. The system returns a validation error for `originScrapedItemId`.
+
+#### A2. No matching store listing exists and no safe fallback is available
+
+1. The product is created without a listing for the scraped item store.
+2. The system cannot infer a single safe target listing.
+3. The system returns a validation error for `originScrapedItemId`.
+
+### Business rules
+
+- `originScrapedItemId` is optional.
+- Linking happens only after store listings are created.
+- Store matching uses the scraped item `store_slug`.
+- When the product has exactly one store listing, that listing is used as a fallback.
 
 ## Notes
 

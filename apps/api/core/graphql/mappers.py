@@ -37,6 +37,7 @@ def build_product_create_input(data: ProductInput) -> ProductCreateInput:
         category_name=data.category_path or data.category_name,
         ean=data.ean,
         description=data.description,
+        origin_scraped_item_id=data.origin_scraped_item_id,
         packaging=data.packaging.value,
         is_published=data.is_published,
         tags=tags_to_use,
@@ -46,7 +47,19 @@ def build_product_create_input(data: ProductInput) -> ProductCreateInput:
         components=[
             ProductComponentDTO(
                 name=component.name,
+                weight=component.weight,
+                brand_name=component.brand_name,
+                category_name=component.category_path or component.category_name,
                 ean=component.ean,
+                description=component.description,
+                packaging=component.packaging.value,
+                tags=[tag_path.path for tag_path in component.tag_paths]
+                if component.tag_paths
+                else component.tags,
+                stores=map_store_data(component.stores) if component.stores else [],
+                nutrition=map_nutrition_data(component.nutrition)
+                if component.nutrition
+                else [],
                 external_id=component.external_id,
                 quantity=component.quantity,
             )

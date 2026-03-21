@@ -308,7 +308,12 @@ class TestPublishHelpers(TestCase):
     def test_build_component_payloads_filters_unnamed_components(self):
         payload = build_component_payloads(
             [
-                {"name": "Dose", "quantity": "2 units", "weight_hint": "30g"},
+                {
+                    "name": "Dose",
+                    "quantity": "2 units",
+                    "ean": "7891234567890",
+                    "external_id": "dose-2",
+                },
                 {"name": ""},
                 {"quantity": 1},
             ],
@@ -319,9 +324,9 @@ class TestPublishHelpers(TestCase):
             [
                 {
                     "name": "Dose",
+                    "ean": "7891234567890",
+                    "externalId": "dose-2",
                     "quantity": 2,
-                    "weightHint": "30g",
-                    "packagingHint": None,
                 },
             ],
         )

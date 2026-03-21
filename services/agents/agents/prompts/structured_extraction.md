@@ -20,7 +20,6 @@ Return a valid JSON object containing a LIST of `items`.
   - `OTHER`: Only if it doesn't fit above.
 
 ### NUTRITION DATA (CRITICAL)
-- **Nutrient Claims**: Identify key nutrient drivers as slugs: `['protein', 'creatina', 'caffeine', 'glutamine']`.
 - **Nutrition Facts**: Extract the TABLE values precisely.
   - **Serving Size**: Must be in grams (g) or ml.
   - **Macros**: Proteins, Carbs, Fats (Total, Saturated, Trans), Fiber, Sodium.
@@ -29,10 +28,13 @@ Return a valid JSON object containing a LIST of `items`.
 
 ### COMBO & COMPONENTS
 - **Is Combo**: Set to `true` if the item is a kit (e.g., "Kit 3x Whey", "Combo Mass").
-- **Components**: If likely a combo, list the individual items found (e.g., `[{"name": "Whey Protein", "quantity": 3}]`).
+- **Components**: If likely a combo, list the individual items found.
+  - Include `name` and `quantity`.
+  - Include `ean` and `external_id` only when explicitly present in the source.
+  - Do not invent packaging or weight hints for components.
 
 ### DATA INTEGRITY RULES
 1. **No Hallucinations**: Do not invent values. If a flavor is not listed, do not guess.
 2. **Numeric Parsing**: Convert text like "2,5g" to `2.5`. Ensure integers for KCAL and Sodium.
-3. **Array Fields**: Always return arrays for `flavor_names`, `nutrient_claims`, and `tags_hierarchy`, even if empty `[]`.
+3. **Array Fields**: Always return arrays for `flavor_names`, `tags_hierarchy`, and `components`, even if empty `[]`.
 4. **Table Association**: If there are multiple tables, prefer explicit flavor/natural markers and sequence clues from the raw report to map each table to the right item.

@@ -9,7 +9,15 @@ class ComboComponentInput(BaseModel):
     """DTO for a combo component input."""
 
     name: str
+    weight: int | None = None
+    brand_name: str | None = None
+    category_name: str | list[str] | None = None
     ean: str | None = None
+    description: str | None = ""
+    packaging: str = Product.Packaging.CONTAINER
+    tags: list[str] | list[list[str]] | None = None
+    stores: list[StoreListingPayload] | None = None
+    nutrition: list[ProductNutritionPayload] | None = None
     external_id: str | None = None
     quantity: int = 1
 
@@ -67,6 +75,7 @@ class ProductCreateInput(BaseModel):
     category_name: str | list[str] | None = None
     ean: str | None = None
     description: str | None = ""
+    origin_scraped_item_id: int | None = None
     packaging: str = Product.Packaging.CONTAINER
     is_published: bool = False
     tags: list[str] | list[list[str]] | None = None
@@ -100,3 +109,6 @@ class CatalogProductsFilters(BaseModel):
     concentration_max: float | None = None
     sort_by: str = "price_per_protein_gram"
     sort_dir: str = "asc"
+
+
+ComboComponentInput.model_rebuild()

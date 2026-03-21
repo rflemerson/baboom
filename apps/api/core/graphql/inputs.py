@@ -61,22 +61,16 @@ class ProductStoreInput:
 
 
 @strawberry.input
-class ComboComponentInput:
-    """Input for combo component."""
-
-    name: str
-    ean: str | None = None
-    external_id: str | None = None
-    quantity: int = 1
-
-
-@strawberry.input(description="Input for creating a new product with all related data")
-class ProductInput:
-    """Input for product creation."""
+class ProductDraftInput:
+    """Shared creation fields used by products and combo components."""
 
     name: str = strawberry.field(description="Product display name")
-    weight: int = strawberry.field(description="Weight in grams")
-    brand_name: str = strawberry.field(
+    weight: int | None = strawberry.field(
+        default=None,
+        description="Weight in grams",
+    )
+    brand_name: str | None = strawberry.field(
+        default=None,
         description="Brand name (auto-created if not exists)",
     )
     category_name: str | None = strawberry.field(
@@ -96,10 +90,6 @@ class ProductInput:
         default=PackagingEnum.CONTAINER,
         description="Packaging type",
     )
-    is_published: bool = strawberry.field(
-        default=False,
-        description="Visible on public site",
-    )
     tags: list[str] | None = strawberry.field(
         default=None,
         description="Deprecated: Use tag_paths",
@@ -115,6 +105,32 @@ class ProductInput:
     nutrition: list[ProductNutritionInput] | None = strawberry.field(
         default=None,
         description="Nutrition profiles",
+    )
+
+
+@strawberry.input
+class ComboComponentInput(ProductDraftInput):
+    """Input for combo component."""
+
+    external_id: str | None = None
+    quantity: int = 1
+
+
+@strawberry.input(description="Input for creating a new product with all related data")
+class ProductInput(ProductDraftInput):
+    """Input for product creation."""
+
+    weight: int = strawberry.field(description="Weight in grams")
+    brand_name: str = strawberry.field(
+        description="Brand name (auto-created if not exists)",
+    )
+    origin_scraped_item_id: int | None = strawberry.field(
+        default=None,
+        description="Optional scraped item to link after product creation",
+    )
+    is_published: bool = strawberry.field(
+        default=False,
+        description="Visible on public site",
     )
 
     is_combo: bool = strawberry.field(

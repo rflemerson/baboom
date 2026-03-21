@@ -725,8 +725,10 @@ class TestDagsterAssetsFlow(TestCase):
         self.assertTrue(api.create_calls)
         payload = api.create_calls[0]
         self.assertEqual(payload["weight"], 900)
+        self.assertEqual(payload["originScrapedItemId"], 401)
         self.assertEqual(payload["stores"][0]["price"], 99.9)
         self.assertEqual(payload["components"][0]["quantity"], 2)
+        self.assertNotIn("nutrientClaims", payload)
         self.assertEqual(
             payload["nutrition"][0]["nutritionFacts"]["servingSizeGrams"],
             30.0,
