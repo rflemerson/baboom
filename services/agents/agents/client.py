@@ -15,8 +15,8 @@ SCRAPED_ITEM_CHECKOUT_FIELDS = """
 id
 productLink
 sourcePageUrl
-sourcePageRawContent
-sourcePageContentType
+sourcePageApiContext
+sourcePageHtmlStructuredData
 storeSlug
 storeName
 externalId
@@ -36,8 +36,8 @@ stockStatus
 productLink
 sourcePageUrl
 sourcePageId
-sourcePageRawContent
-sourcePageContentType
+sourcePageApiContext
+sourcePageHtmlStructuredData
 productStoreId
 linkedProductId
 """

@@ -264,10 +264,10 @@ class ShopifyApiSpider(CatalogApiSpider):
             inventory_quantity = selected_variant.get("inventory_quantity")
             try:
                 stock_quantity = (
-                    int(inventory_quantity) if inventory_quantity is not None else 0
+                    int(inventory_quantity) if inventory_quantity is not None else None
                 )
             except (TypeError, ValueError):
-                stock_quantity = 0
+                stock_quantity = None
 
             stock_status = (
                 ScrapedItem.StockStatus.AVAILABLE
@@ -294,7 +294,11 @@ class ShopifyApiSpider(CatalogApiSpider):
                 category=category_name,
             )
             saved = ScraperService.save_product(input_data)
-            persist_json_context(saved, self._build_product_context(data))
+            persist_json_context(
+                saved,
+                self._build_product_context(data),
+                headers=self.get_headers(),
+            )
         except Exception:
             logger.exception("Error processing item %s", data.get("id"))
             return None

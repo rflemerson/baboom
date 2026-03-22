@@ -81,7 +81,8 @@ The response is a **List of Product Objects**.
     *   Skip item when `Price` is missing/invalid.
     *   If stock is unknown/unparseable, keep status as available (avoid false out-of-stock).
 5.  **Context Persistence**:
-    *   Save structured product payload in `ScrapedPage.raw_content` (`content_type="JSON"`).
+    *   Save structured API payload in `ScrapedPage.api_context` and HTML-derived
+        metadata in `ScrapedPage.html_structured_data`.
 
 ## Implementation Examples
 *   `scrapers/spiders/integral_medica.py`

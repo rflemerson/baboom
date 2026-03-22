@@ -97,4 +97,5 @@ The response is standard VTEX JSON:
     * Skip item when `Price` is missing/invalid.
     * Unknown stock stays available (avoid false out-of-stock).
     * Product IDs are deduplicated globally across categories in one crawl.
-    * Save structured product payload in `ScrapedPage.raw_content` (`content_type="JSON"`).
+    * Save structured API payload in `ScrapedPage.api_context` and HTML-derived
+      metadata in `ScrapedPage.html_structured_data`.

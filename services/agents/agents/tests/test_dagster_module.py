@@ -50,8 +50,11 @@ class _FakeApiClient:
             "productLink": payload.get("page_url"),
             "sourcePageUrl": payload.get("page_url"),
             "sourcePageId": payload.get("source_page_id"),
-            "sourcePageRawContent": payload.get("source_page_raw_content", ""),
-            "sourcePageContentType": payload.get("source_page_content_type", ""),
+            "sourcePageApiContext": payload.get("source_page_api_context", ""),
+            "sourcePageHtmlStructuredData": payload.get(
+                "source_page_html_structured_data",
+                "",
+            ),
             "productStoreId": payload.get("product_store_id"),
             "linkedProductId": payload.get("linked_product_id"),
         }
@@ -158,8 +161,8 @@ class _FakeApiClient:
                 "productLink": page_url,
                 "sourcePageUrl": page_url,
                 "sourcePageId": origin.get("sourcePageId") or self._next_page_id,
-                "sourcePageRawContent": "",
-                "sourcePageContentType": "",
+                "sourcePageApiContext": "",
+                "sourcePageHtmlStructuredData": "",
                 "productStoreId": None,
                 "linkedProductId": None,
             }

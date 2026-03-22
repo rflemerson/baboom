@@ -296,7 +296,11 @@ class WapStoreApiSpider(CatalogApiSpider):
                 category=category,
             )
             saved = ScraperService.save_product(input_data)
-            persist_json_context(saved, self._build_product_context(item))
+            persist_json_context(
+                saved,
+                self._build_product_context(item),
+                headers=self.get_headers(),
+            )
         except Exception:
             logger.exception("Error processing item %s", item.get("id"))
             return None

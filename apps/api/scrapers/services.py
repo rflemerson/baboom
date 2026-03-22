@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+import extruct
+import requests
 from django.db import transaction
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
@@ -277,6 +280,8 @@ class ScrapedItemLinkService:
 class ScraperService:
     """Service for handling scraped data."""
 
+    HTML_EXTRACTION_TIMEOUT_SECONDS = 20
+
     @staticmethod
     @transaction.atomic
     def save_product(data: ScrapedItemIngestionInput) -> ScrapedItem | None:
@@ -356,16 +361,68 @@ class ScraperService:
         return True
 
     @staticmethod
-    def persist_item_context(
+    def _normalize_api_context_payload(context_payload: str | dict) -> dict:
+        """Convert scraper context payloads into a JSON-serializable dict."""
+        if isinstance(context_payload, dict):
+            return context_payload
+        if not context_payload:
+            return {}
+        try:
+            parsed = json.loads(context_payload)
+        except json.JSONDecodeError:
+            logger.warning("Could not decode scraper API context payload as JSON")
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    @staticmethod
+    def extract_html_structured_data(
+        *,
+        url: str,
+        headers: dict[str, str] | None = None,
+    ) -> dict:
+        """Fetch one product page and extract structured metadata from the HTML."""
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=ScraperService.HTML_EXTRACTION_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            logger.exception("Failed to fetch HTML for structured extraction: %s", url)
+            return {}
+
+        try:
+            extracted = extruct.extract(
+                response.text,
+                base_url=url,
+                syntaxes=["json-ld", "microdata", "opengraph", "rdfa", "microformat"],
+                uniform=True,
+            )
+        except Exception:
+            logger.exception("Failed to extract structured HTML data for %s", url)
+            return {}
+
+        return extracted if isinstance(extracted, dict) else {}
+
+    @staticmethod
+    def persist_page_context(
         saved_item: ScrapedItem | None,
-        context_payload: str,
+        api_context_payload: str | dict,
+        *,
+        headers: dict[str, str] | None = None,
     ) -> None:
-        """Persist structured scraper context into source page when available."""
+        """Persist API context and HTML-structured data into source page."""
         if not saved_item or not saved_item.source_page_id:
             return
         page = saved_item.source_page
         if page is None:
             return
-        page.raw_content = context_payload
-        page.content_type = "JSON"
-        page.save(update_fields=["raw_content", "content_type"])
+        page.api_context = ScraperService._normalize_api_context_payload(
+            api_context_payload,
+        )
+        page.html_structured_data = ScraperService.extract_html_structured_data(
+            url=page.url,
+            headers=headers,
+        )
+        page.save(update_fields=["api_context", "html_structured_data"])

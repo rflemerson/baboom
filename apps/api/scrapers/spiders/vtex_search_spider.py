@@ -213,7 +213,11 @@ class VtexSearchSpider(CatalogApiSpider):
                 category=category,
             )
             saved = ScraperService.save_product(input_data)
-            persist_json_context(saved, self._build_product_context(item))
+            persist_json_context(
+                saved,
+                self._build_product_context(item),
+                headers=self.get_headers(),
+            )
         except VTEX_ITEM_PROCESSING_EXCEPTIONS as exc:
             logger.debug("Item parse error: %s", exc)
             return None

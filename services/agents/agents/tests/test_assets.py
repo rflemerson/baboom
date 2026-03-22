@@ -122,8 +122,8 @@ class TestIngestionHelpers(TestCase):
         )()
         item = {
             "productLink": "https://example.com/p",
-            "sourcePageRawContent": "<html></html>",
-            "sourcePageContentType": "HTML",
+            "sourcePageApiContext": '{"platform":"shopify"}',
+            "sourcePageHtmlStructuredData": '{"json-ld":[]}',
         }
 
         page = resolve_source_page_context(api, config, item)
@@ -131,7 +131,7 @@ class TestIngestionHelpers(TestCase):
         self.assertEqual(page.page_id, 55)
         self.assertEqual(page.page_url, "https://example.com/p")
         self.assertEqual(page.store_slug, "demo-store")
-        self.assertEqual(page.source_page_content_type, "HTML")
+        self.assertEqual(page.source_page_api_context, '{"platform":"shopify"}')
 
     def test_build_download_result_maps_source_page_context(self):
         page = SourcePageContext(
@@ -139,8 +139,8 @@ class TestIngestionHelpers(TestCase):
             page_id=55,
             page_url="https://example.com/p",
             store_slug="demo-store",
-            source_page_raw_content="<html></html>",
-            source_page_content_type="HTML",
+            source_page_api_context='{"platform":"shopify"}',
+            source_page_html_structured_data='{"json-ld":[]}',
         )
 
         result = build_download_result(page)
@@ -198,8 +198,7 @@ class TestPreparedInputsHelpers(TestCase):
     def test_load_scraper_context_parses_json_payloads_only(self):
         context = load_scraper_context(
             {
-                "source_page_raw_content": '{"variants":["Chocolate"]}',
-                "source_page_content_type": "JSON",
+                "source_page_api_context": '{"variants":["Chocolate"]}',
             },
         )
         self.assertEqual(context, {"variants": ["Chocolate"]})
@@ -210,24 +209,61 @@ class TestPreparedInputsHelpers(TestCase):
 
     def test_extract_image_urls_reads_shopify_images(self):
         image_urls = extract_image_urls(
-            {
+            scraper_context={
                 "platform": "shopify",
                 "images": [{"src": "https://cdn.example.com/a.jpg", "alt": "front"}],
             },
+            html_structured_data=None,
         )
 
         self.assertEqual(image_urls, ["https://cdn.example.com/a.jpg"])
+
+    def test_extract_image_urls_appends_html_structured_data_without_duplicates(self):
+        image_urls = extract_image_urls(
+            scraper_context={
+                "images": [
+                    {"src": "https://cdn.example.com/a.jpg"},
+                    {"src": "https://cdn.example.com/b.jpg"},
+                ],
+            },
+            html_structured_data={
+                "json-ld": [
+                    {
+                        "image": [
+                            "https://cdn.example.com/b.jpg",
+                            "https://cdn.example.com/c.jpg",
+                        ],
+                    },
+                ],
+                "opengraph": [
+                    {"properties": {"og:image": "https://cdn.example.com/d.jpg"}},
+                ],
+            },
+        )
+
+        self.assertEqual(
+            image_urls,
+            [
+                "https://cdn.example.com/a.jpg",
+                "https://cdn.example.com/b.jpg",
+                "https://cdn.example.com/c.jpg",
+                "https://cdn.example.com/d.jpg",
+            ],
+        )
 
     def test_build_prepared_extraction_inputs_keeps_image_order_from_json(self):
         prepared = build_prepared_extraction_inputs(
             downloaded_assets={
                 "origin_item_id": 42,
                 "url": "https://example.com/p",
-                "source_page_raw_content": (
+                "source_page_api_context": (
                     '{"images":["https://cdn.example.com/1.jpg",'
                     '"https://cdn.example.com/2.jpg"]}'
                 ),
-                "source_page_content_type": "JSON",
+                "source_page_html_structured_data": (
+                    '{"json-ld":[{"image":["https://cdn.example.com/2.jpg",'
+                    '"https://cdn.example.com/3.jpg"]}]}'
+                ),
             },
         )
 
@@ -236,6 +272,7 @@ class TestPreparedInputsHelpers(TestCase):
             [
                 "https://cdn.example.com/1.jpg",
                 "https://cdn.example.com/2.jpg",
+                "https://cdn.example.com/3.jpg",
             ],
         )
 

@@ -71,6 +71,12 @@ def parse_optional_int(value: object) -> int | None:
 def persist_json_context(
     saved_item: object | None,
     context_payload: str,
+    *,
+    headers: dict[str, str] | None = None,
 ) -> None:
     """Persist structured JSON context in source page when available."""
-    ScraperService.persist_item_context(saved_item, context_payload)
+    ScraperService.persist_page_context(
+        saved_item,
+        context_payload,
+        headers=headers,
+    )

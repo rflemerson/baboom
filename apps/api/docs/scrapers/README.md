@@ -3,10 +3,15 @@
 ## Executive Summary
 All target monitors use **API-First** strategies with structured endpoints for
 catalog discovery, product listing, and variant-level details.
-Each spider persists a normalized JSON context in `ScrapedPage.raw_content`
-(`content_type="JSON"`) for downstream Dagster/Agents usage.
-This context is exposed to agents as `sourcePageRawContent` and injected into
-LLM prompts as `[SCRAPER_CONTEXT]`.
+Each spider now persists two structured payloads in `ScrapedPage`:
+
+- `api_context`: normalized product context collected from store APIs
+- `html_structured_data`: structured metadata extracted from the product HTML
+  with `extruct`
+
+The agents pipeline currently consumes `api_context` from the backend GraphQL
+field `sourcePageApiContext` and injects that payload into LLM prompts as
+`[SCRAPER_CONTEXT]`.
 
 All base spiders now follow the same Template Method hook contract for
 category pagination:
@@ -17,6 +22,17 @@ consistent across Shopify, VTEX GraphQL, VTEX Legacy, and Wap.Store.
 The orchestration is centralized in `CatalogApiSpider`, which also provides
 shared retry/backoff and crawl metrics logging (`categories_*`,
 `products_collected`, `crawl_duration_ms`).
+
+## Category Resolution Behavior
+
+`CatalogApiSpider` now gives priority to an explicit `categories=[...]` override
+when one is passed to the spider constructor. Dynamic discovery remains the
+default for production crawls, but smoke tests and focused debugging sessions
+can now constrain the crawl to a known subset safely.
+
+If no explicit categories are provided, the spider falls back to dynamically
+discovered categories first and then to `FALLBACK_CATEGORIES` when discovery
+returns nothing.
 
 ## Technology Stack Breakdown
 

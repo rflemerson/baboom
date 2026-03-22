@@ -114,7 +114,9 @@ We have implemented `GrowthSpider` using this strategy:
 3.  **Parsing**: robustly check `conteudo.produtos` and `data.list`.
 4.  **Validation**: require valid URL and parseable price before persisting item.
 5.  **Stock Logic**: unknown stock keeps item as available (avoids false out-of-stock).
-6.  **Context Persistence**: save structured product JSON in `ScrapedPage.raw_content`.
+6.  **Context Persistence**: save the API-derived product JSON in
+    `ScrapedPage.api_context` and the HTML-derived structured metadata in
+    `ScrapedPage.html_structured_data`.
 
 ## 5. Known Limitations
 -   **Limit**: Strict maximum of 30 items.

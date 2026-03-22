@@ -224,7 +224,7 @@ The deterministic stage is now API-first:
 - `prepared_extraction_inputs` does not materialize image candidates from local
   storage
 - all three stages consume the JSON context already persisted by Django in
-  `ScrapedPage.raw_content`
+  `ScrapedPage.api_context`
 
 Prompt loading is part of the extraction layer, not the agent-wrapper layer:
 
@@ -276,11 +276,11 @@ Instead, it relies on fields already exposed by the backend GraphQL API:
 
 - `sourcePageUrl`
 - `sourcePageId`
-- `sourcePageRawContent`
-- `sourcePageContentType`
+- `sourcePageApiContext`
+- `sourcePageHtmlStructuredData`
 
 The expectation is that Django scrapers already persisted a structured JSON
-payload into `ScrapedPage.raw_content`, and the agents pipeline consumes that
+payload into `ScrapedPage.api_context`, and the agents pipeline consumes that
 JSON directly.
 
 ## Asset-by-Asset Walkthrough
@@ -313,7 +313,7 @@ Source:
    - then run config `store_slug`
 4. call `ensure_source_page(...)` so the scraped item is linked to a source page
 5. read the resulting `sourcePageId`
-6. carry forward `sourcePageRawContent` and `sourcePageContentType`
+6. carry forward `sourcePageApiContext` and `sourcePageHtmlStructuredData`
 7. return a normalized payload for downstream assets
 
 #### Output Payload
@@ -324,8 +324,8 @@ The asset returns a dict with:
 - `page_id`
 - `origin_item_id`
 - `store_slug`
-- `source_page_raw_content`
-- `source_page_content_type`
+- `source_page_api_context`
+- `source_page_html_structured_data`
 
 #### Error Behavior
 
@@ -348,12 +348,18 @@ Source:
 
 #### Step Logic
 
-1. parse `sourcePageRawContent` when `sourcePageContentType == "JSON"`
-2. extract image URLs directly from JSON fields such as:
+1. parse `sourcePageApiContext`
+2. parse `sourcePageHtmlStructuredData`
+3. extract image URLs from both sources, preserving order and deduplicating:
+   - first from `api_context`
+   - then from `html_structured_data`
+4. read image URLs directly from JSON fields such as:
    - `images`
    - `items[].images`
-3. preserve gallery order using the original image positions
-4. determine extraction mode:
+   - `json-ld[].image`
+   - `opengraph[].properties.og:image`
+5. preserve gallery order using the original image positions
+6. determine extraction mode:
    - `multimodal` when image URLs exist
    - `text_only` otherwise
 
@@ -608,8 +614,8 @@ The main pipeline is now API-first.
 
 The deterministic half consumes:
 
-- `sourcePageRawContent` from the backend API
-- `sourcePageContentType`
+- `sourcePageApiContext` from the backend API
+- `sourcePageHtmlStructuredData`
 - image URLs already present in that JSON payload
 
 The agents service no longer relies on local scraper-produced HTML, site-data

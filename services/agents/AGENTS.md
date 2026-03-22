@@ -182,7 +182,7 @@ Push that logic into plain Python functions or service modules instead.
 Current rule for this service:
 
 - the deterministic acquisition stage is API-first
-- it consumes `sourcePageRawContent` / `sourcePageContentType` from the backend
+- it consumes `sourcePageApiContext` from the backend
 - it does not re-download HTML, rebuild `site_data`, or materialize OCR
   candidates from local scraper code
 

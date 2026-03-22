@@ -1,5 +1,6 @@
 """GraphQL types exposed for scraper-managed entities."""
 
+import json
 from typing import cast
 
 import strawberry
@@ -45,19 +46,22 @@ class ScrapedItemType:
         return item.source_page_id
 
     @strawberry.field
-    def source_page_raw_content(self) -> str:
-        """Return raw structured context saved by scraper."""
+    def source_page_api_context(self) -> str:
+        """Return API-backed product context saved by the scraper."""
         item = cast("ScrapedItem", self)
         if item.source_page:
-            return item.source_page.raw_content or ""
+            return json.dumps(item.source_page.api_context or {}, ensure_ascii=False)
         return ""
 
     @strawberry.field
-    def source_page_content_type(self) -> str:
-        """Return source page content type (HTML/JSON)."""
+    def source_page_html_structured_data(self) -> str:
+        """Return structured metadata extracted from the page HTML."""
         item = cast("ScrapedItem", self)
         if item.source_page:
-            return item.source_page.content_type
+            return json.dumps(
+                item.source_page.html_structured_data or {},
+                ensure_ascii=False,
+            )
         return ""
 
     @strawberry.field

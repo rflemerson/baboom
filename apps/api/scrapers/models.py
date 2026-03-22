@@ -6,7 +6,7 @@ from simple_history.models import HistoricalRecords
 
 
 class ScrapedPage(models.Model):
-    """Raw content of a scraped page."""
+    """Structured context collected for a scraped page."""
 
     store_slug = models.CharField(
         max_length=100,
@@ -18,15 +18,15 @@ class ScrapedPage(models.Model):
         unique=True,
         help_text=_("Page URL"),
     )
-    raw_content = models.TextField(
-        help_text=_("Raw HTML or JSON content"),
+    api_context = models.JSONField(
+        default=dict,
         blank=True,
-        default="",
+        help_text=_("Normalized product context collected from store APIs"),
     )
-    content_type = models.CharField(
-        max_length=10,
-        choices=[("HTML", "HTML"), ("JSON", "JSON")],
-        default="HTML",
+    html_structured_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_("Structured metadata extracted from the product HTML"),
     )
     scraped_at = models.DateTimeField(auto_now_add=True)
 

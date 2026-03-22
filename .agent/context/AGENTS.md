@@ -74,9 +74,13 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 - The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/.agents/`.
 
 ## 7. Agents Pipeline Contract (Dagster)
-- Scraper stage must stay lightweight and store artifacts only:
-  - `source.html`, `image_manifest.json`, `site_data.json`, optional `catalog_context.json`.
-- Heavy image download/CV scoring must run in Dagster (`ocr_extraction`) and persist:
-  - `images/*` + `candidates.json`.
-- `ocr_extraction` must always send context blocks (`[SITE_DATA]`, `[CATALOG_CONTEXT]`) and expose fallback metadata when running text-only mode.
-- `product_analysis` must enforce schema consistency plus catalog consistency (allowed flavors/variants when context exists).
+- The Django scrapers are API-first. They persist product context in `ScrapedPage.api_context` and HTML-derived structured data in `ScrapedPage.html_structured_data`.
+- Dagster must consume `sourcePageApiContext` as its primary deterministic input. `sourcePageHtmlStructuredData` is auxiliary context for future enrichment and should not replace `api_context` by default.
+- The agents pipeline no longer owns local HTML scraping, image manifest generation, CV scoring, or storage-side candidate materialization.
+- The deterministic handoff is:
+  - `downloaded_assets` -> normalize the `ScrapedItem` + `ScrapedPage` payload from the API
+  - `prepared_extraction_inputs` -> extract ordered image URLs and JSON context from `api_context`
+- The non-deterministic handoff is:
+  - `raw_extraction` -> send `api_context` JSON plus raw image URLs to the multimodal model
+  - `product_analysis` -> convert raw text into structured product data and apply semantic retries if needed
+- `upload_to_api` publishes the structured result back to Django. Combo components may carry product-like payloads, but the API remains the system of record for matching or creating component products.

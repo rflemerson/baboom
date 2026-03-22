@@ -54,11 +54,21 @@ class CatalogApiSpider(BaseSpider):
         raise NotImplementedError
 
     def _resolve_categories(self) -> list[str]:
+        if self.categories_to_crawl:
+            categories = list(self.categories_to_crawl)
+            logger.info(
+                "Using explicit categories for %s: %s",
+                self.BRAND_NAME,
+                categories,
+            )
+            self.metrics["categories_discovered"] = len(categories)
+            return categories
+
         categories = self._fetch_categories()
         self.check_category_discrepancy(categories, self.FALLBACK_CATEGORIES)
         if not categories:
             logger.info("No dynamic categories found, using fallback/config.")
-            categories = self.categories_to_crawl or self.FALLBACK_CATEGORIES
+            categories = list(self.FALLBACK_CATEGORIES)
         self.metrics["categories_discovered"] = len(categories)
         return categories
 

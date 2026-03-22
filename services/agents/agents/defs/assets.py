@@ -47,8 +47,8 @@ def downloaded_assets(
                 "url": MetadataValue.url(page.page_url),
                 "page_id": page.page_id,
                 "origin_item_id": page.item_id,
-                "scraper_context_type": page.source_page_content_type or "unknown",
-                "has_scraper_context": bool(page.source_page_raw_content),
+                "has_api_context": bool(page.source_page_api_context),
+                "has_html_structured_data": bool(page.source_page_html_structured_data),
                 "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             },
         )

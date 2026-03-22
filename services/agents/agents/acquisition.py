@@ -15,8 +15,8 @@ class SourcePageContext:
     page_id: int
     page_url: str
     store_slug: str
-    source_page_raw_content: str
-    source_page_content_type: str
+    source_page_api_context: str
+    source_page_html_structured_data: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,16 +114,16 @@ def resolve_source_page_context(
             or current_item.get("storeSlug")
             or config.store_slug
         ),
-        source_page_raw_content=(
-            ensured_item.get("sourcePageRawContent")
-            or item.get("sourcePageRawContent")
-            or current_item.get("sourcePageRawContent")
+        source_page_api_context=(
+            ensured_item.get("sourcePageApiContext")
+            or item.get("sourcePageApiContext")
+            or current_item.get("sourcePageApiContext")
             or ""
         ),
-        source_page_content_type=(
-            ensured_item.get("sourcePageContentType")
-            or item.get("sourcePageContentType")
-            or current_item.get("sourcePageContentType")
+        source_page_html_structured_data=(
+            ensured_item.get("sourcePageHtmlStructuredData")
+            or item.get("sourcePageHtmlStructuredData")
+            or current_item.get("sourcePageHtmlStructuredData")
             or ""
         ),
     )
@@ -136,8 +136,8 @@ def build_download_result(page: SourcePageContext) -> dict:
         "page_id": page.page_id,
         "origin_item_id": page.item_id,
         "store_slug": page.store_slug,
-        "source_page_raw_content": page.source_page_raw_content,
-        "source_page_content_type": page.source_page_content_type,
+        "source_page_api_context": page.source_page_api_context,
+        "source_page_html_structured_data": page.source_page_html_structured_data,
     }
 
 
@@ -147,7 +147,11 @@ def build_prepared_extraction_inputs(
 ) -> PreparedExtractionInputs:
     """Build the deterministic handoff between acquisition and extraction."""
     scraper_context = load_scraper_context(downloaded_assets)
-    image_urls = extract_image_urls(scraper_context)
+    html_structured_data = load_html_structured_data(downloaded_assets)
+    image_urls = extract_image_urls(
+        scraper_context=scraper_context,
+        html_structured_data=html_structured_data,
+    )
     fallback_reason = resolve_fallback_reason(image_urls)
     return PreparedExtractionInputs(
         origin_item_id=int(downloaded_assets["origin_item_id"]),
@@ -160,30 +164,49 @@ def build_prepared_extraction_inputs(
 
 def load_scraper_context(downloaded_assets: dict) -> dict | None:
     """Parse JSON scraper context when source page payload is available."""
-    raw_scraper_context = downloaded_assets.get("source_page_raw_content")
-    scraper_context_type = str(
-        downloaded_assets.get("source_page_content_type") or "",
-    ).upper()
-    if not raw_scraper_context or scraper_context_type != "JSON":
+    return _load_json_object(downloaded_assets.get("source_page_api_context"))
+
+
+def load_html_structured_data(downloaded_assets: dict) -> dict | None:
+    """Parse HTML structured data when the API payload is available."""
+    return _load_json_object(downloaded_assets.get("source_page_html_structured_data"))
+
+
+def _load_json_object(raw_payload: object) -> dict | None:
+    if not raw_payload:
         return None
     try:
-        parsed_context = json.loads(raw_scraper_context)
+        parsed_context = json.loads(str(raw_payload))
     except json.JSONDecodeError:
         return None
     return parsed_context if isinstance(parsed_context, dict) else None
 
 
-def extract_image_urls(scraper_context: dict | None) -> list[str]:
-    """Extract image URLs from the API payload while preserving source order."""
-    if not scraper_context:
-        return []
-    return list(_iter_image_urls(scraper_context))
+def extract_image_urls(
+    *,
+    scraper_context: dict | None,
+    html_structured_data: dict | None = None,
+) -> list[str]:
+    """Extract image URLs from API and HTML structured data in stable order."""
+    seen_urls: set[str] = set()
+    image_urls: list[str] = []
+
+    for payload in (scraper_context, html_structured_data):
+        if not payload:
+            continue
+        for image_url in _iter_image_urls(payload):
+            if image_url in seen_urls:
+                continue
+            seen_urls.add(image_url)
+            image_urls.append(image_url)
+
+    return image_urls
 
 
 def _extract_image_url(image: object) -> str | None:
     if isinstance(image, str):
         url = image.strip()
-        if not url:
+        if not url or not url.startswith(("http://", "https://")):
             return None
         return url
 
@@ -195,6 +218,7 @@ def _extract_image_url(image: object) -> str | None:
         or image.get("url")
         or image.get("imageUrl")
         or image.get("imageUrlHttps")
+        or image.get("content")
     )
     if not url:
         return None
@@ -208,13 +232,16 @@ def _iter_image_urls(payload: object) -> list[str]:
 
 
 def _collect_image_urls(payload: object, image_urls: list[str]) -> None:
+    if isinstance(payload, str):
+        image_url = _extract_image_url(payload)
+        if image_url:
+            image_urls.append(image_url)
+        return
+
     if isinstance(payload, dict):
-        if "images" in payload and isinstance(payload["images"], list):
-            for image in payload["images"]:
-                image_url = _extract_image_url(image)
-                if image_url:
-                    image_urls.append(image_url)
-            return
+        image_url = _extract_image_url(payload)
+        if image_url:
+            image_urls.append(image_url)
         for value in payload.values():
             _collect_image_urls(value, image_urls)
         return
