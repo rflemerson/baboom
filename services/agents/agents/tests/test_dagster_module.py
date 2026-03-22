@@ -178,7 +178,7 @@ class TestDagsterSensor(TestCase):
 
     def test_definitions_validate_loadable(self):
         """The Dagster code location remains structurally loadable."""
-        defs.validate_loadable()
+        type(defs).validate_loadable(defs)
 
     def test_sensor_skips_when_queue_empty(self):
         """Returns SkipReason when checkout has no pending item."""
@@ -697,9 +697,29 @@ class TestDagsterAssetsFlow(TestCase):
                     "items": [
                         {
                             "name": "Numeric Product",
+                            "brand_name": "Growth",
                             "packaging": "CONTAINER",
                             "weight_grams": "900g",
-                            "components": [{"name": "Dose", "quantity": "2 units"}],
+                            "components": [
+                                {
+                                    "name": "Dose",
+                                    "weight_grams": "30g",
+                                    "brand_name": "Growth",
+                                    "category_hierarchy": ["Protein", "Dose"],
+                                    "quantity": "2 units",
+                                    "ean": "7891234567890",
+                                    "description": "Dose do combo",
+                                    "packaging": "REFILL",
+                                    "tags_hierarchy": [["Goal", "Mass"]],
+                                    "nutrition_facts": {
+                                        "serving_size_grams": "30g",
+                                        "energy_kcal": "120 kcal",
+                                        "proteins": "24g",
+                                        "carbohydrates": "3g",
+                                        "total_fats": "2g",
+                                    },
+                                },
+                            ],
                             "nutrition_facts": {
                                 "serving_size_grams": "30g",
                                 "energy_kcal": "120 kcal",
@@ -726,8 +746,13 @@ class TestDagsterAssetsFlow(TestCase):
         payload = api.create_calls[0]
         self.assertEqual(payload["weight"], 900)
         self.assertEqual(payload["originScrapedItemId"], 401)
-        self.assertEqual(payload["stores"][0]["price"], 99.9)
+        self.assertEqual(payload["stores"][0]["price"], 90.0)
         self.assertEqual(payload["components"][0]["quantity"], 2)
+        self.assertEqual(payload["components"][0]["weight"], 30)
+        self.assertEqual(payload["components"][0]["brandName"], "Growth")
+        self.assertEqual(payload["components"][0]["categoryPath"], ["Protein", "Dose"])
+        self.assertEqual(payload["components"][0]["packaging"], "REFILL")
+        self.assertTrue(payload["components"][0]["nutrition"])
         self.assertNotIn("nutrientClaims", payload)
         self.assertEqual(
             payload["nutrition"][0]["nutritionFacts"]["servingSizeGrams"],

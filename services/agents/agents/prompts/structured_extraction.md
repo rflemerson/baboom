@@ -29,12 +29,24 @@ Return a valid JSON object containing a LIST of `items`.
 ### COMBO & COMPONENTS
 - **Is Combo**: Set to `true` if the item is a kit (e.g., "Kit 3x Whey", "Combo Mass").
 - **Components**: If likely a combo, list the individual items found.
-  - Include `name` and `quantity`.
+  - Include the same product fields when they are explicitly available for the component:
+    - `name`
+    - `weight_grams`
+    - `brand_name`
+    - `category_hierarchy`
+    - `ean`
+    - `description`
+    - `packaging`
+    - `tags_hierarchy`
+    - `nutrition_facts`
+    - `flavor_names`
+    - `external_id`
+    - `quantity`
   - Include `ean` and `external_id` only when explicitly present in the source.
-  - Do not invent packaging or weight hints for components.
+  - If a field is not explicit for the component, leave it empty instead of copying from the combo automatically.
 
 ### DATA INTEGRITY RULES
 1. **No Hallucinations**: Do not invent values. If a flavor is not listed, do not guess.
 2. **Numeric Parsing**: Convert text like "2,5g" to `2.5`. Ensure integers for KCAL and Sodium.
-3. **Array Fields**: Always return arrays for `flavor_names`, `tags_hierarchy`, and `components`, even if empty `[]`.
+3. **Array Fields**: Always return arrays for `flavor_names`, `tags_hierarchy`, `components`, and component-level hierarchy fields, even if empty `[]`.
 4. **Table Association**: If there are multiple tables, prefer explicit flavor/natural markers and sequence clues from the raw report to map each table to the right item.

@@ -372,7 +372,10 @@ def build_product_payload(
         "tagPaths": build_tag_paths(analysis_data.get("tags_hierarchy") or []),
         "tags": [],
         "isCombo": bool(analysis_data.get("is_combo")),
-        "components": build_component_payloads(analysis_data.get("components") or []),
+        "components": build_component_payloads(
+            analysis_data.get("components") or [],
+            parent_analysis_data=analysis_data,
+        ),
         "isPublished": False,
     }
 
@@ -401,12 +404,30 @@ def build_tag_paths(tags_hierarchy: list[str]) -> list[dict]:
     return [{"path": path} for path in tags_hierarchy if path]
 
 
-def build_component_payloads(components: list[dict]) -> list[dict]:
+def build_component_payloads(
+    components: list[dict],
+    *,
+    parent_analysis_data: dict,
+) -> list[dict]:
     """Build component payload entries while filtering unnamed components."""
     return [
         {
             "name": component.get("name"),
+            "weight": (
+                int(parsed_weight)
+                if (parsed_weight := parse_number(component.get("weight_grams")))
+                is not None
+                else None
+            ),
+            "brandName": component.get("brand_name")
+            or parent_analysis_data.get("brand_name"),
+            "categoryPath": component.get("category_hierarchy") or [],
             "ean": component.get("ean"),
+            "description": component.get("description"),
+            "packaging": component.get("packaging") or "CONTAINER",
+            "tagPaths": build_tag_paths(component.get("tags_hierarchy") or []),
+            "tags": [],
+            "nutrition": build_nutrition_payload(component),
             "externalId": component.get("external_id"),
             "quantity": parse_int(component.get("quantity"), default=1),
         }

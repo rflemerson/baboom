@@ -1,9 +1,6 @@
 """Dagster asset adapters for the agents pipeline."""
 
-from __future__ import annotations
-
 import time
-from typing import TYPE_CHECKING
 
 from dagster import AssetExecutionContext, MetadataValue, asset
 
@@ -28,9 +25,9 @@ from ..publishing import (
     publish_analysis_item,
     resolve_analysis_items,
 )
+from . import pipeline as pipeline_module
 
-if TYPE_CHECKING:
-    from .pipeline import ItemConfig
+ItemConfig = pipeline_module.ItemConfig
 
 
 @asset
@@ -176,9 +173,10 @@ def upload_to_api(
     context: AssetExecutionContext,
     config: ItemConfig,
     product_analysis: dict,
-    _downloaded_assets: dict,
+    downloaded_assets: dict,
 ) -> list[dict]:
     """Create one product per analyzed item and link generated scraped items."""
+    _ = downloaded_assets
     api = AgentClient()
     try:
         started = time.perf_counter()

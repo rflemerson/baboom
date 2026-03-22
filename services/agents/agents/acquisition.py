@@ -86,7 +86,6 @@ def resolve_source_page_context(
     item: dict,
 ) -> SourcePageContext:
     """Ensure source page exists and return normalized page context."""
-    _ = item
     current_item, ensured_item = ensure_item_source_page(
         api,
         item_id=config.item_id,
@@ -111,16 +110,19 @@ def resolve_source_page_context(
         page_url=ensured_page_url,
         store_slug=(
             ensured_item.get("storeSlug")
+            or item.get("storeSlug")
             or current_item.get("storeSlug")
             or config.store_slug
         ),
         source_page_raw_content=(
             ensured_item.get("sourcePageRawContent")
+            or item.get("sourcePageRawContent")
             or current_item.get("sourcePageRawContent")
             or ""
         ),
         source_page_content_type=(
             ensured_item.get("sourcePageContentType")
+            or item.get("sourcePageContentType")
             or current_item.get("sourcePageContentType")
             or ""
         ),

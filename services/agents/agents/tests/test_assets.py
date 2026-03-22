@@ -310,13 +310,27 @@ class TestPublishHelpers(TestCase):
             [
                 {
                     "name": "Dose",
+                    "weight_grams": "30g",
+                    "brand_name": "Growth",
+                    "category_hierarchy": ["Protein", "Whey"],
                     "quantity": "2 units",
                     "ean": "7891234567890",
+                    "description": "Dose do combo",
+                    "packaging": "REFILL",
+                    "tags_hierarchy": [["Goal", "Mass"]],
+                    "nutrition_facts": {
+                        "serving_size_grams": "30g",
+                        "energy_kcal": "120",
+                        "proteins": "24g",
+                        "carbohydrates": "3g",
+                        "total_fats": "2g",
+                    },
                     "external_id": "dose-2",
                 },
                 {"name": ""},
                 {"quantity": 1},
             ],
+            parent_analysis_data={"brand_name": "Parent Brand"},
         )
 
         self.assertEqual(
@@ -324,7 +338,34 @@ class TestPublishHelpers(TestCase):
             [
                 {
                     "name": "Dose",
+                    "weight": 30,
+                    "brandName": "Growth",
+                    "categoryPath": ["Protein", "Whey"],
                     "ean": "7891234567890",
+                    "description": "Dose do combo",
+                    "packaging": "REFILL",
+                    "tagPaths": [{"path": ["Goal", "Mass"]}],
+                    "tags": [],
+                    "nutrition": [
+                        {
+                            "flavorNames": [],
+                            "nutritionFacts": {
+                                "description": "AI Analysis",
+                                "servingSizeGrams": 30.0,
+                                "energyKcal": 120,
+                                "proteins": 24.0,
+                                "carbohydrates": 3.0,
+                                "totalSugars": 0.0,
+                                "addedSugars": 0.0,
+                                "totalFats": 2.0,
+                                "saturatedFats": 0.0,
+                                "transFats": 0.0,
+                                "dietaryFiber": 0.0,
+                                "sodium": 0.0,
+                                "micronutrients": [],
+                            },
+                        },
+                    ],
                     "externalId": "dose-2",
                     "quantity": 2,
                 },

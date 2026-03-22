@@ -1,16 +1,11 @@
 """Dagster sensor polling the work queue and launching the item pipeline."""
 
-from __future__ import annotations
+from typing import Any
 
-from typing import TYPE_CHECKING, Any
-
-from dagster import DefaultSensorStatus, RunRequest, SkipReason, sensor
+from dagster import DefaultSensorStatus, SkipReason, sensor
 
 from ..client import AgentClient
 from .pipeline import PROCESS_ITEM_JOB_NAME, QueueWorkItem, build_item_run_request
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 
 def _parse_work_item(work: dict[str, Any] | None) -> QueueWorkItem | None:
@@ -37,9 +32,10 @@ def _parse_work_item(work: dict[str, Any] | None) -> QueueWorkItem | None:
     default_status=DefaultSensorStatus.RUNNING,
 )
 def work_queue_sensor(
-    _context: object,
-) -> Iterator[RunRequest | SkipReason]:
+    context: object,
+) -> object:
     """Poll API for new items to process."""
+    _ = context
     api = AgentClient()
     work = api.checkout_work()
     item = _parse_work_item(work)

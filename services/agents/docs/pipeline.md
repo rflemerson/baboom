@@ -238,6 +238,11 @@ This means the `brain` modules can be executed directly from plain Python
 without Dagster UI or Dagster runtime, as long as the caller passes a prompt and
 model configuration.
 
+For combo products, `upload_to_api` now sends rich component payloads instead of
+identifier-only payloads. Components may include the same product-like fields
+used by the main product payload, such as weight, brand, taxonomy, packaging,
+nutrition, and tags, whenever extraction produces those values.
+
 ## External Systems
 
 The pipeline talks to three main infrastructure boundaries.

@@ -50,9 +50,41 @@ class ComboComponent(BaseModel):
     """A component product detected inside a combo/kit."""
 
     name: str = Field(..., description="Name of the component product e.g. 'Whey 900g'")
+    weight_grams: int | None = Field(
+        None,
+        description="Component weight in grams when explicitly present",
+    )
+    brand_name: str | None = Field(
+        None,
+        description="Brand name of the component when explicitly present",
+    )
+    category_hierarchy: list[str] = Field(
+        default_factory=list,
+        description="Hierarchical category path for the component",
+    )
     ean: str | None = Field(
         None,
         description="EAN/GTIN of the component when explicitly present",
+    )
+    description: str | None = Field(
+        None,
+        description="Marketing description of the component when explicitly present",
+    )
+    packaging: str = Field(
+        "CONTAINER",
+        description="Packaging type: CONTAINER, REFILL, BAR, OTHER",
+    )
+    tags_hierarchy: list[list[str]] = Field(
+        default_factory=list,
+        description="Hierarchical tag paths for the component",
+    )
+    nutrition_facts: NutritionFacts | None = Field(
+        None,
+        description="Nutrition facts for the component when available",
+    )
+    flavor_names: list[str] = Field(
+        default_factory=list,
+        description="Flavors identified for this component",
     )
     external_id: str | None = Field(
         None,
