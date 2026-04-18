@@ -1,257 +1,52 @@
-# Agents Service Guide (Dagster)
+# Agents Service Guide
 
-This guide defines the preferred architecture and working rules for
-`services/agents`.
+Use this file as the minimal context for `services/agents`.
 
-It is intentionally opinionated toward Dagster best practices from the official
-documentation, even when the current codebase has not fully caught up yet.
-Treat this file as the target shape for future refactors.
+## Load On Demand
 
-## Scope
+Read these docs only when they are relevant:
 
-- Package entrypoint: `agents/definitions.py`
-- Dagster-facing modules: `agents/defs/**`
-- Deterministic acquisition logic: `agents/acquisition.py`
-- Non-deterministic extraction logic: `agents/extraction.py`
-- Agent/model wrappers: `agents/brain.py`
-- Shared non-Dagster support logic: `agents/schemas.py`
+- `docs/pipeline.md`
+  current pipeline step by step
+- `docs/architecture.md`
+  architecture rules, Dagster boundaries, and preferred patterns
+- `README.md`
+  local setup, environment variables, and service runtime
 
-## Official references
+## Current Scope
 
-- Project organization:
-  https://docs.dagster.io/guides/build/projects/project-structure/organizing-dagster-projects
-- `Definitions` API:
-  https://docs.dagster.io/api/dagster/definitions
-- Sensors:
-  https://docs.dagster.io/guides/automate/sensors
-- Official quickstart reference repo:
-  https://github.com/dagster-io/dagster-quickstart
+- Entrypoint Dagster: `agents/definitions.py`
+- Dagster code: `agents/defs/`
+- Deterministic acquisition: `agents/acquisition.py`
+- Non-deterministic extraction: `agents/extraction.py`
+- Model wrappers: `agents/brain.py`
+- Shared schema: `agents/schemas.py`
 
-## Core Dagster rules
+## Current Pipeline Contract
 
-1. Expose one loadable `Definitions` object per code location.
-2. Keep `agents/definitions.py` thin. It should wire assets, jobs, sensors,
-   schedules, and resources, not implement business logic.
-3. Keep Dagster-specific code under `agents/defs/`.
-4. Keep non-Dagster logic in plain Python modules so it stays easy to test
-   without Dagster machinery.
-5. Prefer a single code location unless dependency boundaries or team ownership
-   clearly require multiple locations.
+- The Django backend is the source of truth for `api_context` and
+  `html_structured_data`.
+- Dagster consumes `sourcePageApiContext` as its primary deterministic input.
+- Each page produces exactly one root `ExtractedProduct`.
+- Combos and kits use `children`; there is no `items`, `components`, or
+  `is_combo`.
+- The final stage is `extraction_handoff`: it only returns the extracted
+  payload and does not create catalog data.
 
-## Preferred structure
+## Working Rules
 
-```text
-agents/
-  definitions.py
-  defs/
-    assets.py
-    pipeline.py
-    sensors.py
-  acquisition.py
-  extraction.py
-  prompts/
-  schemas.py
-  tests/
+- Keep `agents/definitions.py` thin.
+- Keep Dagster logic in `agents/defs/` and testable non-Dagster logic in plain
+  Python modules.
+- Prefer removing dead paths and stale abstractions over documenting them.
+- Update this documentation in the same change when the architecture changes.
+
+## Commands
+
+```bash
+Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
+Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
+Lint Agents (Just): just agents-lint
+Orchestration: PYTHONPATH=services/agents:. dagster dev -m agents.definitions
+Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
 ```
-
-Notes:
-
-- `defs/` is for Dagster-facing objects only.
-- `acquisition.py` owns deterministic source preparation up to prepared OCR
-  inputs, using API-provided scraper context instead of re-scraping HTML.
-- `extraction.py` owns the non-deterministic raw and structured extraction flow.
-- `defs/assets.py` builds the final extraction handoff payload; it must not
-  decide catalog identity or create catalog records.
-- `brain.py` is limited to agent/model wrappers only.
-- `extraction.py` owns loading prompt files from `agents/prompts/`.
-- `brain.py` and `schemas.py` should remain importable and testable outside
-  Dagster.
-- Structured extraction returns one recursive `ExtractedProduct` tree per page.
-- Combos/kits are represented by `children`; there is no `items` list and no
-  `is_combo` flag in the agents output.
-- We do not need to mimic the quickstart repo literally; we only want its good
-  defaults: a thin entrypoint and a loadable package layout.
-
-## Definitions best practices
-
-`agents/definitions.py` should be the single place that assembles:
-
-- assets
-- jobs
-- sensors
-- schedules
-- resources
-
-Good patterns:
-
-- `load_assets_from_modules(...)` for asset registration
-- `Definitions(...)` as the top-level loadable object
-- `Definitions.merge(...)` only when merging truly independent definition sets
-
-Validation:
-
-- Add a unit test that calls `defs.validate_loadable()`
-
-Recommended test:
-
-```python
-from agents.definitions import defs
-
-
-def test_definitions_loadable():
-    defs.validate_loadable()
-```
-
-This should be treated as a required structural smoke test.
-
-## Sensor best practices
-
-Sensors should stay orchestration-only.
-
-They may:
-
-- poll for work
-- decide whether to launch a run
-- construct minimal run config
-- emit `RunRequest` or `SkipReason`
-
-They should not:
-
-- perform heavy transformation
-- perform expensive network fan-out
-- contain business logic that belongs in assets or plain services
-
-For this project:
-
-1. Use `minimum_interval_seconds` deliberately.
-2. Always prefer a `run_key` when launching work from queue items.
-3. Add cursor state only when the queue volume or event volume requires it.
-4. Keep sensor config-building small; extract helpers when the payload mapping
-   starts growing.
-
-Recommended direction for `work_queue_sensor`:
-
-```python
-yield RunRequest(
-    run_key=str(item_id),
-    run_config=run_config,
-    tags={...},
-)
-```
-
-If the same item can validly be retried with different upstream states, use a
-more specific key, such as:
-
-- item id + source page id
-- item id + upstream updated timestamp
-
-## Asset best practices
-
-Assets should model the pipeline steps, not UI or transport concerns.
-
-Good rules:
-
-1. Keep each asset focused on one transformation boundary.
-2. Prefer explicit inputs and outputs over hidden state.
-3. Keep expensive LLM or OCR calls isolated so failures are easier to retry and
-   inspect.
-4. Share reusable helpers through plain modules, not through cross-calling
-   assets.
-
-The intended step shape here is now:
-
-- acquisition
-- prepared extraction inputs
-- OCR / extraction
-- product-tree analysis
-- extraction handoff
-
-## Resource best practices
-
-Resources should represent external systems, for example:
-
-- API client
-
-Resources should be:
-
-- thin
-- configured by environment
-- easy to stub in tests
-
-Resources should not accumulate data-shaping logic or orchestration decisions.
-Push that logic into plain Python functions or service modules instead.
-
-Current rule for this service:
-
-- the deterministic acquisition stage is API-first
-- it consumes `sourcePageApiContext` from the backend
-- it does not re-download HTML, rebuild `site_data`, or materialize OCR
-  candidates from local scraper code
-
-## Testing strategy
-
-Split tests by layer:
-
-1. Structure tests
-   - `defs.validate_loadable()`
-   - sensor/job registration smoke tests
-
-2. Unit tests
-   - `brain.py`
-   - shared helpers
-   - pure data shaping
-
-3. Asset and resource contract tests
-   - asset config behavior
-   - resource error handling
-   - API payload contracts
-
-4. External end-to-end tests
-   - opt-in only
-   - never the default fast feedback path
-
-## Current repo guidance
-
-The current `services/agents` structure is already close to the recommended
-shape. The highest-value next improvements are:
-
-1. keep `agents/definitions.py` thin and move pipeline contract wiring into
-   shared helpers under `agents/defs/`
-2. keep `work_queue_sensor` orchestration-only, with queue payload parsing and
-   `RunRequest` construction delegated to helpers
-3. keep assets thin by extracting normalized context dataclasses and pure helper
-   functions for payload shaping, retries, and metadata building
-4. keep business logic moving away from Dagster wrappers, not toward them
-
-Patterns now preferred in this repo:
-
-- normalized context dataclasses such as source-page or publish-origin contexts
-- helper functions that return explicit value objects instead of loosely-shaped
-  intermediate dicts
-- shared pipeline constants and run-config builders in one place
-- asset bodies that read like orchestration steps, not monolithic business logic
-
-## Quick comparison with the official example
-
-The cloned reference repo in `services/dagster-quickstart-reference/` is useful
-for one thing: it shows the minimal loadable Dagster package shape.
-
-What we should copy from it:
-
-- small `definitions.py`
-- simple package layout
-- easy-to-find tests
-
-What we should not copy blindly:
-
-- its minimalism where our real service genuinely needs sensors, resources, and
-  LLM/OCR pipeline stages
-
-## Decision rule
-
-When refactoring `services/agents`, prefer the change that makes the code:
-
-1. more loadable by Dagster
-2. easier to test without Dagster
-3. less coupled to transport details
-4. more explicit about orchestration boundaries
