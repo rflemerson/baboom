@@ -191,10 +191,15 @@ def extract_image_urls(
     seen_urls: set[str] = set()
     image_urls: list[str] = []
 
-    for payload in (scraper_context, html_structured_data):
-        if not payload:
-            continue
-        for image_url in _iter_image_urls(payload):
+    if scraper_context:
+        for image_url in _iter_image_urls(scraper_context):
+            if image_url in seen_urls:
+                continue
+            seen_urls.add(image_url)
+            image_urls.append(image_url)
+
+    if html_structured_data:
+        for image_url in _iter_structured_data_image_urls(html_structured_data):
             if image_url in seen_urls:
                 continue
             seen_urls.add(image_url)
@@ -206,7 +211,7 @@ def extract_image_urls(
 def _extract_image_url(image: object) -> str | None:
     if isinstance(image, str):
         url = image.strip()
-        if not url or not url.startswith(("http://", "https://")):
+        if not _is_likely_image_url(url):
             return None
         return url
 
@@ -222,12 +227,29 @@ def _extract_image_url(image: object) -> str | None:
     )
     if not url:
         return None
-    return str(url)
+    normalized_url = str(url).strip()
+    if not _is_likely_image_url(normalized_url):
+        return None
+    return normalized_url
+
+
+def _is_likely_image_url(url: str) -> bool:
+    if not url.startswith(("http://", "https://")):
+        return False
+
+    lowered = url.lower()
+    return "ogp.me/ns" not in lowered and "w3.org/1999/xhtml/vocab" not in lowered
 
 
 def _iter_image_urls(payload: object) -> list[str]:
     image_urls: list[str] = []
     _collect_image_urls(payload, image_urls)
+    return image_urls
+
+
+def _iter_structured_data_image_urls(payload: object) -> list[str]:
+    image_urls: list[str] = []
+    _collect_structured_data_image_urls(payload, image_urls)
     return image_urls
 
 
@@ -249,6 +271,35 @@ def _collect_image_urls(payload: object, image_urls: list[str]) -> None:
     if isinstance(payload, list):
         for item in payload:
             _collect_image_urls(item, image_urls)
+
+
+def _collect_structured_data_image_urls(payload: object, image_urls: list[str]) -> None:
+    if isinstance(payload, list):
+        for item in payload:
+            _collect_structured_data_image_urls(item, image_urls)
+        return
+
+    if not isinstance(payload, dict):
+        return
+
+    for key, value in payload.items():
+        normalized_key = str(key).lower()
+        if normalized_key in {
+            "image",
+            "images",
+            "thumbnailurl",
+            "contenturl",
+            "og:image",
+        }:
+            _collect_image_urls(value, image_urls)
+            continue
+
+        if normalized_key == "properties" and isinstance(value, dict):
+            og_image = value.get("og:image")
+            if og_image is not None:
+                _collect_image_urls(og_image, image_urls)
+
+        _collect_structured_data_image_urls(value, image_urls)
 
 
 def resolve_fallback_reason(image_urls: list[str]) -> str:

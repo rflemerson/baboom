@@ -160,17 +160,19 @@ class AgentClient:
     ) -> None:
         """Report a processing error back to the API."""
         mutation = """
-        mutation($itemId: Int!, $message: String!, $isFatal: Boolean!) {
-            reportScrapedItemError(
-                itemId: $itemId,
-                message: $message,
-                isFatal: $isFatal
-            )
+        mutation($data: ScrapedItemErrorInput!) {
+            reportScrapedItemError(data: $data)
         }
         """
         self._send(
             mutation,
-            {"itemId": int(item_id), "message": str(message), "isFatal": is_fatal},
+            {
+                "data": {
+                    "itemId": int(item_id),
+                    "message": str(message),
+                    "isFatal": is_fatal,
+                },
+            },
         )
 
     def create_product(self, product_input: dict[str, Any]) -> dict[str, Any]:
@@ -282,24 +284,8 @@ class AgentClient:
         """Create or update a variant scraped item for multi-product pages."""
         mutation = (
             """
-        mutation(
-            $originItemId: Int!,
-            $externalId: String!,
-            $name: String!,
-            $pageUrl: String!,
-            $storeSlug: String!,
-            $price: Float,
-            $stockStatus: String
-        ) {
-            upsertScrapedItemVariant(
-                originItemId: $originItemId,
-                externalId: $externalId,
-                name: $name,
-                pageUrl: $pageUrl,
-                storeSlug: $storeSlug,
-                price: $price,
-                stockStatus: $stockStatus
-            ) {
+        mutation($data: ScrapedItemVariantInput!) {
+            upsertScrapedItemVariant(data: $data) {
             """
             + SCRAPED_ITEM_VARIANT_FIELDS
             + GRAPHQL_SELECTION_CLOSE
@@ -307,13 +293,15 @@ class AgentClient:
         data = self._send(
             mutation,
             {
-                "originItemId": int(origin_item_id),
-                "externalId": str(external_id),
-                "name": str(name),
-                "pageUrl": str(page_url),
-                "storeSlug": str(store_slug),
-                "price": price,
-                "stockStatus": stock_status,
+                "data": {
+                    "originItemId": int(origin_item_id),
+                    "externalId": str(external_id),
+                    "name": str(name),
+                    "pageUrl": str(page_url),
+                    "storeSlug": str(store_slug),
+                    "price": price,
+                    "stockStatus": stock_status,
+                },
             },
         )
         return data.get("data", {}).get("upsertScrapedItemVariant")

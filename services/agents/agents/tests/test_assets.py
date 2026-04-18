@@ -251,6 +251,26 @@ class TestPreparedInputsHelpers(TestCase):
             ],
         )
 
+    def test_extract_image_urls_ignores_structured_data_vocabulary_urls(self):
+        image_urls = extract_image_urls(
+            scraper_context=None,
+            html_structured_data={
+                "opengraph": [
+                    {
+                        "namespace": "http://ogp.me/ns#",
+                        "properties": {
+                            "og:image": "https://cdn.example.com/product.jpg",
+                        },
+                    },
+                    {
+                        "typeof": "http://www.w3.org/1999/xhtml/vocab#presentation",
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(image_urls, ["https://cdn.example.com/product.jpg"])
+
     def test_build_prepared_extraction_inputs_keeps_image_order_from_json(self):
         prepared = build_prepared_extraction_inputs(
             downloaded_assets={

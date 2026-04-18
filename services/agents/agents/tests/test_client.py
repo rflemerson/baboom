@@ -72,3 +72,58 @@ class TestAgentClient(TestCase):
             self.assertRaisesRegex(Exception, "missing product id"),
         ):
             client.create_product({"name": "x"})
+
+    def test_report_error_uses_input_object_contract(self):
+        """Reports errors with the current GraphQL input-object shape."""
+        client = AgentClient()
+
+        with patch.object(client, "_send", return_value={"data": {}}) as mock_send:
+            client.report_error(7, "boom", is_fatal=True)
+
+        _query, variables = mock_send.call_args.args
+        self.assertEqual(
+            variables,
+            {
+                "data": {
+                    "itemId": 7,
+                    "message": "boom",
+                    "isFatal": True,
+                },
+            },
+        )
+
+    def test_upsert_variant_uses_input_object_contract(self):
+        """Upserts variants with the current GraphQL input-object shape."""
+        client = AgentClient()
+
+        with patch.object(
+            client,
+            "_send",
+            return_value={"data": {"upsertScrapedItemVariant": {"id": 8}}},
+        ) as mock_send:
+            result = client.upsert_scraped_item_variant(
+                origin_item_id=7,
+                external_id="variant-1",
+                name="Variant",
+                page_url="https://example.com/p",
+                store_slug="demo",
+                price=10.5,
+                stock_status="A",
+            )
+
+        self.assertEqual(result, {"id": 8})
+        _query, variables = mock_send.call_args.args
+        self.assertEqual(
+            variables,
+            {
+                "data": {
+                    "originItemId": 7,
+                    "externalId": "variant-1",
+                    "name": "Variant",
+                    "pageUrl": "https://example.com/p",
+                    "storeSlug": "demo",
+                    "price": 10.5,
+                    "stockStatus": "A",
+                },
+            },
+        )
