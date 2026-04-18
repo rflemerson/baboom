@@ -411,6 +411,54 @@ class ProductCreateServiceTests(TestCase):
         assert origin_item.product_store_id == listing.id
         assert origin_item.status == ScrapedItem.Status.LINKED
 
+    def test_execute_reuses_existing_origin_listing_on_retry(self) -> None:
+        """Retries should link to an existing listing without duplicating products."""
+        brand = Brand.objects.create(name="growth", display_name="Growth")
+        existing_product = Product.objects.create(
+            name="Whey Isolate",
+            weight=900,
+            brand=brand,
+            ean="7890000000001",
+        )
+        existing_listing = ProductStore.objects.create(
+            product=existing_product,
+            store=self.store,
+            external_id="growth-900",
+            product_link="https://growth.example/whey",
+        )
+        origin_item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-origin-900",
+            name="Whey Isolate",
+            price=Decimal("149.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+        )
+
+        product = self.service.execute(
+            ProductCreateInput(
+                name="Whey Isolate Updated",
+                weight=900,
+                brand_name="Growth",
+                ean="7890000000001",
+                origin_scraped_item_id=origin_item.id,
+                stores=[
+                    StoreListingPayload(
+                        store_name="Growth",
+                        external_id="growth-900",
+                        product_link="https://growth.example/whey",
+                        price=149.90,
+                    ),
+                ],
+            ),
+        )
+
+        origin_item.refresh_from_db()
+
+        assert product.id == existing_product.id
+        assert Product.objects.count() == 1
+        assert origin_item.product_store_id == existing_listing.id
+        assert origin_item.status == ScrapedItem.Status.LINKED
+
     def test_execute_rejects_origin_link_without_matching_store_listing(self) -> None:
         """Origin links should fail when no target listing can be resolved."""
         origin_item = ScrapedItem.objects.create(
@@ -510,6 +558,8 @@ class ProductMetadataUpdateServiceTests(TestCase):
 class ProductNutritionServiceTests(TestCase):
     """Essential coverage for admin-facing nutrition selection workflow."""
 
+    REPEATED_PAYLOAD_COUNT = 2
+
     def setUp(self) -> None:
         """Create a product and reusable nutrition facts."""
         self.service = ProductNutritionService()
@@ -565,6 +615,28 @@ class ProductNutritionServiceTests(TestCase):
             nutrition_mode=ProductNutritionService.MODE_NONE,
         )
         assert self.product.nutrition_profiles.count() == 0
+
+    def test_attach_profiles_creates_new_facts_for_repeated_payloads(self) -> None:
+        """Repeated payloads should not be deduplicated by nutrition content."""
+        payload = ProductNutritionPayload(
+            nutrition_facts=NutritionFactsPayload(
+                description="Repeated table",
+                serving_size_grams=30,
+                energy_kcal=120,
+                proteins=24,
+                carbohydrates=3,
+                total_fats=2,
+            ),
+        )
+
+        self.service.attach_profiles(self.product, [payload])
+        self.service.attach_profiles(self.product, [payload])
+
+        assert (
+            NutritionFacts.objects.filter(description="Repeated table").count()
+            == self.REPEATED_PAYLOAD_COUNT
+        )
+        assert self.product.nutrition_profiles.count() == self.REPEATED_PAYLOAD_COUNT
 
 
 class ProductStatsTest(TestCase):
@@ -885,6 +957,69 @@ class GraphQLProductCreateTests(TestCase):
         assert payload["data"]["createProduct"]["errors"] is None
         assert payload["data"]["createProduct"]["product"]["id"] is not None
         assert self.origin_item.product_store_id is not None
+        assert self.origin_item.status == ScrapedItem.Status.LINKED
+
+    def test_create_product_reuses_existing_origin_listing_on_retry(self) -> None:
+        """The mutation should be idempotent for already-published origin listings."""
+        store = Store.objects.create(name="growth", display_name="Growth")
+        brand = Brand.objects.create(name="growth", display_name="Growth")
+        existing_product = Product.objects.create(
+            name="Whey Isolate",
+            weight=900,
+            brand=brand,
+            ean="7890000000001",
+        )
+        existing_listing = ProductStore.objects.create(
+            product=existing_product,
+            store=store,
+            external_id="growth-900",
+            product_link="https://growth.example/whey",
+        )
+        mutation = """
+        mutation CreateProduct($data: ProductInput!) {
+          createProduct(data: $data) {
+            product {
+              id
+            }
+            errors {
+              field
+              message
+            }
+          }
+        }
+        """
+        variables = {
+            "data": {
+                "name": "Whey Isolate Updated",
+                "weight": 900,
+                "brandName": "Growth",
+                "ean": "7890000000001",
+                "originScrapedItemId": self.origin_item.id,
+                "stores": [
+                    {
+                        "storeName": "Growth",
+                        "externalId": "growth-900",
+                        "productLink": "https://growth.example/whey",
+                        "price": 149.9,
+                        "stockStatus": "AVAILABLE",
+                    },
+                ],
+            },
+        }
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": mutation, "variables": variables}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.valid_key,
+        )
+
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
+        self.origin_item.refresh_from_db()
+
+        assert payload["data"]["createProduct"]["errors"] is None
+        assert Product.objects.count() == 1
+        assert self.origin_item.product_store_id == existing_listing.id
         assert self.origin_item.status == ScrapedItem.Status.LINKED
 
     def test_create_product_accepts_rich_combo_component_payload(self) -> None:

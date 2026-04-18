@@ -141,8 +141,7 @@ class ProductAdmin(admin.ModelAdmin):
                 ),
                 "description": (
                     "Select an existing nutrition table or enter a new one. "
-                    "New values are automatically reused when an identical "
-                    "table already exists."
+                    "New values are stored as a separate table for review."
                 ),
             },
         ),
@@ -417,7 +416,6 @@ class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
         "trans_fats",
         "dietary_fiber",
         "sodium",
-        "content_hash",
     )
     inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
         MicronutrientInline,

@@ -409,10 +409,8 @@ Manage product nutrition through the official Django admin workflow.
 2. The system validates the nutrition-specific form fields.
 3. If the actor selects an existing table, the system links it to the product.
 4. If the actor enters a new table, the admin maps the form to a nutrition payload.
-5. The system computes a content hash from the nutrition values and micronutrients.
-6. The system reuses identical nutrition facts when available.
-7. Otherwise, the system creates new nutrition facts.
-8. The system attaches the resulting nutrition profile to the product.
+5. The system creates new nutrition facts from the submitted values.
+6. The system attaches the resulting nutrition profile to the product.
 
 ### Alternate flows
 
@@ -435,8 +433,8 @@ Manage product nutrition through the official Django admin workflow.
 
 ### Business rules
 
-- Nutrition facts identity is determined by `content_hash`.
-- Identical tables are reused automatically instead of duplicated.
+- New nutrition submissions are stored as distinct facts tables.
+- Reuse is explicit: the actor must select an existing nutrition table.
 - Admin nutrition management must go through `ProductNutritionService`.
 
 ## UC-09 Manage Product Store Listings From Admin

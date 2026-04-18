@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import secrets
-from collections.abc import Mapping
-from decimal import Decimal, InvalidOperation
-from typing import TypedDict
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -17,14 +13,6 @@ from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
 
 logger = logging.getLogger(__name__)
-
-
-class MicronutrientHashInput(TypedDict, total=False):
-    """Mapping shape accepted when hashing micronutrient payloads."""
-
-    name: str
-    value: Decimal | float | int | str | None
-    unit: str
 
 
 class BaseModel(models.Model):
@@ -482,20 +470,6 @@ class ProductPriceHistory(models.Model):
 class NutritionFacts(BaseModel):
     """Nutritional information model."""
 
-    HASH_FIELDS = (
-        "serving_size_grams",
-        "energy_kcal",
-        "proteins",
-        "carbohydrates",
-        "total_sugars",
-        "added_sugars",
-        "total_fats",
-        "saturated_fats",
-        "trans_fats",
-        "dietary_fiber",
-        "sodium",
-    )
-
     description = models.CharField(
         _("Internal Label"),
         max_length=200,
@@ -555,15 +529,6 @@ class NutritionFacts(BaseModel):
         default=0,
     )
 
-    content_hash = models.CharField(
-        _("Content Hash"),
-        max_length=64,
-        unique=True,
-        db_index=True,
-        blank=True,
-        help_text=_("Auto-computed hash of nutritional values for deduplication"),
-    )
-
     class Meta:
         """Meta options."""
 
@@ -573,84 +538,6 @@ class NutritionFacts(BaseModel):
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.description or 'Generic Nutrition Facts'}"
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Save instance with hash generation."""
-        if not self.content_hash:
-            self.content_hash = self.generate_hash(source=self)
-        super().save(*args, **kwargs)
-
-    @staticmethod
-    def _format_hash_value(value: object) -> str:
-        if value is None:
-            return "0.00"
-
-        try:
-            decimal_value = Decimal(str(value))
-        except (InvalidOperation, TypeError, ValueError):
-            return "0.00"
-
-        return f"{decimal_value:.2f}"
-
-    @staticmethod
-    def _get_source_value(
-        source: NutritionFacts | Mapping[str, object],
-        key: str,
-    ) -> object:
-        if isinstance(source, Mapping):
-            return source.get(key)
-        return getattr(source, key, None)
-
-    @classmethod
-    def _serialize_micronutrient(
-        cls,
-        micronutrient: Micronutrient | MicronutrientHashInput,
-    ) -> str:
-        if isinstance(micronutrient, Mapping):
-            name = micronutrient.get("name")
-            value = micronutrient.get("value")
-            unit = micronutrient.get("unit", "mg")
-        else:
-            name = micronutrient.name
-            value = micronutrient.value
-            unit = micronutrient.unit
-
-        return f"{name}:{cls._format_hash_value(value)}:{unit}"
-
-    @classmethod
-    def generate_hash(
-        cls,
-        source: NutritionFacts | Mapping[str, object],
-        micronutrients: list[Micronutrient | MicronutrientHashInput] | None = None,
-    ) -> str:
-        """Single Source of Truth for Nutritional Hashing.
-
-        Generates deterministic hash based on Macros and (optionally) Micros.
-
-        Args:
-            source: Can be a NutritionFacts instance OR a dictionary (from Service).
-            micronutrients: List of dictionaries [{'name': '...', 'value': ...}, ...].
-                            Required if 'source' is dict, or to complement the hash.
-
-        """
-        parts = [
-            cls._format_hash_value(cls._get_source_value(source, field_name))
-            for field_name in cls.HASH_FIELDS
-        ]
-
-        if micronutrients:
-            parts.extend(
-                cls._serialize_micronutrient(micronutrient)
-                for micronutrient in sorted(
-                    micronutrients,
-                    key=lambda item: item["name"]
-                    if isinstance(item, Mapping)
-                    else item.name,
-                )
-            )
-
-        raw_string = "|".join(parts)
-        return hashlib.sha256(raw_string.encode()).hexdigest()
 
 
 class Micronutrient(BaseModel):

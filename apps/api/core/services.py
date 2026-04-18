@@ -326,39 +326,24 @@ class ProductNutritionService:
         product: Product,
         nutrition_profiles_data: list[ProductNutritionPayload],
     ) -> None:
-        """Create or reuse nutrition profiles linked to a product."""
+        """Create nutrition facts and link them to a product."""
         for profile_data in nutrition_profiles_data:
             facts_payload = profile_data.nutrition_facts
-            micronutrient_payloads = facts_payload.micronutrients or []
-
-            facts, created = self._get_or_create_facts_by_content_hash(
-                facts_payload,
-                micronutrient_payloads,
-            )
-            self._create_micronutrients_if_needed(
+            facts = self._create_facts(facts_payload)
+            self._create_micronutrients(
                 facts,
-                facts_were_created=created,
-                micronutrient_payloads=micronutrient_payloads,
+                facts_payload.micronutrients or [],
             )
             profile = self._get_or_create_profile(product, facts)
             self._attach_flavors(profile, profile_data.flavor_names)
 
-    def _get_or_create_facts_by_content_hash(
+    def _create_facts(
         self,
         facts_payload: NutritionFactsPayload,
-        micronutrient_payloads: list[MicronutrientPayload],
-    ) -> tuple[NutritionFacts, bool]:
-        """Create or reuse nutrition facts based on their content hash."""
-        content_hash = NutritionFacts.generate_hash(
-            source=facts_payload.model_dump(exclude={"micronutrients"}),
-            micronutrients=[
-                micronutrient_payload.model_dump()
-                for micronutrient_payload in micronutrient_payloads
-            ],
-        )
-        return NutritionFacts.objects.get_or_create(
-            content_hash=content_hash,
-            defaults=self._build_facts_defaults(facts_payload),
+    ) -> NutritionFacts:
+        """Persist one nutrition facts table from the submitted payload."""
+        return NutritionFacts.objects.create(
+            **self._build_facts_defaults(facts_payload),
         )
 
     def _build_facts_defaults(
@@ -381,15 +366,13 @@ class ProductNutritionService:
             "sodium": Decimal(str(facts_payload.sodium)),
         }
 
-    def _create_micronutrients_if_needed(
+    def _create_micronutrients(
         self,
         facts: NutritionFacts,
-        *,
-        facts_were_created: bool,
         micronutrient_payloads: list[MicronutrientPayload],
     ) -> None:
-        """Persist micronutrients only when facts are being created."""
-        if not facts_were_created or not micronutrient_payloads:
+        """Persist micronutrients for a freshly created facts table."""
+        if not micronutrient_payloads:
             return
 
         Micronutrient.objects.bulk_create(
@@ -566,6 +549,10 @@ class ProductCreateService:
 
     def execute(self, data: ProductCreateInput) -> Product:
         """Create a product with all related data."""
+        existing_product = self._resolve_existing_origin_product(data)
+        if existing_product is not None:
+            return existing_product
+
         self._validate_unique_ean(data.ean)
 
         try:
@@ -614,6 +601,71 @@ class ProductCreateService:
         """Reject duplicate EAN values before creating the product."""
         if ean and Product.objects.filter(ean=ean).exists():
             raise ValidationError({"ean": _("A product with this EAN already exists.")})
+
+    def _resolve_existing_origin_product(
+        self,
+        data: ProductCreateInput,
+    ) -> Product | None:
+        """Return and link an already-created product for a repeated origin item."""
+        if data.origin_scraped_item_id is None or not data.stores:
+            return None
+
+        origin_item = ScrapedItem.objects.filter(
+            id=data.origin_scraped_item_id,
+        ).first()
+        if origin_item is None:
+            return None
+
+        listing = self._find_existing_origin_listing(
+            origin_item=origin_item,
+            store_payloads=data.stores,
+        )
+        if listing is None:
+            return None
+
+        linked_item = ScrapedItemLinkService().execute(
+            scraped_item_id=origin_item.id,
+            product_store_id=listing.id,
+        )
+        if linked_item is None:
+            raise ValidationError(
+                {
+                    "origin_scraped_item_id": _(
+                        "Could not link the scraped item to the existing product.",
+                    ),
+                },
+            )
+
+        return listing.product
+
+    def _find_existing_origin_listing(
+        self,
+        *,
+        origin_item: ScrapedItem,
+        store_payloads: list[StoreListingPayload],
+    ) -> ProductStore | None:
+        """Find the persisted listing represented by the origin item payload."""
+        for store_payload in store_payloads:
+            if not store_payload.external_id:
+                continue
+
+            store_names = {
+                origin_item.store_slug,
+                store_payload.store_name,
+                slugify(store_payload.store_name),
+            }
+            listing = (
+                ProductStore.objects.select_related("product")
+                .filter(
+                    external_id=store_payload.external_id,
+                    store__name__in=store_names,
+                )
+                .first()
+            )
+            if listing is not None:
+                return listing
+
+        return None
 
     def _resolve_brand(self, brand_name: str) -> Brand:
         """Find or create the brand associated with the product."""

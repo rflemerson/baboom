@@ -115,6 +115,8 @@ Create a simple product through GraphQL from scraped context.
 
 - A simple `Product` exists in the catalog.
 - Optional nutrition and store listing data are applied.
+- When the submitted origin item already maps to an existing store listing, the
+  scraped item is linked to that listing and no duplicate product is created.
 
 ### Main success flow
 
@@ -127,7 +129,15 @@ Create a simple product through GraphQL from scraped context.
 
 ### Alternate flows
 
-#### A1. Duplicate EAN
+#### A1. Origin listing already exists
+
+1. The agent submits `originScrapedItemId` with store listing data.
+2. The system finds an existing `ProductStore` with the same store and
+   `external_id`.
+3. The system links the scraped item to that existing listing.
+4. The system returns the existing product instead of creating a duplicate.
+
+#### A2. Duplicate EAN
 
 1. The system detects an existing product with the same EAN.
 2. The system rejects creation with a validation error.
@@ -136,6 +146,8 @@ Create a simple product through GraphQL from scraped context.
 
 - Agent-driven creation goes through GraphQL as a thin boundary.
 - Product creation remains owned by `ProductCreateService`.
+- Product creation is idempotent for agent retries when `originScrapedItemId`
+  and a matching store `external_id` identify an existing listing.
 
 ## UC-03 Create Combo Product From Agent
 
