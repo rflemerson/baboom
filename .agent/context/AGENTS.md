@@ -82,5 +82,6 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
   - `prepared_extraction_inputs` -> extract ordered image URLs and JSON context from `api_context`
 - The non-deterministic handoff is:
   - `raw_extraction` -> send `api_context` JSON plus raw image URLs to the multimodal model
-  - `product_analysis` -> convert raw text into structured product data and apply semantic retries if needed
-- `upload_to_api` publishes the structured result back to Django. Combo components may carry product-like payloads, but the API remains the system of record for matching or creating component products.
+  - `product_analysis` -> convert raw text into one recursive `ExtractedProduct` tree
+- `extraction_handoff` is a final handoff asset only: it emits source identifiers, raw extraction text, and the extracted product tree. It must not create catalog products, variants, or components.
+- Combo/kit structure is represented by `ExtractedProduct.children`; there is no `items` list, `components` list, or `is_combo` flag in the agents output.

@@ -54,20 +54,6 @@ productStoreId
 linkedProductId
 """
 
-SCRAPED_ITEM_VARIANT_FIELDS = """
-id
-name
-status
-storeSlug
-externalId
-price
-stockStatus
-sourcePageUrl
-sourcePageId
-productStoreId
-linkedProductId
-"""
-
 GRAPHQL_SELECTION_CLOSE = """
             }
         }
@@ -142,13 +128,16 @@ class AgentClient:
         """Checkout a ScrapedItem for processing."""
         mutation = (
             """
-        mutation($force: Boolean, $targetItemId: Int) {
-            checkoutScrapedItem(force: $force, targetItemId: $targetItemId) {
+        mutation($data: ScrapedItemCheckoutInput!) {
+            checkoutScrapedItem(data: $data) {
         """
             + SCRAPED_ITEM_CHECKOUT_FIELDS
             + GRAPHQL_SELECTION_CLOSE
         )
-        data = self._send(mutation, {"force": force, "targetItemId": target_item_id})
+        data = self._send(
+            mutation,
+            {"data": {"force": force, "targetItemId": target_item_id}},
+        )
         return data.get("data", {}).get("checkoutScrapedItem")
 
     def report_error(
@@ -174,27 +163,6 @@ class AgentClient:
                 },
             },
         )
-
-    def create_product(self, product_input: dict[str, Any]) -> dict[str, Any]:
-        """Create a new Product via the API."""
-        mutation = """
-        mutation($data: ProductInput!) {
-            createProduct(data: $data) {
-                product { id }
-                errors { field message }
-            }
-        }
-        """
-        data = self._send(mutation, {"data": product_input})
-        result = data.get("data", {}).get("createProduct")
-        if not result:
-            self._raise_empty_create_product_response()
-        if result.get("errors"):
-            self._raise_create_product_errors(result["errors"])
-        product = result.get("product")
-        if not product or not product.get("id"):
-            self._raise_missing_product_id()
-        return result
 
     def get_scraped_item(self, item_id: int) -> dict[str, Any] | None:
         """Fetch one scraped item snapshot for pipeline state decisions."""
@@ -234,78 +202,6 @@ class AgentClient:
         )
         return data.get("data", {}).get("ensureScrapedItemSourcePage")
 
-    def update_scraped_item_data(
-        self,
-        item_id: int,
-        name: str | None = None,
-        source_page_url: str | None = None,
-        store_slug: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Update mutable scraped item fields used by agents flow."""
-        mutation = (
-            """
-        mutation(
-            $itemId: Int!,
-            $name: String,
-            $sourcePageUrl: String,
-            $storeSlug: String
-        ) {
-            updateScrapedItemData(
-                itemId: $itemId,
-                name: $name,
-                sourcePageUrl: $sourcePageUrl,
-                storeSlug: $storeSlug
-            ) {
-        """
-            + SCRAPED_ITEM_MUTATION_FIELDS
-            + GRAPHQL_SELECTION_CLOSE
-        )
-        data = self._send(
-            mutation,
-            {
-                "itemId": int(item_id),
-                "name": name,
-                "sourcePageUrl": source_page_url,
-                "storeSlug": store_slug,
-            },
-        )
-        return data.get("data", {}).get("updateScrapedItemData")
-
-    def upsert_scraped_item_variant(
-        self,
-        origin_item_id: int,
-        external_id: str,
-        name: str,
-        page_url: str,
-        store_slug: str,
-        price: float | None = None,
-        stock_status: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Create or update a variant scraped item for multi-product pages."""
-        mutation = (
-            """
-        mutation($data: ScrapedItemVariantInput!) {
-            upsertScrapedItemVariant(data: $data) {
-            """
-            + SCRAPED_ITEM_VARIANT_FIELDS
-            + GRAPHQL_SELECTION_CLOSE
-        )
-        data = self._send(
-            mutation,
-            {
-                "data": {
-                    "originItemId": int(origin_item_id),
-                    "externalId": str(external_id),
-                    "name": str(name),
-                    "pageUrl": str(page_url),
-                    "storeSlug": str(store_slug),
-                    "price": price,
-                    "stockStatus": stock_status,
-                },
-            },
-        )
-        return data.get("data", {}).get("upsertScrapedItemVariant")
-
     @staticmethod
     def _raise_graphql_error(errors: object) -> None:
         logger.error("GraphQL error: %s", errors)
@@ -321,19 +217,3 @@ class AgentClient:
     def _raise_unexpected_request_flow() -> NoReturn:
         message = "Unexpected request flow"
         raise RuntimeError(message)
-
-    @staticmethod
-    def _raise_empty_create_product_response() -> None:
-        message = "Product creation failed: empty createProduct response"
-        raise AgentClientError(message)
-
-    @staticmethod
-    def _raise_missing_product_id() -> None:
-        message = "Product creation failed: missing product id in response"
-        raise AgentClientError(message)
-
-    @staticmethod
-    def _raise_create_product_errors(errors: object) -> None:
-        logger.error("Product creation failed: %s", errors)
-        message = f"Product creation failed: {errors}"
-        raise AgentClientError(message)

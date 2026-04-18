@@ -14,16 +14,9 @@ from ..acquisition import (
 from ..brain import run_structured_extraction
 from ..client import AgentClient
 from ..extraction import (
-    MIN_EXPECTED_VARIANTS_FOR_RECONCILIATION,
     build_analysis_metadata,
     run_analysis_pipeline,
     run_raw_extraction_step,
-)
-from ..publishing import (
-    build_publish_origin_context,
-    build_upload_metadata,
-    publish_analysis_item,
-    resolve_analysis_items,
 )
 from . import pipeline as pipeline_module
 
@@ -126,38 +119,19 @@ def product_analysis(
     config: ItemConfig,
     raw_extraction: str,
 ) -> dict:
-    """Convert raw text into a structured list of product analyses."""
+    """Convert raw text into one extracted product tree."""
     api = AgentClient()
     try:
         started = time.perf_counter()
-        analysis = run_analysis_pipeline(
+        product = run_analysis_pipeline(
             raw_extraction,
             extraction_runner=run_structured_extraction,
         )
 
-        if (
-            analysis.variant_context.expected_variant_count
-            >= MIN_EXPECTED_VARIANTS_FOR_RECONCILIATION
-            and analysis.reconciliation_retry_used
-        ):
-            context.log.warning(
-                "Structured extraction under-detected variants (%s/%s). "
-                "Reconciliation prompt improved the result.",
-                analysis.structured_variant_count,
-                analysis.variant_context.expected_variant_count,
-            )
-        if analysis.context_guard_retry_used:
-            context.log.warning(
-                "Structured extraction returned variants outside %s (%s invalid). "
-                "Context guard improved the result.",
-                "catalog/scraper context",
-                analysis.context_invalid_variants,
-            )
-
         context.add_output_metadata(
             build_analysis_metadata(
-                analysis=analysis,
-                started=(time.perf_counter() - started) * 1000,
+                product=product,
+                started=started,
             ),
         )
     except Exception as exc:
@@ -165,69 +139,77 @@ def product_analysis(
         api.report_error(config.item_id, str(exc), is_fatal=False)
         raise
     else:
-        return analysis.payload
+        return product.model_dump(by_alias=True)
 
 
 @asset
-def upload_to_api(
+def extraction_handoff(
     context: AssetExecutionContext,
     config: ItemConfig,
     product_analysis: dict,
+    raw_extraction: str,
     downloaded_assets: dict,
-) -> list[dict]:
-    """Create one product per analyzed item and link generated scraped items."""
-    _ = downloaded_assets
-    api = AgentClient()
-    try:
-        started = time.perf_counter()
-        origin_context = build_publish_origin_context(
-            api,
-            item_id=config.item_id,
-            url=config.url,
-            store_slug=config.store_slug,
-        )
-        items = resolve_analysis_items(
-            product_analysis,
-            origin_context.item,
-        )
+) -> dict:
+    """Emit the extracted product tree without creating catalog records."""
+    _ = config
+    started = time.perf_counter()
+    handoff = build_extraction_handoff(
+        product=product_analysis,
+        downloaded_assets=downloaded_assets,
+        raw_extraction=raw_extraction,
+    )
+    context.add_output_metadata(
+        build_handoff_metadata(
+            handoff=handoff,
+            started=started,
+        ),
+    )
+    return handoff
 
-        results: list[dict] = []
-        created_count = 0
-        for idx, analysis_data in enumerate(items):
-            item_result = publish_analysis_item(
-                context=context,
-                api=api,
-                idx=idx,
-                analysis_data=analysis_data,
-                origin=origin_context,
-            )
-            if item_result.variant_created:
-                created_count += 1
-            results.append(item_result.result)
 
-        context.add_output_metadata(
-            build_upload_metadata(
-                results=results,
-                created_count=created_count,
-                page_id=origin_context.page_id,
-                started=started,
-            ),
-        )
-    except Exception as exc:
-        context.log.exception("Upload failed")
-        api.report_error(config.item_id, str(exc), is_fatal=False)
-        raise
-    else:
-        return results
+def build_extraction_handoff(
+    *,
+    product: dict,
+    downloaded_assets: dict,
+    raw_extraction: str,
+) -> dict:
+    """Build the final payload emitted by the Dagster pipeline."""
+    return {
+        "originScrapedItemId": int(downloaded_assets["origin_item_id"]),
+        "sourcePageId": downloaded_assets.get("page_id"),
+        "sourcePageUrl": downloaded_assets.get("url"),
+        "storeSlug": downloaded_assets.get("store_slug"),
+        "rawExtraction": raw_extraction,
+        "product": product,
+    }
+
+
+def build_handoff_metadata(
+    *,
+    handoff: dict,
+    started: float,
+) -> dict:
+    """Build Dagster metadata for the final handoff payload."""
+    product = handoff.get("product") if isinstance(handoff, dict) else {}
+    children = product.get("children") if isinstance(product, dict) else []
+    return {
+        "origin_item_id": handoff.get("originScrapedItemId"),
+        "source_page_id": handoff.get("sourcePageId"),
+        "root_product_name": product.get("name") if isinstance(product, dict) else "",
+        "children_detected": len(children) if isinstance(children, list) else 0,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
 
 
 ASSET_MODULES = [__import__(__name__, fromlist=["*"])]
 
 __all__ = [
     "ASSET_MODULES",
+    "build_extraction_handoff",
+    "build_handoff_metadata",
     "downloaded_assets",
+    "extraction_handoff",
     "prepared_extraction_inputs",
     "product_analysis",
     "raw_extraction",
-    "upload_to_api",
 ]

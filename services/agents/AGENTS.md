@@ -14,7 +14,6 @@ Treat this file as the target shape for future refactors.
 - Deterministic acquisition logic: `agents/acquisition.py`
 - Non-deterministic extraction logic: `agents/extraction.py`
 - Agent/model wrappers: `agents/brain.py`
-- API publishing logic: `agents/publishing.py`
 - Shared non-Dagster support logic: `agents/schemas.py`
 
 ## Official references
@@ -50,7 +49,6 @@ agents/
     sensors.py
   acquisition.py
   extraction.py
-  publishing.py
   prompts/
   schemas.py
   tests/
@@ -61,12 +59,16 @@ Notes:
 - `defs/` is for Dagster-facing objects only.
 - `acquisition.py` owns deterministic source preparation up to prepared OCR
   inputs, using API-provided scraper context instead of re-scraping HTML.
-- `extraction.py` owns the non-deterministic OCR and structured-analysis flow.
-- `publishing.py` owns API synchronization after analysis is finalized.
+- `extraction.py` owns the non-deterministic raw and structured extraction flow.
+- `defs/assets.py` builds the final extraction handoff payload; it must not
+  decide catalog identity or create catalog records.
 - `brain.py` is limited to agent/model wrappers only.
 - `extraction.py` owns loading prompt files from `agents/prompts/`.
 - `brain.py` and `schemas.py` should remain importable and testable outside
   Dagster.
+- Structured extraction returns one recursive `ExtractedProduct` tree per page.
+- Combos/kits are represented by `children`; there is no `items` list and no
+  `is_combo` flag in the agents output.
 - We do not need to mimic the quickstart repo literally; we only want its good
   defaults: a thin entrypoint and a loadable package layout.
 
@@ -161,8 +163,8 @@ The intended step shape here is now:
 - acquisition
 - prepared extraction inputs
 - OCR / extraction
-- analysis / normalization
-- publish / synchronize
+- product-tree analysis
+- extraction handoff
 
 ## Resource best practices
 

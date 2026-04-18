@@ -16,7 +16,7 @@ import logging
 import requests
 from pydantic_ai import Agent, BinaryContent
 
-from .schemas import ProductAnalysisList
+from .schemas import ExtractedProduct
 
 logger = logging.getLogger(__name__)
 
@@ -105,15 +105,15 @@ def run_structured_extraction(
     *,
     prompt: str,
     model_name: str | None = None,
-) -> ProductAnalysisList:
-    """Run the structured model and return the typed product analysis output."""
+) -> ExtractedProduct:
+    """Run the structured model and return one extracted product tree."""
     model_id = _get_required_model_id(model_name)
 
     logger.info("Running structured extraction on %s chars of text", len(raw_text))
 
     agent = Agent(
         model_id,
-        output_type=ProductAnalysisList,
+        output_type=ExtractedProduct,
         system_prompt=prompt,
     )
 

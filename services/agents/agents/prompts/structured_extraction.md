@@ -1,52 +1,49 @@
-Analyze the following RAW TEXT REPORT (extracted from product images/description) and map it to the `ProductAnalysisList` schema.
+Analyze the RAW TEXT REPORT and return exactly one product object matching the
+`ExtractedProduct` schema.
 
-Identify if the page offers multiple purchasing options (e.g. Unit vs Box, Flavors).
-Return a valid JSON object containing a LIST of `items`.
+A scraped page always describes one root product. Do not return a list.
 
-### VARIANT DETECTION
-- **Box/Kit**: If a "Box of 12" is available, create a separate Item in the list.
-- **Flavors**: If different flavors are listed as *purchasable options*, create separate Items (or consolidate if just a list of available flavors).
-- **Multiple Nutrition Tables**: When raw text indicates table-to-variant mapping, keep each table tied to the correct variant/item. Do not merge unrelated tables.
+### Product Tree Rule
 
-### PRODUCT NAMING & CLASSIFICATION
-- **Name**: Extract the full, clean product name. Remove promotional slogans (e.g., "Best Price").
-- **Category Hierarchy**: Must be a list of strings representing the path.
-  - Example: `["Protein", "Animal", "Whey", "Concentrate"]`
-  - For Creatine: `["Energy", "Creatine", "Monohydrate"]`
-- **Packaging**: STRICTLY map to one of these enums:
-  - `CONTAINER`: For tubs, pots, jars, cans.
-  - `REFILL`: For pouches, bags, sachets.
-  - `BAR`: For protein bars.
-  - `OTHER`: Only if it doesn't fit above.
+- Return the page product as the root object.
+- If the page describes a kit, combo, or bundle, put each included product in
+  `children`.
+- Each child uses the same product contract and may also have its own
+  `children`.
+- If there are no included products, return `children: []`.
+- Do not create sibling products for flavors, sizes, nutrition tables, or
+  variants.
 
-### NUTRITION DATA (CRITICAL)
-- **Nutrition Facts**: Extract the TABLE values precisely.
-  - **Serving Size**: Must be in grams (g) or ml.
-  - **Macros**: Proteins, Carbs, Fats (Total, Saturated, Trans), Fiber, Sodium.
-  - **Micros**: Vitamins and Minerals if prominent.
-  - **Values**: Use `0` for implicitly missing values (e.g., "Does not contain saturated fat"). Use `null` only if the table is completely missing.
+### Fields
 
-### COMBO & COMPONENTS
-- **Is Combo**: Set to `true` if the item is a kit (e.g., "Kit 3x Whey", "Combo Mass").
-- **Components**: If likely a combo, list the individual items found.
-  - Include the same product fields when they are explicitly available for the component:
-    - `name`
-    - `weight_grams`
-    - `brand_name`
-    - `category_hierarchy`
-    - `ean`
-    - `description`
-    - `packaging`
-    - `tags_hierarchy`
-    - `nutrition_facts`
-    - `flavor_names`
-    - `external_id`
-    - `quantity`
-  - Include `ean` and `external_id` only when explicitly present in the source.
-  - If a field is not explicit for the component, leave it empty instead of copying from the combo automatically.
+Use these fields for the root product and every child:
 
-### DATA INTEGRITY RULES
-1. **No Hallucinations**: Do not invent values. If a flavor is not listed, do not guess.
-2. **Numeric Parsing**: Convert text like "2,5g" to `2.5`. Ensure integers for KCAL and Sodium.
-3. **Array Fields**: Always return arrays for `flavor_names`, `tags_hierarchy`, `components`, and component-level hierarchy fields, even if empty `[]`.
-4. **Table Association**: If there are multiple tables, prefer explicit flavor/natural markers and sequence clues from the raw report to map each table to the right item.
+- `name`
+- `brand_name`
+- `weight_grams`
+- `packaging`: one of `CONTAINER`, `REFILL`, `BAR`, `OTHER`
+- `quantity`
+- `category_hierarchy`
+- `tags_hierarchy`
+- `nutrition_facts`
+- `flavor_names`
+- `variant_name`
+- `children`
+
+### Nutrition Data
+
+- Extract nutrition table values precisely when visible.
+- Use grams for serving size and macros.
+- Use kcal for energy and mg for sodium.
+- Use `0` for explicit zero values.
+- Use `null` for `nutrition_facts` when no table is available for that product
+  node.
+
+### Data Integrity Rules
+
+1. Do not invent values.
+2. Keep arrays as arrays, even when empty.
+3. Flavors and variants belong in `flavor_names` or `variant_name`; they do not
+   become sibling products.
+4. Children are only products physically included in a kit, combo, or bundle.
+5. If unsure whether something is a child product, keep it out of `children`.

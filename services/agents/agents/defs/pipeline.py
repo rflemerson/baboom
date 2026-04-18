@@ -10,7 +10,7 @@ PROCESS_ITEM_JOB_NAME = "process_item_job"
 PROCESS_ITEM_OP_NAMES = (
     "downloaded_assets",
     "product_analysis",
-    "upload_to_api",
+    "extraction_handoff",
 )
 
 
