@@ -1,17 +1,17 @@
-"""Tests for raw extraction agent behavior."""
+"""Tests for image-report agent behavior."""
 
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from agents.brain import run_raw_extraction
+from agents.brain import run_image_report_extraction
 
 
-class TestRawExtractionAgent(TestCase):
-    """Tests for multimodal raw extraction helper."""
+class TestImageReportAgent(TestCase):
+    """Tests for multimodal image-report helper."""
 
     @patch("agents.brain.requests.get")
     @patch("agents.brain.Agent")
-    def test_run_raw_extraction_uses_supported_images(
+    def test_run_image_report_extraction_uses_supported_images(
         self,
         mock_agent_cls,
         mock_get,
@@ -25,7 +25,7 @@ class TestRawExtractionAgent(TestCase):
             MagicMock(content=b"img-b", raise_for_status=MagicMock()),
         ]
 
-        result = run_raw_extraction(
+        result = run_image_report_extraction(
             name="Product",
             description="Description",
             image_urls=[
@@ -42,13 +42,13 @@ class TestRawExtractionAgent(TestCase):
         self.assertEqual(len(call_args), 2)  # text + one supported image
 
     @patch("agents.brain.Agent")
-    def test_run_raw_extraction_returns_output(self, mock_agent_cls):
+    def test_run_image_report_extraction_returns_output(self, mock_agent_cls):
         """Returns the Agent output string."""
         agent = MagicMock()
         agent.run_sync.return_value = type("R", (), {"output": "RAW-OUT"})()
         mock_agent_cls.return_value = agent
 
-        result = run_raw_extraction(
+        result = run_image_report_extraction(
             name="Product",
             description="",
             image_urls=[],
@@ -58,14 +58,14 @@ class TestRawExtractionAgent(TestCase):
         self.assertEqual(result, "RAW-OUT")
 
     @patch("agents.brain.Agent")
-    def test_run_raw_extraction_raises_on_agent_error(self, mock_agent_cls):
+    def test_run_image_report_extraction_raises_on_agent_error(self, mock_agent_cls):
         """Re-raises exceptions from Agent execution."""
         agent = MagicMock()
         agent.run_sync.side_effect = RuntimeError("boom")
         mock_agent_cls.return_value = agent
 
         with self.assertRaisesRegex(RuntimeError, "boom"):
-            run_raw_extraction(
+            run_image_report_extraction(
                 name="Product",
                 description="",
                 image_urls=[],
@@ -73,13 +73,13 @@ class TestRawExtractionAgent(TestCase):
                 model_name="openai:gpt-5.2",
             )
 
-    def test_run_raw_extraction_raises_without_explicit_model(self):
+    def test_run_image_report_extraction_raises_without_explicit_model(self):
         """Fails fast when caller does not pass a model id."""
         with self.assertRaisesRegex(
             RuntimeError,
             "model_name must be passed explicitly",
         ):
-            run_raw_extraction(
+            run_image_report_extraction(
                 name="Product",
                 description="",
                 image_urls=[],

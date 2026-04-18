@@ -12,6 +12,7 @@ plain Python, tests, and Dagster assets with the same contract.
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 import requests
 from pydantic_ai import Agent, BinaryContent
@@ -43,7 +44,7 @@ def _get_required_model_id(model_name: str | None) -> str:
     raise RuntimeError(message)
 
 
-def run_raw_extraction(
+def run_image_report_extraction(
     *,
     name: str,
     description: str,
@@ -51,10 +52,69 @@ def run_raw_extraction(
     prompt: str,
     model_name: str | None = None,
 ) -> str:
-    """Run the raw extraction model with plain image URLs and JSON context."""
+    """Run the multimodal image-report model with image URLs and JSON context."""
     model_id = _get_required_model_id(model_name)
     agent = Agent(model_id)
+    user_content, loaded_images = _build_multimodal_user_content(
+        prompt=prompt,
+        name=name,
+        description=description,
+        image_urls=image_urls,
+    )
 
+    logger.info(
+        "Image report extraction for %s using %s with %s images",
+        name,
+        model_id,
+        loaded_images,
+    )
+
+    try:
+        result = agent.run_sync(user_content)
+    except Exception:
+        logger.exception("Image report extraction failed")
+        raise
+    else:
+        return result.output
+
+
+def run_structured_extraction(
+    analysis_input_text: str,
+    *,
+    prompt: str,
+    model_name: str | None = None,
+) -> ExtractedProduct:
+    """Run the structured model and return one extracted product tree."""
+    model_id = _get_required_model_id(model_name)
+
+    logger.info(
+        "Running structured extraction on %s chars of text",
+        len(analysis_input_text),
+    )
+
+    agent = Agent(
+        model_id,
+        output_type=ExtractedProduct,
+        system_prompt=prompt,
+    )
+
+    try:
+        result = agent.run_sync(analysis_input_text)
+    except Exception:
+        logger.exception("Structured extraction failed")
+        raise
+    else:
+        return result.output
+
+
+def _build_multimodal_user_content(
+    *,
+    prompt: str,
+    name: str,
+    description: str,
+    image_urls: list[str],
+) -> tuple[list[str | BinaryContent], int]:
+    """Build the shared multimodal input payload for image-based extraction."""
     user_content: list[str | BinaryContent] = [
         prompt + f"\n\n---\nProduct Name: {name}\nDescription: {description or ''}",
     ]
@@ -64,7 +124,8 @@ def run_raw_extraction(
         try:
             response = requests.get(image_url, headers=_REQUEST_HEADERS, timeout=30)
             response.raise_for_status()
-            file_extension = image_url.rsplit(".", 1)[-1].lower()
+            path = urlsplit(image_url).path
+            file_extension = path.rsplit(".", 1)[-1].lower() if "." in path else ""
             media_type = _SUPPORTED_IMAGE_MEDIA_TYPES.get(file_extension)
             if media_type is None:
                 logger.debug("Skipping unsupported image format: %s", file_extension)
@@ -77,50 +138,11 @@ def run_raw_extraction(
                 ),
             )
             loaded_images += 1
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, requests.RequestException) as exc:
             logger.warning(
-                "Failed to load image for raw extraction %s: %s",
+                "Failed to load image for multimodal extraction %s: %s",
                 image_url,
                 exc,
             )
 
-    logger.info(
-        "Raw extraction for %s using %s with %s images",
-        name,
-        model_id,
-        loaded_images,
-    )
-
-    try:
-        result = agent.run_sync(user_content)
-    except Exception:
-        logger.exception("Raw extraction failed")
-        raise
-    else:
-        return result.output
-
-
-def run_structured_extraction(
-    raw_text: str,
-    *,
-    prompt: str,
-    model_name: str | None = None,
-) -> ExtractedProduct:
-    """Run the structured model and return one extracted product tree."""
-    model_id = _get_required_model_id(model_name)
-
-    logger.info("Running structured extraction on %s chars of text", len(raw_text))
-
-    agent = Agent(
-        model_id,
-        output_type=ExtractedProduct,
-        system_prompt=prompt,
-    )
-
-    try:
-        result = agent.run_sync(raw_text)
-    except Exception:
-        logger.exception("Structured extraction failed")
-        raise
-    else:
-        return result.output
+    return user_content, loaded_images

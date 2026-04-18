@@ -54,14 +54,16 @@ agents/
 ### `extraction.py`
 
 - non-deterministic stage
-- runs `raw_extraction`
-- converts text into `ExtractedProduct`
+- runs `image_report`
+- converts the ordered image report into `ExtractedProduct`
 - loads prompts
 
 ### `brain.py`
 
 - thin wrappers for model calls
 - no implicit schema or prompt fallback
+- exposes one multimodal wrapper for `image_report`
+- exposes one text wrapper for `product_analysis`
 
 ### `schemas.py`
 

@@ -9,25 +9,20 @@ from __future__ import annotations
 import json
 import os
 import time
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .brain import run_raw_extraction, run_structured_extraction
-from .schemas import ExtractedProduct
+from .brain import (
+    run_image_report_extraction,
+    run_structured_extraction,
+)
 
 if TYPE_CHECKING:
     from .acquisition import PreparedExtractionInputs
+    from .schemas import ExtractedProduct
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 CONTEXT_BLOCK_CHAR_LIMIT = 7000
-
-StructuredExtractionRunner = Callable[..., ExtractedProduct]
-
-
-def load_raw_extraction_prompt() -> str:
-    """Load the base prompt for multimodal raw extraction."""
-    return _load_prompt("raw_extraction.md")
 
 
 def load_structured_extraction_prompt() -> str:
@@ -35,30 +30,49 @@ def load_structured_extraction_prompt() -> str:
     return _load_prompt("structured_extraction.md")
 
 
-def run_raw_extraction_step(
+def load_image_ocr_prompt() -> str:
+    """Load the base prompt for ordered multi-image OCR-like extraction."""
+    return _load_prompt("image_ocr.md")
+
+
+def run_image_ocr_step(
     *,
     prepared_inputs: PreparedExtractionInputs,
 ) -> tuple[str, dict[str, Any]]:
-    """Run raw extraction from API-provided JSON context and image URLs."""
-    llm_description = build_json_context_block(
+    """Extract ordered OCR-like notes for all relevant images in one call."""
+    image_manifest_lines = [
+        f"- IMAGE_{index}: {image_url}"
+        for index, image_url in enumerate(prepared_inputs.image_urls, start=1)
+    ]
+    description = build_json_context_block(
         "SCRAPER_CONTEXT",
         prepared_inputs.scraper_context,
     )
-    raw_text = run_raw_extraction(
-        name=prepared_inputs.page_url,
-        description=llm_description,
+    if image_manifest_lines:
+        description += (
+            "\n\n[IMAGE_MANIFEST]\n"
+            + "\n".join(image_manifest_lines)
+            + "\n[/IMAGE_MANIFEST]"
+        )
+
+    ocr_text = run_image_report_extraction(
+        name=f"{prepared_inputs.page_url}#ordered-images",
+        description=description,
         image_urls=prepared_inputs.image_urls,
-        prompt=load_raw_extraction_prompt(),
-        model_name=_get_configured_model("RAW_EXTRACTION_MODEL"),
+        prompt=load_image_ocr_prompt(),
+        model_name=_get_configured_model("IMAGE_REPORT_MODEL"),
     )
-    return raw_text, build_raw_extraction_metadata(prepared_inputs=prepared_inputs)
+    return ocr_text, {
+        "images_processed": len(prepared_inputs.image_urls),
+        "images_sent": prepared_inputs.image_urls,
+    }
 
 
-def build_raw_extraction_metadata(
+def build_image_report_metadata(
     *,
     prepared_inputs: PreparedExtractionInputs,
 ) -> dict[str, Any]:
-    """Build Dagster metadata for the prepared raw extraction inputs."""
+    """Build Dagster metadata for the prepared image-report inputs."""
     return {
         "fallback_reason": prepared_inputs.fallback_reason,
         "scraper_context_included": bool(prepared_inputs.scraper_context),
@@ -68,15 +82,30 @@ def build_raw_extraction_metadata(
 
 
 def run_analysis_pipeline(
-    raw_extraction_text: str,
-    *,
-    extraction_runner: StructuredExtractionRunner = run_structured_extraction,
+    analysis_input_text: str,
 ) -> ExtractedProduct:
     """Run structured extraction once and return the extracted product tree."""
-    return extraction_runner(
-        raw_extraction_text,
+    return run_structured_extraction(
+        analysis_input_text,
         prompt=load_structured_extraction_prompt(),
         model_name=_get_configured_model("STRUCTURED_EXTRACTION_MODEL"),
+    )
+
+
+def build_analysis_input(
+    *,
+    prepared_inputs: PreparedExtractionInputs,
+    image_report_text: str,
+) -> str:
+    """Build the text payload consumed by the schema extraction step."""
+    return (
+        build_json_context_block(
+            "SCRAPER_CONTEXT",
+            prepared_inputs.scraper_context,
+        )
+        + "\n\n[ORDERED_IMAGE_OCR]\n"
+        + image_report_text
+        + "\n[/ORDERED_IMAGE_OCR]"
     )
 
 
@@ -104,9 +133,12 @@ def build_json_context_block(title: str, payload: dict | list | None) -> str:
     if not payload:
         return ""
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    if len(body) > CONTEXT_BLOCK_CHAR_LIMIT:
+    is_truncated = len(body) > CONTEXT_BLOCK_CHAR_LIMIT
+    if is_truncated:
         body = f"{body[:CONTEXT_BLOCK_CHAR_LIMIT]}..."
-    return f"\n\n[{title}]\n{body}\n[/{title}]"
+
+    tag = f"{title} (TRUNCATED)" if is_truncated else title
+    return f"\n\n[{tag}]\n{body}\n[/{tag}]"
 
 
 def _load_prompt(filename: str) -> str:

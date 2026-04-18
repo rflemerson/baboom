@@ -1,5 +1,6 @@
 """Dagster asset adapters for the agents pipeline."""
 
+import sys
 import time
 
 from dagster import AssetExecutionContext, MetadataValue, asset
@@ -11,12 +12,13 @@ from ..acquisition import (
     get_item_or_raise,
     resolve_source_page_context,
 )
-from ..brain import run_structured_extraction
 from ..client import AgentClient
 from ..extraction import (
+    build_analysis_input,
     build_analysis_metadata,
+    build_image_report_metadata,
     run_analysis_pipeline,
-    run_raw_extraction_step,
+    run_image_ocr_step,
 )
 from . import pipeline as pipeline_module
 
@@ -73,11 +75,11 @@ def prepared_extraction_inputs(
 
 
 @asset
-def raw_extraction(
+def image_report(
     context: AssetExecutionContext,
     prepared_extraction_inputs: PreparedExtractionInputs,
 ) -> str:
-    """Run raw extraction directly from API-provided images and JSON context."""
+    """Describe all selected images in order before schema extraction."""
     api = AgentClient()
     origin_item_id = prepared_extraction_inputs.origin_item_id
 
@@ -85,48 +87,54 @@ def raw_extraction(
         started = time.perf_counter()
         if prepared_extraction_inputs.fallback_reason:
             context.log.warning(
-                "Raw extraction running without images: %s for item %s",
+                "Image report running without images: %s for item %s",
                 prepared_extraction_inputs.fallback_reason,
                 origin_item_id,
             )
         llm_started = time.perf_counter()
-        raw_text, extraction_metadata = run_raw_extraction_step(
+        report_text, extraction_metadata = run_image_ocr_step(
             prepared_inputs=prepared_extraction_inputs,
         )
         llm_ms = round((time.perf_counter() - llm_started) * 1000, 2)
 
         context.add_output_metadata(
             {
+                **build_image_report_metadata(
+                    prepared_inputs=prepared_extraction_inputs,
+                ),
                 **extraction_metadata,
                 "llm_ms": llm_ms,
                 "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 "text_preview": MetadataValue.md(
-                    (raw_text[:500] + "...") if raw_text else "",
+                    (report_text[:500] + "...") if report_text else "",
                 ),
             },
         )
     except Exception as exc:
-        context.log.exception("Raw extraction failed")
+        context.log.exception("Image report failed")
         api.report_error(origin_item_id, str(exc), is_fatal=False)
         raise
     else:
-        return raw_text
+        return report_text
 
 
 @asset
 def product_analysis(
     context: AssetExecutionContext,
-    config: ItemConfig,
-    raw_extraction: str,
+    prepared_extraction_inputs: PreparedExtractionInputs,
+    image_report: str,
 ) -> dict:
-    """Convert raw text into one extracted product tree."""
+    """Convert the ordered image report plus JSON context into one product tree."""
     api = AgentClient()
+    origin_item_id = prepared_extraction_inputs.origin_item_id
+
     try:
         started = time.perf_counter()
-        product = run_analysis_pipeline(
-            raw_extraction,
-            extraction_runner=run_structured_extraction,
+        analysis_input = build_analysis_input(
+            prepared_inputs=prepared_extraction_inputs,
+            image_report_text=image_report,
         )
+        product = run_analysis_pipeline(analysis_input)
 
         context.add_output_metadata(
             build_analysis_metadata(
@@ -136,7 +144,7 @@ def product_analysis(
         )
     except Exception as exc:
         context.log.exception("Structured analysis failed")
-        api.report_error(config.item_id, str(exc), is_fatal=False)
+        api.report_error(origin_item_id, str(exc), is_fatal=False)
         raise
     else:
         return product.model_dump(by_alias=True)
@@ -145,18 +153,16 @@ def product_analysis(
 @asset
 def extraction_handoff(
     context: AssetExecutionContext,
-    config: ItemConfig,
     product_analysis: dict,
-    raw_extraction: str,
+    image_report: str,
     downloaded_assets: dict,
 ) -> dict:
     """Emit the extracted product tree without creating catalog records."""
-    _ = config
     started = time.perf_counter()
     handoff = build_extraction_handoff(
         product=product_analysis,
         downloaded_assets=downloaded_assets,
-        raw_extraction=raw_extraction,
+        image_report=image_report,
     )
     context.add_output_metadata(
         build_handoff_metadata(
@@ -171,7 +177,7 @@ def build_extraction_handoff(
     *,
     product: dict,
     downloaded_assets: dict,
-    raw_extraction: str,
+    image_report: str,
 ) -> dict:
     """Build the final payload emitted by the Dagster pipeline."""
     return {
@@ -179,7 +185,7 @@ def build_extraction_handoff(
         "sourcePageId": downloaded_assets.get("page_id"),
         "sourcePageUrl": downloaded_assets.get("url"),
         "storeSlug": downloaded_assets.get("store_slug"),
-        "rawExtraction": raw_extraction,
+        "imageReport": image_report,
         "product": product,
     }
 
@@ -201,7 +207,7 @@ def build_handoff_metadata(
     }
 
 
-ASSET_MODULES = [__import__(__name__, fromlist=["*"])]
+ASSET_MODULES = [sys.modules[__name__]]
 
 __all__ = [
     "ASSET_MODULES",
@@ -209,7 +215,7 @@ __all__ = [
     "build_handoff_metadata",
     "downloaded_assets",
     "extraction_handoff",
+    "image_report",
     "prepared_extraction_inputs",
     "product_analysis",
-    "raw_extraction",
 ]

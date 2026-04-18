@@ -10,8 +10,8 @@ from agents.definitions import defs
 from agents.defs.assets import (
     downloaded_assets,
     extraction_handoff,
+    image_report,
     product_analysis,
-    raw_extraction,
 )
 from agents.defs.pipeline import (
     ItemConfig,
@@ -126,8 +126,7 @@ class TestDagsterSensor(TestCase):
         self.assertEqual(run.tags["item_id"], "22")
         ops = run.run_config["ops"]
         self.assertIn("downloaded_assets", ops)
-        self.assertIn("product_analysis", ops)
-        self.assertIn("extraction_handoff", ops)
+        self.assertEqual(list(ops), ["downloaded_assets"])
 
     def test_build_item_run_request_uses_shared_config(self):
         """Builds stable run config for queued items."""
@@ -176,8 +175,8 @@ class TestDagsterAssets(TestCase):
         self.assertEqual(result["store_slug"], "demo-store")
         self.assertEqual(result["source_page_api_context"], '{"items": []}')
 
-    def test_raw_extraction_reports_errors(self):
-        """Reports raw extraction errors against the origin item."""
+    def test_image_report_reports_errors(self):
+        """Reports image-report errors against the origin item."""
         api = _FakeApiClient()
         prepared_inputs = PreparedExtractionInputs(
             origin_item_id=99,
@@ -190,12 +189,12 @@ class TestDagsterAssets(TestCase):
         with (
             patch("agents.defs.assets.AgentClient", return_value=api),
             patch(
-                "agents.defs.assets.run_raw_extraction_step",
+                "agents.defs.assets.run_image_ocr_step",
                 side_effect=RuntimeError("boom"),
             ),
             self.assertRaisesRegex(RuntimeError, "boom"),
         ):
-            raw_extraction(
+            image_report(
                 context=build_asset_context(),
                 prepared_extraction_inputs=prepared_inputs,
             )
@@ -209,16 +208,19 @@ class TestDagsterAssets(TestCase):
             name="Combo",
             children=[ExtractedProduct(name="Creatina")],
         )
+        prepared_inputs = PreparedExtractionInputs(
+            origin_item_id=99,
+            page_url="https://example.com/product",
+            scraper_context={"product": {"name": "Combo"}},
+            image_urls=[],
+            fallback_reason="",
+        )
 
         with patch("agents.defs.assets.run_analysis_pipeline", return_value=product):
             result = product_analysis(
                 context=build_asset_context(),
-                config=ItemConfig(
-                    item_id=99,
-                    url="https://example.com/product",
-                    store_slug="demo-store",
-                ),
-                raw_extraction="RAW",
+                prepared_extraction_inputs=prepared_inputs,
+                image_report="IMAGE REPORT",
             )
 
         self.assertEqual(result["name"], "Combo")
@@ -228,13 +230,8 @@ class TestDagsterAssets(TestCase):
         """The final asset no longer creates catalog products."""
         result = extraction_handoff(
             context=build_asset_context(),
-            config=ItemConfig(
-                item_id=99,
-                url="https://example.com/product",
-                store_slug="demo-store",
-            ),
             product_analysis={"name": "Whey", "children": []},
-            raw_extraction="RAW",
+            image_report="IMAGE REPORT",
             downloaded_assets={
                 "origin_item_id": 99,
                 "page_id": 123,
@@ -245,4 +242,4 @@ class TestDagsterAssets(TestCase):
 
         self.assertEqual(result["originScrapedItemId"], 99)
         self.assertEqual(result["product"]["name"], "Whey")
-        self.assertEqual(result["rawExtraction"], "RAW")
+        self.assertEqual(result["imageReport"], "IMAGE REPORT")

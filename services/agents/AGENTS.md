@@ -30,6 +30,9 @@ Read these docs only when they are relevant:
 - Each page produces exactly one root `ExtractedProduct`.
 - Combos and kits use `children`; there is no `items`, `components`, or
   `is_combo`.
+- The only extraction flow is:
+  `image_report` reads the images once and returns ordered text,
+  then `product_analysis` converts that text into schema.
 - The final stage is `extraction_handoff`: it only returns the extracted
   payload and does not create catalog data.
 

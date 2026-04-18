@@ -61,22 +61,26 @@ Minimum:
 
 - `AGENTS_API_URL`
 - `AGENTS_API_KEY`
-- `RAW_EXTRACTION_MODEL`
+- `IMAGE_REPORT_MODEL`
 - `STRUCTURED_EXTRACTION_MODEL`
 - LLM key(s) used by your provider (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`)
 
 Recommended split:
 
-- `RAW_EXTRACTION_MODEL`
-  multimodal model for `JSON + images -> raw text`
+- `IMAGE_REPORT_MODEL`
+  multimodal model for `JSON + images -> ordered image report`
 - `STRUCTURED_EXTRACTION_MODEL`
-  cheaper text model for `raw text -> structured payload`
+  cheaper text model for `image report + JSON context -> structured payload`
 
-Image selection tuning:
+Deterministic image filtering:
 
-- `OCR_INCLUDE_ALL_TABLES`
-- `OCR_MAX_TABLE_CANDIDATES`
-- `OCR_MAX_IMAGES`
-- `OCR_MAX_NUTRITION_IMAGES`
-- `OCR_MAX_IMAGES_NO_NUTRITION`
-- `OCR_CV_TABLE_THRESHOLD`
+- `AGENTS_IMAGE_FILTER_ENABLED`
+  enable or disable URL-level filtering before the multimodal call
+- `AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE`
+  treat querystring-only URL variants as the same image
+- `AGENTS_IMAGE_FILTER_MAX_IMAGES`
+  cap the number of images kept after filtering; `0` means no cap
+- `AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS`
+  comma-separated lowercase URL keywords to drop, useful for decorative assets
+  such as logos, placeholders, sprites, swatches, badges, or store-specific
+  branding frames

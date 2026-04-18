@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from typing import Protocol
+from urllib.parse import urlsplit, urlunsplit
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +30,16 @@ class PreparedExtractionInputs:
     scraper_context: dict | None
     image_urls: list[str]
     fallback_reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImageFilterConfig:
+    """Deterministic URL-level filter configuration for image selection."""
+
+    enabled: bool
+    strip_query_for_dedupe: bool
+    max_images: int
+    exclude_keywords: tuple[str, ...]
 
 
 class ItemInput(Protocol):
@@ -62,46 +74,30 @@ def get_item_or_raise(api: IngestionApi, item_id: int) -> dict:
     return item
 
 
-def ensure_item_source_page(
-    api: IngestionApi,
-    *,
-    item_id: int,
-    fallback_url: str,
-    fallback_store_slug: str,
-) -> tuple[dict, dict]:
-    """Load one item, ensure its source page, and return both payloads."""
-    item = get_item_or_raise(api, item_id)
-    page_url = item.get("sourcePageUrl") or item.get("productLink") or fallback_url
-    store_slug = item.get("storeSlug") or fallback_store_slug
-    ensured_item = api.ensure_source_page(item_id, page_url, store_slug)
-    if not ensured_item:
-        message = f"Failed to ensure source page for item {item_id}"
-        raise RuntimeError(message)
-    return item, ensured_item
-
-
 def resolve_source_page_context(
     api: IngestionApi,
     config: ItemInput,
     item: dict,
 ) -> SourcePageContext:
     """Ensure source page exists and return normalized page context."""
-    current_item, ensured_item = ensure_item_source_page(
-        api,
-        item_id=config.item_id,
-        fallback_url=config.url,
-        fallback_store_slug=config.store_slug,
-    )
+    item_id = config.item_id
+    page_url = item.get("sourcePageUrl") or item.get("productLink") or config.url
+    store_slug = item.get("storeSlug") or config.store_slug
+
+    ensured_item = api.ensure_source_page(item_id, page_url, store_slug)
+    if not ensured_item:
+        message = f"Failed to ensure source page for item {item_id}"
+        raise RuntimeError(message)
 
     page_id = ensured_item.get("sourcePageId")
     ensured_page_url = (
         ensured_item.get("sourcePageUrl")
-        or current_item.get("sourcePageUrl")
-        or current_item.get("productLink")
+        or item.get("sourcePageUrl")
+        or item.get("productLink")
         or config.url
     )
     if not page_id:
-        message = f"Missing sourcePageId for item {config.item_id}"
+        message = f"Missing sourcePageId for item {item_id}"
         raise RuntimeError(message)
 
     return SourcePageContext(
@@ -109,21 +105,16 @@ def resolve_source_page_context(
         page_id=int(page_id),
         page_url=ensured_page_url,
         store_slug=(
-            ensured_item.get("storeSlug")
-            or item.get("storeSlug")
-            or current_item.get("storeSlug")
-            or config.store_slug
+            ensured_item.get("storeSlug") or item.get("storeSlug") or config.store_slug
         ),
         source_page_api_context=(
             ensured_item.get("sourcePageApiContext")
             or item.get("sourcePageApiContext")
-            or current_item.get("sourcePageApiContext")
             or ""
         ),
         source_page_html_structured_data=(
             ensured_item.get("sourcePageHtmlStructuredData")
             or item.get("sourcePageHtmlStructuredData")
-            or current_item.get("sourcePageHtmlStructuredData")
             or ""
         ),
     )
@@ -205,7 +196,77 @@ def extract_image_urls(
             seen_urls.add(image_url)
             image_urls.append(image_url)
 
-    return image_urls
+    return filter_image_urls(image_urls)
+
+
+def filter_image_urls(image_urls: list[str]) -> list[str]:
+    """Apply deterministic URL-level filters while preserving input order."""
+    config = load_image_filter_config()
+    if not config.enabled:
+        return image_urls[: config.max_images] if config.max_images > 0 else image_urls
+
+    filtered_urls: list[str] = []
+    seen_normalized_urls: set[str] = set()
+
+    for image_url in image_urls:
+        normalized_url = normalize_image_url(
+            image_url,
+            strip_query=config.strip_query_for_dedupe,
+        )
+        if normalized_url in seen_normalized_urls:
+            continue
+        if should_exclude_image_url(image_url, config):
+            continue
+
+        seen_normalized_urls.add(normalized_url)
+        filtered_urls.append(image_url)
+        if config.max_images > 0 and len(filtered_urls) >= config.max_images:
+            break
+
+    return filtered_urls
+
+
+def load_image_filter_config() -> ImageFilterConfig:
+    """Load deterministic image filtering rules from environment variables."""
+    return ImageFilterConfig(
+        enabled=_get_env_bool("AGENTS_IMAGE_FILTER_ENABLED", default=True),
+        strip_query_for_dedupe=_get_env_bool(
+            "AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE",
+            default=True,
+        ),
+        max_images=max(0, _get_env_int("AGENTS_IMAGE_FILTER_MAX_IMAGES", 0)),
+        exclude_keywords=_get_env_csv(
+            "AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS",
+            (
+                "logo",
+                "icon",
+                "placeholder",
+                "sprite",
+                "swatch",
+                "avatar",
+                "badge",
+                "favicon",
+                "caveira",
+            ),
+        ),
+    )
+
+
+def should_exclude_image_url(image_url: str, config: ImageFilterConfig) -> bool:
+    """Return whether one image URL should be dropped by keyword rules."""
+    lowered_url = image_url.lower()
+    return any(keyword in lowered_url for keyword in config.exclude_keywords)
+
+
+def normalize_image_url(image_url: str, *, strip_query: bool) -> str:
+    """Normalize one image URL for deterministic duplicate detection."""
+    if not strip_query:
+        return image_url.strip()
+
+    split_url = urlsplit(image_url.strip())
+    return urlunsplit(
+        (split_url.scheme, split_url.netloc, split_url.path, "", ""),
+    )
 
 
 def _extract_image_url(image: object) -> str | None:
@@ -307,3 +368,29 @@ def resolve_fallback_reason(image_urls: list[str]) -> str:
     if image_urls:
         return ""
     return "no_images_available"
+
+
+def _get_env_bool(name: str, *, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_env_int(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return int(raw_value.strip())
+    except ValueError:
+        return default
+
+
+def _get_env_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    values = [value.strip().lower() for value in raw_value.split(",")]
+    normalized_values = tuple(value for value in values if value)
+    return normalized_values or default

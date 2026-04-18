@@ -7,11 +7,7 @@ from dataclasses import dataclass
 from dagster import Config, RunRequest, define_asset_job
 
 PROCESS_ITEM_JOB_NAME = "process_item_job"
-PROCESS_ITEM_OP_NAMES = (
-    "downloaded_assets",
-    "product_analysis",
-    "extraction_handoff",
-)
+PROCESS_ITEM_OP_NAMES = ("downloaded_assets",)
 
 
 @dataclass(frozen=True, slots=True)
