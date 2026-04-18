@@ -36,7 +36,7 @@ def downloaded_assets(
     try:
         started = time.perf_counter()
         item = get_item_or_raise(api, config.item_id)
-        page = resolve_source_page_context(api, config, item)
+        page = resolve_source_page_context(config, item)
         context.add_output_metadata(
             {
                 "url": MetadataValue.url(page.page_url),
@@ -157,20 +157,31 @@ def extraction_handoff(
     image_report: str,
     downloaded_assets: dict,
 ) -> dict:
-    """Emit the extracted product tree without creating catalog records."""
+    """Submit the extracted product tree for backend review."""
+    api = AgentClient()
     started = time.perf_counter()
     handoff = build_extraction_handoff(
         product=product_analysis,
         downloaded_assets=downloaded_assets,
         image_report=image_report,
     )
-    context.add_output_metadata(
-        build_handoff_metadata(
-            handoff=handoff,
-            started=started,
-        ),
-    )
-    return handoff
+    try:
+        submitted = api.submit_extraction(handoff)
+        context.add_output_metadata(
+            {
+                **build_handoff_metadata(
+                    handoff=handoff,
+                    started=started,
+                ),
+                "submitted_extraction_id": submitted.get("id"),
+            },
+        )
+    except Exception as exc:
+        context.log.exception("Extraction submit failed")
+        api.report_error(int(downloaded_assets["origin_item_id"]), str(exc))
+        raise
+    else:
+        return handoff
 
 
 def build_extraction_handoff(
@@ -179,7 +190,7 @@ def build_extraction_handoff(
     downloaded_assets: dict,
     image_report: str,
 ) -> dict:
-    """Build the final payload emitted by the Dagster pipeline."""
+    """Build the payload submitted to the backend review queue."""
     return {
         "originScrapedItemId": int(downloaded_assets["origin_item_id"]),
         "sourcePageId": downloaded_assets.get("page_id"),

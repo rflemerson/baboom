@@ -1,14 +1,19 @@
 """GraphQL types exposed for scraper-managed entities."""
 
 import json
+from datetime import datetime
 from typing import cast
 
 import strawberry
 from strawberry import auto
 from strawberry.django import type as django_type
+from strawberry.scalars import JSON
 
+from baboom.utils import ValidationError
 from core.models import Store
-from scrapers.models import ScrapedItem
+from scrapers.models import ScrapedItem, ScrapedItemExtraction
+
+_STRAWBERRY_RUNTIME_TYPES = (datetime, JSON, ValidationError)
 
 
 @django_type(ScrapedItem)
@@ -86,3 +91,37 @@ class ScrapedItemType:
             return store.display_name
 
         return self.store_slug.replace("_", " ").title()
+
+
+@strawberry.type
+class ScrapedItemExtractionType:
+    """GraphQL type for staged agent extractions."""
+
+    id: int
+    scraped_item_id: int
+    source_page_id: int
+    image_report: str
+    extracted_product: JSON
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_model(cls, extraction: ScrapedItemExtraction) -> ScrapedItemExtractionType:
+        """Build a GraphQL type from a persisted extraction."""
+        return cls(
+            id=extraction.id,
+            scraped_item_id=extraction.scraped_item_id,
+            source_page_id=extraction.source_page_id,
+            image_report=extraction.image_report,
+            extracted_product=extraction.extracted_product,
+            created_at=extraction.created_at,
+            updated_at=extraction.updated_at,
+        )
+
+
+@strawberry.type
+class ScrapedItemExtractionResult:
+    """Result for staging agent extractions."""
+
+    extraction: ScrapedItemExtractionType | None = None
+    errors: list[ValidationError] | None = None

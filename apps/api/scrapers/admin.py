@@ -11,7 +11,7 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import ScrapedItem
+from .models import ScrapedItem, ScrapedItemExtraction
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -116,3 +116,31 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
             if obj.name and len(obj.name) > NAME_SUMMARY_MAX_LENGTH
             else obj.name
         )
+
+
+@admin.register(ScrapedItemExtraction)
+class ScrapedItemExtractionAdmin(admin.ModelAdmin):
+    """Admin for staged agent extractions."""
+
+    list_display = (
+        "id",
+        "scraped_item",
+        "source_page",
+        "root_product_name",
+        "updated_at",
+    )
+    search_fields = (
+        "scraped_item__name",
+        "scraped_item__external_id",
+        "source_page__url",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+    @admin.display(description="Root product")
+    def root_product_name(self, obj: ScrapedItemExtraction) -> str:
+        """Return the extracted root product name for quick review."""
+        name = obj.extracted_product.get("name", "")
+        return str(name)

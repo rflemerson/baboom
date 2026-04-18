@@ -38,20 +38,6 @@ sourcePageUrl
 sourcePageId
 sourcePageApiContext
 sourcePageHtmlStructuredData
-productStoreId
-linkedProductId
-"""
-
-SCRAPED_ITEM_MUTATION_FIELDS = """
-id
-name
-status
-storeSlug
-externalId
-sourcePageUrl
-sourcePageId
-productStoreId
-linkedProductId
 """
 
 GRAPHQL_SELECTION_CLOSE = """
@@ -177,30 +163,34 @@ class AgentClient:
         data = self._send(query, {"itemId": int(item_id)})
         return data.get("data", {}).get("scrapedItem")
 
-    def ensure_source_page(
-        self,
-        item_id: int,
-        url: str,
-        store_slug: str,
-    ) -> dict[str, Any] | None:
-        """Ensure source page exists and is linked to the scraped item."""
-        mutation = (
-            """
-        mutation($itemId: Int!, $url: String!, $storeSlug: String!) {
-            ensureScrapedItemSourcePage(
-                itemId: $itemId,
-                url: $url,
-                storeSlug: $storeSlug
-            ) {
+    def submit_extraction(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Persist the final extraction payload for backend review."""
+        mutation = """
+        mutation($data: AgentExtractionInput!) {
+            submitAgentExtraction(data: $data) {
+                extraction {
+                    id
+                    scrapedItemId
+                    sourcePageId
+                }
+                errors {
+                    field
+                    message
+                }
+            }
+        }
         """
-            + SCRAPED_ITEM_MUTATION_FIELDS
-            + GRAPHQL_SELECTION_CLOSE
-        )
-        data = self._send(
-            mutation,
-            {"itemId": int(item_id), "url": str(url), "storeSlug": str(store_slug)},
-        )
-        return data.get("data", {}).get("ensureScrapedItemSourcePage")
+        data = self._send(mutation, {"data": payload})
+        result = data.get("data", {}).get("submitAgentExtraction") or {}
+        errors = result.get("errors")
+        if errors:
+            message = f"Extraction submit failed: {errors}"
+            raise AgentClientError(message)
+        extraction = result.get("extraction")
+        if not extraction:
+            message = "Extraction submit failed without errors"
+            raise AgentClientError(message)
+        return extraction
 
     @staticmethod
     def _raise_graphql_error(errors: object) -> None:

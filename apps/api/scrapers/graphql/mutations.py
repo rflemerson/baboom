@@ -3,30 +3,37 @@
 from __future__ import annotations
 
 import strawberry
+from django.core.exceptions import ValidationError as DjangoValidationError
 
+from baboom.utils import format_graphql_errors
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
 from scrapers.services import (
     ScrapedItemCheckoutService,
-    ScrapedItemDiscardService,
     ScrapedItemErrorService,
+    ScrapedItemExtractionSubmitService,
     ScrapedItemLinkService,
-    ScrapedItemSourcePageService,
-    ScrapedItemVariantService,
+    build_agent_extraction_submit_input,
 )
 
 from .inputs import (
+    AgentExtractionInput,
     ScrapedItemCheckoutInput,
     ScrapedItemErrorInput,
     ScrapedItemLinkInput,
-    ScrapedItemVariantInput,
 )
-from .types import ScrapedItemType
+from .types import (
+    ScrapedItemExtractionResult,
+    ScrapedItemExtractionType,
+    ScrapedItemType,
+)
 
 _STRAWBERRY_RUNTIME_TYPES = (
+    AgentExtractionInput,
     ScrapedItemCheckoutInput,
     ScrapedItemErrorInput,
     ScrapedItemLinkInput,
-    ScrapedItemVariantInput,
+    ScrapedItemExtractionResult,
+    ScrapedItemExtractionType,
     ScrapedItemType,
 )
 
@@ -56,25 +63,6 @@ class ScrapersMutation:
         )
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def discard_scraped_item(self, item_id: int, reason: str) -> bool:
-        """Agent marks item as DISCARDED (e.g., T-shirt, not supplement)."""
-        return ScrapedItemDiscardService().execute(item_id=item_id, reason=reason)
-
-    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def ensure_scraped_item_source_page(
-        self,
-        item_id: int,
-        url: str,
-        store_slug: str,
-    ) -> ScrapedItemType | None:
-        """Ensure item has source page linked, creating page by URL when needed."""
-        return ScrapedItemSourcePageService().ensure(
-            item_id=item_id,
-            url=url,
-            store_slug=store_slug,
-        )
-
-    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def link_scraped_item_to_product_store(
         self,
         data: ScrapedItemLinkInput,
@@ -86,25 +74,25 @@ class ScrapersMutation:
         )
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def update_scraped_item_data(
+    def submit_agent_extraction(
         self,
-        item_id: int,
-        name: str | None = None,
-        source_page_url: str | None = None,
-        store_slug: str | None = None,
-    ) -> ScrapedItemType | None:
-        """Update mutable fields of a scraped item used by agents pipeline."""
-        return ScrapedItemSourcePageService().update_item_data(
-            item_id=item_id,
-            name=name,
-            source_page_url=source_page_url,
-            store_slug=store_slug,
-        )
-
-    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def upsert_scraped_item_variant(
-        self,
-        data: ScrapedItemVariantInput,
-    ) -> ScrapedItemType | None:
-        """Create or update a variant ScrapedItem linked to the same source page."""
-        return ScrapedItemVariantService().execute(data)
+        data: AgentExtractionInput,
+    ) -> ScrapedItemExtractionResult:
+        """Stage the agent extraction payload for review."""
+        payload = {
+            "origin_scraped_item_id": data.origin_scraped_item_id,
+            "source_page_id": data.source_page_id,
+            "source_page_url": data.source_page_url,
+            "store_slug": data.store_slug,
+            "image_report": data.image_report,
+            "product": data.product,
+        }
+        try:
+            extraction = ScrapedItemExtractionSubmitService().execute(
+                build_agent_extraction_submit_input(payload),
+            )
+            return ScrapedItemExtractionResult(
+                extraction=ScrapedItemExtractionType.from_model(extraction),
+            )
+        except DjangoValidationError as exc:
+            return ScrapedItemExtractionResult(errors=format_graphql_errors(exc))

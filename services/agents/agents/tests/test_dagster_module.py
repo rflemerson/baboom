@@ -29,8 +29,8 @@ class _FakeApiClient:
     def __init__(self, work_payload=None):
         self.work_payload = work_payload
         self.report_error_calls: list[tuple[int, str, bool]] = []
+        self.submit_extraction_calls: list[dict] = []
         self._items: dict[int, dict] = {}
-        self._next_page_id = 5000
 
     def seed_item(self, item_id: int, payload: dict) -> dict:
         """Insert one fake scraped item for tests."""
@@ -51,8 +51,6 @@ class _FakeApiClient:
                 "source_page_html_structured_data",
                 "",
             ),
-            "productStoreId": payload.get("product_store_id"),
-            "linkedProductId": payload.get("linked_product_id"),
         }
         self._items[int(item_id)] = item
         return item
@@ -69,19 +67,14 @@ class _FakeApiClient:
         """Return fake scraped item payload by id."""
         return self._items.get(int(item_id))
 
-    def ensure_source_page(self, item_id: int, url: str, store_slug: str):
-        """Ensure source page fields are present in fake item."""
-        item = self._items.get(int(item_id))
-        if not item:
-            return None
-        if not item.get("sourcePageId"):
-            item["sourcePageId"] = self._next_page_id
-            self._next_page_id += 1
-        item["sourcePageUrl"] = item.get("sourcePageUrl") or url
-        item["productLink"] = item.get("productLink") or item["sourcePageUrl"]
-        item["storeSlug"] = store_slug or item.get("storeSlug")
-        item["storeName"] = item["storeSlug"].replace("_", " ").title()
-        return item
+    def submit_extraction(self, payload: dict):
+        """Track submitted extraction payloads."""
+        self.submit_extraction_calls.append(payload)
+        return {
+            "id": 123,
+            "scrapedItemId": payload["originScrapedItemId"],
+            "sourcePageId": payload["sourcePageId"],
+        }
 
 
 class TestDagsterSensor(TestCase):
@@ -226,20 +219,24 @@ class TestDagsterAssets(TestCase):
         self.assertEqual(result["name"], "Combo")
         self.assertEqual(result["children"][0]["name"], "Creatina")
 
-    def test_extraction_handoff_emits_payload_without_api_writes(self):
-        """The final asset no longer creates catalog products."""
-        result = extraction_handoff(
-            context=build_asset_context(),
-            product_analysis={"name": "Whey", "children": []},
-            image_report="IMAGE REPORT",
-            downloaded_assets={
-                "origin_item_id": 99,
-                "page_id": 123,
-                "url": "https://example.com/product",
-                "store_slug": "demo-store",
-            },
-        )
+    def test_extraction_handoff_submits_payload_for_review(self):
+        """The final asset sends the extracted tree to Django review staging."""
+        api = _FakeApiClient()
+
+        with patch("agents.defs.assets.AgentClient", return_value=api):
+            result = extraction_handoff(
+                context=build_asset_context(),
+                product_analysis={"name": "Whey", "children": []},
+                image_report="IMAGE REPORT",
+                downloaded_assets={
+                    "origin_item_id": 99,
+                    "page_id": 123,
+                    "url": "https://example.com/product",
+                    "store_slug": "demo-store",
+                },
+            )
 
         self.assertEqual(result["originScrapedItemId"], 99)
         self.assertEqual(result["product"]["name"], "Whey")
         self.assertEqual(result["imageReport"], "IMAGE REPORT")
+        self.assertEqual(api.submit_extraction_calls[0], result)

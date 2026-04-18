@@ -8,8 +8,9 @@ This document describes the current Dagster pipeline implemented in
 The agents pipeline processes one queued scraped item at a time and extracts one
 product tree from the scraped page.
 
-It does not create catalog products. Django remains responsible for deciding how
-an extracted product tree becomes catalog data.
+It does not create catalog products. Django stores the extracted tree in scraper
+review staging and remains responsible for deciding how that tree becomes
+catalog data.
 
 ## Runtime Entry Point
 
@@ -32,7 +33,7 @@ One run executes this linear asset graph:
 3. `prepared_extraction_inputs` extracts API JSON and ordered image URLs
 4. `image_report` sends JSON context and images to the multimodal model
 5. `product_analysis` converts the ordered image report into one `ExtractedProduct`
-6. `extraction_handoff` emits the final handoff payload without writing catalog data
+6. `extraction_handoff` submits the final payload to Django review staging
 
 ```mermaid
 flowchart TD
@@ -150,7 +151,7 @@ publishing decisions in this stage.
 
 ### `extraction_handoff`
 
-This asset only emits the final handoff payload:
+This asset submits the final payload through `submitAgentExtraction`:
 
 ```json
 {
@@ -174,10 +175,11 @@ The agents service still uses Django GraphQL for queue/source operations:
 
 - `checkout_work(...)`
 - `get_scraped_item(...)`
-- `ensure_source_page(...)`
+- `submit_extraction(...)`
 - `report_error(...)`
 
-Catalog writes are intentionally out of scope for the current Dagster pipeline.
+Catalog writes are intentionally out of scope for the Dagster pipeline. The only
+write is review staging in `scrapers.ScrapedItemExtraction`.
 
 ## Error Handling
 

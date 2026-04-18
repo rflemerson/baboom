@@ -1,6 +1,9 @@
 """Input objects for scraper GraphQL mutations."""
 
 import strawberry
+from strawberry.scalars import JSON
+
+_STRAWBERRY_RUNTIME_TYPES = (JSON,)
 
 
 @strawberry.input
@@ -21,21 +24,20 @@ class ScrapedItemErrorInput:
 
 
 @strawberry.input
-class ScrapedItemVariantInput:
-    """Input for creating or updating scraped item variants."""
-
-    origin_item_id: int
-    external_id: str
-    name: str
-    page_url: str
-    store_slug: str
-    price: float | None = None
-    stock_status: str | None = None
-
-
-@strawberry.input
 class ScrapedItemLinkInput:
     """Input for explicitly linking a scraped item to a product store."""
 
     item_id: int
     product_store_id: int
+
+
+@strawberry.input
+class AgentExtractionInput:
+    """Input for staging one agent extraction for review."""
+
+    origin_scraped_item_id: int
+    source_page_id: int | None = None
+    source_page_url: str = ""
+    store_slug: str = ""
+    image_report: str = ""
+    product: JSON

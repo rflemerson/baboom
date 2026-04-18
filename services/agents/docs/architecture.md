@@ -77,7 +77,7 @@ agents/
 - `children` uses the same schema recursively.
 - The pipeline does not decide catalog identity.
 - The pipeline does not create products, variants, or components.
-- The pipeline ends at `extraction_handoff`.
+- The pipeline ends by submitting the extracted tree to Django review staging.
 
 ## Sensor Rules
 

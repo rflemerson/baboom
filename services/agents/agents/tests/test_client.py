@@ -71,3 +71,37 @@ class TestAgentClient(TestCase):
                 },
             },
         )
+
+    def test_submit_extraction_uses_review_staging_mutation(self):
+        """Submits the final payload to the scraper review mutation."""
+        client = AgentClient()
+        payload = {
+            "originScrapedItemId": 7,
+            "sourcePageId": 9,
+            "sourcePageUrl": "https://example.com/p",
+            "storeSlug": "demo",
+            "imageReport": "IMAGE REPORT",
+            "product": {"name": "Whey", "children": []},
+        }
+
+        with patch.object(
+            client,
+            "_send",
+            return_value={
+                "data": {
+                    "submitAgentExtraction": {
+                        "extraction": {
+                            "id": 11,
+                            "scrapedItemId": 7,
+                            "sourcePageId": 9,
+                        },
+                        "errors": None,
+                    },
+                },
+            },
+        ) as mock_send:
+            result = client.submit_extraction(payload)
+
+        _query, variables = mock_send.call_args.args
+        self.assertEqual(variables, {"data": payload})
+        self.assertEqual(result["id"], 11)

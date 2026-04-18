@@ -33,8 +33,8 @@ Read these docs only when they are relevant:
 - The only extraction flow is:
   `image_report` reads the images once and returns ordered text,
   then `product_analysis` converts that text into schema.
-- The final stage is `extraction_handoff`: it only returns the extracted
-  payload and does not create catalog data.
+- The final stage is `extraction_handoff`: it submits the extracted payload to
+  Django `scrapers` review staging. It does not create catalog data.
 
 ## Working Rules
 

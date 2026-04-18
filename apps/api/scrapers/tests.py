@@ -1,18 +1,21 @@
 """Tests for scraper spiders and ingestion helpers."""
 
+import json
 import logging
 import os
 from decimal import Decimal
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from strawberry.django.views import GraphQLView
 
-from core.models import Brand, Product, ProductPriceHistory, ProductStore, Store
-from scrapers.dtos import ScrapedItemIngestionInput
-from scrapers.models import ScrapedItem
-from scrapers.services import ScraperService
+from baboom.schema import schema
+from core.models import APIKey, Brand, Product, ProductPriceHistory, ProductStore, Store
+from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
+from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
+from scrapers.services import ScrapedItemExtractionSubmitService, ScraperService
 from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.catalog_api_spider import CatalogApiSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
@@ -20,6 +23,9 @@ from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
 from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
+
+if TYPE_CHECKING:
+    from django.http import HttpResponse
 
 EXPECTED_EXTERNAL_STOCK_QUANTITY = 100
 EXPECTED_PRICE_HISTORY_RECORDS_AFTER_UPDATE = 2
@@ -193,6 +199,133 @@ class SyncPriceToCoreTests(TestCase):
             self.fail("Latest history not found")
 
         assert latest.price == Decimal("179.90")
+
+
+class ScrapedItemExtractionSubmitServiceTests(TestCase):
+    """Unit tests for staging agent extraction output."""
+
+    def setUp(self) -> None:
+        """Set up one scraped item with source context."""
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/whey",
+        )
+        self.item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-1",
+            name="Whey Growth",
+            status=ScrapedItem.Status.PROCESSING,
+            source_page=self.page,
+        )
+
+    def test_execute_stages_extraction_and_moves_item_to_review(self) -> None:
+        """Persist validated agent output without creating catalog records."""
+        data = AgentExtractionSubmitInput.model_validate(
+            {
+                "originScrapedItemId": self.item.id,
+                "sourcePageId": self.page.id,
+                "sourcePageUrl": self.page.url,
+                "storeSlug": "growth",
+                "imageReport": "Image 1: whey label",
+                "product": {
+                    "name": "Whey Growth",
+                    "brandName": "Growth",
+                    "weightGrams": 900,
+                    "children": [
+                        {
+                            "name": "Creatine",
+                            "brandName": "Growth",
+                            "weightGrams": 250,
+                            "children": [],
+                        },
+                    ],
+                },
+            },
+        )
+
+        extraction = ScrapedItemExtractionSubmitService().execute(data)
+
+        self.item.refresh_from_db()
+        assert extraction.scraped_item == self.item
+        assert extraction.source_page == self.page
+        assert extraction.extracted_product["name"] == "Whey Growth"
+        assert extraction.extracted_product["children"][0]["name"] == "Creatine"
+        assert self.item.status == ScrapedItem.Status.REVIEW
+        assert self.item.error_count == 0
+        assert self.item.last_error_log == ""
+
+
+class ScrapedItemExtractionGraphQLTests(TestCase):
+    """GraphQL tests for agent extraction staging."""
+
+    def setUp(self) -> None:
+        """Set up authenticated GraphQL test client state."""
+        self.factory = RequestFactory()
+        self.api_key_obj = APIKey.objects.create(name="Agent Client")
+        self.view = GraphQLView.as_view(schema=schema)
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/whey",
+        )
+        self.item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-graphql-1",
+            name="Whey Growth",
+            status=ScrapedItem.Status.PROCESSING,
+            source_page=self.page,
+        )
+
+    def test_submit_agent_extraction_mutation_stages_payload(self) -> None:
+        """The mutation stores the agent product tree for review."""
+        mutation = """
+        mutation SubmitAgentExtraction($data: AgentExtractionInput!) {
+          submitAgentExtraction(data: $data) {
+            extraction {
+              id
+              scrapedItemId
+              sourcePageId
+              extractedProduct
+            }
+            errors {
+              field
+              message
+            }
+          }
+        }
+        """
+        variables = {
+            "data": {
+                "originScrapedItemId": self.item.id,
+                "sourcePageId": self.page.id,
+                "sourcePageUrl": self.page.url,
+                "storeSlug": "growth",
+                "imageReport": "Image 1: label",
+                "product": {
+                    "name": "Whey Growth",
+                    "brandName": "Growth",
+                    "children": [],
+                },
+            },
+        }
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": mutation, "variables": variables}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.api_key_obj.key,
+        )
+
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
+
+        result = payload["data"]["submitAgentExtraction"]
+        self.item.refresh_from_db()
+        extraction = ScrapedItemExtraction.objects.get(scraped_item=self.item)
+        assert result["errors"] is None
+        assert result["extraction"]["scrapedItemId"] == self.item.id
+        assert result["extraction"]["sourcePageId"] == self.page.id
+        assert result["extraction"]["extractedProduct"]["name"] == "Whey Growth"
+        assert extraction.image_report == "Image 1: label"
+        assert self.item.status == ScrapedItem.Status.REVIEW
 
 
 class _DummyCatalogSpider(CatalogApiSpider):

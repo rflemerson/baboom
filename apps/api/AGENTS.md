@@ -24,6 +24,11 @@ cd apps/api && .venv/bin/python manage.py runserver
   - `core/graphql/` and `scrapers/graphql/` map input, call services/selectors, map output.
 - Read/query composition lives in `selectors.py`, not in GraphQL and not in form-style filters.
 - Scraper workflows live in `scrapers/services.py`.
+- Agent extraction review staging lives in `scrapers`:
+  - persistence model: `ScrapedItemExtraction`
+  - service: `ScrapedItemExtractionSubmitService`
+  - GraphQL mutation: `submitAgentExtraction`
+- Agent extraction staging must not create or link catalog products directly.
 - Admin forms/formsets live in `core/forms.py`.
 - Admin-to-service mapping helpers live in `core/admin_mappers.py`.
 - Domain docs live in `docs/domain/`; scraper strategy docs live in `docs/scrapers/`.

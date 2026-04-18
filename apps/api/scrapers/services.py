@@ -9,17 +9,20 @@ from typing import TYPE_CHECKING
 
 import extruct
 import requests
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
+from pydantic import ValidationError as PydanticValidationError
 
 from core.models import ProductPriceHistory, ProductStore
 
-from .models import ScrapedItem, ScrapedPage
+from .dtos import AgentExtractionSubmitInput
+from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
 
 if TYPE_CHECKING:
     from .dtos import ScrapedItemIngestionInput
-    from .graphql.inputs import ScrapedItemCheckoutInput, ScrapedItemVariantInput
+    from .graphql.inputs import ScrapedItemCheckoutInput
 
 logger = logging.getLogger(__name__)
 
@@ -135,123 +138,6 @@ class ScrapedItemErrorService:
         return True
 
 
-class ScrapedItemDiscardService:
-    """Discard scraped items that should not enter the catalog."""
-
-    def execute(self, *, item_id: int, reason: str) -> bool:
-        """Mark a scraped item as discarded with an explicit reason."""
-        try:
-            item = ScrapedItem.objects.get(id=item_id)
-        except ScrapedItem.DoesNotExist:
-            return False
-
-        item.status = ScrapedItem.Status.DISCARDED
-        item.last_error_log = f"Discarded by Agent: {reason}"
-        item.save()
-        return True
-
-
-class ScrapedItemSourcePageService:
-    """Maintain source-page associations for scraped items."""
-
-    def ensure(
-        self,
-        *,
-        item_id: int,
-        url: str,
-        store_slug: str,
-    ) -> ScrapedItem | None:
-        """Ensure a scraped item is linked to a source page by URL."""
-        try:
-            item = ScrapedItem.objects.get(id=item_id)
-        except ScrapedItem.DoesNotExist:
-            return None
-
-        page, _ = ScrapedPage.objects.get_or_create(
-            url=url,
-            defaults={"store_slug": store_slug},
-        )
-        changed = False
-        if item.source_page_id != page.id:
-            item.source_page = page
-            changed = True
-        if item.store_slug != store_slug:
-            item.store_slug = store_slug
-            changed = True
-        if changed:
-            item.save()
-        return item
-
-    def update_item_data(
-        self,
-        *,
-        item_id: int,
-        name: str | None = None,
-        source_page_url: str | None = None,
-        store_slug: str | None = None,
-    ) -> ScrapedItem | None:
-        """Update mutable scraped item fields used by agent workflows."""
-        try:
-            item = ScrapedItem.objects.get(id=item_id)
-        except ScrapedItem.DoesNotExist:
-            return None
-
-        changed = False
-        if name:
-            item.name = name
-            changed = True
-        if source_page_url:
-            resolved_store = store_slug or item.store_slug
-            page, _ = ScrapedPage.objects.get_or_create(
-                url=source_page_url,
-                defaults={"store_slug": resolved_store},
-            )
-            if item.source_page_id != page.id:
-                item.source_page = page
-                changed = True
-        if store_slug and item.store_slug != store_slug:
-            item.store_slug = store_slug
-            changed = True
-        if changed:
-            item.save()
-        return item
-
-
-class ScrapedItemVariantService:
-    """Create or update scraped item variants discovered by the agent."""
-
-    def execute(self, data: ScrapedItemVariantInput) -> ScrapedItem | None:
-        """Create or update a variant linked to the origin source page."""
-        try:
-            origin_item = ScrapedItem.objects.get(id=data.origin_item_id)
-        except ScrapedItem.DoesNotExist:
-            return None
-
-        page, _ = ScrapedPage.objects.get_or_create(
-            url=data.page_url,
-            defaults={"store_slug": data.store_slug},
-        )
-
-        resolved_price = data.price if data.price is not None else origin_item.price
-        resolved_stock_status = data.stock_status or origin_item.stock_status
-        valid_stock_values = {choice[0] for choice in ScrapedItem.StockStatus.choices}
-        if resolved_stock_status not in valid_stock_values:
-            resolved_stock_status = ScrapedItem.StockStatus.AVAILABLE
-
-        item, _ = ScrapedItem.objects.update_or_create(
-            store_slug=data.store_slug,
-            external_id=data.external_id,
-            defaults={
-                "name": data.name,
-                "source_page": page,
-                "price": resolved_price,
-                "stock_status": resolved_stock_status,
-                "status": ScrapedItem.Status.PROCESSING,
-            },
-        )
-        return item
-
-
 class ScrapedItemLinkService:
     """Link a scraped item to an explicitly selected product store listing."""
 
@@ -275,6 +161,90 @@ class ScrapedItemLinkService:
         item.save(update_fields=["product_store", "status"])
         ScraperService.sync_price_to_core(item)
         return item
+
+
+class ScrapedItemExtractionSubmitService:
+    """Stage one agent extraction for review without creating catalog products."""
+
+    @transaction.atomic
+    def execute(self, data: AgentExtractionSubmitInput) -> ScrapedItemExtraction:
+        """Persist the agent output and move the origin item to review."""
+        item = self._get_item(data.origin_scraped_item_id)
+        source_page = self._resolve_source_page(item=item, data=data)
+        extraction, _ = ScrapedItemExtraction.objects.update_or_create(
+            scraped_item=item,
+            defaults={
+                "source_page": source_page,
+                "image_report": data.image_report,
+                "extracted_product": data.product_payload(),
+            },
+        )
+
+        item.source_page = source_page
+        item.status = ScrapedItem.Status.REVIEW
+        item.error_count = 0
+        item.last_error_log = ""
+        item.last_attempt_at = timezone.now()
+        item.save(
+            update_fields=[
+                "source_page",
+                "status",
+                "error_count",
+                "last_error_log",
+                "last_attempt_at",
+                "updated_at",
+            ],
+        )
+        return extraction
+
+    def _get_item(self, item_id: int) -> ScrapedItem:
+        """Return the origin item or raise a GraphQL-friendly validation error."""
+        item = (
+            ScrapedItem.objects.select_related("source_page").filter(id=item_id).first()
+        )
+        if item is None:
+            raise DjangoValidationError(
+                {"originScrapedItemId": ["Scraped item does not exist."]},
+            )
+        return item
+
+    def _resolve_source_page(
+        self,
+        *,
+        item: ScrapedItem,
+        data: AgentExtractionSubmitInput,
+    ) -> ScrapedPage:
+        """Resolve the source page used by this extraction."""
+        if data.source_page_id:
+            page = ScrapedPage.objects.filter(id=data.source_page_id).first()
+            if page is None:
+                raise DjangoValidationError(
+                    {"sourcePageId": ["Source page does not exist."]},
+                )
+            return page
+
+        if item.source_page_id and item.source_page:
+            return item.source_page
+
+        if data.source_page_url:
+            page, _ = ScrapedPage.objects.get_or_create(
+                url=data.source_page_url,
+                defaults={"store_slug": data.store_slug or item.store_slug},
+            )
+            return page
+
+        raise DjangoValidationError(
+            {"sourcePageId": ["A source page id or URL is required."]},
+        )
+
+
+def build_agent_extraction_submit_input(payload: object) -> AgentExtractionSubmitInput:
+    """Validate a raw GraphQL JSON payload into the staging DTO."""
+    try:
+        return AgentExtractionSubmitInput.model_validate(payload)
+    except PydanticValidationError as exc:
+        errors = {str(error["loc"]): [error["msg"]] for error in exc.errors()}
+        raise DjangoValidationError(errors) from exc
 
 
 class ScraperService:

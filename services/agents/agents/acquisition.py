@@ -57,14 +57,6 @@ class IngestionApi(Protocol):
     def get_scraped_item(self, item_id: int) -> dict | None:
         """Return one scraped item snapshot."""
 
-    def ensure_source_page(
-        self,
-        item_id: int,
-        url: str,
-        store_slug: str,
-    ) -> dict | None:
-        """Ensure the scraped item is linked to a source page."""
-
 
 def get_item_or_raise(api: IngestionApi, item_id: int) -> dict:
     """Load one scraped item or fail fast."""
@@ -76,47 +68,26 @@ def get_item_or_raise(api: IngestionApi, item_id: int) -> dict:
 
 
 def resolve_source_page_context(
-    api: IngestionApi,
     config: ItemInput,
     item: dict,
 ) -> SourcePageContext:
-    """Ensure source page exists and return normalized page context."""
+    """Return normalized source-page context from the checked-out item."""
     item_id = config.item_id
     page_url = item.get("sourcePageUrl") or item.get("productLink") or config.url
     store_slug = item.get("storeSlug") or config.store_slug
-
-    ensured_item = api.ensure_source_page(item_id, page_url, store_slug)
-    if not ensured_item:
-        message = f"Failed to ensure source page for item {item_id}"
-        raise RuntimeError(message)
-
-    page_id = ensured_item.get("sourcePageId")
-    ensured_page_url = (
-        ensured_item.get("sourcePageUrl")
-        or item.get("sourcePageUrl")
-        or item.get("productLink")
-        or config.url
-    )
+    page_id = item.get("sourcePageId")
     if not page_id:
         message = f"Missing sourcePageId for item {item_id}"
         raise RuntimeError(message)
 
     return SourcePageContext(
-        item_id=int(ensured_item["id"]),
+        item_id=int(item["id"]),
         page_id=int(page_id),
-        page_url=ensured_page_url,
-        store_slug=(
-            ensured_item.get("storeSlug") or item.get("storeSlug") or config.store_slug
-        ),
-        source_page_api_context=(
-            ensured_item.get("sourcePageApiContext")
-            or item.get("sourcePageApiContext")
-            or ""
-        ),
+        page_url=page_url,
+        store_slug=store_slug,
+        source_page_api_context=item.get("sourcePageApiContext") or "",
         source_page_html_structured_data=(
-            ensured_item.get("sourcePageHtmlStructuredData")
-            or item.get("sourcePageHtmlStructuredData")
-            or ""
+            item.get("sourcePageHtmlStructuredData") or ""
         ),
     )
 

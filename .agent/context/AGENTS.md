@@ -81,7 +81,7 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
   - `downloaded_assets` -> normalize the `ScrapedItem` + `ScrapedPage` payload from the API
   - `prepared_extraction_inputs` -> extract ordered image URLs and JSON context from `api_context`
 - The non-deterministic handoff is:
-  - `raw_extraction` -> send `api_context` JSON plus raw image URLs to the multimodal model
-  - `product_analysis` -> convert raw text into one recursive `ExtractedProduct` tree
-- `extraction_handoff` is a final handoff asset only: it emits source identifiers, raw extraction text, and the extracted product tree. It must not create catalog products, variants, or components.
+  - `image_report` -> send ordered images to the multimodal model and return ordered text
+  - `product_analysis` -> convert JSON context plus image text into one recursive `ExtractedProduct` tree
+- `extraction_handoff` submits the extracted product tree to Django `scrapers` review staging through `submitAgentExtraction`. It must not create catalog products, variants, or components.
 - Combo/kit structure is represented by `ExtractedProduct.children`; there is no `items` list, `components` list, or `is_combo` flag in the agents output.

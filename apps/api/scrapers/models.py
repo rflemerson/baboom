@@ -182,3 +182,40 @@ class ScrapedItem(models.Model):
             f"[{self.store_slug}] {self.external_id} - "
             f"{self.get_stock_status_display()}"
         )
+
+
+class ScrapedItemExtraction(models.Model):
+    """Agent extraction staged for human/backend catalog review."""
+
+    scraped_item = models.OneToOneField(
+        ScrapedItem,
+        on_delete=models.CASCADE,
+        related_name="agent_extraction",
+        help_text=_("Scraped item that produced this extraction"),
+    )
+    source_page = models.ForeignKey(
+        ScrapedPage,
+        on_delete=models.CASCADE,
+        related_name="agent_extractions",
+        help_text=_("Source page used by the agent pipeline"),
+    )
+    image_report = models.TextField(
+        blank=True,
+        help_text=_("Ordered text report extracted from product images"),
+    )
+    extracted_product = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_("Recursive product tree returned by the agent"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        """Meta options."""
+
+        ordering = ("-updated_at",)
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return f"Extraction for scraped item {self.scraped_item_id}"
