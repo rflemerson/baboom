@@ -71,6 +71,8 @@ class AgentClient:
         """Read runtime configuration directly from environment variables."""
         self.api_key = os.environ.get("AGENTS_API_KEY", "")
         self.url = os.environ.get("AGENTS_API_URL", "http://localhost:8000/graphql/")
+        self.retries = max(1, int(os.environ.get("AGENTS_HTTP_RETRIES", "3")))
+        self.retry_backoff = float(os.environ.get("AGENTS_HTTP_RETRY_BACKOFF", "0.6"))
 
         self.headers = {"Content-Type": "application/json", "X-API-KEY": self.api_key}
         if not self.api_key:
@@ -81,11 +83,9 @@ class AgentClient:
         query: str,
         variables: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        retries = max(1, int(os.environ.get("AGENTS_HTTP_RETRIES", "3")))
-        backoff = float(os.environ.get("AGENTS_HTTP_RETRY_BACKOFF", "0.6"))
         last_exception: Exception | None = None
 
-        for attempt in range(1, retries + 1):
+        for attempt in range(1, self.retries + 1):
             try:
                 response = requests.post(
                     self.url,
@@ -94,8 +94,8 @@ class AgentClient:
                     timeout=(10, 120),
                 )
                 if response.status_code in {429, 500, 502, 503, 504}:
-                    if attempt < retries:
-                        time.sleep(backoff * attempt)
+                    if attempt < self.retries:
+                        time.sleep(self.retry_backoff * attempt)
                         continue
                     response.raise_for_status()
 
@@ -108,8 +108,8 @@ class AgentClient:
                     return data
             except (requests.RequestException, ValueError, AgentClientError) as exc:
                 last_exception = exc
-                if attempt < retries:
-                    time.sleep(backoff * attempt)
+                if attempt < self.retries:
+                    time.sleep(self.retry_backoff * attempt)
                     continue
                 logger.exception("Network error while calling %s", self.url)
                 raise

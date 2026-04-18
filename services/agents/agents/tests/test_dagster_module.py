@@ -189,7 +189,7 @@ class TestDagsterAssets(TestCase):
         with (
             patch("agents.defs.assets.AgentClient", return_value=api),
             patch(
-                "agents.defs.assets.run_image_ocr_step",
+                "agents.defs.assets.run_image_report_step",
                 side_effect=RuntimeError("boom"),
             ),
             self.assertRaisesRegex(RuntimeError, "boom"),

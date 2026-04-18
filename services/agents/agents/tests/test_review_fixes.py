@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from agents.brain import _build_multimodal_user_content
+from agents.brain import _build_multimodal_user_content, _download_images
 from agents.extraction import CONTEXT_BLOCK_CHAR_LIMIT, build_json_context_block
 
 
@@ -23,14 +23,14 @@ class TestReviewFixes(TestCase):
         # URL with query string that previously would fail (extension becomes "jpg?v=123")
         image_urls = ["https://example.com/image.jpg?v=123"]
 
-        user_content, loaded_count = _build_multimodal_user_content(
+        downloaded_images = _download_images(image_urls)
+        user_content = _build_multimodal_user_content(
             prompt="PROMPT",
-            name="NAME",
             description="DESC",
-            image_urls=image_urls,
+            downloaded_images=downloaded_images,
         )
 
-        self.assertEqual(loaded_count, 1)
+        self.assertEqual(len(downloaded_images), 1)
         # Verify it detected image/jpeg
         self.assertEqual(user_content[1].media_type, "image/jpeg")
 
@@ -41,15 +41,14 @@ class TestReviewFixes(TestCase):
 
         image_urls = ["https://example.com/fail.jpg"]
 
-        # Should not raise exception
-        user_content, loaded_count = _build_multimodal_user_content(
+        downloaded_images = _download_images(image_urls)
+        user_content = _build_multimodal_user_content(
             prompt="PROMPT",
-            name="NAME",
             description="DESC",
-            image_urls=image_urls,
+            downloaded_images=downloaded_images,
         )
 
-        self.assertEqual(loaded_count, 0)
+        self.assertEqual(len(downloaded_images), 0)
         self.assertEqual(len(user_content), 1)  # Only text prompt
 
     def test_build_json_context_block_truncation_marker(self):

@@ -38,10 +38,10 @@ def work_queue_sensor(
     _ = context
     api = AgentClient()
     work = api.checkout_work()
-    item = _parse_work_item(work)
     if not work:
         yield SkipReason("Queue empty. Sleeping...")
         return
+    item = _parse_work_item(work)
     if item is None:
         yield SkipReason(f"Item {int(work['id'])} has no source URL.")
         return

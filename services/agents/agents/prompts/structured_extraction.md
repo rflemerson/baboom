@@ -6,10 +6,10 @@ A scraped page always describes one root product. Do not return a list.
 The input contains:
 
 - `[SCRAPER_CONTEXT]` with deterministic store JSON
-- `[ORDERED_IMAGE_OCR]` with one ordered block per image
+- `[ORDERED_IMAGE_REPORT]` with one ordered block per image
 
 Use both sources together.
-Prefer `[ORDERED_IMAGE_OCR]` for visible packaging text, tables, ingredients,
+Prefer `[ORDERED_IMAGE_REPORT]` for visible packaging text, tables, ingredients,
 allergens, flavors, weights, and combo composition.
 Use `[SCRAPER_CONTEXT]` to confirm names, options, and store metadata when it
 does not conflict with visible evidence.
@@ -95,7 +95,7 @@ Use these fields for the root product and every child:
 
 ### Image Report Rules
 
-- `[ORDERED_IMAGE_OCR]` may contain:
+- `[ORDERED_IMAGE_REPORT]` may contain:
   - front packshots
   - combo frames
   - nutrition tables

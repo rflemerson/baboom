@@ -1,7 +1,7 @@
-Analyze all provided product images together and return ordered OCR-like notes.
+Analyze all provided product images together and return an ordered image report.
 
 Goal:
-- recover visible text from each image
+- recover visible text from each image when available
 - identify what kind of image each one is
 - preserve the original image order for downstream parsing
 

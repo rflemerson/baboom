@@ -17,6 +17,7 @@ class SourcePageContext:
     page_id: int
     page_url: str
     store_slug: str
+    # JSON-encoded transport payloads from the backend API.
     source_page_api_context: str
     source_page_html_structured_data: str
 
@@ -142,6 +143,7 @@ def build_prepared_extraction_inputs(
     image_urls = extract_image_urls(
         scraper_context=scraper_context,
         html_structured_data=html_structured_data,
+        filter_config=load_image_filter_config(),
     )
     fallback_reason = resolve_fallback_reason(image_urls)
     return PreparedExtractionInputs(
@@ -163,11 +165,11 @@ def load_html_structured_data(downloaded_assets: dict) -> dict | None:
     return _load_json_object(downloaded_assets.get("source_page_html_structured_data"))
 
 
-def _load_json_object(raw_payload: object) -> dict | None:
+def _load_json_object(raw_payload: str | None) -> dict | None:
     if not raw_payload:
         return None
     try:
-        parsed_context = json.loads(str(raw_payload))
+        parsed_context = json.loads(raw_payload)
     except json.JSONDecodeError:
         return None
     return parsed_context if isinstance(parsed_context, dict) else None
@@ -177,31 +179,26 @@ def extract_image_urls(
     *,
     scraper_context: dict | None,
     html_structured_data: dict | None = None,
+    filter_config: ImageFilterConfig,
 ) -> list[str]:
     """Extract image URLs from API and HTML structured data in stable order."""
-    seen_urls: set[str] = set()
     image_urls: list[str] = []
 
     if scraper_context:
-        for image_url in _iter_image_urls(scraper_context):
-            if image_url in seen_urls:
-                continue
-            seen_urls.add(image_url)
-            image_urls.append(image_url)
+        image_urls.extend(_iter_image_urls(scraper_context))
 
     if html_structured_data:
-        for image_url in _iter_structured_data_image_urls(html_structured_data):
-            if image_url in seen_urls:
-                continue
-            seen_urls.add(image_url)
-            image_urls.append(image_url)
+        image_urls.extend(_iter_structured_data_image_urls(html_structured_data))
 
-    return filter_image_urls(image_urls)
+    return filter_image_urls(image_urls, config=filter_config)
 
 
-def filter_image_urls(image_urls: list[str]) -> list[str]:
+def filter_image_urls(
+    image_urls: list[str],
+    *,
+    config: ImageFilterConfig,
+) -> list[str]:
     """Apply deterministic URL-level filters while preserving input order."""
-    config = load_image_filter_config()
     if not config.enabled:
         return image_urls[: config.max_images] if config.max_images > 0 else image_urls
 
@@ -241,12 +238,9 @@ def load_image_filter_config() -> ImageFilterConfig:
                 "logo",
                 "icon",
                 "placeholder",
-                "sprite",
-                "swatch",
                 "avatar",
                 "badge",
                 "favicon",
-                "caveira",
             ),
         ),
     )
@@ -325,6 +319,7 @@ def _collect_image_urls(payload: object, image_urls: list[str]) -> None:
         image_url = _extract_image_url(payload)
         if image_url:
             image_urls.append(image_url)
+            return
         for value in payload.values():
             _collect_image_urls(value, image_urls)
         return
@@ -359,6 +354,11 @@ def _collect_structured_data_image_urls(payload: object, image_urls: list[str]) 
             og_image = value.get("og:image")
             if og_image is not None:
                 _collect_image_urls(og_image, image_urls)
+                nested_value = {
+                    key: item for key, item in value.items() if key != "og:image"
+                }
+                _collect_structured_data_image_urls(nested_value, image_urls)
+                continue
 
         _collect_structured_data_image_urls(value, image_urls)
 

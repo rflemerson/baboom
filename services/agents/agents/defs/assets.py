@@ -18,7 +18,7 @@ from ..extraction import (
     build_analysis_metadata,
     build_image_report_metadata,
     run_analysis_pipeline,
-    run_image_ocr_step,
+    run_image_report_step,
 )
 from . import pipeline as pipeline_module
 
@@ -92,7 +92,7 @@ def image_report(
                 origin_item_id,
             )
         llm_started = time.perf_counter()
-        report_text, extraction_metadata = run_image_ocr_step(
+        report_text, extraction_metadata = run_image_report_step(
             prepared_inputs=prepared_extraction_inputs,
         )
         llm_ms = round((time.perf_counter() - llm_started) * 1000, 2)
@@ -196,13 +196,13 @@ def build_handoff_metadata(
     started: float,
 ) -> dict:
     """Build Dagster metadata for the final handoff payload."""
-    product = handoff.get("product") if isinstance(handoff, dict) else {}
-    children = product.get("children") if isinstance(product, dict) else []
+    product = handoff["product"]
+    children = product.get("children", [])
     return {
         "origin_item_id": handoff.get("originScrapedItemId"),
         "source_page_id": handoff.get("sourcePageId"),
-        "root_product_name": product.get("name") if isinstance(product, dict) else "",
-        "children_detected": len(children) if isinstance(children, list) else 0,
+        "root_product_name": product.get("name", ""),
+        "children_detected": len(children),
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
     }
 

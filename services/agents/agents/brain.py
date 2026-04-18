@@ -12,6 +12,7 @@ plain Python, tests, and Dagster assets with the same contract.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 import requests
@@ -35,6 +36,15 @@ _REQUEST_HEADERS = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class DownloadedImage:
+    """Image bytes prepared for the multimodal model."""
+
+    url: str
+    data: bytes
+    media_type: str
+
+
 def _get_required_model_id(model_name: str | None) -> str:
     """Return the required explicit model id."""
     model_id = (model_name or "").strip()
@@ -46,7 +56,7 @@ def _get_required_model_id(model_name: str | None) -> str:
 
 def run_image_report_extraction(
     *,
-    name: str,
+    run_label: str,
     description: str,
     image_urls: list[str],
     prompt: str,
@@ -55,18 +65,18 @@ def run_image_report_extraction(
     """Run the multimodal image-report model with image URLs and JSON context."""
     model_id = _get_required_model_id(model_name)
     agent = Agent(model_id)
-    user_content, loaded_images = _build_multimodal_user_content(
+    downloaded_images = _download_images(image_urls)
+    user_content = _build_multimodal_user_content(
         prompt=prompt,
-        name=name,
         description=description,
-        image_urls=image_urls,
+        downloaded_images=downloaded_images,
     )
 
     logger.info(
         "Image report extraction for %s using %s with %s images",
-        name,
+        run_label,
         model_id,
-        loaded_images,
+        len(downloaded_images),
     )
 
     try:
@@ -110,39 +120,61 @@ def run_structured_extraction(
 def _build_multimodal_user_content(
     *,
     prompt: str,
-    name: str,
     description: str,
-    image_urls: list[str],
-) -> tuple[list[str | BinaryContent], int]:
-    """Build the shared multimodal input payload for image-based extraction."""
+    downloaded_images: list[DownloadedImage],
+) -> list[str | BinaryContent]:
+    """Build the multimodal model payload from already downloaded images."""
     user_content: list[str | BinaryContent] = [
-        prompt + f"\n\n---\nProduct Name: {name}\nDescription: {description or ''}",
+        prompt + f"\n\n---\n{description or ''}",
     ]
+    user_content.extend(
+        BinaryContent(
+            data=image.data,
+            media_type=image.media_type,
+        )
+        for image in downloaded_images
+    )
 
-    loaded_images = 0
+    return user_content
+
+
+def _download_images(image_urls: list[str]) -> list[DownloadedImage]:
+    """Download supported images, skipping individual failures explicitly."""
+    downloaded_images: list[DownloadedImage] = []
     for image_url in image_urls:
-        try:
-            response = requests.get(image_url, headers=_REQUEST_HEADERS, timeout=30)
-            response.raise_for_status()
-            path = urlsplit(image_url).path
-            file_extension = path.rsplit(".", 1)[-1].lower() if "." in path else ""
-            media_type = _SUPPORTED_IMAGE_MEDIA_TYPES.get(file_extension)
-            if media_type is None:
-                logger.debug("Skipping unsupported image format: %s", file_extension)
-                continue
+        downloaded_image = _download_image(image_url)
+        if downloaded_image is not None:
+            downloaded_images.append(downloaded_image)
+    return downloaded_images
 
-            user_content.append(
-                BinaryContent(
-                    data=response.content,
-                    media_type=media_type,
-                ),
-            )
-            loaded_images += 1
-        except (OSError, ValueError, requests.RequestException) as exc:
-            logger.warning(
-                "Failed to load image for multimodal extraction %s: %s",
-                image_url,
-                exc,
-            )
 
-    return user_content, loaded_images
+def _download_image(image_url: str) -> DownloadedImage | None:
+    """Download one supported image URL for multimodal input."""
+    media_type = _resolve_image_media_type(image_url)
+    if media_type is None:
+        logger.debug("Skipping unsupported image format: %s", image_url)
+        return None
+
+    try:
+        response = requests.get(image_url, headers=_REQUEST_HEADERS, timeout=30)
+        response.raise_for_status()
+    except (OSError, ValueError, requests.RequestException) as exc:
+        logger.warning(
+            "Failed to load image for multimodal extraction %s: %s",
+            image_url,
+            exc,
+        )
+        return None
+
+    return DownloadedImage(
+        url=image_url,
+        data=response.content,
+        media_type=media_type,
+    )
+
+
+def _resolve_image_media_type(image_url: str) -> str | None:
+    """Resolve supported image media type from URL path, ignoring querystrings."""
+    path = urlsplit(image_url).path
+    file_extension = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    return _SUPPORTED_IMAGE_MEDIA_TYPES.get(file_extension)

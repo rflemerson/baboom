@@ -30,16 +30,16 @@ def load_structured_extraction_prompt() -> str:
     return _load_prompt("structured_extraction.md")
 
 
-def load_image_ocr_prompt() -> str:
-    """Load the base prompt for ordered multi-image OCR-like extraction."""
-    return _load_prompt("image_ocr.md")
+def load_image_report_prompt() -> str:
+    """Load the base prompt for ordered multi-image reporting."""
+    return _load_prompt("image_report.md")
 
 
-def run_image_ocr_step(
+def run_image_report_step(
     *,
     prepared_inputs: PreparedExtractionInputs,
 ) -> tuple[str, dict[str, Any]]:
-    """Extract ordered OCR-like notes for all relevant images in one call."""
+    """Extract ordered notes for all relevant images in one call."""
     image_manifest_lines = [
         f"- IMAGE_{index}: {image_url}"
         for index, image_url in enumerate(prepared_inputs.image_urls, start=1)
@@ -55,14 +55,14 @@ def run_image_ocr_step(
             + "\n[/IMAGE_MANIFEST]"
         )
 
-    ocr_text = run_image_report_extraction(
-        name=f"{prepared_inputs.page_url}#ordered-images",
+    report_text = run_image_report_extraction(
+        run_label=f"{prepared_inputs.page_url}#ordered-images",
         description=description,
         image_urls=prepared_inputs.image_urls,
-        prompt=load_image_ocr_prompt(),
+        prompt=load_image_report_prompt(),
         model_name=_get_configured_model("IMAGE_REPORT_MODEL"),
     )
-    return ocr_text, {
+    return report_text, {
         "images_processed": len(prepared_inputs.image_urls),
         "images_sent": prepared_inputs.image_urls,
     }
@@ -103,9 +103,9 @@ def build_analysis_input(
             "SCRAPER_CONTEXT",
             prepared_inputs.scraper_context,
         )
-        + "\n\n[ORDERED_IMAGE_OCR]\n"
+        + "\n\n[ORDERED_IMAGE_REPORT]\n"
         + image_report_text
-        + "\n[/ORDERED_IMAGE_OCR]"
+        + "\n[/ORDERED_IMAGE_REPORT]"
     )
 
 
