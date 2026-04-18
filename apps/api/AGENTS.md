@@ -28,6 +28,9 @@ cd apps/api && .venv/bin/python manage.py runserver
   - persistence model: `ScrapedItemExtraction`
   - service: `ScrapedItemExtractionSubmitService`
   - GraphQL mutation: `submitAgentExtraction`
+- Agent extraction approval also lives in `scrapers`:
+  - service: `scrapers.approval.ScrapedItemExtractionApproveService`
+  - admin action: `approve_extractions`
 - Agent extraction staging must not create or link catalog products directly.
 - Admin forms/formsets live in `core/forms.py`.
 - Admin-to-service mapping helpers live in `core/admin_mappers.py`.

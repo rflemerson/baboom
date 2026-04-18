@@ -5,12 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 from simple_history.admin import SimpleHistoryAdmin
 
+from .approval import ScrapedItemExtractionApproveService
 from .models import ScrapedItem, ScrapedItemExtraction
 
 if TYPE_CHECKING:
@@ -18,6 +20,16 @@ if TYPE_CHECKING:
     from django.http import HttpRequest, HttpResponseRedirect
 
 NAME_SUMMARY_MAX_LENGTH = 40
+
+
+def _format_validation_error(error: DjangoValidationError) -> str:
+    """Return a compact validation message for Django admin feedback."""
+    if hasattr(error, "message_dict"):
+        return "; ".join(
+            f"{field}: {', '.join(messages)}"
+            for field, messages in error.message_dict.items()
+        )
+    return "; ".join(error.messages)
 
 
 @admin.action(description="Open product creation from selected item")
@@ -82,6 +94,37 @@ def reset_to_new(
     )
 
 
+@admin.action(description="Approve selected extractions into catalog")
+def approve_extractions(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[ScrapedItemExtraction],
+) -> None:
+    """Approve staged extractions by creating catalog products."""
+    approved_count = 0
+    service = ScrapedItemExtractionApproveService()
+
+    for extraction in queryset.order_by("id"):
+        try:
+            service.execute(extraction_id=extraction.id)
+        except DjangoValidationError as error:
+            modeladmin.message_user(
+                request,
+                _("Extraction %(id)s was not approved: %(error)s")
+                % {"id": extraction.id, "error": _format_validation_error(error)},
+                level=messages.ERROR,
+            )
+            continue
+        approved_count += 1
+
+    if approved_count:
+        modeladmin.message_user(
+            request,
+            _("%(count)s extraction(s) approved into the catalog.")
+            % {"count": approved_count},
+        )
+
+
 @admin.register(ScrapedItem)
 class ScrapedItemAdmin(SimpleHistoryAdmin):
     """Admin for scraped items."""
@@ -127,8 +170,11 @@ class ScrapedItemExtractionAdmin(admin.ModelAdmin):
         "scraped_item",
         "source_page",
         "root_product_name",
+        "approved_product",
+        "approved_at",
         "updated_at",
     )
+    list_filter = ("approved_at", "scraped_item__store_slug")
     search_fields = (
         "scraped_item__name",
         "scraped_item__external_id",
@@ -137,7 +183,10 @@ class ScrapedItemExtractionAdmin(admin.ModelAdmin):
     readonly_fields = (
         "created_at",
         "updated_at",
+        "approved_product",
+        "approved_at",
     )
+    actions = (approve_extractions,)
 
     @admin.display(description="Root product")
     def root_product_name(self, obj: ScrapedItemExtraction) -> str:

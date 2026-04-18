@@ -208,6 +208,19 @@ class ScrapedItemExtraction(models.Model):
         blank=True,
         help_text=_("Recursive product tree returned by the agent"),
     )
+    approved_product = models.ForeignKey(
+        "core.Product",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_scraper_extractions",
+        help_text=_("Catalog product created from this extraction"),
+    )
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When this extraction was approved into the catalog"),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

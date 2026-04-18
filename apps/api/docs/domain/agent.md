@@ -9,7 +9,7 @@ agent no longer creates catalog products directly.
 - Dagster reads `ScrapedPage.api_context` and `ScrapedPage.html_structured_data`.
 - The agent returns one recursive product tree.
 - Django stores the result in `ScrapedItemExtraction` for review.
-- Catalog creation, linking, and deduplication are later backend/admin concerns.
+- Catalog creation and linking happen only after admin approval.
 
 ## Main Flow
 
@@ -22,6 +22,22 @@ agent no longer creates catalog products directly.
 5. Django validates the payload shape with scraper DTOs.
 6. Django upserts `ScrapedItemExtraction` for the origin item.
 7. Django marks the origin item as `REVIEW`.
+
+## Approval Flow
+
+The review operator approves staged extractions from Django admin:
+
+1. Open `ScrapedItemExtraction`.
+2. Select one or more rows.
+3. Run `Approve selected extractions into catalog`.
+4. Django revalidates the stored extraction JSON.
+5. Django maps the extraction into `ProductCreateInput`.
+6. `ProductCreateService` creates or reuses the catalog product.
+7. The origin `ScrapedItem` is linked and marked `LINKED`.
+8. `ScrapedItemExtraction.approved_product` and `approved_at` are set.
+
+Approval is strict. If required catalog fields are missing, the action reports a
+validation error and does not create a product.
 
 ## GraphQL Mutation
 
@@ -85,4 +101,5 @@ Rules:
 - `scrapers.models.ScrapedItemExtraction` persists the staged result.
 - `scrapers.services.ScrapedItemExtractionSubmitService` owns validation and
   status changes.
-- `core.ProductCreateService` is not called by this flow.
+- `scrapers.approval.ScrapedItemExtractionApproveService` owns approval mapping.
+- `core.ProductCreateService` is called only during admin approval.

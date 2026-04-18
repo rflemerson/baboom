@@ -13,6 +13,7 @@ from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
 from core.models import APIKey, Brand, Product, ProductPriceHistory, ProductStore, Store
+from scrapers.approval import ScrapedItemExtractionApproveService
 from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
 from scrapers.services import ScrapedItemExtractionSubmitService, ScraperService
@@ -36,6 +37,8 @@ EXPECTED_GROWTH_CURRENCY_PRICE = 89.5
 EXPECTED_VTEX_DECIMAL_PRICE = 99.9
 EXPECTED_VTEX_INTEGER_PRICE = 55.0
 EXPECTED_FALLBACK_CATEGORY_COUNT = 2
+EXPECTED_APPROVED_WHEY_WEIGHT = 900
+EXPECTED_COMBO_COMPONENT_COUNT = 2
 
 type ScrapedJsonObject = dict[str, object]
 
@@ -325,6 +328,134 @@ class ScrapedItemExtractionGraphQLTests(TestCase):
         assert result["extraction"]["sourcePageId"] == self.page.id
         assert result["extraction"]["extractedProduct"]["name"] == "Whey Growth"
         assert extraction.image_report == "Image 1: label"
+        assert self.item.status == ScrapedItem.Status.REVIEW
+
+
+class ScrapedItemExtractionApproveServiceTests(TestCase):
+    """Unit tests for approving staged agent extractions."""
+
+    def setUp(self) -> None:
+        """Set up one staged extraction with enough source data to approve."""
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/whey",
+        )
+        self.item = ScrapedItem.objects.create(
+            store_slug="growth",
+            external_id="growth-approve-1",
+            name="Whey Growth",
+            price=Decimal("149.90"),
+            stock_status=ScrapedItem.StockStatus.AVAILABLE,
+            status=ScrapedItem.Status.REVIEW,
+            source_page=self.page,
+        )
+
+    def test_execute_creates_product_and_links_origin_item(self) -> None:
+        """Approval creates a catalog product from staged extraction JSON."""
+        extraction = ScrapedItemExtraction.objects.create(
+            scraped_item=self.item,
+            source_page=self.page,
+            image_report="Image 1: whey label",
+            extracted_product={
+                "name": "Whey Growth",
+                "brandName": "Growth",
+                "weightGrams": 900,
+                "packaging": "REFILL",
+                "categoryHierarchy": ["Proteins", "Whey"],
+                "tagsHierarchy": [["Goal", "Hypertrophy"]],
+                "flavorNames": ["Chocolate"],
+                "nutritionFacts": {
+                    "servingSizeGrams": 30,
+                    "energyKcal": 120,
+                    "proteins": 24,
+                    "carbohydrates": 3,
+                    "totalFats": 2,
+                },
+                "children": [],
+            },
+        )
+
+        result = ScrapedItemExtractionApproveService().execute(
+            extraction_id=extraction.id,
+        )
+
+        self.item.refresh_from_db()
+        extraction.refresh_from_db()
+        product = result.product
+        assert product.name == "Whey Growth"
+        assert product.weight == EXPECTED_APPROVED_WHEY_WEIGHT
+        assert product.brand.display_name == "Growth"
+        assert product.packaging == Product.Packaging.REFILL
+        assert product.type == Product.Type.SIMPLE
+        assert product.store_links.count() == 1
+        assert product.nutrition_profiles.count() == 1
+        assert self.item.status == ScrapedItem.Status.LINKED
+        assert self.item.product_store_id is not None
+        assert extraction.approved_product == product
+        assert extraction.approved_at is not None
+
+    def test_execute_creates_combo_with_children_components(self) -> None:
+        """Approval maps extracted children into combo components."""
+        extraction = ScrapedItemExtraction.objects.create(
+            scraped_item=self.item,
+            source_page=self.page,
+            image_report="Image 1: combo",
+            extracted_product={
+                "name": "Combo Whey + Creatina",
+                "brandName": "Growth",
+                "weightGrams": 1200,
+                "packaging": "OTHER",
+                "children": [
+                    {
+                        "name": "Whey Growth",
+                        "brandName": "Growth",
+                        "weightGrams": 900,
+                        "packaging": "REFILL",
+                        "children": [],
+                    },
+                    {
+                        "name": "Creatina Growth",
+                        "brandName": "Growth",
+                        "weightGrams": 300,
+                        "packaging": "CONTAINER",
+                        "quantity": 2,
+                        "children": [],
+                    },
+                ],
+            },
+        )
+
+        result = ScrapedItemExtractionApproveService().execute(
+            extraction_id=extraction.id,
+        )
+
+        self.item.refresh_from_db()
+        product = result.product
+        assert product.type == Product.Type.COMBO
+        assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
+        assert set(
+            product.component_links.values_list("component__name", flat=True),
+        ) == {"Whey Growth", "Creatina Growth"}
+        assert self.item.status == ScrapedItem.Status.LINKED
+
+    def test_execute_rejects_extraction_missing_required_catalog_fields(self) -> None:
+        """Approval fails clearly when the extracted product is incomplete."""
+        extraction = ScrapedItemExtraction.objects.create(
+            scraped_item=self.item,
+            source_page=self.page,
+            image_report="Image 1: incomplete",
+            extracted_product={
+                "name": "Whey Growth",
+                "brandName": "Growth",
+                "children": [],
+            },
+        )
+
+        with self.assertRaisesMessage(Exception, "Product weight is required"):
+            ScrapedItemExtractionApproveService().execute(extraction_id=extraction.id)
+
+        self.item.refresh_from_db()
+        assert Product.objects.count() == 0
         assert self.item.status == ScrapedItem.Status.REVIEW
 
 
