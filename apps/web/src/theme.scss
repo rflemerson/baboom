@@ -271,6 +271,15 @@ body {
   }
 }
 
+.app-select {
+  appearance: none;
+  padding-right: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2378756c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 1rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem 1rem;
+}
+
 .app-input:focus-visible,
 .app-select:focus-visible {
   outline: 2px solid var(--app-brand);
@@ -376,6 +385,7 @@ body {
 
 .app-binary-toggle__thumb {
   position: absolute;
+  left: 0.125rem;
   top: 0.125rem;
   bottom: 0.125rem;
   width: calc(50% - 0.125rem);
@@ -393,7 +403,7 @@ body {
 }
 
 .app-binary-toggle__thumb--end {
-  transform: translateX(calc(100% + 0.125rem));
+  transform: translateX(100%);
 }
 
 .app-binary-toggle__option {
