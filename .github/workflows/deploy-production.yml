@@ -10,18 +10,19 @@ jobs:
   deploy:
     name: Pull images and restart stack
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Install SSH key
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/production_key
           chmod 600 ~/.ssh/production_key
-          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ vars.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy over SSH
         env:
-          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
-          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_HOST: ${{ vars.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ vars.PRODUCTION_USER }}
           GHCR_USER: ${{ secrets.GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
