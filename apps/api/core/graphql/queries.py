@@ -40,7 +40,7 @@ def _product_detail_queryset() -> QuerySet[Product]:
 class CoreQuery:
     """GraphQL queries for core module."""
 
-    @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
+    @strawberry.field
     def catalog_products(
         self,
         filters: CatalogProductsFiltersInput | None = None,

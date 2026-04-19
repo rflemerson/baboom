@@ -833,7 +833,12 @@ class GraphQLAlertSubscriptionTests(TestCase):
         self.valid_key = self.api_key_obj.key
         self.view = GraphQLView.as_view(schema=schema)
 
-    def _execute_mutation(self, email: str) -> dict[str, object]:
+    def _execute_mutation(
+        self,
+        email: str,
+        *,
+        include_api_key: bool = False,
+    ) -> dict[str, object]:
         """Execute the alert subscription mutation and decode the JSON response."""
         mutation = """
         mutation SubscribeAlerts($email: String!) {
@@ -848,17 +853,18 @@ class GraphQLAlertSubscriptionTests(TestCase):
           }
         }
         """
+        headers = {"HTTP_X_API_KEY": self.valid_key} if include_api_key else {}
         request = self.factory.post(
             "/graphql/",
             data=json.dumps({"query": mutation, "variables": {"email": email}}),
             content_type="application/json",
-            HTTP_X_API_KEY=self.valid_key,
+            **headers,
         )
         response = cast("HttpResponse", self.view(request))
         return json.loads(response.content)
 
     def test_subscribe_alerts_creates_new_subscriber(self) -> None:
-        """A new email subscription should succeed."""
+        """A new public email subscription should succeed without API key."""
         result = self._execute_mutation("new-subscriber@example.com")
 
         assert result["data"]["subscribeAlerts"]["success"]
@@ -1093,10 +1099,10 @@ class GraphQLSecurityTests(TestCase):
 
     def _execute_query(
         self,
+        query: str = "{ hello }",
         headers: dict[str, str] | None = None,
     ) -> dict[str, object]:
         """Execute the hello query and decode the JSON response."""
-        query = "{ hello }"
         request = self.factory.post(
             "/graphql/",
             data=json.dumps({"query": query}),
@@ -1109,10 +1115,29 @@ class GraphQLSecurityTests(TestCase):
         return json.loads(b"{}")
 
     def test_query_without_api_key(self) -> None:
-        """Requests without API key should be denied."""
+        """Internal requests without API key should be denied."""
         result = self._execute_query()
         assert "errors" in result
         assert result["errors"][0]["message"] == "API Key required"
+
+    def test_public_catalog_query_without_api_key(self) -> None:
+        """Public catalog requests should be allowed without API key."""
+        result = self._execute_query(
+            """
+            {
+              catalogProducts {
+                pageInfo {
+                  totalCount
+                }
+                items {
+                  id
+                }
+              }
+            }
+            """,
+        )
+        assert "errors" not in result
+        assert result["data"]["catalogProducts"]["pageInfo"]["totalCount"] == 0
 
     def test_query_with_valid_api_key(self) -> None:
         """Requests with valid API key should be allowed."""
