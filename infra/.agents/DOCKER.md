@@ -23,6 +23,8 @@
   production; changing it creates a fresh PostgreSQL data directory.
 - Use `NGINX_CONF=./infra/nginx/default.conf` in production so Cloudflare can
   validate the origin certificate. `infra/nginx/local.conf` is HTTP-only.
+- Production should pull prebuilt `API_IMAGE`, `WEB_IMAGE`, and `AGENTS_IMAGE`
+  from GHCR, then run `docker compose up -d --no-build ...` on small hosts.
 - The current deployment model is one stack for `web`, `api`, and `agents` on the same host.
 - Use clear service names in compose:
   - `web` for the public frontend

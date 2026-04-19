@@ -1,0 +1,42 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Pull images and restart stack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/production_key
+          chmod 600 ~/.ssh/production_key
+          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
+            "GHCR_USER=$(printf '%q' "$GHCR_USER") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") bash -se" <<'REMOTE'
+            set -euo pipefail
+
+            cd /home/ubuntu/app/baboom
+            git pull --ff-only origin main
+
+            if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
+              printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+
+            docker compose pull api web agents celery
+            docker compose up -d --no-build api web agents celery nginx
+            docker compose ps
+          REMOTE
