@@ -81,6 +81,9 @@ agents/
 
 ## Sensor Rules
 
+- Sensors are not registered in `agents/definitions.py` by default; production
+  Dagster runs are manual-only unless automatic queue polling is explicitly
+  re-enabled.
 - a sensor only orchestrates
 - it may fetch work, validate the minimum payload, and emit `RunRequest`
 - it must not carry heavy domain logic

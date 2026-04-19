@@ -24,6 +24,8 @@ Read these docs only when they are relevant:
 
 ## Current Pipeline Contract
 
+- Dagster is manual-only by default: `agents/definitions.py` must not register
+  queue sensors unless automatic processing is explicitly re-enabled.
 - The Django backend is the source of truth for `api_context` and
   `html_structured_data`.
 - Dagster consumes `sourcePageApiContext` as its primary deterministic input.

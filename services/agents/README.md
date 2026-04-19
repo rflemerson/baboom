@@ -13,6 +13,8 @@ This folder defines the isolated dependency surface for the `agents` service, in
 - The service depends on API access to the web backend GraphQL endpoint.
 - The service does **not** require Django runtime dependencies for execution.
 - Keep both web and agents deployments on the same repository revision to avoid schema drift.
+- Dagster loads jobs/assets only by default. Queue polling sensors are not
+  registered, so processing starts only from a manual Dagster run.
 
 ## Local Setup (isolated venv)
 
