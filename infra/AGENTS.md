@@ -11,3 +11,5 @@
 - This directory contains infrastructure and deployment configuration.
 - Keep application code out of `infra/`.
 - Keep deploy-only configuration, reverse proxy config, and environment orchestration here.
+- The current infra target is a single combined stack: `web`, `api`, and `agents`
+  deployed together for now.
