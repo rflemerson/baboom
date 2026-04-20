@@ -37,7 +37,10 @@ jobs:
               printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             fi
 
-            docker compose pull api web agents celery
-            docker compose up -d --no-build api web agents celery nginx
+            docker compose -f docker-compose.yml -f docker-compose.agents.yml stop agents || true
+            docker compose -f docker-compose.yml -f docker-compose.agents.yml rm -f agents || true
+
+            docker compose pull api web celery celery-beat
+            docker compose up -d --no-build api web celery celery-beat nginx
             docker compose ps
           REMOTE

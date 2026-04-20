@@ -11,5 +11,6 @@
 - This directory contains infrastructure and deployment configuration.
 - Keep application code out of `infra/`.
 - Keep deploy-only configuration, reverse proxy config, and environment orchestration here.
-- The current infra target is a single combined stack: `web`, `api`, and `agents`
-  deployed together for now.
+- The VM1 production stack is `web`, `api`, `nginx`, `db`, `rabbitmq`, `celery`,
+  and `celery-beat`.
+- Dagster/agents is isolated in `docker-compose.agents.yml` for a later VM2.

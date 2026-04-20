@@ -53,30 +53,6 @@ services:
     expose:
       - "80"
 
-  agents:
-    image: ${AGENTS_IMAGE:-ghcr.io/rflemerson/baboom-agents:latest}
-    build:
-      context: .
-      dockerfile: services/agents/Dockerfile
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - AGENTS_API_URL=http://api:8000/graphql/
-      - AGENTS_API_KEY=${AGENTS_API_KEY}
-      - IMAGE_REPORT_MODEL=${IMAGE_REPORT_MODEL}
-      - STRUCTURED_EXTRACTION_MODEL=${STRUCTURED_EXTRACTION_MODEL}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - AGENTS_HTTP_RETRIES=${AGENTS_HTTP_RETRIES:-3}
-      - AGENTS_HTTP_RETRY_BACKOFF=${AGENTS_HTTP_RETRY_BACKOFF:-0.6}
-      - AGENTS_IMAGE_FILTER_ENABLED=${AGENTS_IMAGE_FILTER_ENABLED:-true}
-      - AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE=${AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE:-true}
-      - AGENTS_IMAGE_FILTER_MAX_IMAGES=${AGENTS_IMAGE_FILTER_MAX_IMAGES:-0}
-      - AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS=${AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS:-logo,icon,placeholder,sprite,swatch,avatar,badge,favicon,caveira}
-    depends_on:
-      api:
-        condition: service_healthy
-
   nginx:
     image: nginx:1.27-alpine
     container_name: baboom_nginx
@@ -153,6 +129,30 @@ services:
       - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - PLAYWRIGHT_CDP_URL=${PLAYWRIGHT_CDP_URL}
+    depends_on:
+      api:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  celery-beat:
+    image: ${API_IMAGE:-ghcr.io/rflemerson/baboom-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: always
+    command: sh -c "su appuser -s /bin/sh -c 'celery -A baboom beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler'"
+    environment:
+      - DJANGO_ENV=${DJANGO_ENV}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
     depends_on:
       api:
         condition: service_healthy
