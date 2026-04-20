@@ -70,13 +70,13 @@ describe('CatalogResults', () => {
         filtersActive: true,
         products: [],
         loading: false,
-        errorMessage: 'GraphQL exploded',
+        errorMessage: 'API exploded',
         viewMode: 'grid',
       },
     })
 
     expect(wrapper.text()).toContain("We couldn't load the catalog")
-    expect(wrapper.text()).toContain('GraphQL exploded')
+    expect(wrapper.text()).toContain('API exploded')
 
     await wrapper.get('button').trigger('click')
 

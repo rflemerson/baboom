@@ -74,6 +74,15 @@ DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
 }
 
+CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS = env.int(
+    "CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS",
+    default=300,
+)
+CATALOG_PRODUCTS_EDGE_CACHE_SECONDS = env.int(
+    "CATALOG_PRODUCTS_EDGE_CACHE_SECONDS",
+    default=21600,
+)
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

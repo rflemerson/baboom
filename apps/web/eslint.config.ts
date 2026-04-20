@@ -26,7 +26,6 @@ export default defineConfigWithVueTs(
   {
     name: 'app/typed-linting',
     files: ['src/**/*.{ts,vue}', 'e2e/**/*.ts', '*.ts'],
-    ignores: ['src/gql/**/*'],
     plugins: {
       '@typescript-eslint': tseslint.plugin,
     },

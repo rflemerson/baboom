@@ -11,8 +11,6 @@
     "test:e2e": "playwright test",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "graphql-codegen": "graphql-codegen",
-    "graphql-codegen:watch": "graphql-codegen --watch",
     "knip": "knip --config knip.json",
     "lint": "run-s lint:*",
     "lint:knip": "npm run knip",
@@ -22,10 +20,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@apollo/client": "^3.14.1",
     "@tailwindcss/vite": "^4.2.1",
-    "@vue/apollo-composable": "^4.2.2",
-    "graphql": "^16.13.1",
     "lucide-vue-next": "^0.577.0",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.2.1",
@@ -33,8 +28,6 @@
     "vue-router": "^5.0.3"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "^6.2.1",
-    "@graphql-codegen/client-preset": "^5.2.4",
     "@playwright/test": "^1.58.2",
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.0",

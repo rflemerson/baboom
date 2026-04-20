@@ -23,6 +23,11 @@ cd apps/api && .venv/bin/python manage.py runserver
 - GraphQL stays thin:
   - `core/graphql/` and `scrapers/graphql/` map input, call services/selectors, map output.
 - Read/query composition lives in `selectors.py`, not in GraphQL and not in form-style filters.
+- Public frontend reads use REST under `/api/catalog/` with `Cache-Control`
+  headers for Cloudflare. Tune `CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS` and
+  `CATALOG_PRODUCTS_EDGE_CACHE_SECONDS`.
+- Keep GraphQL fields and mutations protected with `IsAuthenticatedWithAPIKey`;
+  public frontend flows should use explicit REST endpoints instead of API keys.
 - Scraper workflows live in `scrapers/services.py`.
 - Agent extraction review staging lives in `scrapers`:
   - persistence model: `ScrapedItemExtraction`

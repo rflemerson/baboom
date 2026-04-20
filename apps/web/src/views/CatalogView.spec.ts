@@ -39,7 +39,7 @@ describe('CatalogView', () => {
         },
       ]),
       refetch: vi.fn(),
-      result: ref(undefined),
+      result: ref(null),
     })
 
     const wrapper = mount(CatalogView)

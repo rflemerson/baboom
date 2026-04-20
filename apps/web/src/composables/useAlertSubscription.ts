@@ -1,10 +1,18 @@
 import { computed, ref, watch } from 'vue'
-import { useMutation } from '@vue/apollo-composable'
-
-import { SubscribeAlertsDocument } from '@/gql/graphql'
 
 const INVALID_EMAIL_MESSAGE = 'Please enter a valid email address.'
 const DEBUG_ALERTS = import.meta.env.DEV
+const alertsApiUrl = import.meta.env.VITE_ALERTS_API_URL || '/api/alerts/subscribe/'
+
+interface AlertSubscriptionResponse {
+  success: boolean
+  alreadySubscribed: boolean
+  email?: string | null
+  errors?: Array<{
+    field?: string | null
+    message: string
+  }> | null
+}
 
 function debugLog(message: string, payload?: unknown) {
   if (!DEBUG_ALERTS) {
@@ -41,8 +49,7 @@ export function useAlertSubscription() {
   const email = ref('')
   const status = ref<'idle' | 'success' | 'duplicate' | 'error'>('idle')
   const errorMessage = ref<string | null>(null)
-
-  const { loading, mutate } = useMutation(SubscribeAlertsDocument)
+  const loading = ref(false)
 
   const normalizedEmail = computed(() => email.value.trim())
   const hasEmail = computed(() => normalizedEmail.value.length > 0)
@@ -111,33 +118,37 @@ export function useAlertSubscription() {
       return
     }
 
-    debugLog('[alerts] sending GraphQL mutation', {
+    debugLog('[alerts] sending REST request', {
       email: normalizedEmail.value,
     })
 
-    let response
+    let result: AlertSubscriptionResponse
 
     try {
-      response = await mutate({
-        email: normalizedEmail.value,
+      loading.value = true
+      const response = await fetch(alertsApiUrl, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: normalizedEmail.value }),
       })
-    } catch (error) {
-      debugLog('[alerts] GraphQL mutation threw', { error })
+
+      result = (await response.json()) as AlertSubscriptionResponse
+      if (!response.ok && !result.errors?.length) {
+        throw new Error(`Alert subscription failed with status ${response.status}`)
+      }
+    } catch (caughtError) {
+      debugLog('[alerts] REST request failed', { error: caughtError })
       status.value = 'error'
       errorMessage.value = 'Unable to subscribe right now.'
       return
+    } finally {
+      loading.value = false
     }
 
-    debugLog('[alerts] GraphQL mutation resolved', { response })
-
-    const result = response?.data?.subscribeAlerts
-
-    if (!result) {
-      debugLog('[alerts] missing subscribeAlerts payload', { response })
-      status.value = 'error'
-      errorMessage.value = 'Unexpected response from the server.'
-      return
-    }
+    debugLog('[alerts] REST request resolved', { result })
 
     if (result.success) {
       debugLog('[alerts] subscription created successfully', { result })

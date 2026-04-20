@@ -27,7 +27,7 @@ _STRAWBERRY_RUNTIME_TYPES = (ProductInput, ProductContentUpdateInput)
 class CoreMutation:
     """Core mutations."""
 
-    @strawberry.mutation
+    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def subscribe_alerts(self, email: str) -> AlertSubscriptionResult:
         """Subscribe an email to price alerts."""
         try:

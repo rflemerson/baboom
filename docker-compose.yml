@@ -47,8 +47,8 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-/graphql/}
-        VITE_GRAPHQL_API_KEY: ${VITE_GRAPHQL_API_KEY:-}
+        VITE_CATALOG_API_URL: ${VITE_CATALOG_API_URL:-/api/catalog/products/}
+        VITE_ALERTS_API_URL: ${VITE_ALERTS_API_URL:-/api/alerts/subscribe/}
     restart: always
     expose:
       - "80"

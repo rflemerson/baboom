@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [vue(), vueJsx(), vueDevTools(), tailwindcss()],
   server: {
     proxy: {
-      '/graphql/': {
+      '/api/': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },

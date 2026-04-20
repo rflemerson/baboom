@@ -317,65 +317,66 @@ function matchesNumericRange(value: number, min?: number | null, max?: number | 
   return true
 }
 
-async function fulfillGraphql(route: Route) {
-  const request = route.request()
-  const body = request.postDataJSON() as {
-    operationName?: string
-    query?: string
-    variables?: Record<string, unknown>
+async function fulfillCatalog(route: Route) {
+  const url = new URL(route.request().url())
+  const readNumberParam = (name: string) => {
+    const value = url.searchParams.get(name)
+    return value ? Number(value) : null
   }
-
-  if (body.operationName === 'CatalogProducts') {
-    const payload = filterProducts(body.variables as CatalogVariables)
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ data: payload }),
-    })
-    return
+  const variables: CatalogVariables = {
+    page: Number(url.searchParams.get('page') ?? 1),
+    perPage: Number(url.searchParams.get('per_page') ?? 12),
+    search: url.searchParams.get('search'),
+    brand: url.searchParams.get('brand'),
+    priceMin: readNumberParam('price_min'),
+    priceMax: readNumberParam('price_max'),
+    pricePerProteinGramMin: readNumberParam('price_per_protein_gram_min'),
+    pricePerProteinGramMax: readNumberParam('price_per_protein_gram_max'),
+    concentrationMin: readNumberParam('concentration_min'),
+    concentrationMax: readNumberParam('concentration_max'),
+    sortBy: url.searchParams.get('sort_by') ?? 'price_per_protein_gram',
+    sortDir: url.searchParams.get('sort_dir') ?? 'asc',
   }
-
-  if (body.operationName === 'SubscribeAlerts') {
-    const email = typeof body.variables?.email === 'string' ? body.variables.email : ''
-    const alreadySubscribed = email.toLowerCase() === 'already@subscribed.com'
-
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        data: {
-          subscribeAlerts: alreadySubscribed
-            ? {
-                success: false,
-                alreadySubscribed: true,
-                email,
-                errors: [],
-              }
-            : {
-                success: true,
-                alreadySubscribed: false,
-                email,
-                errors: [],
-              },
-        },
-      }),
-    })
-    return
-  }
+  const payload = filterProducts(variables)
 
   await route.fulfill({
-    status: 500,
     contentType: 'application/json',
-    body: JSON.stringify({
-      errors: [{ message: `Unhandled GraphQL operation: ${body.operationName ?? 'unknown'}` }],
-    }),
+    body: JSON.stringify(payload.catalogProducts),
   })
 }
 
-async function setupGraphqlMock(page: Page) {
-  await page.route('**/graphql/', fulfillGraphql)
+async function fulfillAlerts(route: Route) {
+  const body = route.request().postDataJSON() as { email?: string }
+  const email = typeof body.email === 'string' ? body.email : ''
+  const alreadySubscribed = email.toLowerCase() === 'already@subscribed.com'
+
+  await route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(
+      alreadySubscribed
+        ? {
+            success: false,
+            alreadySubscribed: true,
+            email,
+            errors: [],
+          }
+        : {
+            success: true,
+            alreadySubscribed: false,
+            email,
+            errors: null,
+          },
+    ),
+  })
+}
+
+async function setupApiMock(page: Page) {
+  await page.route('**/api/catalog/products/**', fulfillCatalog)
+  await page.route('**/api/alerts/subscribe/', fulfillAlerts)
 }
 
 test.beforeEach(async ({ page }) => {
-  await setupGraphqlMock(page)
+  await setupApiMock(page)
 })
 
 test('loads the catalog and paginates through results', async ({ page }) => {

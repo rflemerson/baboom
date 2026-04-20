@@ -5,13 +5,12 @@
     "src/**/*",
     "src/**/*.vue",
     "e2e/**/*.ts",
-    "codegen.ts",
     "eslint.config.ts",
     "playwright.config.ts",
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "exclude": ["src/gql/**/*", "dist", "coverage", "playwright-report", "test-results"],
+  "exclude": ["dist", "coverage", "playwright-report", "test-results"],
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"]

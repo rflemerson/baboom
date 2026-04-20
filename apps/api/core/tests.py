@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Protocol, cast
 
 from django.core.exceptions import ValidationError
@@ -823,73 +824,46 @@ class ProductStatsTest(TestCase):
         assert items[:2] == [("Alpha", "Whey A"), ("Beta", "Whey B")]
 
 
-class GraphQLAlertSubscriptionTests(TestCase):
-    """Tests for the alert subscription mutation."""
+class PublicAlertSubscriptionRESTTests(TestCase):
+    """Tests for the public alert subscription REST endpoint."""
 
-    def setUp(self) -> None:
-        """Set up test environment."""
-        self.factory = RequestFactory()
-        self.api_key_obj = APIKey.objects.create(name="Test Client")
-        self.valid_key = self.api_key_obj.key
-        self.view = GraphQLView.as_view(schema=schema)
-
-    def _execute_mutation(
+    def _execute_subscription(
         self,
         email: str,
-        *,
-        include_api_key: bool = False,
     ) -> dict[str, object]:
-        """Execute the alert subscription mutation and decode the JSON response."""
-        mutation = """
-        mutation SubscribeAlerts($email: String!) {
-          subscribeAlerts(email: $email) {
-            success
-            alreadySubscribed
-            email
-            errors {
-              field
-              message
-            }
-          }
-        }
-        """
-        headers = {"HTTP_X_API_KEY": self.valid_key} if include_api_key else {}
-        request = self.factory.post(
-            "/graphql/",
-            data=json.dumps({"query": mutation, "variables": {"email": email}}),
+        """Execute the alert subscription REST endpoint and decode the JSON response."""
+        response = self.client.post(
+            "/api/alerts/subscribe/",
+            data=json.dumps({"email": email}),
             content_type="application/json",
-            **headers,
         )
-        response = cast("HttpResponse", self.view(request))
         return json.loads(response.content)
 
     def test_subscribe_alerts_creates_new_subscriber(self) -> None:
-        """A new public email subscription should succeed without API key."""
-        result = self._execute_mutation("new-subscriber@example.com")
+        """A new public email subscription should succeed through REST."""
+        result = self._execute_subscription("new-subscriber@example.com")
 
-        assert result["data"]["subscribeAlerts"]["success"]
-        assert not result["data"]["subscribeAlerts"]["alreadySubscribed"]
-        assert (
-            result["data"]["subscribeAlerts"]["email"] == "new-subscriber@example.com"
-        )
+        assert result["success"]
+        assert not result["alreadySubscribed"]
+        assert result["email"] == "new-subscriber@example.com"
 
     def test_subscribe_alerts_returns_duplicate_state(self) -> None:
         """Duplicate subscriptions should be reported explicitly."""
         subscriber = AlertSubscriber.objects.create(email="duplicate@example.com")
 
-        result = self._execute_mutation(subscriber.email)
+        result = self._execute_subscription(subscriber.email)
 
-        assert not result["data"]["subscribeAlerts"]["success"]
-        assert result["data"]["subscribeAlerts"]["alreadySubscribed"]
-        assert result["data"]["subscribeAlerts"]["email"] == subscriber.email
+        assert not result["success"]
+        assert result["alreadySubscribed"]
+        assert result["email"] == subscriber.email
 
     def test_subscribe_alerts_returns_validation_errors(self) -> None:
         """Invalid emails should return formatted validation errors."""
-        result = self._execute_mutation("not-an-email")
+        result = self._execute_subscription("not-an-email")
 
-        assert not result["data"]["subscribeAlerts"]["success"]
-        assert result["data"]["subscribeAlerts"]["email"] == "not-an-email"
-        assert result["data"]["subscribeAlerts"]["errors"][0]["field"] == "email"
+        assert not result["success"]
+        assert result["email"] == "not-an-email"
+        assert result["errors"][0]["field"] == "email"
 
 
 class GraphQLProductCreateTests(TestCase):
@@ -1121,7 +1095,7 @@ class GraphQLSecurityTests(TestCase):
         assert result["errors"][0]["message"] == "API Key required"
 
     def test_public_catalog_query_without_api_key(self) -> None:
-        """Public catalog requests should be allowed without API key."""
+        """GraphQL catalog requests without API key should be denied."""
         result = self._execute_query(
             """
             {
@@ -1136,8 +1110,32 @@ class GraphQLSecurityTests(TestCase):
             }
             """,
         )
-        assert "errors" not in result
-        assert result["data"]["catalogProducts"]["pageInfo"]["totalCount"] == 0
+        assert "errors" in result
+        assert result["errors"][0]["message"] == "API Key required"
+
+    def test_public_catalog_rest_query_without_api_key(self) -> None:
+        """Public REST catalog requests should be allowed without API key."""
+        response = self.client.get("/api/catalog/products/")
+        payload = json.loads(response.content)
+
+        assert response.status_code == HTTPStatus.OK
+        assert "public" in response["Cache-Control"]
+        assert "s-maxage=21600" in response["Cache-Control"]
+        assert payload["pageInfo"]["totalCount"] == 0
+
+    def test_subscribe_alerts_query_without_api_key(self) -> None:
+        """GraphQL alert subscriptions without API key should be denied."""
+        result = self._execute_query(
+            """
+            mutation {
+              subscribeAlerts(email: "user@example.com") {
+                success
+              }
+            }
+            """,
+        )
+        assert "errors" in result
+        assert result["errors"][0]["message"] == "API Key required"
 
     def test_query_with_valid_api_key(self) -> None:
         """Requests with valid API key should be allowed."""
