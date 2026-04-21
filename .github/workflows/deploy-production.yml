@@ -23,15 +23,20 @@ jobs:
         env:
           PRODUCTION_HOST: ${{ vars.PRODUCTION_HOST }}
           PRODUCTION_USER: ${{ vars.PRODUCTION_USER }}
+          REGISTRY: ${{ vars.REGISTRY }}
+          IMAGE_OWNER: ${{ vars.IMAGE_OWNER }}
           GHCR_USER: ${{ secrets.GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
           ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
-            "GHCR_USER=$(printf '%q' "$GHCR_USER") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") bash -se" <<'REMOTE'
+            "REGISTRY=$(printf '%q' "$REGISTRY") IMAGE_OWNER=$(printf '%q' "$IMAGE_OWNER") GHCR_USER=$(printf '%q' "$GHCR_USER") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") bash -se" <<'REMOTE'
             set -euo pipefail
 
             cd /home/ubuntu/app/baboom
             git pull --ff-only origin main
+            IMAGE_TAG="sha-$(git rev-parse HEAD)"
+            export API_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-api:${IMAGE_TAG}"
+            export WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-web:${IMAGE_TAG}"
 
             if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
               printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin

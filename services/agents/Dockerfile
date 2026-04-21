@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r appuser \
-    && useradd -r -g appuser appuser
+    && useradd -r -g appuser -m -d /home/appuser appuser
 
 COPY services/agents/ /app/
 RUN pip install --no-cache-dir . \
