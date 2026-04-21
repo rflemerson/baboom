@@ -31,19 +31,29 @@ jobs:
           ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
             "REGISTRY=$(printf '%q' "$REGISTRY") IMAGE_OWNER=$(printf '%q' "$IMAGE_OWNER") GHCR_USER=$(printf '%q' "$GHCR_USER") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") bash -se" <<'REMOTE'
             set -euo pipefail
+            trap 'status=$?; echo "::error::Deploy failed with exit code ${status}"; echo "== docker compose ps =="; docker compose ps || true; echo "== api health =="; docker inspect baboom-api-1 --format "{{json .State.Health}}" || true; echo "== api logs =="; docker logs --tail=200 baboom-api-1 || true; echo "== web logs =="; docker logs --tail=100 baboom-web-1 || true; echo "== nginx logs =="; docker logs --tail=100 baboom_nginx || true; exit "$status"' ERR
 
             cd /home/ubuntu/app/baboom
+            echo "== Updating repository =="
             git pull --ff-only origin main
             IMAGE_TAG="sha-$(git rev-parse HEAD)"
             export API_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-api:${IMAGE_TAG}"
             export WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-web:${IMAGE_TAG}"
+            echo "Deploying commit: $(git rev-parse --short HEAD)"
+            echo "API image: ${API_IMAGE}"
+            echo "Web image: ${WEB_IMAGE}"
 
             if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
+              echo "== Logging in to GHCR =="
               printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             fi
 
+            echo "== Pulling immutable images =="
             docker compose pull api web celery celery-beat
+            echo "== Starting application services =="
             docker compose up -d --no-build api web celery celery-beat
+            echo "== Reloading edge proxy =="
             docker compose up -d --no-build --force-recreate nginx
+            echo "== Final compose state =="
             docker compose ps
           REMOTE

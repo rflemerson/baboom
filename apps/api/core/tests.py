@@ -8,7 +8,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Protocol, cast
 
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from strawberry.django.views import GraphQLView
 
@@ -1125,6 +1125,15 @@ class GraphQLSecurityTests(TestCase):
 
     def test_healthz_without_api_key(self) -> None:
         """Healthchecks should not depend on GraphQL authentication."""
+        response = self.client.get("/healthz/")
+        payload = json.loads(response.content)
+
+        assert response.status_code == HTTPStatus.OK
+        assert payload == {"status": "ok"}
+
+    @override_settings(SECURE_SSL_REDIRECT=True, SECURE_REDIRECT_EXEMPT=[r"^healthz/$"])
+    def test_healthz_skips_production_ssl_redirect(self) -> None:
+        """Container healthchecks should receive a direct 200 in production."""
         response = self.client.get("/healthz/")
         payload = json.loads(response.content)
 
