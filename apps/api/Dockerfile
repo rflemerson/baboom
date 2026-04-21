@@ -2,6 +2,8 @@ FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV GUNICORN_WORKERS=2
+ENV GUNICORN_TIMEOUT=120
 ARG DJANGO_SECRET_KEY=build-only-secret-key
 
 WORKDIR /app
@@ -22,4 +24,4 @@ RUN pip install --no-cache-dir . \
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "mkdir -p /app/media /app/staticfiles && chown -R appuser:appuser /app/media /app/staticfiles && su appuser -s /bin/sh -c 'python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers 3 --access-logfile - baboom.wsgi:application'"]
+CMD ["sh", "-c", "mkdir -p /app/media /app/staticfiles && chown -R appuser:appuser /app/media /app/staticfiles && su appuser -s /bin/sh -c 'python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2} --timeout ${GUNICORN_TIMEOUT:-120} --access-logfile - baboom.wsgi:application'"]

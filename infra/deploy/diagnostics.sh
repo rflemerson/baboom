@@ -15,3 +15,6 @@ docker logs --tail="${DEPLOY_LOG_LINES:-100}" baboom-web-1 || true
 
 echo "== nginx logs =="
 docker logs --tail="${DEPLOY_LOG_LINES:-100}" baboom_nginx || true
+
+echo "== redis logs =="
+docker logs --tail="${DEPLOY_LOG_LINES:-100}" baboom-redis-1 || true

@@ -19,8 +19,10 @@ services:
       - DB_PASS=${DB_PASS}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
-      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672//
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
 
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8000/healthz/"]
@@ -38,7 +40,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      rabbitmq:
+      redis:
         condition: service_healthy
 
   web:
@@ -92,19 +94,17 @@ services:
       timeout: 5s
       retries: 5
 
-  rabbitmq:
-    image: rabbitmq:4-management
+  redis:
+    image: redis:7-alpine
     restart: always
+    command: redis-server --appendonly yes
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - redis_data:/data
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 30s
-      timeout: 30s
-      retries: 3
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   celery:
     image: ${API_IMAGE:-ghcr.io/rflemerson/baboom-api:latest}
@@ -112,7 +112,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: always
-    command: sh -c "mkdir -p /app/media && chown -R appuser:appuser /app/media && su appuser -s /bin/sh -c 'celery -A baboom worker -l info'"
+    command: sh -c "mkdir -p /app/media && chown -R appuser:appuser /app/media && su appuser -s /bin/sh -c 'celery -A baboom worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --prefetch-multiplier=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}'"
     volumes:
       - media_data:/app/media
     extra_hosts:
@@ -126,13 +126,15 @@ services:
       - DB_PASS=${DB_PASS}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
-      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672//
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY:-1}
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
       - PLAYWRIGHT_CDP_URL=${PLAYWRIGHT_CDP_URL}
     depends_on:
       api:
         condition: service_healthy
-      rabbitmq:
+      redis:
         condition: service_healthy
 
   celery-beat:
@@ -151,16 +153,16 @@ services:
       - DB_PASS=${DB_PASS}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
-      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672//
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
     depends_on:
       api:
         condition: service_healthy
-      rabbitmq:
+      redis:
         condition: service_healthy
 
 volumes:
-  rabbitmq_data:
+  redis_data:
   media_data:
   static_data:
   certbot_conf:

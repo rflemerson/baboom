@@ -17,7 +17,7 @@ dependencies = [
   "django-treebeard",
   "django-nested-admin",
   "django-environ",
-  "celery",
+  "celery[redis]",
   "urllib3",
   "curl_cffi",
   "extruct",

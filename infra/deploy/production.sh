@@ -37,7 +37,7 @@ if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
 fi
 
 echo "== Pulling immutable images =="
-docker compose pull api web celery celery-beat
+docker compose pull api web celery celery-beat redis
 
 echo "== Starting web and API =="
 docker compose up -d --no-build web api
@@ -48,6 +48,9 @@ docker compose up -d --no-build celery celery-beat
 
 echo "== Reloading edge proxy =="
 docker compose up -d --no-build --force-recreate --no-deps nginx
+
+echo "== Pruning unused images =="
+docker image prune -f
 
 echo "== Final compose state =="
 docker compose ps

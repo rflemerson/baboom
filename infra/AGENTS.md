@@ -11,7 +11,7 @@
 - This directory contains infrastructure and deployment configuration.
 - Keep application code out of `infra/`.
 - Keep deploy-only configuration, reverse proxy config, and environment orchestration here.
-- The VM1 production stack is `web`, `api`, `nginx`, `db`, `rabbitmq`, `celery`,
+- The VM1 production stack is `web`, `api`, `nginx`, `db`, `redis`, `celery`,
   and `celery-beat`.
 - Dagster/agents is isolated in `docker-compose.agents.yml` for a later VM2.
 - Production deploy logic lives in `infra/deploy/`; keep GitHub Actions YAML thin
