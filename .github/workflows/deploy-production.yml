@@ -32,6 +32,10 @@ jobs:
           IMAGE_OWNER: ${{ vars.IMAGE_OWNER }}
           GHCR_USER: ${{ secrets.GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_TRACES_SAMPLE_RATE }}
+          SENTRY_SEND_DEFAULT_PII: ${{ vars.SENTRY_SEND_DEFAULT_PII }}
+          SENTRY_MONITOR_CELERY_BEAT: ${{ vars.SENTRY_MONITOR_CELERY_BEAT }}
         run: |
           ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
             "cd /home/ubuntu/app/baboom \
@@ -41,4 +45,8 @@ jobs:
                 IMAGE_OWNER=$(printf '%q' "$IMAGE_OWNER") \
                 GHCR_USER=$(printf '%q' "$GHCR_USER") \
                 GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") \
+                SENTRY_DSN=$(printf '%q' "$SENTRY_DSN") \
+                SENTRY_TRACES_SAMPLE_RATE=$(printf '%q' "$SENTRY_TRACES_SAMPLE_RATE") \
+                SENTRY_SEND_DEFAULT_PII=$(printf '%q' "$SENTRY_SEND_DEFAULT_PII") \
+                SENTRY_MONITOR_CELERY_BEAT=$(printf '%q' "$SENTRY_MONITOR_CELERY_BEAT") \
                 ./infra/deploy/production.sh"

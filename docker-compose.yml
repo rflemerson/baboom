@@ -23,6 +23,10 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.0}
+      - SENTRY_SEND_DEFAULT_PII=${SENTRY_SEND_DEFAULT_PII:-false}
+      - SENTRY_MONITOR_CELERY_BEAT=${SENTRY_MONITOR_CELERY_BEAT:-false}
 
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8000/healthz/"]
@@ -51,6 +55,8 @@ services:
       args:
         VITE_CATALOG_API_URL: ${VITE_CATALOG_API_URL:-/api/catalog/products/}
         VITE_ALERTS_API_URL: ${VITE_ALERTS_API_URL:-/api/alerts/subscribe/}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE:-0.0}
     restart: always
     expose:
       - "80"
@@ -131,6 +137,10 @@ services:
       - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY:-1}
       - CELERY_WORKER_PREFETCH_MULTIPLIER=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
       - PLAYWRIGHT_CDP_URL=${PLAYWRIGHT_CDP_URL}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.0}
+      - SENTRY_SEND_DEFAULT_PII=${SENTRY_SEND_DEFAULT_PII:-false}
+      - SENTRY_MONITOR_CELERY_BEAT=${SENTRY_MONITOR_CELERY_BEAT:-false}
     depends_on:
       api:
         condition: service_healthy
@@ -155,6 +165,10 @@ services:
       - DB_PORT=${DB_PORT}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.0}
+      - SENTRY_SEND_DEFAULT_PII=${SENTRY_SEND_DEFAULT_PII:-false}
+      - SENTRY_MONITOR_CELERY_BEAT=${SENTRY_MONITOR_CELERY_BEAT:-false}
     depends_on:
       api:
         condition: service_healthy

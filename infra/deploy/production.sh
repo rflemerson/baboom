@@ -26,6 +26,10 @@ image_tag="sha-${commit_sha}"
 
 export API_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-api:${image_tag}"
 export WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-web:${image_tag}"
+export SENTRY_DSN="${SENTRY_DSN:-}"
+export SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-0.0}"
+export SENTRY_SEND_DEFAULT_PII="${SENTRY_SEND_DEFAULT_PII:-false}"
+export SENTRY_MONITOR_CELERY_BEAT="${SENTRY_MONITOR_CELERY_BEAT:-false}"
 
 echo "Deploying commit: ${short_sha}"
 echo "API image: ${API_IMAGE}"

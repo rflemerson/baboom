@@ -19,6 +19,9 @@ def _load_settings_module(module: ModuleType) -> None:
     )
 
 
+env_name = os.getenv("DJANGO_ENV", "development")
+DJANGO_ENV = env_name
+
 _load_settings_module(importlib.import_module(".base", package=__package__))
 
 apps_folder = Path(__file__).parent / "apps"
@@ -28,8 +31,6 @@ for _finder, name, _ in pkgutil.iter_modules([str(apps_folder)]):
     _load_settings_module(module)
 
 del apps_folder, name, module, pkgutil, Path
-
-env_name = os.getenv("DJANGO_ENV", "development")
 
 if env_name == "production":
     env_module = importlib.import_module(".production", package=__package__)
