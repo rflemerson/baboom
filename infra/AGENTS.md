@@ -14,3 +14,6 @@
 - The VM1 production stack is `web`, `api`, `nginx`, `db`, `rabbitmq`, `celery`,
   and `celery-beat`.
 - Dagster/agents is isolated in `docker-compose.agents.yml` for a later VM2.
+- Production deploy logic lives in `infra/deploy/`; keep GitHub Actions YAML thin
+  and put orchestration, health waits, and diagnostics in versioned shell scripts.
+- The deploy uses immutable GHCR image tags based on the full Git commit SHA.
