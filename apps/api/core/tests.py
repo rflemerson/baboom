@@ -1123,6 +1123,14 @@ class GraphQLSecurityTests(TestCase):
         assert "s-maxage=21600" in response["Cache-Control"]
         assert payload["pageInfo"]["totalCount"] == 0
 
+    def test_healthz_without_api_key(self) -> None:
+        """Healthchecks should not depend on GraphQL authentication."""
+        response = self.client.get("/healthz/")
+        payload = json.loads(response.content)
+
+        assert response.status_code == HTTPStatus.OK
+        assert payload == {"status": "ok"}
+
     def test_subscribe_alerts_query_without_api_key(self) -> None:
         """GraphQL alert subscriptions without API key should be denied."""
         result = self._execute_query(

@@ -18,13 +18,21 @@ Including another URLconf
 
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
 from django.views.decorators.csrf import csrf_exempt
 from strawberry.django.views import GraphQLView
 
 from .schema import schema
 
+
+def healthz(_request: HttpRequest) -> JsonResponse:
+    """Return a lightweight liveness response for container healthchecks."""
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    path("healthz/", healthz),
     path("admin/", admin.site.urls),
     path("api/", include("core.rest.urls")),
     path(
