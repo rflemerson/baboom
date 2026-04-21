@@ -44,6 +44,46 @@ class ScrapedPage(models.Model):
         return f"[{self.store_slug}] {self.url}"
 
 
+class ScraperRun(models.Model):
+    """Auditable execution record for scheduled scraper monitor tasks."""
+
+    class Status(models.TextChoices):
+        """Lifecycle status for a scraper run."""
+
+        RUNNING = "running", _("Running")
+        SUCCESS = "success", _("Success")
+        ERROR = "error", _("Error")
+
+    label = models.CharField(max_length=100, db_index=True)
+    task_name = models.CharField(max_length=255, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.RUNNING,
+        db_index=True,
+    )
+    started_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+    items_count = models.PositiveIntegerField(default=0)
+    message = models.CharField(max_length=255, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        """Meta options."""
+
+        ordering = ("-started_at",)
+        indexes = (
+            models.Index(fields=["label", "-started_at"]),
+            models.Index(fields=["status", "-started_at"]),
+        )
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        started_at = self.started_at.strftime("%Y-%m-%d %H:%M:%S")
+        return f"{self.label} - {self.get_status_display()} at {started_at}"
+
+
 class ScrapedItem(models.Model):
     """Product data scraped from external sources."""
 

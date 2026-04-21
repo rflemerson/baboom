@@ -13,13 +13,14 @@ from django.utils.translation import gettext_lazy as _
 from simple_history.admin import SimpleHistoryAdmin
 
 from .approval import ScrapedItemExtractionApproveService
-from .models import ScrapedItem, ScrapedItemExtraction
+from .models import ScrapedItem, ScrapedItemExtraction, ScraperRun
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
     from django.http import HttpRequest, HttpResponseRedirect
 
 NAME_SUMMARY_MAX_LENGTH = 40
+ERROR_SUMMARY_MAX_LENGTH = 80
 
 
 def _format_validation_error(error: DjangoValidationError) -> str:
@@ -158,6 +159,47 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
             obj.name[:NAME_SUMMARY_MAX_LENGTH] + "..."
             if obj.name and len(obj.name) > NAME_SUMMARY_MAX_LENGTH
             else obj.name
+        )
+
+
+@admin.register(ScraperRun)
+class ScraperRunAdmin(admin.ModelAdmin):
+    """Admin for scraper execution history."""
+
+    list_display = (
+        "id",
+        "label",
+        "status",
+        "items_count",
+        "started_at",
+        "finished_at",
+        "duration_ms",
+        "error_summary",
+    )
+    list_filter = ("status", "label", "started_at")
+    search_fields = ("label", "task_name", "message", "error_message")
+    readonly_fields = (
+        "label",
+        "task_name",
+        "status",
+        "started_at",
+        "finished_at",
+        "duration_ms",
+        "items_count",
+        "message",
+        "error_message",
+    )
+    ordering = ("-started_at",)
+
+    @admin.display(description="Error")
+    def error_summary(self, obj: ScraperRun) -> str:
+        """Return a compact error preview for list display."""
+        if not obj.error_message:
+            return ""
+        return (
+            obj.error_message[:ERROR_SUMMARY_MAX_LENGTH] + "..."
+            if len(obj.error_message) > ERROR_SUMMARY_MAX_LENGTH
+            else obj.error_message
         )
 
 

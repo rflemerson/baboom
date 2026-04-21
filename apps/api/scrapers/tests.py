@@ -15,7 +15,7 @@ from baboom.schema import schema
 from core.models import APIKey, Brand, Product, ProductPriceHistory, ProductStore, Store
 from scrapers.approval import ScrapedItemExtractionApproveService
 from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
-from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
+from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage, ScraperRun
 from scrapers.services import ScrapedItemExtractionSubmitService, ScraperService
 from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.catalog_api_spider import CatalogApiSpider
@@ -24,6 +24,7 @@ from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
 from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
+from scrapers.tasks import _run_spider_monitor
 
 if TYPE_CHECKING:
     from django.http import HttpResponse
@@ -39,11 +40,54 @@ EXPECTED_VTEX_INTEGER_PRICE = 55.0
 EXPECTED_FALLBACK_CATEGORY_COUNT = 2
 EXPECTED_APPROVED_WHEY_WEIGHT = 900
 EXPECTED_COMBO_COMPONENT_COUNT = 2
+EXPECTED_SCRAPER_RUN_ITEMS = 2
 
 type ScrapedJsonObject = dict[str, object]
 
 # Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
+
+
+class ScraperRunHistoryTests(TestCase):
+    """Tests for scraper monitor execution history."""
+
+    def test_monitor_success_creates_scraper_run(self) -> None:
+        """Successful monitor runs should be visible in admin history."""
+
+        class SuccessfulSpider:
+            def crawl(self) -> list[object]:
+                return [object(), object()]
+
+        result = _run_spider_monitor(SuccessfulSpider, "Test Store")
+        run = ScraperRun.objects.get()
+
+        assert result == "Test Store Monitor: Saved/Updated 2 items."
+        assert run.label == "Test Store"
+        assert run.status == ScraperRun.Status.SUCCESS
+        assert run.items_count == EXPECTED_SCRAPER_RUN_ITEMS
+        assert run.finished_at is not None
+        assert run.duration_ms is not None
+        assert run.error_message == ""
+
+    def test_monitor_error_creates_failed_scraper_run(self) -> None:
+        """Failed monitor runs should record the error before re-raising."""
+
+        class FailingSpider:
+            def crawl(self) -> list[object]:
+                msg = "blocked by upstream"
+                raise RuntimeError(msg)
+
+        with self.assertRaisesRegex(RuntimeError, "blocked by upstream"):  # noqa: PT027
+            _run_spider_monitor(FailingSpider, "Blocked Store")
+
+        run = ScraperRun.objects.get()
+        assert run.label == "Blocked Store"
+        assert run.status == ScraperRun.Status.ERROR
+        assert run.items_count == 0
+        assert run.finished_at is not None
+        assert run.duration_ms is not None
+        assert run.message == "Blocked Store Monitor failed."
+        assert run.error_message == "blocked by upstream"
 
 
 @skipUnless(
