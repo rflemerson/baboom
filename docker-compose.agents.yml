@@ -1,13 +1,15 @@
 services:
-  agents:
+  dagster-webserver:
     image: ${AGENTS_IMAGE:-ghcr.io/rflemerson/baboom-agents:latest}
     build:
       context: .
       dockerfile: services/agents/Dockerfile
+    command: ["dagster-webserver", "-m", "agents.definitions", "-h", "0.0.0.0", "-p", "3000"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
     environment:
+      - DAGSTER_HOME=/opt/dagster/dagster_home
       - AGENTS_API_URL=${AGENTS_API_URL:-https://baboom.com.br/graphql/}
       - AGENTS_API_KEY=${AGENTS_API_KEY}
       - IMAGE_REPORT_MODEL=${IMAGE_REPORT_MODEL}
@@ -19,3 +21,48 @@ services:
       - AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE=${AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE:-true}
       - AGENTS_IMAGE_FILTER_MAX_IMAGES=${AGENTS_IMAGE_FILTER_MAX_IMAGES:-0}
       - AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS=${AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS:-logo,icon,placeholder,sprite,swatch,avatar,badge,favicon,caveira}
+      - AGENTS_SENTRY_DSN=${AGENTS_SENTRY_DSN:-}
+      - AGENTS_SENTRY_ENVIRONMENT=${AGENTS_SENTRY_ENVIRONMENT:-production}
+      - AGENTS_SENTRY_TRACES_SAMPLE_RATE=${AGENTS_SENTRY_TRACES_SAMPLE_RATE:-0.0}
+      - AGENTS_SENTRY_SEND_DEFAULT_PII=${AGENTS_SENTRY_SEND_DEFAULT_PII:-false}
+    volumes:
+      - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:3000/server_info', timeout=5).read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  dagster-daemon:
+    image: ${AGENTS_IMAGE:-ghcr.io/rflemerson/baboom-agents:latest}
+    build:
+      context: .
+      dockerfile: services/agents/Dockerfile
+    command: ["dagster-daemon", "run", "-m", "agents.definitions"]
+    restart: unless-stopped
+    environment:
+      - DAGSTER_HOME=/opt/dagster/dagster_home
+      - AGENTS_API_URL=${AGENTS_API_URL:-https://baboom.com.br/graphql/}
+      - AGENTS_API_KEY=${AGENTS_API_KEY}
+      - IMAGE_REPORT_MODEL=${IMAGE_REPORT_MODEL}
+      - STRUCTURED_EXTRACTION_MODEL=${STRUCTURED_EXTRACTION_MODEL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AGENTS_HTTP_RETRIES=${AGENTS_HTTP_RETRIES:-3}
+      - AGENTS_HTTP_RETRY_BACKOFF=${AGENTS_HTTP_RETRY_BACKOFF:-0.6}
+      - AGENTS_IMAGE_FILTER_ENABLED=${AGENTS_IMAGE_FILTER_ENABLED:-true}
+      - AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE=${AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE:-true}
+      - AGENTS_IMAGE_FILTER_MAX_IMAGES=${AGENTS_IMAGE_FILTER_MAX_IMAGES:-0}
+      - AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS=${AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS:-logo,icon,placeholder,sprite,swatch,avatar,badge,favicon,caveira}
+      - AGENTS_SENTRY_DSN=${AGENTS_SENTRY_DSN:-}
+      - AGENTS_SENTRY_ENVIRONMENT=${AGENTS_SENTRY_ENVIRONMENT:-production}
+      - AGENTS_SENTRY_TRACES_SAMPLE_RATE=${AGENTS_SENTRY_TRACES_SAMPLE_RATE:-0.0}
+      - AGENTS_SENTRY_SEND_DEFAULT_PII=${AGENTS_SENTRY_SEND_DEFAULT_PII:-false}
+    volumes:
+      - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home

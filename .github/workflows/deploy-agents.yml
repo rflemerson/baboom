@@ -1,0 +1,76 @@
+name: Deploy Agents
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agents-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull agents image and restart Dagster
+    runs-on: ubuntu-latest
+    environment: agents-production
+    timeout-minutes: 20
+    steps:
+      - name: Install SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.AGENTS_SSH_KEY }}" > ~/.ssh/agents_key
+          chmod 600 ~/.ssh/agents_key
+          ssh-keyscan -H "${{ vars.AGENTS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          AGENTS_HOST: ${{ vars.AGENTS_HOST }}
+          AGENTS_USER: ${{ vars.AGENTS_USER }}
+          REGISTRY: ${{ vars.REGISTRY }}
+          IMAGE_OWNER: ${{ vars.IMAGE_OWNER }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          AGENTS_API_URL: ${{ vars.AGENTS_API_URL }}
+          AGENTS_API_KEY: ${{ secrets.AGENTS_API_KEY }}
+          IMAGE_REPORT_MODEL: ${{ vars.IMAGE_REPORT_MODEL }}
+          STRUCTURED_EXTRACTION_MODEL: ${{ vars.STRUCTURED_EXTRACTION_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AGENTS_HTTP_RETRIES: ${{ vars.AGENTS_HTTP_RETRIES }}
+          AGENTS_HTTP_RETRY_BACKOFF: ${{ vars.AGENTS_HTTP_RETRY_BACKOFF }}
+          AGENTS_IMAGE_FILTER_ENABLED: ${{ vars.AGENTS_IMAGE_FILTER_ENABLED }}
+          AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE: ${{ vars.AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE }}
+          AGENTS_IMAGE_FILTER_MAX_IMAGES: ${{ vars.AGENTS_IMAGE_FILTER_MAX_IMAGES }}
+          AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS: ${{ vars.AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS }}
+          DAGSTER_STORAGE_PATH: ${{ vars.DAGSTER_STORAGE_PATH }}
+          AGENTS_SENTRY_DSN: ${{ secrets.AGENTS_SENTRY_DSN }}
+          AGENTS_SENTRY_ENVIRONMENT: ${{ vars.AGENTS_SENTRY_ENVIRONMENT }}
+          AGENTS_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.AGENTS_SENTRY_TRACES_SAMPLE_RATE }}
+          AGENTS_SENTRY_SEND_DEFAULT_PII: ${{ vars.AGENTS_SENTRY_SEND_DEFAULT_PII }}
+        run: |
+          ssh -i ~/.ssh/agents_key "${AGENTS_USER}@${AGENTS_HOST}" \
+            "cd /home/ubuntu/app/baboom \
+              && git pull --ff-only origin main \
+              && DEPLOY_SKIP_GIT_UPDATE=1 \
+                REGISTRY=$(printf '%q' "$REGISTRY") \
+                IMAGE_OWNER=$(printf '%q' "$IMAGE_OWNER") \
+                GHCR_USER=$(printf '%q' "$GHCR_USER") \
+                GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") \
+                AGENTS_API_URL=$(printf '%q' "$AGENTS_API_URL") \
+                AGENTS_API_KEY=$(printf '%q' "$AGENTS_API_KEY") \
+                IMAGE_REPORT_MODEL=$(printf '%q' "$IMAGE_REPORT_MODEL") \
+                STRUCTURED_EXTRACTION_MODEL=$(printf '%q' "$STRUCTURED_EXTRACTION_MODEL") \
+                GEMINI_API_KEY=$(printf '%q' "$GEMINI_API_KEY") \
+                AGENTS_HTTP_RETRIES=$(printf '%q' "$AGENTS_HTTP_RETRIES") \
+                AGENTS_HTTP_RETRY_BACKOFF=$(printf '%q' "$AGENTS_HTTP_RETRY_BACKOFF") \
+                AGENTS_IMAGE_FILTER_ENABLED=$(printf '%q' "$AGENTS_IMAGE_FILTER_ENABLED") \
+                AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE=$(printf '%q' "$AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE") \
+                AGENTS_IMAGE_FILTER_MAX_IMAGES=$(printf '%q' "$AGENTS_IMAGE_FILTER_MAX_IMAGES") \
+                AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS=$(printf '%q' "$AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS") \
+                DAGSTER_STORAGE_PATH=$(printf '%q' "$DAGSTER_STORAGE_PATH") \
+                AGENTS_SENTRY_DSN=$(printf '%q' "$AGENTS_SENTRY_DSN") \
+                AGENTS_SENTRY_ENVIRONMENT=$(printf '%q' "$AGENTS_SENTRY_ENVIRONMENT") \
+                AGENTS_SENTRY_TRACES_SAMPLE_RATE=$(printf '%q' "$AGENTS_SENTRY_TRACES_SAMPLE_RATE") \
+                AGENTS_SENTRY_SEND_DEFAULT_PII=$(printf '%q' "$AGENTS_SENTRY_SEND_DEFAULT_PII") \
+                ./infra/deploy/agents.sh"

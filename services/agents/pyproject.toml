@@ -11,21 +11,15 @@ version = "0.1.0"
 description = "Isolated dependency project for the Baboom Agents service (Dagster + LLM pipeline)."
 requires-python = ">=3.14"
 dependencies = [
-  "Pillow",
-  "beautifulsoup4",
   "dagster",
   "dagster-webserver",
-  "extruct",
   "google-genai",
   "groq",
-  "lxml",
-  "opencv-python-headless",
   "openai",
   "pydantic",
   "pydantic-ai",
-  "python-dotenv",
   "requests",
-  "w3lib",
+  "sentry-sdk",
 ]
 
 [project.optional-dependencies]

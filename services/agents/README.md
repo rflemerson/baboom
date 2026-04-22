@@ -47,6 +47,45 @@ cd /path/to/baboom
 PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 ```
 
+## Production Runtime
+
+Production runs Dagster as two long-lived services instead of `dagster dev`:
+
+- `dagster-webserver`
+  serves the UI on `127.0.0.1:3000`.
+- `dagster-daemon`
+  owns daemon responsibilities such as run queue, schedules, and sensors.
+
+The production compose file is:
+
+```bash
+docker compose -f docker-compose.agents.yml up -d --no-build dagster-webserver dagster-daemon
+```
+
+Dagster state is persisted under `DAGSTER_STORAGE_PATH`, defaulting to:
+
+```bash
+/opt/baboom/dagster
+```
+
+This path uses the VM disk. It does not create a new OCI Block Volume.
+
+The UI is intentionally bound to localhost on the VM. Access it with an SSH
+tunnel:
+
+```bash
+ssh -L 3000:127.0.0.1:3000 ubuntu@<agents-vm-ip>
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Queue sensors are still not registered by default, so production remains
+manual-only unless `agents/definitions.py` explicitly adds sensors.
+
 ## Container Build
 
 The service owns its container definition at `services/agents/Dockerfile`.
@@ -86,3 +125,54 @@ Deterministic image filtering:
   comma-separated lowercase URL keywords to drop, useful for decorative assets
   such as logos, placeholders, sprites, swatches, badges, or store-specific
   branding frames
+
+Dagster production:
+
+- `DAGSTER_STORAGE_PATH`
+  host path mounted as `DAGSTER_HOME` for persistent Dagster SQLite storage,
+  artifacts, and compute logs
+
+Observability:
+
+- `AGENTS_SENTRY_DSN`
+  Sentry DSN for the agents service
+- `AGENTS_SENTRY_ENVIRONMENT`
+  Sentry environment name, normally `production`
+- `AGENTS_SENTRY_TRACES_SAMPLE_RATE`
+  Sentry performance sample rate; `0.0` disables tracing but keeps errors
+- `AGENTS_SENTRY_SEND_DEFAULT_PII`
+  whether Sentry may send default PII
+
+## GitHub Actions Deploy
+
+Agents deploy is handled by `.github/workflows/deploy-agents.yml` and runs
+against the `agents-production` GitHub environment.
+
+Environment secrets:
+
+- `AGENTS_SSH_KEY`
+- `AGENTS_API_KEY`
+- `GEMINI_API_KEY`
+- `AGENTS_SENTRY_DSN`
+- `GHCR_USER`
+- `GHCR_TOKEN`
+
+Environment variables:
+
+- `AGENTS_HOST`
+- `AGENTS_USER`
+- `REGISTRY`
+- `IMAGE_OWNER`
+- `AGENTS_API_URL`
+- `IMAGE_REPORT_MODEL`
+- `STRUCTURED_EXTRACTION_MODEL`
+- `AGENTS_HTTP_RETRIES`
+- `AGENTS_HTTP_RETRY_BACKOFF`
+- `AGENTS_IMAGE_FILTER_ENABLED`
+- `AGENTS_IMAGE_FILTER_STRIP_QUERY_FOR_DEDUPE`
+- `AGENTS_IMAGE_FILTER_MAX_IMAGES`
+- `AGENTS_IMAGE_FILTER_EXCLUDE_KEYWORDS`
+- `DAGSTER_STORAGE_PATH`
+- `AGENTS_SENTRY_ENVIRONMENT`
+- `AGENTS_SENTRY_TRACES_SAMPLE_RATE`
+- `AGENTS_SENTRY_SEND_DEFAULT_PII`

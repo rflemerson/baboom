@@ -26,6 +26,10 @@ Read these docs only when they are relevant:
 
 - Dagster is manual-only by default: `agents/definitions.py` must not register
   queue sensors unless automatic processing is explicitly re-enabled.
+- Production runs as separate `dagster-webserver` and `dagster-daemon` services
+  in `docker-compose.agents.yml`; do not use `dagster dev` for production.
+- Production Dagster state is persisted through `DAGSTER_STORAGE_PATH`, default
+  `/opt/baboom/dagster`, on the VM disk.
 - The Django backend is the source of truth for `api_context` and
   `html_structured_data`.
 - Dagster consumes `sourcePageApiContext` as its primary deterministic input.
