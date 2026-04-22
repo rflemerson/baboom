@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y \
 
 COPY services/agents/ /app/
 RUN pip install --no-cache-dir . \
-    && cp /app/dagster/dagster.yaml "$DAGSTER_HOME"/dagster.yaml \
     && chown -R appuser:appuser /app /opt/dagster
 
 USER appuser
