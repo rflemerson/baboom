@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import decimal
-from typing import Any
+import re
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .models import ScrapedItem
 
@@ -16,6 +17,8 @@ type JsonObject = dict[str, Any]
 
 class ScrapedItemIngestionInput(BaseModel):
     """DTO for persisting scraped item snapshots."""
+
+    GTIN_PATTERN: ClassVar[re.Pattern[str]] = re.compile(r"^\d{8,14}$")
 
     store_slug: str
     external_id: str
@@ -28,6 +31,13 @@ class ScrapedItemIngestionInput(BaseModel):
     sku: str = ""
     pid: str = ""
     category: str = ""
+
+    @field_validator("ean", mode="before")
+    @classmethod
+    def normalize_ean(cls, value: object) -> str:
+        """Keep only valid GTIN-like EAN values that fit the database field."""
+        ean = str(value or "").strip()
+        return ean if cls.GTIN_PATTERN.fullmatch(ean) else ""
 
 
 class ExtractedMicronutrientInput(BaseModel):

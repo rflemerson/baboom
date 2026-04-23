@@ -49,6 +49,40 @@ type ScrapedJsonObject = dict[str, object]
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
 
 
+class ScrapedItemIngestionInputTests(SimpleTestCase):
+    """Unit tests for scraper ingestion DTO normalization."""
+
+    def test_normalizes_invalid_ean_suffix_to_blank(self) -> None:
+        """VTEX bundle labels with GTIN-looking prefixes should not hit the DB."""
+        input_data = ScrapedItemIngestionInput(
+            store_slug="black_skull",
+            external_id="445",
+            ean="7898708737105KIT",
+        )
+
+        assert input_data.ean == ""
+
+    def test_normalizes_descriptive_ean_to_blank(self) -> None:
+        """Descriptive bundle labels are not valid EAN/GTIN identifiers."""
+        input_data = ScrapedItemIngestionInput(
+            store_slug="max_titanium",
+            external_id="333",
+            ean="Whey Pro Morango +Horus Limao",
+        )
+
+        assert input_data.ean == ""
+
+    def test_keeps_valid_gtin_14(self) -> None:
+        """Valid GTIN values should still be persisted."""
+        input_data = ScrapedItemIngestionInput(
+            store_slug="black_skull",
+            external_id="445",
+            ean="7898708737105",
+        )
+
+        assert input_data.ean == "7898708737105"
+
+
 class ScraperRunHistoryTests(TestCase):
     """Tests for scraper monitor execution history."""
 
