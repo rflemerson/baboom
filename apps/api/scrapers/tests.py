@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
+import requests
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from strawberry.django.views import GraphQLView
 
@@ -560,6 +561,45 @@ class CatalogApiSpiderTests(SimpleTestCase):
 
 class ScraperServiceContextPersistenceTests(SimpleTestCase):
     """Unit tests for Django-side context persistence helper."""
+
+    @patch("scrapers.services.extruct.extract")
+    @patch("scrapers.services.requests.get")
+    def test_extract_html_structured_data_skips_missing_product_page(
+        self,
+        mock_get: MagicMock,
+        mock_extract: MagicMock,
+    ) -> None:
+        """Missing product pages should not be reported as extraction errors."""
+        response = MagicMock()
+        response.status_code = 404
+        mock_get.return_value = response
+
+        result = ScraperService.extract_html_structured_data(
+            url="https://example.com/missing-product/p",
+        )
+
+        assert result == {}
+        response.raise_for_status.assert_not_called()
+        mock_extract.assert_not_called()
+
+    @patch("scrapers.services.requests.get")
+    def test_extract_html_structured_data_logs_unexpected_http_error(
+        self,
+        mock_get: MagicMock,
+    ) -> None:
+        """Unexpected HTTP failures should still be logged with exception context."""
+        response = MagicMock()
+        response.status_code = 500
+        response.raise_for_status.side_effect = requests.HTTPError("server error")
+        mock_get.return_value = response
+
+        with self.assertLogs("scrapers.services", level="ERROR") as logs:
+            result = ScraperService.extract_html_structured_data(
+                url="https://example.com/error-product/p",
+            )
+
+        assert result == {}
+        assert "Failed to fetch HTML for structured extraction" in logs.output[0]
 
     def test_persist_page_context_updates_source_page_json_fields(
         self,

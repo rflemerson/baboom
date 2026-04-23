@@ -357,6 +357,16 @@ class ScraperService:
                 headers=headers,
                 timeout=ScraperService.HTML_EXTRACTION_TIMEOUT_SECONDS,
             )
+        except requests.RequestException:
+            logger.exception("Failed to fetch HTML for structured extraction: %s", url)
+            return {}
+        if response.status_code in {404, 410}:
+            logger.info(
+                "Skipping HTML structured extraction for missing product page: %s",
+                url,
+            )
+            return {}
+        try:
             response.raise_for_status()
         except requests.RequestException:
             logger.exception("Failed to fetch HTML for structured extraction: %s", url)
