@@ -18,7 +18,7 @@ services:
       ]
     restart: unless-stopped
     environment:
-      - DAGSTER_HOME=/opt/dagster/dagster_home
+      - DAGSTER_HOME=/opt/dagster
       - AGENTS_API_URL=${AGENTS_API_URL:-https://baboom.com.br/graphql/}
       - AGENTS_API_KEY=${AGENTS_API_KEY}
       - IMAGE_REPORT_MODEL=${IMAGE_REPORT_MODEL}
@@ -39,7 +39,7 @@ services:
       - "4000"
     volumes:
       - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
-      - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
+      - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster.yaml:ro
     healthcheck:
       test:
         [
@@ -75,7 +75,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      - DAGSTER_HOME=/opt/dagster/dagster_home
+      - DAGSTER_HOME=/opt/dagster
       - AGENTS_API_URL=${AGENTS_API_URL:-https://baboom.com.br/graphql/}
       - AGENTS_API_KEY=${AGENTS_API_KEY}
       - IMAGE_REPORT_MODEL=${IMAGE_REPORT_MODEL}
@@ -93,7 +93,7 @@ services:
       - AGENTS_SENTRY_SEND_DEFAULT_PII=${AGENTS_SENTRY_SEND_DEFAULT_PII:-false}
     volumes:
       - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
-      - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
+      - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster.yaml:ro
     healthcheck:
       test:
         [
@@ -118,7 +118,7 @@ services:
       dagster-code-server:
         condition: service_healthy
     environment:
-      - DAGSTER_HOME=/opt/dagster/dagster_home
+      - DAGSTER_HOME=/opt/dagster
       - AGENTS_API_URL=${AGENTS_API_URL:-https://baboom.com.br/graphql/}
       - AGENTS_API_KEY=${AGENTS_API_KEY}
       - IMAGE_REPORT_MODEL=${IMAGE_REPORT_MODEL}
@@ -136,4 +136,4 @@ services:
       - AGENTS_SENTRY_SEND_DEFAULT_PII=${AGENTS_SENTRY_SEND_DEFAULT_PII:-false}
     volumes:
       - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
-      - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
+      - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster.yaml:ro

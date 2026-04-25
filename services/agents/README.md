@@ -74,9 +74,9 @@ Dagster state is persisted under `DAGSTER_STORAGE_PATH`, defaulting to:
 
 This path uses the VM disk. It does not create a new OCI Block Volume.
 
-The compose file also mounts `services/agents/dagster/dagster.yaml` into
-`$DAGSTER_HOME/dagster.yaml` so the instance and both process roles share the
-same storage configuration.
+The compose file sets `DAGSTER_HOME=/opt/dagster`, mounts
+`services/agents/dagster/dagster.yaml` into `/opt/dagster/dagster.yaml`, and
+persists instance storage under `/opt/dagster/dagster_home`.
 
 `dagster-code-server` now has a healthcheck on port `4000`, and both
 `dagster-webserver` and `dagster-daemon` wait for that service to become

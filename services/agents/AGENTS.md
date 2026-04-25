@@ -35,6 +35,9 @@ Read these docs only when they are relevant:
   processes.
 - `dagster-code-server` owns the stable gRPC endpoint and must have a
   healthcheck; webserver and daemon should wait for it before starting.
+- Production compose uses `DAGSTER_HOME=/opt/dagster`; `dagster.yaml` is mounted
+  at `/opt/dagster/dagster.yaml` and persistent storage at
+  `/opt/dagster/dagster_home`.
 - Production Dagster state is persisted through `DAGSTER_STORAGE_PATH`, default
   `/opt/baboom/dagster`, on the VM disk.
 - The Django backend is the source of truth for `api_context` and
