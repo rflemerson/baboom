@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 import nested_admin
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import transaction
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
@@ -101,6 +101,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_per_page = 20
     filter_horizontal: ClassVar[list[str]] = ["tags"]
     inlines: ClassVar[list[type[admin.TabularInline]]] = [ProductStoreInline]
+    actions = ("delete_products_with_related_data",)
     save_on_top = True
     readonly_fields = ("created_at", "updated_at", "last_enriched_at")
     fieldsets = (
@@ -266,6 +267,44 @@ class ProductAdmin(admin.ModelAdmin):
         ProductStoreService().replace_listings(
             product,
             build_store_listing_payloads(product_store_formset),
+        )
+
+    @admin.action(
+        description="Excluir products selecionados com links e histórico",
+        permissions=["delete"],
+    )
+    def delete_products_with_related_data(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[Product],
+    ) -> None:
+        """Delete selected products plus their store links and price history."""
+        products = list(queryset)
+        if not products:
+            return
+
+        product_ids = [product.id for product in products]
+        store_links = ProductStore.objects.filter(product_id__in=product_ids)
+        price_history = ProductPriceHistory.objects.filter(
+            store_product_link__in=store_links,
+        )
+
+        with transaction.atomic():
+            deleted_price_history_count, _ = price_history.delete()
+            deleted_store_link_count, _ = store_links.delete()
+            deleted_product_count, _ = Product.objects.filter(
+                id__in=product_ids,
+            ).delete()
+
+        self.message_user(
+            request,
+            (
+                "Excluded "
+                f"{deleted_product_count} product(s), "
+                f"{deleted_store_link_count} store link(s), and "
+                f"{deleted_price_history_count} price history record(s)."
+            ),
+            level=messages.SUCCESS,
         )
 
 

@@ -6,13 +6,16 @@ import json
 from decimal import Decimal
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Protocol, cast
+from unittest.mock import Mock
 
+from django.contrib import admin as django_admin
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
+from core.admin import ProductAdmin
 from core.dtos import (
     CatalogProductsFilters,
     ComboComponentInput,
@@ -659,6 +662,48 @@ class ProductNutritionServiceTests(TestCase):
         max_length = ProductNutritionService.MAX_FACTS_DESCRIPTION_LENGTH
         assert len(facts.description) == max_length
         assert facts.description == long_description[:max_length]
+
+
+class ProductAdminActionTests(TestCase):
+    """Coverage for manager-facing product deletion workflow."""
+
+    def setUp(self) -> None:
+        """Create a product with related store data."""
+        self.factory = RequestFactory()
+        self.admin = ProductAdmin(Product, django_admin.site)
+        self.admin.message_user = Mock()
+        self.brand = Brand.objects.create(name="dark-lab", display_name="Dark Lab")
+        self.store = Store.objects.create(name="dark-lab", display_name="Dark Lab")
+        self.product = Product.objects.create(
+            name="Whey One Refil 900g - Dark Lab",
+            brand=self.brand,
+            weight=900,
+            packaging=Product.Packaging.REFILL,
+        )
+        self.store_link = ProductStore.objects.create(
+            product=self.product,
+            store=self.store,
+            external_id="568",
+            product_link="https://example.com/whey",
+        )
+        self.price_history = ProductPriceHistory.objects.create(
+            store_product_link=self.store_link,
+            price=Decimal("72.90"),
+        )
+
+    def test_delete_products_with_related_data_removes_related_records(self) -> None:
+        """Admin action should remove related price history and store links."""
+        request = self.factory.post("/admin/core/product/")
+
+        self.admin.delete_products_with_related_data(
+            request,
+            Product.objects.filter(id=self.product.id),
+        )
+
+        assert Product.objects.filter(id=self.product.id).count() == 0
+        assert ProductStore.objects.filter(id=self.store_link.id).count() == 0
+        assert ProductPriceHistory.objects.filter(id=self.price_history.id).count() == 0
+        self.admin.message_user.assert_called_once()
 
 
 class ProductStatsTest(TestCase):
