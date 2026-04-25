@@ -26,8 +26,15 @@ Read these docs only when they are relevant:
 
 - Dagster is manual-only by default: `agents/definitions.py` must not register
   queue sensors unless automatic processing is explicitly re-enabled.
-- Production runs as separate `dagster-webserver` and `dagster-daemon` services
-  in `docker-compose.agents.yml`; do not use `dagster dev` for production.
+- Production runs as separate `dagster-code-server`, `dagster-webserver`, and
+  `dagster-daemon` services in `docker-compose.agents.yml`; do not use
+  `dagster dev` for production.
+- Production webserver and daemon must load
+  `services/agents/dagster/workspace.yaml`, which points at the dedicated gRPC
+  code server. Do not run production with `-m agents.definitions` on both
+  processes.
+- `dagster-code-server` owns the stable gRPC endpoint and must have a
+  healthcheck; webserver and daemon should wait for it before starting.
 - Production Dagster state is persisted through `DAGSTER_STORAGE_PATH`, default
   `/opt/baboom/dagster`, on the VM disk.
 - The Django backend is the source of truth for `api_context` and

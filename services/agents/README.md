@@ -49,17 +49,21 @@ PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 
 ## Production Runtime
 
-Production runs Dagster as two long-lived services instead of `dagster dev`:
+Production runs Dagster as three long-lived services instead of `dagster dev`:
 
+- `dagster-code-server`
+  serves the `agents.definitions` code location over a stable gRPC port.
 - `dagster-webserver`
-  serves the UI on `127.0.0.1:3000`.
+  serves the UI on `127.0.0.1:3000` and loads code locations from
+  `services/agents/dagster/workspace.yaml`.
 - `dagster-daemon`
-  owns daemon responsibilities such as run queue, schedules, and sensors.
+  owns daemon responsibilities such as run queue, schedules, and sensors, using
+  the same workspace file as the webserver.
 
 The production compose file is:
 
 ```bash
-docker compose -f docker-compose.agents.yml up -d --no-build dagster-webserver dagster-daemon
+docker compose -f docker-compose.agents.yml up -d --no-build dagster-code-server dagster-webserver dagster-daemon
 ```
 
 Dagster state is persisted under `DAGSTER_STORAGE_PATH`, defaulting to:
@@ -69,6 +73,14 @@ Dagster state is persisted under `DAGSTER_STORAGE_PATH`, defaulting to:
 ```
 
 This path uses the VM disk. It does not create a new OCI Block Volume.
+
+The compose file also mounts `services/agents/dagster/dagster.yaml` into
+`$DAGSTER_HOME/dagster.yaml` so the instance and both process roles share the
+same storage configuration.
+
+`dagster-code-server` now has a healthcheck on port `4000`, and both
+`dagster-webserver` and `dagster-daemon` wait for that service to become
+healthy before starting.
 
 The UI is intentionally bound to localhost on the VM. Access it with an SSH
 tunnel:
@@ -85,6 +97,15 @@ http://localhost:3000
 
 Queue sensors are still not registered by default, so production remains
 manual-only unless `agents/definitions.py` explicitly adds sensors.
+
+Using `-m agents.definitions` directly for both the webserver and daemon is
+safe for local development, but it is not the production pattern here because
+queued runs can end up pointing at a short-lived Unix socket owned by one
+process. The dedicated gRPC code server avoids that failure mode.
+
+If the instance already contains queued or failed runs from an older ephemeral
+code location, restart all three services and then retry or clear the affected
+runs from the Dagster UI so they bind to the current code server.
 
 ## Container Build
 
