@@ -40,6 +40,7 @@ services:
     volumes:
       - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
       - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster.yaml:ro
+      - ./services/agents/dagster/workspace.yaml:/app/dagster/workspace.yaml:ro
     healthcheck:
       test:
         [
@@ -94,6 +95,7 @@ services:
     volumes:
       - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
       - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster.yaml:ro
+      - ./services/agents/dagster/workspace.yaml:/app/dagster/workspace.yaml:ro
     healthcheck:
       test:
         [
@@ -137,3 +139,4 @@ services:
     volumes:
       - ${DAGSTER_STORAGE_PATH:-/opt/baboom/dagster}:/opt/dagster/dagster_home
       - ./services/agents/dagster/dagster.yaml:/opt/dagster/dagster.yaml:ro
+      - ./services/agents/dagster/workspace.yaml:/app/dagster/workspace.yaml:ro
