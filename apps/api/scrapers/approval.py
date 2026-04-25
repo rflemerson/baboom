@@ -19,7 +19,7 @@ from core.dtos import (
     StoreListingPayload,
 )
 from core.models import Product
-from core.services import ProductCreateService
+from core.services import ProductCreateService, ProductNutritionService
 
 from .dtos import AgentExtractionSubmitInput, ExtractedProductInput
 from .models import ScrapedItem, ScrapedItemExtraction
@@ -205,7 +205,8 @@ class ScrapedItemExtractionApproveService:
                         MicronutrientPayload(
                             name=micronutrient.name,
                             value=float(micronutrient.value),
-                            unit=micronutrient.unit or "mg",
+                            unit=micronutrient.unit
+                            or ProductNutritionService.DEFAULT_MICRONUTRIENT_UNIT,
                         )
                         for micronutrient in facts.micronutrients
                         if micronutrient.value is not None

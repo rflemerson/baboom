@@ -546,6 +546,7 @@ class Micronutrient(BaseModel):
     class Units(models.TextChoices):
         """Supported units of measurement."""
 
+        UNKNOWN = "-", "-"
         GRAM = "g", "g"
         MILLIGRAM = "mg", "mg"
         MICROGRAM = "mcg", "mcg"
@@ -574,7 +575,7 @@ class Micronutrient(BaseModel):
         _("Unit"),
         max_length=10,
         choices=Units.choices,
-        default=Units.MILLIGRAM,
+        default=Units.UNKNOWN,
     )
 
     class Meta:

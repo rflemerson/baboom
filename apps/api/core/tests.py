@@ -663,6 +663,33 @@ class ProductNutritionServiceTests(TestCase):
         assert len(facts.description) == max_length
         assert facts.description == long_description[:max_length]
 
+    def test_attach_profiles_normalizes_invalid_micronutrient_unit(self) -> None:
+        """Micronutrient units from model output should fall back to unknown."""
+        payload = ProductNutritionPayload(
+            nutrition_facts=NutritionFactsPayload(
+                description="Micronutrients",
+                serving_size_grams=30,
+                energy_kcal=120,
+                proteins=24,
+                carbohydrates=3,
+                total_fats=2,
+                micronutrients=[
+                    {
+                        "name": "Glicina",
+                        "value": 360,
+                        "unit": "mg,value:360},{name:",
+                    },
+                ],
+            ),
+        )
+
+        self.service.attach_profiles(self.product, [payload])
+
+        micronutrient = (
+            self.product.nutrition_profiles.get().nutrition_facts.micronutrients.get()
+        )
+        assert micronutrient.unit == ProductNutritionService.DEFAULT_MICRONUTRIENT_UNIT
+
 
 class ProductAdminActionTests(TestCase):
     """Coverage for manager-facing product deletion workflow."""

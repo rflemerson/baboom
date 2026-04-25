@@ -278,6 +278,7 @@ class ProductNutritionService:
     MODE_EXISTING = "existing"
     MODE_NEW = "new"
     MAX_FACTS_DESCRIPTION_LENGTH = 200
+    DEFAULT_MICRONUTRIENT_UNIT = Micronutrient.Units.UNKNOWN
 
     def apply_selection(
         self,
@@ -384,11 +385,21 @@ class ProductNutritionService:
                     nutrition_facts=facts,
                     name=micronutrient_payload.name,
                     value=Decimal(str(micronutrient_payload.value)),
-                    unit=micronutrient_payload.unit,
+                    unit=self._normalize_micronutrient_unit(
+                        micronutrient_payload.unit,
+                    ),
                 )
                 for micronutrient_payload in micronutrient_payloads
             ],
         )
+
+    def _normalize_micronutrient_unit(self, value: str) -> str:
+        """Return a supported micronutrient unit or the default fallback."""
+        normalized = value.strip()
+        valid_units = {choice for choice, _label in Micronutrient.Units.choices}
+        if normalized in valid_units:
+            return normalized
+        return self.DEFAULT_MICRONUTRIENT_UNIT
 
     def _get_or_create_profile(
         self,
