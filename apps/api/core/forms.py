@@ -232,6 +232,13 @@ class ProductStoreInlineFormSet(forms.BaseInlineFormSet):
         "price",
     )
 
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Provide the change-tracking attributes Django admin expects."""
+        super().__init__(*args, **kwargs)
+        self.new_objects: list[ProductStore] = []
+        self.changed_objects: list[tuple[ProductStore, list[str]]] = []
+        self.deleted_objects: list[ProductStore] = []
+
     def clean(self) -> None:
         """Require a current price for every non-deleted store listing row."""
         super().clean()
