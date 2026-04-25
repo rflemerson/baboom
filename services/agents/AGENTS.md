@@ -34,7 +34,8 @@ Read these docs only when they are relevant:
   code server. Do not run production with `-m agents.definitions` on both
   processes.
 - `dagster-code-server` owns the stable gRPC endpoint and must have a
-  healthcheck; webserver and daemon should wait for it before starting.
+  healthcheck; webserver and daemon should wait for it before starting. Use a
+  generous startup grace period because cold boots on the VM may be slow.
 - Production compose uses `DAGSTER_HOME=/opt/dagster`; `dagster.yaml` is mounted
   at `/opt/dagster/dagster.yaml` and persistent storage at
   `/opt/dagster/dagster_home`.

@@ -50,8 +50,8 @@ services:
         ]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 10s
+      retries: 18
+      start_period: 60s
 
   dagster-webserver:
     image: ${AGENTS_IMAGE:-ghcr.io/rflemerson/baboom-agents:latest}

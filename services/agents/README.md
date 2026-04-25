@@ -80,7 +80,9 @@ persists instance storage under `/opt/dagster/dagster_home`.
 
 `dagster-code-server` now has a healthcheck on port `4000`, and both
 `dagster-webserver` and `dagster-daemon` wait for that service to become
-healthy before starting.
+healthy before starting. The startup grace period is intentionally longer than
+the default because cold image boots and dependency initialization can take
+longer than a few seconds on the VM.
 
 The UI is intentionally bound to localhost on the VM. Access it with an SSH
 tunnel:
