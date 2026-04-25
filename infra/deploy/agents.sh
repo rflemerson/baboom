@@ -54,10 +54,10 @@ sudo mkdir -p "$DAGSTER_STORAGE_PATH"
 sudo chown -R 10001:10001 "$DAGSTER_STORAGE_PATH"
 
 echo "== Pulling immutable agents image =="
-docker compose -f "$COMPOSE_FILE" pull dagster-webserver dagster-daemon
+docker compose -f "$COMPOSE_FILE" pull dagster-code-server dagster-webserver dagster-daemon
 
 echo "== Starting Dagster services =="
-docker compose -f "$COMPOSE_FILE" up -d --no-build dagster-webserver dagster-daemon
+docker compose -f "$COMPOSE_FILE" up -d --no-build dagster-code-server dagster-webserver dagster-daemon
 
 webserver_container="$(docker compose -f "$COMPOSE_FILE" ps -q dagster-webserver)"
 ./infra/deploy/wait-health.sh "$webserver_container" "${DAGSTER_HEALTH_ATTEMPTS:-30}" "${DAGSTER_HEALTH_INTERVAL:-10}"
