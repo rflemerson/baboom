@@ -63,7 +63,7 @@ class ScrapedItemCheckoutService:
     ) -> Q:
         """Build the checkout eligibility rules for scraped items."""
         retry_threshold = now - self.RETRY_COOLDOWN
-        eligible_filters = Q(status=ScrapedItem.Status.NEW) | Q(
+        eligible_filters = Q(status=ScrapedItem.Status.QUEUED) | Q(
             status=ScrapedItem.Status.ERROR,
             error_count__lt=self.MAX_RETRIES,
             last_attempt_at__lt=retry_threshold,
@@ -89,7 +89,7 @@ class ScrapedItemCheckoutService:
             )
             .annotate(
                 checkout_priority=Case(
-                    When(status=ScrapedItem.Status.NEW, then=Value(0)),
+                    When(status=ScrapedItem.Status.QUEUED, then=Value(0)),
                     When(status=ScrapedItem.Status.ERROR, then=Value(1)),
                     When(status=ScrapedItem.Status.REVIEW, then=Value(2)),
                     When(status=ScrapedItem.Status.LINKED, then=Value(3)),

@@ -33,6 +33,10 @@ cd apps/api && .venv/bin/python manage.py runserver
   - persistence model: `ScrapedItemExtraction`
   - service: `ScrapedItemExtractionSubmitService`
   - GraphQL mutation: `submitAgentExtraction`
+- Dagster queue selection is explicit:
+  - newly scraped items stay `ScrapedItem.Status.NEW`
+  - the admin action on `ScrapedItemAdmin` must move chosen items to
+    `ScrapedItem.Status.QUEUED` before the agents checkout flow will consume them
 - Agent extraction approval also lives in `scrapers`:
   - service: `scrapers.approval.ScrapedItemExtractionApproveService`
   - admin action: `approve_extractions`

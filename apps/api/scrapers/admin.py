@@ -95,6 +95,25 @@ def reset_to_new(
     )
 
 
+@admin.action(description="Queue selected items for Dagster")
+def queue_for_agents(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[ScrapedItem],
+) -> None:
+    """Mark selected scraped items as explicitly ready for agent processing."""
+    updated = queryset.update(
+        status=ScrapedItem.Status.QUEUED,
+        error_count=0,
+        last_attempt_at=None,
+        last_error_log="",
+    )
+    modeladmin.message_user(
+        request,
+        _("%(count)s items queued for Dagster processing.") % {"count": updated},
+    )
+
+
 @admin.action(description="Approve selected extractions into catalog")
 def approve_extractions(
     modeladmin: admin.ModelAdmin,
@@ -150,7 +169,7 @@ class ScrapedItemAdmin(SimpleHistoryAdmin):
         "product_store",
     )
 
-    actions = (create_product_from_scraped_item, reset_to_new)
+    actions = (create_product_from_scraped_item, queue_for_agents, reset_to_new)
 
     @admin.display(description="Name")
     def name_summary(self, obj: ScrapedItem) -> str:

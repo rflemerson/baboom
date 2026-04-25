@@ -14,10 +14,15 @@ from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
 from core.models import APIKey, Brand, Product, ProductPriceHistory, ProductStore, Store
+from scrapers.admin import queue_for_agents
 from scrapers.approval import ScrapedItemExtractionApproveService
 from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage, ScraperRun
-from scrapers.services import ScrapedItemExtractionSubmitService, ScraperService
+from scrapers.services import (
+    ScrapedItemCheckoutService,
+    ScrapedItemExtractionSubmitService,
+    ScraperService,
+)
 from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.catalog_api_spider import CatalogApiSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
@@ -281,6 +286,59 @@ class SyncPriceToCoreTests(TestCase):
             self.fail("Latest history not found")
 
         assert latest.price == Decimal("179.90")
+
+
+class ScrapedItemQueueTests(TestCase):
+    """Tests for explicit Dagster queue selection."""
+
+    def setUp(self) -> None:
+        """Create one source page shared by queue items."""
+        self.factory = RequestFactory()
+        self.page = ScrapedPage.objects.create(
+            store_slug="dark_lab",
+            url="https://example.com/product",
+        )
+
+    def test_queue_for_agents_marks_selected_items(self) -> None:
+        """Admin action should move selected items into the explicit queue."""
+        item = ScrapedItem.objects.create(
+            store_slug="dark_lab",
+            external_id="568",
+            status=ScrapedItem.Status.NEW,
+            source_page=self.page,
+        )
+        request = self.factory.post("/admin/scrapers/scrapeditem/")
+        modeladmin = MagicMock()
+
+        queue_for_agents(modeladmin, request, ScrapedItem.objects.filter(id=item.id))
+
+        item.refresh_from_db()
+        assert item.status == ScrapedItem.Status.QUEUED
+        modeladmin.message_user.assert_called_once()
+
+    def test_checkout_only_consumes_queued_items(self) -> None:
+        """Checkout should ignore NEW items until they are explicitly queued."""
+        ScrapedItem.objects.create(
+            store_slug="dark_lab",
+            external_id="new-item",
+            status=ScrapedItem.Status.NEW,
+            source_page=self.page,
+        )
+        queued_item = ScrapedItem.objects.create(
+            store_slug="dark_lab",
+            external_id="queued-item",
+            status=ScrapedItem.Status.QUEUED,
+            source_page=self.page,
+        )
+
+        work = ScrapedItemCheckoutService().execute(
+            data=MagicMock(force=False, target_item_id=None),
+        )
+
+        assert work is not None
+        assert work.id == queued_item.id
+        queued_item.refresh_from_db()
+        assert queued_item.status == ScrapedItem.Status.PROCESSING
 
 
 class ScrapedItemExtractionSubmitServiceTests(TestCase):

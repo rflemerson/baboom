@@ -24,8 +24,8 @@ Read these docs only when they are relevant:
 
 ## Current Pipeline Contract
 
-- Dagster is manual-only by default: `agents/definitions.py` must not register
-  queue sensors unless automatic processing is explicitly re-enabled.
+- The queue sensor is registered but starts `STOPPED` by default. Operators must
+  enable it manually in Dagster when they want queued work to flow.
 - Production runs as separate `dagster-code-server`, `dagster-webserver`, and
   `dagster-daemon` services in `docker-compose.agents.yml`; do not use
   `dagster dev` for production.
@@ -36,6 +36,8 @@ Read these docs only when they are relevant:
 - `dagster-code-server` owns the stable gRPC endpoint and must have a
   healthcheck; webserver and daemon should wait for it before starting. Use a
   generous startup grace period because cold boots on the VM may be slow.
+- When the queue sensor is enabled, it polls the backend work queue every 60
+  seconds.
 - Production compose uses `DAGSTER_HOME=/opt/dagster`; `dagster.yaml` is mounted
   at `/opt/dagster/dagster.yaml` and persistent storage at
   `/opt/dagster/dagster_home`.

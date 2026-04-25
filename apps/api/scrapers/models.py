@@ -91,6 +91,7 @@ class ScrapedItem(models.Model):
         """Status of the scraped item in the pipeline."""
 
         NEW = "new", _("New")
+        QUEUED = "queued", _("Queued for Agents")
         PROCESSING = "processing", _("Processing")
         LINKED = "linked", _("Linked")
         ERROR = "error", _("Error (Retry)")

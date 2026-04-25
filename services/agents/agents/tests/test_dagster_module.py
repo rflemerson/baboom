@@ -3,8 +3,6 @@
 from unittest import TestCase
 from unittest.mock import patch
 
-from dagster import RunRequest, SkipReason, build_asset_context
-
 from agents.acquisition import PreparedExtractionInputs
 from agents.definitions import defs
 from agents.defs.assets import (
@@ -21,6 +19,7 @@ from agents.defs.pipeline import (
 )
 from agents.defs.sensors import work_queue_sensor
 from agents.schemas import ExtractedProduct
+from dagster import DefaultSensorStatus, RunRequest, SkipReason, build_asset_context
 
 
 class _FakeApiClient:
@@ -83,6 +82,10 @@ class TestDagsterSensor(TestCase):
     def test_definitions_validate_loadable(self):
         """The Dagster code location remains structurally loadable."""
         type(defs).validate_loadable(defs)
+
+    def test_sensor_defaults_to_stopped(self):
+        """Automatic queue polling should require manual enablement."""
+        self.assertEqual(work_queue_sensor.default_status, DefaultSensorStatus.STOPPED)
 
     def test_sensor_skips_when_queue_empty(self):
         """Returns SkipReason when checkout has no pending item."""

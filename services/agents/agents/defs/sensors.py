@@ -28,8 +28,8 @@ def _parse_work_item(work: dict[str, Any] | None) -> QueueWorkItem | None:
 
 @sensor(
     job_name=PROCESS_ITEM_JOB_NAME,
-    minimum_interval_seconds=10,
-    default_status=DefaultSensorStatus.RUNNING,
+    minimum_interval_seconds=60,
+    default_status=DefaultSensorStatus.STOPPED,
 )
 def work_queue_sensor(
     context: object,
