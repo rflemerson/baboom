@@ -22,8 +22,10 @@ does not conflict with visible evidence.
 - Each child uses the same product contract and may also have its own
   `children`.
 - If there are no included products, return `children: []`.
-- Do not create sibling products for flavors, sizes, nutrition tables, or
-  variants.
+- Do not create child products for flavor-only variations of the same product.
+- Different weights or sizes may be separate child products when the extracted
+  offer clearly includes multiple distinct sellable products.
+- Do not create child products just because multiple nutrition tables appear.
 - For combos, the root object must still be meaningfully filled.
 - If the page title or packshot identifies the combo name, use it at the root.
 - If the combo root has no single package weight, keep `weight_grams: null`.
@@ -31,6 +33,23 @@ does not conflict with visible evidence.
   type, `packaging` may stay `OTHER`.
 - When children are clearly identified, prefer rich child nodes over inventing
   synthetic root nutrition.
+
+Examples:
+
+- Flavor-only page:
+  a whey product page shows vanilla, chocolate, and strawberry as flavor
+  options for the same 900g refill. Expected interpretation: one root product
+  with `children: []`.
+- Distinct weight offers in one extracted structure:
+  the page clearly represents 900g and 1800g packs as separate sellable
+  products within the same offer structure. Expected interpretation: they may
+  be separate child products.
+- Real combo:
+  the page sells "Whey + Creatine" together. Expected interpretation: one root
+  product with child products for whey and creatine.
+- Safety rule:
+  when in doubt, prefer one root product with `children: []` rather than
+  inventing child products from flavor selectors or carousel variants.
 
 ### Fields
 
@@ -113,9 +132,14 @@ Use these fields for the root product and every child:
 1. Do not invent values.
 2. Keep arrays as arrays, even when empty.
 3. Flavors and variants belong in `flavor_names` or `variant_name`; they do not
-   become sibling products.
+   become child products when the difference is only flavor.
 4. Children are only products physically included in a kit, combo, or bundle.
-5. If unsure whether something is a child product, keep it out of `children`.
-6. If the root page is a combo, do not collapse the whole page into one child.
-7. When a child has reliable table data, attach the table to that child even if
+5. A single scraped item should resolve to one extracted offer. Do not expand
+   every visible flavor option into child products.
+6. If unsure whether something is a child product, keep it out of `children`.
+7. Different weights or sizes can be child products only when the extracted
+   offer genuinely includes multiple distinct products, not when they are just
+   alternative choices for one flavor selector.
+8. If the root page is a combo, do not collapse the whole page into one child.
+9. When a child has reliable table data, attach the table to that child even if
    the root is only a bundle.
