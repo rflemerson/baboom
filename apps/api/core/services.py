@@ -277,6 +277,7 @@ class ProductNutritionService:
     MODE_NONE = "none"
     MODE_EXISTING = "existing"
     MODE_NEW = "new"
+    MAX_FACTS_DESCRIPTION_LENGTH = 200
 
     def apply_selection(
         self,
@@ -352,7 +353,9 @@ class ProductNutritionService:
     ) -> dict[str, str | int | float | Decimal]:
         """Build defaults used when persisting new nutrition facts."""
         return {
-            "description": facts_payload.description or "",
+            "description": (facts_payload.description or "")[
+                : self.MAX_FACTS_DESCRIPTION_LENGTH
+            ],
             "serving_size_grams": facts_payload.serving_size_grams,
             "energy_kcal": facts_payload.energy_kcal,
             "proteins": Decimal(str(facts_payload.proteins)),

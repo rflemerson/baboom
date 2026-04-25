@@ -639,6 +639,27 @@ class ProductNutritionServiceTests(TestCase):
         )
         assert self.product.nutrition_profiles.count() == self.REPEATED_PAYLOAD_COUNT
 
+    def test_attach_profiles_truncates_long_facts_description(self) -> None:
+        """Nutrition facts descriptions should fit the model field."""
+        long_description = "x" * 250
+        payload = ProductNutritionPayload(
+            nutrition_facts=NutritionFactsPayload(
+                description=long_description,
+                serving_size_grams=30,
+                energy_kcal=120,
+                proteins=24,
+                carbohydrates=3,
+                total_fats=2,
+            ),
+        )
+
+        self.service.attach_profiles(self.product, [payload])
+
+        facts = NutritionFacts.objects.get()
+        max_length = ProductNutritionService.MAX_FACTS_DESCRIPTION_LENGTH
+        assert len(facts.description) == max_length
+        assert facts.description == long_description[:max_length]
+
 
 class ProductStatsTest(TestCase):
     """Tests for the public catalog selector annotations."""
