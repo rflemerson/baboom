@@ -558,6 +558,18 @@ class ProductMetadataUpdateServiceTests(TestCase):
 
         assert updated_product.category is None
 
+    def test_execute_updates_published_state(self) -> None:
+        """Published state should persist through the metadata update workflow."""
+        assert self.product.is_published is False
+
+        updated_product = self.service.execute(
+            product_id=self.product.id,
+            data=ProductMetadataUpdateInput(is_published=True),
+        )
+
+        updated_product.refresh_from_db()
+        assert updated_product.is_published is True
+
 
 class ProductNutritionServiceTests(TestCase):
     """Essential coverage for admin-facing nutrition selection workflow."""

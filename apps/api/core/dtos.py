@@ -93,6 +93,7 @@ class ProductMetadataUpdateInput(BaseModel):
     description: str | None = None
     category_name: str | list[str] | None = None
     packaging: str | None = None
+    is_published: bool | None = None
     tags: list[str] | list[list[str]] | None = None
 
 

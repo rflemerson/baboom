@@ -761,6 +761,7 @@ class ProductMetadataUpdateResolved:
     name: str | None
     description: str | None
     packaging: str | None
+    is_published: bool | None
     category: Category | None
     replace_category: bool
     tags: list[Tag] | None
@@ -804,6 +805,7 @@ class ProductMetadataUpdateService:
             name=data.name,
             description=data.description,
             packaging=data.packaging,
+            is_published=data.is_published,
             category=category,
             replace_category=replace_category,
             tags=self.taxonomy_resolution.resolve_update_tags(data.tags),
@@ -828,6 +830,8 @@ class ProductMetadataUpdateService:
             product.description = resolved.description
         if resolved.packaging is not None:
             product.packaging = resolved.packaging
+        if resolved.is_published is not None:
+            product.is_published = resolved.is_published
         if resolved.replace_category:
             product.category = resolved.category
         if resolved.tags is not None:

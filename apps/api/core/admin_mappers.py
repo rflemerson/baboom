@@ -51,6 +51,7 @@ def build_product_metadata_update_input(
             form.cleaned_data["category"].name if form.cleaned_data["category"] else ""
         ),
         packaging=form.cleaned_data["packaging"],
+        is_published=form.cleaned_data["is_published"],
         tags=[tag.name for tag in form.cleaned_data["tags"]],
     )
 

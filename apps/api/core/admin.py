@@ -162,16 +162,6 @@ class ProductAdmin(admin.ModelAdmin):
         """Return category name."""
         return obj.category.name if obj.category else "-"
 
-    def get_readonly_fields(
-        self,
-        _request: HttpRequest,
-        obj: Product | None = None,
-    ) -> tuple[str, ...]:
-        """Lock fields that do not yet have an official update workflow."""
-        if obj is None:
-            return self.readonly_fields
-        return (*self.readonly_fields, "brand", "weight", "ean")
-
     def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, str]:
         """Populate initial form data.
 
