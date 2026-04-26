@@ -3,6 +3,8 @@
 import sys
 import time
 
+from pydantic_ai.exceptions import ModelHTTPError
+
 from dagster import AssetExecutionContext, MetadataValue, asset
 
 from ..acquisition import (
@@ -110,6 +112,13 @@ def image_report(
                 ),
             },
         )
+    except ModelHTTPError as exc:
+        if exc.status_code in {429, 503}:
+            context.log.warning("Image report transient provider failure: %s", exc)
+        else:
+            context.log.exception("Image report failed")
+        api.report_error(origin_item_id, str(exc), is_fatal=False)
+        raise
     except Exception as exc:
         context.log.exception("Image report failed")
         api.report_error(origin_item_id, str(exc), is_fatal=False)
@@ -142,6 +151,16 @@ def product_analysis(
                 started=started,
             ),
         )
+    except ModelHTTPError as exc:
+        if exc.status_code in {429, 503}:
+            context.log.warning(
+                "Structured analysis transient provider failure: %s",
+                exc,
+            )
+        else:
+            context.log.exception("Structured analysis failed")
+        api.report_error(origin_item_id, str(exc), is_fatal=False)
+        raise
     except Exception as exc:
         context.log.exception("Structured analysis failed")
         api.report_error(origin_item_id, str(exc), is_fatal=False)
