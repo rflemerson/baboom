@@ -120,7 +120,10 @@ class ComboComponentInput(ProductDraftInput):
 class ProductInput(ProductDraftInput):
     """Input for product creation."""
 
-    weight: int = strawberry.field(description="Weight in grams")
+    weight: int | None = strawberry.field(
+        default=None,
+        description="Weight in grams",
+    )
     brand_name: str = strawberry.field(
         description="Brand name (auto-created if not exists)",
     )

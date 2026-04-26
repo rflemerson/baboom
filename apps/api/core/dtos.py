@@ -70,7 +70,7 @@ class ProductCreateInput(BaseModel):
     """DTO for product creation service."""
 
     name: str
-    weight: int
+    weight: int | None = None
     brand_name: str
     category_name: str | list[str] | None = None
     ean: str | None = None

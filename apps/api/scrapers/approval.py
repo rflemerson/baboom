@@ -107,7 +107,7 @@ class ScrapedItemExtractionApproveService:
         self._validate_required_root_fields(product)
         return ProductCreateInput(
             name=str(product.name),
-            weight=int(product.weight_grams),
+            weight=product.weight_grams,
             brand_name=str(product.brand_name),
             category_name=product.category_hierarchy or None,
             ean=product.ean or None,
@@ -229,8 +229,6 @@ class ScrapedItemExtractionApproveService:
             errors["product.name"] = _("Product name is required.")
         if not product.brand_name:
             errors["product.brandName"] = _("Product brand is required.")
-        if product.weight_grams is None:
-            errors["product.weightGrams"] = _("Product weight is required.")
         if errors:
             raise DjangoValidationError(errors)
 

@@ -575,6 +575,44 @@ class ScrapedItemExtractionApproveServiceTests(TestCase):
         ) == {"Whey Growth", "Creatina Growth"}
         assert self.item.status == ScrapedItem.Status.LINKED
 
+    def test_execute_allows_combo_without_root_weight(self) -> None:
+        """Combo roots may omit a single total weight."""
+        extraction = ScrapedItemExtraction.objects.create(
+            scraped_item=self.item,
+            source_page=self.page,
+            image_report="Image 1: combo",
+            extracted_product={
+                "name": "Combo Whey + Creatina",
+                "brandName": "Growth",
+                "packaging": "OTHER",
+                "children": [
+                    {
+                        "name": "Whey Growth",
+                        "brandName": "Growth",
+                        "weightGrams": 900,
+                        "packaging": "REFILL",
+                        "children": [],
+                    },
+                    {
+                        "name": "Creatina Growth",
+                        "brandName": "Growth",
+                        "weightGrams": 300,
+                        "packaging": "CONTAINER",
+                        "children": [],
+                    },
+                ],
+            },
+        )
+
+        result = ScrapedItemExtractionApproveService().execute(
+            extraction_id=extraction.id,
+        )
+
+        product = result.product
+        assert product.type == Product.Type.COMBO
+        assert product.weight is None
+        assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
+
     def test_execute_rejects_extraction_missing_required_catalog_fields(self) -> None:
         """Approval fails clearly when the extracted product is incomplete."""
         extraction = ScrapedItemExtraction.objects.create(

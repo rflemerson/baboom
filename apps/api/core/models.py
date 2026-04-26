@@ -193,6 +193,8 @@ class Product(BaseModel):
 
     weight = models.PositiveIntegerField(
         _("Weight (grams)"),
+        null=True,
+        blank=True,
         help_text=_("Total product weight in grams"),
     )
 
@@ -279,7 +281,8 @@ class Product(BaseModel):
 
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.brand.name} - {self.name} ({self.weight}g)"
+        weight_display = f"{self.weight}g" if self.weight is not None else "No weight"
+        return f"{self.brand.name} - {self.name} ({weight_display})"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Validate rules on save."""

@@ -166,7 +166,7 @@ class CatalogProductType:
 
     id: int
     name: str
-    weight: int
+    weight: int | None
     packaging: str
     is_published: bool
     brand: BrandType
