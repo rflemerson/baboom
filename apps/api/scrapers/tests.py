@@ -613,6 +613,48 @@ class ScrapedItemExtractionApproveServiceTests(TestCase):
         assert product.weight is None
         assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
 
+    def test_execute_allows_combo_children_without_weight(self) -> None:
+        """Combo children may omit weight."""
+        extraction = ScrapedItemExtraction.objects.create(
+            scraped_item=self.item,
+            source_page=self.page,
+            image_report="Image 1: combo",
+            extracted_product={
+                "name": "Combo Whey + Creatina",
+                "brandName": "Growth",
+                "packaging": "OTHER",
+                "children": [
+                    {
+                        "name": "Whey Growth",
+                        "brandName": "Growth",
+                        "packaging": "REFILL",
+                        "children": [],
+                    },
+                    {
+                        "name": "Creatina Growth",
+                        "brandName": "Growth",
+                        "packaging": "CONTAINER",
+                        "children": [],
+                    },
+                ],
+            },
+        )
+
+        result = ScrapedItemExtractionApproveService().execute(
+            extraction_id=extraction.id,
+        )
+
+        product = result.product
+        assert product.type == Product.Type.COMBO
+        assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
+        assert all(
+            weight is None
+            for weight in product.component_links.values_list(
+                "component__weight",
+                flat=True,
+            )
+        )
+
     def test_execute_rejects_extraction_missing_required_catalog_fields(self) -> None:
         """Approval fails clearly when the extracted product is incomplete."""
         extraction = ScrapedItemExtraction.objects.create(
@@ -621,12 +663,11 @@ class ScrapedItemExtractionApproveServiceTests(TestCase):
             image_report="Image 1: incomplete",
             extracted_product={
                 "name": "Whey Growth",
-                "brandName": "Growth",
                 "children": [],
             },
         )
 
-        with self.assertRaisesMessage(Exception, "Product weight is required"):
+        with self.assertRaisesMessage(Exception, "Product brand is required"):
             ScrapedItemExtractionApproveService().execute(extraction_id=extraction.id)
 
         self.item.refresh_from_db()

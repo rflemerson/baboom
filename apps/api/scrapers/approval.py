@@ -243,7 +243,5 @@ class ScrapedItemExtractionApproveService:
             errors["children.name"] = _("Component name is required.")
         if not product.brand_name and not parent.brand_name:
             errors["children.brandName"] = _("Component brand is required.")
-        if product.weight_grams is None:
-            errors["children.weightGrams"] = _("Component weight is required.")
         if errors:
             raise DjangoValidationError(errors)
