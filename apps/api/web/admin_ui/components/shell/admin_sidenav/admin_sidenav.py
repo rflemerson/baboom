@@ -13,13 +13,13 @@ class AdminSidenavComponent(Component):
 
     def get_context_data(
         self,
-        available_apps: list[dict[str, Any]],
-        current_path: str,
+        current_path: str = "",
+        available_apps: list[dict[str, Any]] | None = None,
         *_args: object,
         **_kwargs: object,
     ) -> dict[str, Any]:
         """Prepare context for the collapsible sidebar."""
         return {
-            "available_apps": available_apps,
+            "available_apps": available_apps or [],
             "current_path": current_path,
         }

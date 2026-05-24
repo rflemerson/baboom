@@ -3,6 +3,12 @@
 {% block title %}
     {% translate 'Server error (500)' %}
 {% endblock %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+        &rsaquo; {% translate 'Server error' %}
+    </div>
+{% endblock %}
 {% block content %}
     {% component "admin_rich_message"
     heading="Server Error <em>(500)</em>"

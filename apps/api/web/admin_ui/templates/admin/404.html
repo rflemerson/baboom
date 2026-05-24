@@ -3,6 +3,12 @@
 {% block title %}
     {% translate 'Page not found' %}
 {% endblock %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+        &rsaquo; {% translate 'Page not found' %}
+    </div>
+{% endblock %}
 {% block content %}
     {% component "admin_message"
     heading="Page not found"
