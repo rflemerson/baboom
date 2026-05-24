@@ -1,0 +1,102 @@
+{% extends "admin/base.html" %}
+{% load i18n admin_urls static admin_modify component_tags %}
+{% block title %}
+    {% if errors %}
+        {% translate "Error:" %}
+    {% endif %}
+    {{ block.super }}
+{% endblock %}
+{% block extrahead %}
+    {{ block.super }}
+    <script src="{% url 'admin:jsi18n' %}"></script>
+    {{ media }}
+{% endblock %}
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static "admin/css/forms.css" %}">
+{% endblock %}
+{% block coltype %}colM{% endblock %}
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+{% block content %}
+    <div id="content-main">
+        {% if change and not is_popup %}
+            <ul class="object-tools">
+                {% component "change_form_object_tools"
+                opts=opts
+                original=original
+                has_absolute_url=has_absolute_url
+                absolute_url=absolute_url
+                preserved_filters=preserved_filters
+                %}
+            {% endcomponent %}
+        </ul>
+    {% endif %}
+    <form {% if has_file_field %}enctype="multipart/form-data"{% endif %}
+          {% if form_url %}action="{{ form_url }}"{% endif %}
+          method="post"
+          id="{{ opts.model_name }}_form"
+          novalidate>
+        {% csrf_token %}
+        <div>
+            {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+            {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
+            {% if save_on_top %}
+                {% component "submit_line"
+                add=add
+                change=change
+                is_popup=is_popup
+                save_as=save_as
+                has_add_permission=has_add_permission
+                has_change_permission=has_change_permission
+                has_view_permission=has_view_permission
+                has_delete_permission=has_delete_permission
+                has_editable_inline_admin_formsets=has_editable_inline_admin_formsets
+                opts=opts
+                original=original
+                preserved_filters=preserved_filters
+                show_delete=show_delete
+                show_save=show_save
+                show_save_and_add_another=show_save_and_add_another
+                show_save_and_continue=show_save_and_continue
+                %}
+            {% endcomponent %}
+        {% endif %}
+        {% if errors %}
+            {% component "errornote" error_count=errors|length non_form_errors=adminform.form.non_field_errors %}
+        {% endcomponent %}
+    {% endif %}
+    {% for fieldset in adminform %}
+        {% component "fieldset" fieldset=fieldset heading_level=2 prefix="fieldset" id_prefix=0 id_suffix=forloop.counter0 %}
+    {% endcomponent %}
+{% endfor %}
+{% for inline_admin_formset in inline_admin_formsets %}
+    {% include inline_admin_formset.opts.template %}
+{% endfor %}
+{% component "submit_line"
+add=add
+change=change
+is_popup=is_popup
+save_as=save_as
+has_add_permission=has_add_permission
+has_change_permission=has_change_permission
+has_view_permission=has_view_permission
+has_delete_permission=has_delete_permission
+has_editable_inline_admin_formsets=has_editable_inline_admin_formsets
+opts=opts
+original=original
+preserved_filters=preserved_filters
+show_delete=show_delete
+show_save=show_save
+show_save_and_add_another=show_save_and_add_another
+show_save_and_continue=show_save_and_continue
+%}
+{% endcomponent %}
+<script id="django-admin-form-add-constants" src="{% static 'admin/js/change_form.js' %}" {% if adminform and add %} data-model-name="{{ opts.model_name }}" {% endif %} async>
+</script>
+{% if prepopulated_fields %}
+    {% component "prepopulated_fields_js" prepopulated_fields_json=prepopulated_fields_json %}{% endcomponent %}
+{% endif %}
+</div>
+</form>
+</div>
+{% endblock %}

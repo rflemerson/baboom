@@ -1,0 +1,11 @@
+{% load component_tags i18n %}
+<div class="changelist-footer">
+    {% component "pagination" cl=cl %}
+{% endcomponent %}
+{% if show_save %}
+    <input type="submit"
+           name="_save"
+           class="default"
+           value="{% translate 'Save' %}">
+{% endif %}
+</div>

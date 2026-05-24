@@ -1,0 +1,5 @@
+{% load i18n %}
+<p class="errornote">
+    {% blocktranslate count counter=error_count %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}
+</p>
+{{ non_form_errors }}

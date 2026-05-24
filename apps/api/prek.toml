@@ -32,7 +32,7 @@ args = [
     "--optional-dependencies-dev-groups",
     "dev",
     "--package-module-name-map",
-    "factory-boy=factory",
+    "factory-boy=factory,django-components=django_components",
     "--per-rule-ignores",
     "DEP002=gunicorn|psycopg|django-celery-results|django-celery-beat|strawberry-graphql-django,DEP004=factory",
 ]

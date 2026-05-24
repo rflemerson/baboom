@@ -10,6 +10,8 @@ from django.db import transaction
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
+from web.admin_ui.admin_base import BaseAdmin
+
 from .admin_mappers import (
     build_product_create_input,
     build_product_metadata_update_input,
@@ -75,7 +77,7 @@ class ProductStoreInline(admin.TabularInline):
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(BaseAdmin):
     """Admin for products."""
 
     INITIAL_FIELDS: ClassVar[tuple[str, ...]] = (

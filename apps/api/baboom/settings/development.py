@@ -1,5 +1,6 @@
 """Development settings overrides for the Django project."""
 
+from .apps.project import COMPONENTS
 from .base import BASE_DIR
 
 # Quick-start development settings - unsuitable for production
@@ -18,6 +19,4 @@ DATABASES = {
 }
 
 # Django Components: Reload server on component file changes (dev only)
-COMPONENTS = {
-    "reload_on_file_change": True,
-}
+COMPONENTS["reload_on_file_change"] = True

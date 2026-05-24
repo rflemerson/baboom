@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+{% load component_tags i18n %}
+{% block content %}
+    {% component "admin_message"
+    message="Something’s wrong with your database installation. Make sure the appropriate database tables have been created, and make sure the database is readable by the appropriate user."
+    %}
+{% endcomponent %}
+{% endblock %}

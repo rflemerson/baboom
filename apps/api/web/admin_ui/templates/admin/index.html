@@ -1,0 +1,20 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static component_tags %}
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
+{% endblock %}
+{% block coltype %}colMS{% endblock %}
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block content %}
+    <div id="content-main" class="app-list">
+        {% component "app_list" app_list=app_list show_changelinks=True %}
+    {% endcomponent %}
+</div>
+{% endblock %}
+{% block sidebar %}
+    {% component "recent_actions" %}
+{% endcomponent %}
+{% endblock %}

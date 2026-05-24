@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% load component_tags i18n %}
+{% block title %}
+    {% translate 'Server error (500)' %}
+{% endblock %}
+{% block content %}
+    {% component "admin_rich_message"
+    heading="Server Error <em>(500)</em>"
+    message="There’s been an error. It’s been reported to the site administrators via email and should be fixed shortly. Thanks for your patience."
+    %}
+{% endcomponent %}
+{% endblock %}

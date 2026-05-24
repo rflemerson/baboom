@@ -1,0 +1,12 @@
+<nav aria-label="Breadcrumbs">
+    <div class="breadcrumbs">
+        {% for item in items %}
+            {% if not forloop.first %}&rsaquo;{% endif %}
+            {% if item.url and not forloop.last %}
+                <a href="{{ item.url }}">{{ item.label }}</a>
+            {% else %}
+                {{ item.label }}
+            {% endif %}
+        {% endfor %}
+    </div>
+</nav>

@@ -27,6 +27,7 @@ dependencies = [
   "strawberry-graphql-django",
   "pydantic",
   "sentry-sdk",
+  "django-components",
 ]
 
 [project.urls]
