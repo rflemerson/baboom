@@ -187,27 +187,21 @@ def _apply_catalog_numeric_filters(
     return queryset
 
 
-def _resolve_catalog_sort_by(filters: CatalogProductsFilters) -> str:
-    """Return a supported catalog sort field."""
-    if filters.sort_by in SORTABLE_CATALOG_FIELDS:
-        return filters.sort_by
-    return DEFAULT_CATALOG_SORT_BY
-
-
-def _resolve_catalog_sort_dir(filters: CatalogProductsFilters) -> str:
-    """Return a supported catalog sort direction."""
-    if filters.sort_dir in {"asc", "desc"}:
-        return filters.sort_dir
-    return DEFAULT_CATALOG_SORT_DIR
-
-
 def _apply_catalog_sorting(
     queryset: QuerySet[Product],
     filters: CatalogProductsFilters,
 ) -> QuerySet[Product]:
     """Apply stable null-safe ordering to the public catalog."""
-    sort_by = _resolve_catalog_sort_by(filters)
-    sort_dir = _resolve_catalog_sort_dir(filters)
+    sort_by = (
+        filters.sort_by
+        if filters.sort_by in SORTABLE_CATALOG_FIELDS
+        else DEFAULT_CATALOG_SORT_BY
+    )
+    sort_dir = (
+        filters.sort_dir
+        if filters.sort_dir in {"asc", "desc"}
+        else DEFAULT_CATALOG_SORT_DIR
+    )
     ordering = F(sort_by)
     stable_fallback = ["brand__name", "name", "pk"]
 

@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 import secrets
-from typing import ClassVar, TypedDict
+from typing import ClassVar
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -16,14 +16,6 @@ from treebeard.mp_tree import MP_Node
 from common.models import BaseModel
 
 logger = logging.getLogger(__name__)
-
-
-class MicronutrientHashInput(TypedDict):
-    """Typed micronutrient data used for nutrition hash computation."""
-
-    name: str
-    value: float
-    unit: str
 
 
 class Brand(BaseModel):
@@ -154,12 +146,6 @@ class Category(MP_Node, BaseModel):
 class Product(BaseModel):
     """Main product model."""
 
-    class Type(models.TextChoices):
-        """Product types."""
-
-        SIMPLE = "SIMPLE", _("Simple Product")
-        COMBO = "COMBO", _("Combo/Kit")
-
     class Packaging(models.TextChoices):
         """Packaging types."""
 
@@ -167,13 +153,6 @@ class Product(BaseModel):
         CONTAINER = "CONTAINER", _("Container Package")
         BAR = "BAR", _("Bar")
         OTHER = "OTHER", _("Other")
-
-    type = models.CharField(
-        _("Product Type"),
-        max_length=20,
-        choices=Type.choices,
-        default=Type.SIMPLE,
-    )
 
     name = models.CharField(_("Product Name"), max_length=200)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name=_("Brand"))
@@ -227,15 +206,6 @@ class Product(BaseModel):
         blank=True,
     )
 
-    components = models.ManyToManyField(
-        "self",
-        through="ProductComponent",
-        symmetrical=False,
-        verbose_name=_("Components"),
-        blank=True,
-        help_text=_("If this is a Combo, list the products it contains."),
-    )
-
     is_published = models.BooleanField(
         _("Published"),
         default=False,
@@ -279,27 +249,27 @@ class Product(BaseModel):
 
 
 class ProductComponent(BaseModel):
-    """Link between a Combo Product (parent) and its components (children)."""
+    """One item inside a combo product."""
 
     parent = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
         related_name="component_links",
-        verbose_name=_("Parent Combo"),
+        verbose_name=_("Combo"),
     )
     component = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
         related_name="parent_links",
-        verbose_name=_("Component Product"),
+        verbose_name=_("Component"),
     )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
 
     class Meta:
         """Meta options."""
 
-        verbose_name = _("Product Component")
-        verbose_name_plural = _("Product Components")
+        verbose_name = _("Component")
+        verbose_name_plural = _("Components")
         constraints = (
             models.UniqueConstraint(
                 fields=["parent", "component"],
@@ -309,7 +279,7 @@ class ProductComponent(BaseModel):
 
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.parent.name} -> {self.quantity}x {self.component.name}"
+        return f"{self.quantity}x {self.component.name}"
 
 
 class ProductStore(BaseModel):
@@ -481,20 +451,34 @@ class NutritionFacts(BaseModel):
             ),
         )
 
-    @classmethod
-    def compute_hash(
-        cls,
-        field_values: dict[str, object],
-        *,
-        micronutrients: list[MicronutrientHashInput] | None = None,
-    ) -> str:
-        """Compute a stable SHA-256 from nutritional field values and micronutrients."""
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Keep the content hash in sync with the stored values on every write.
+
+        The hash is owned by the model: no caller recomputes it. When a
+        micronutrient changes it re-saves its parent facts (see Micronutrient),
+        which lands back here and refreshes the fingerprint.
+        """
+        self.content_hash = self._content_hash()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = {*update_fields, "content_hash", "updated_at"}
+        super().save(*args, **kwargs)
+
+    def _content_hash(self) -> str:
+        """Return a stable SHA-256 of the scalar values and saved micronutrients."""
         data: dict[str, object] = {
-            field: float(field_values[field]) for field in cls.HASH_FIELDS
+            field: float(getattr(self, field)) for field in self.HASH_FIELDS
         }
-        data["micronutrients"] = sorted(
-            micronutrients or [],
-            key=lambda micronutrient: micronutrient["name"],
+        data["micronutrients"] = (
+            sorted(
+                (
+                    {"name": item.name, "value": float(item.value), "unit": item.unit}
+                    for item in self.micronutrients.all()
+                ),
+                key=lambda micronutrient: micronutrient["name"],
+            )
+            if self.pk
+            else []
         )
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -518,6 +502,12 @@ class Micronutrient(BaseModel):
         MICROGRAM = "mcg", "mcg"
         IU = "IU", "IU"
         PERCENT = "%", "%"
+
+        @classmethod
+        def normalize(cls, value: str) -> str:
+            """Return a supported unit or the unknown fallback."""
+            candidate = value.strip()
+            return candidate if candidate in cls.values else cls.UNKNOWN
 
     nutrition_facts = models.ForeignKey(
         NutritionFacts,
@@ -559,6 +549,18 @@ class Micronutrient(BaseModel):
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.name}: {self.value}{self.unit}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Persist the micronutrient and refresh its parent facts hash."""
+        super().save(*args, **kwargs)
+        self.nutrition_facts.save(update_fields=["content_hash", "updated_at"])
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Remove the micronutrient and refresh its parent facts hash."""
+        facts = self.nutrition_facts
+        result = super().delete(*args, **kwargs)
+        facts.save(update_fields=["content_hash", "updated_at"])
+        return result
 
 
 class ProductNutrition(BaseModel):

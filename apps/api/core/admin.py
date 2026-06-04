@@ -7,17 +7,18 @@ from typing import TYPE_CHECKING, ClassVar
 import nested_admin
 from django.contrib import admin, messages
 from django.db import transaction
+from django.db.models import Count
+from django.urls import reverse
+from django.utils.html import format_html
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
-from .admin_mappers import (
-    build_product_create_input,
-    build_product_metadata_update_input,
-    build_store_listing_payloads,
-    find_product_store_inline_formset,
-)
+from offers.models import StockStatus
+
+from .dtos import ProductCreateInput, ProductMetadataUpdateInput, StoreListingPayload
 from .forms import ProductAdminForm, ProductStoreInlineForm, ProductStoreInlineFormSet
 from .models import (
+    AlertSubscriber,
     APIKey,
     Brand,
     Category,
@@ -25,6 +26,7 @@ from .models import (
     Micronutrient,
     NutritionFacts,
     Product,
+    ProductComponent,
     ProductNutrition,
     ProductStore,
     Store,
@@ -69,6 +71,18 @@ class ProductStoreInline(admin.TabularInline):
     )
 
 
+class ProductComponentInline(admin.TabularInline):
+    """Inline for building combo products from existing catalog items."""
+
+    model = ProductComponent
+    fk_name = "parent"
+    extra = 0
+    autocomplete_fields: ClassVar[list[str]] = ["component"]
+    fields = ("component", "quantity")
+    verbose_name = "Component"
+    verbose_name_plural = "Components (leave empty for simple products)"
+
+
 class ProductNutritionInline(admin.TabularInline):
     """Inline for linking products to nutrition tables managed in the admin."""
 
@@ -105,6 +119,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_per_page = 20
     filter_horizontal: ClassVar[list[str]] = ["tags"]
     inlines: ClassVar[list[type[admin.TabularInline]]] = [
+        ProductComponentInline,
         ProductStoreInline,
         ProductNutritionInline,
     ]
@@ -180,14 +195,42 @@ class ProductAdmin(admin.ModelAdmin):
         if change:
             updated_product = ProductMetadataUpdateService().execute(
                 product_id=obj.pk,
-                data=build_product_metadata_update_input(form),
+                data=ProductMetadataUpdateInput(
+                    name=form.cleaned_data["name"],
+                    weight=form.cleaned_data["weight"],
+                    brand_id=form.cleaned_data["brand"].id,
+                    ean=form.cleaned_data["ean"],
+                    description=form.cleaned_data["description"],
+                    category_id=(
+                        form.cleaned_data["category"].id
+                        if form.cleaned_data["category"]
+                        else None
+                    ),
+                    packaging=form.cleaned_data["packaging"],
+                    is_published=form.cleaned_data["is_published"],
+                    tag_ids=[tag.id for tag in form.cleaned_data["tags"]],
+                ),
             )
             obj.pk = updated_product.pk
             obj.refresh_from_db()
             return
 
         created_product = ProductCreateService().execute(
-            build_product_create_input(form),
+            ProductCreateInput(
+                name=form.cleaned_data["name"],
+                weight=form.cleaned_data["weight"],
+                brand_id=form.cleaned_data["brand"].id,
+                category_id=(
+                    form.cleaned_data["category"].id
+                    if form.cleaned_data["category"]
+                    else None
+                ),
+                ean=form.cleaned_data["ean"],
+                description=form.cleaned_data["description"],
+                packaging=form.cleaned_data["packaging"],
+                is_published=form.cleaned_data["is_published"],
+                tag_ids=[tag.id for tag in form.cleaned_data["tags"]],
+            ),
         )
         obj.pk = created_product.pk
         obj.refresh_from_db()
@@ -212,14 +255,37 @@ class ProductAdmin(admin.ModelAdmin):
         formsets: list[BaseInlineFormSet],
     ) -> None:
         """Replace product store listings using the service-backed inline rows."""
-        product_store_formset = find_product_store_inline_formset(formsets)
+        product_store_formset = next(
+            (fs for fs in formsets if isinstance(fs, ProductStoreInlineFormSet)),
+            None,
+        )
         if product_store_formset is None:
             return
 
-        ProductStoreService().replace_listings(
-            product,
-            build_store_listing_payloads(product_store_formset),
-        )
+        store_listings_data: list[StoreListingPayload] = []
+        for inline_form in product_store_formset.forms:
+            cleaned_data = getattr(inline_form, "cleaned_data", None)
+            if not cleaned_data or cleaned_data.get("DELETE"):
+                continue
+            store = cleaned_data.get("store")
+            product_link = cleaned_data.get("product_link")
+            price = cleaned_data.get("price")
+            if store is None or not product_link or price in (None, ""):
+                continue
+            store_listings_data.append(
+                StoreListingPayload(
+                    store_id=store.id,
+                    external_id=cleaned_data.get("external_id") or "",
+                    product_link=product_link,
+                    affiliate_link=cleaned_data.get("affiliate_link") or "",
+                    price=float(price),
+                    stock_status=(
+                        cleaned_data.get("stock_status") or StockStatus.AVAILABLE
+                    ),
+                ),
+            )
+
+        ProductStoreService().replace_listings(product, store_listings_data)
 
     @admin.action(
         description="Excluir products selecionados com links",
@@ -264,27 +330,68 @@ class BrandAdmin(admin.ModelAdmin):
     """Admin for brands."""
 
     show_facets = admin.ShowFacets.ALWAYS
-    list_display = ("name", "display_name")
+    list_display = ("name", "display_name", "products_count")
     search_fields = ("name", "display_name")
     list_per_page = 50
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Annotate product count."""
+        return super().get_queryset(request).annotate(product_count=Count("product"))
+
+    @admin.display(description="Products", ordering="product_count")
+    def products_count(self, obj: Brand) -> str:
+        """Return the number of linked products with a link to the changelist."""
+        url = reverse("admin:core_product_changelist") + f"?brand__id__exact={obj.id}"
+        return format_html('<a href="{}">{}</a>', url, obj.product_count)
 
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
     """Admin for stores."""
 
-    list_display = ("name", "display_name")
+    list_display = ("name", "display_name", "products_count")
     search_fields = ("name", "display_name")
     list_per_page = 50
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Annotate product count."""
+        return (
+            super().get_queryset(request).annotate(product_count=Count("productstore"))
+        )
+
+    @admin.display(description="Products", ordering="product_count")
+    def products_count(self, obj: Store) -> str:
+        """Return the number of linked products with a link to the changelist."""
+        url = reverse("admin:core_product_changelist") + f"?stores__id__exact={obj.id}"
+        return format_html('<a href="{}">{}</a>', url, obj.product_count)
 
 
 @admin.register(Flavor)
 class FlavorAdmin(admin.ModelAdmin):
     """Admin for flavors."""
 
-    list_display = ("name", "description")
+    list_display = ("name", "description", "products_count")
     search_fields = ("name",)
     list_per_page = 50
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Annotate product count."""
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                product_count=Count("productnutrition__product", distinct=True),
+            )
+        )
+
+    @admin.display(description="Products", ordering="product_count")
+    def products_count(self, obj: Flavor) -> str:
+        """Return the number of linked products with a link to the changelist."""
+        url = (
+            reverse("admin:core_product_changelist")
+            + f"?nutrition_profiles__flavors__id__exact={obj.id}"
+        )
+        return format_html('<a href="{}">{}</a>', url, obj.product_count)
 
 
 @admin.register(Tag)
@@ -304,6 +411,38 @@ class CategoryAdmin(TreeAdmin):
     form = movenodeform_factory(Category)
     list_display = ("name", "description")
     search_fields = ("name",)
+    list_per_page = 50
+
+
+@admin.register(ProductComponent)
+class ProductComponentAdmin(admin.ModelAdmin):
+    """Admin for product combo components."""
+
+    list_display = ("parent", "component", "quantity")
+    search_fields = ("parent__name", "component__name")
+    autocomplete_fields: ClassVar[list[str]] = ["parent", "component"]
+    list_per_page = 50
+
+
+@admin.register(ProductNutrition)
+class ProductNutritionAdmin(admin.ModelAdmin):
+    """Admin for product nutrition links."""
+
+    list_display = ("product", "nutrition_facts")
+    search_fields = ("product__name", "nutrition_facts__description")
+    autocomplete_fields: ClassVar[list[str]] = ["product", "nutrition_facts"]
+    filter_horizontal: ClassVar[list[str]] = ["flavors"]
+    list_per_page = 50
+
+
+@admin.register(Micronutrient)
+class MicronutrientAdmin(admin.ModelAdmin):
+    """Admin for nutrition micronutrients."""
+
+    list_display = ("nutrition_facts", "name", "value", "unit")
+    list_filter = ("unit",)
+    search_fields = ("name", "nutrition_facts__description")
+    autocomplete_fields: ClassVar[list[str]] = ["nutrition_facts"]
     list_per_page = 50
 
 
@@ -362,20 +501,12 @@ class ProductStoreAdmin(admin.ModelAdmin):
 class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
     """Technical support admin for nutrition facts."""
 
-    list_display = ("description", "serving_size_grams", "energy_kcal")
-    search_fields = ("description",)
+    list_display = ("__str__", "serving_size_grams", "energy_kcal")
+    search_fields = ("description", "content_hash")
     inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
         MicronutrientInline,
     ]
     list_per_page = 20
-
-    def has_delete_permission(
-        self,
-        _request: HttpRequest,
-        _obj: NutritionFacts | None = None,
-    ) -> bool:
-        """Disallow direct deletion from the technical support admin."""
-        return False
 
 
 @admin.register(APIKey)
@@ -386,3 +517,13 @@ class APIKeyAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("name",)
     readonly_fields = ("key", "created_at", "updated_at")
+
+
+@admin.register(AlertSubscriber)
+class AlertSubscriberAdmin(admin.ModelAdmin):
+    """Admin for price alert subscribers."""
+
+    list_display = ("email", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("email",)
+    list_per_page = 50

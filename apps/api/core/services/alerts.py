@@ -24,8 +24,8 @@ class AlertSubscriptionService:
 
     def execute(self, *, email: str) -> AlertSubscriptionResult:
         """Normalize, validate, and create an alert subscription."""
-        normalized_email = self._normalize_email(email)
-        if self._is_already_subscribed(normalized_email):
+        normalized_email = email.strip().lower()
+        if AlertSubscriber.objects.filter(email=normalized_email).exists():
             return AlertSubscriptionResult(
                 email=normalized_email,
                 subscriber=None,
@@ -42,11 +42,3 @@ class AlertSubscriptionService:
             subscriber=subscriber,
             already_subscribed=False,
         )
-
-    def _normalize_email(self, email: str) -> str:
-        """Normalize incoming email values before validation."""
-        return email.strip().lower()
-
-    def _is_already_subscribed(self, email: str) -> bool:
-        """Return whether a subscription already exists for the email."""
-        return AlertSubscriber.objects.filter(email=email).exists()

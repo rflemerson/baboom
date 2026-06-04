@@ -23,6 +23,11 @@ class StockStatus(models.TextChoices):
     LAST_UNITS = "L", _("Last Units")
     OUT_OF_STOCK = "O", _("Out of Stock")
 
+    @classmethod
+    def normalize(cls, value: str) -> str:
+        """Return a supported stock status or the available fallback."""
+        return value if value in cls.values else cls.AVAILABLE
+
 
 class Offer(BaseModel):
     """A product-for-sale at a specific merchant, identified by store + id.

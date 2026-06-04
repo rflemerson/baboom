@@ -16,12 +16,14 @@ from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
-from offers.models import Offer, PriceObservation, StockStatus
+from offers.services import OfferObservationService
 
 from .dtos import AgentExtractionSubmitInput
 from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
 
 if TYPE_CHECKING:
+    from offers.models import Offer
+
     from .dtos import ScrapedItemIngestionInput
     from .graphql.inputs import ScrapedItemCheckoutInput
 
@@ -272,66 +274,26 @@ class ScraperService:
 
     @staticmethod
     def record_offer_observation(data: ScrapedItemIngestionInput) -> Offer:
-        """Upsert the merchant offer and append a price snapshot when it changes.
+        """Record the merchant offer and its price via the offers domain service.
 
         This is the price source of truth for the pricing domain. It is written
         from the first time the scraper sees an offer, independent of whether the
         offer has been linked to a catalog product yet.
         """
-        price = ScraperService._normalize_price(data.price)
-        stock_status = ScraperService._normalize_stock_status(data.stock_status)
-
-        offer, _created = Offer.objects.update_or_create(
+        return OfferObservationService().record(
             store_slug=data.store_slug,
             external_id=data.external_id,
-            defaults={
+            price=ScraperService._normalize_price(data.price),
+            stock_status=data.stock_status,
+            snapshot={
                 "name": data.name,
                 "category": data.category,
                 "url": data.url,
                 "ean": data.ean,
                 "sku": data.sku,
                 "pid": data.pid,
-                "current_price": price,
-                "current_stock_status": stock_status,
                 "current_stock_quantity": data.stock_quantity,
             },
-        )
-
-        if price is None:
-            return offer
-
-        ScraperService._append_price_observation_if_changed(
-            offer=offer,
-            price=price,
-            stock_status=stock_status,
-        )
-        return offer
-
-    @staticmethod
-    def _append_price_observation_if_changed(
-        *,
-        offer: Offer,
-        price: Decimal,
-        stock_status: str,
-    ) -> None:
-        """Append a price observation only when price or stock status changed."""
-        latest = offer.price_observations.values("price", "stock_status").first()
-        if (
-            latest is not None
-            and latest["price"] == price
-            and latest["stock_status"] == stock_status
-        ):
-            return
-
-        PriceObservation.objects.create(
-            offer=offer,
-            price=price,
-            stock_status=stock_status,
-        )
-        logger.info(
-            "Recorded price observation for %s: R$%s",
-            offer.store_slug,
-            price,
         )
 
     @staticmethod
@@ -344,12 +306,6 @@ class ScraperService:
         except (InvalidOperation, ValueError):
             logger.warning("Could not parse scraped price value: %r", value)
             return None
-
-    @staticmethod
-    def _normalize_stock_status(value: str) -> str:
-        """Return a supported stock status, defaulting to available."""
-        valid = {choice for choice, _label in StockStatus.choices}
-        return value if value in valid else StockStatus.AVAILABLE
 
     @staticmethod
     def _normalize_api_context_payload(context_payload: str | dict) -> dict:

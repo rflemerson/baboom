@@ -14,14 +14,11 @@ from django.forms.models import inlineformset_factory
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
-from core.admin import ProductAdmin
+from core.admin import NutritionFactsAdmin, ProductAdmin
 from core.dtos import (
     CatalogProductsFilters,
-    ComboComponentInput,
-    NutritionFactsPayload,
     ProductCreateInput,
     ProductMetadataUpdateInput,
-    ProductNutritionPayload,
     StoreListingPayload,
 )
 from core.forms import ProductStoreInlineForm, ProductStoreInlineFormSet
@@ -31,17 +28,15 @@ from core.models import (
     Category,
     NutritionFacts,
     Product,
-    ProductComponent,
     ProductNutrition,
     ProductStore,
     Store,
+    Tag,
 )
 from core.selectors import public_catalog_products, public_catalog_products_with_stats
 from core.services import (
-    ComboResolutionService,
     ProductCreateService,
     ProductMetadataUpdateService,
-    ProductNutritionService,
     ProductStoreService,
 )
 from offers.models import Offer, PriceObservation, StockStatus
@@ -126,7 +121,7 @@ class ProductStoreServiceTests(TestCase):
             self.product,
             [
                 StoreListingPayload(
-                    store_name="Growth",
+                    store_id=self.store.id,
                     external_id="sku-2",
                     product_link="https://growth.example/new",
                     affiliate_link="https://aff.example/new",
@@ -200,7 +195,7 @@ class ProductStoreServiceTests(TestCase):
             self.product,
             [
                 StoreListingPayload(
-                    store_name="Growth",
+                    store_id=self.store.id,
                     external_id="sku-1",
                     product_link="https://growth.example/item",
                     price=109.90,
@@ -238,7 +233,7 @@ class ProductStoreServiceTests(TestCase):
             self.product,
             [
                 StoreListingPayload(
-                    store_name="Growth",
+                    store_id=self.store.id,
                     external_id="growth-1",
                     product_link="https://growth.example/item",
                     price=99.90,
@@ -258,13 +253,13 @@ class ProductStoreServiceTests(TestCase):
                 self.product,
                 [
                     StoreListingPayload(
-                        store_name="Growth",
+                        store_id=self.store.id,
                         external_id="growth-1",
                         product_link="https://growth.example/1",
                         price=99.90,
                     ),
                     StoreListingPayload(
-                        store_name="Growth",
+                        store_id=self.store.id,
                         external_id="growth-2",
                         product_link="https://growth.example/2",
                         price=109.90,
@@ -281,215 +276,102 @@ class ProductCreateServiceTests(TestCase):
     """Essential coverage for product creation workflows."""
 
     EXPECTED_TAG_COUNT = 2
-    EXPECTED_COMPONENT_COUNT = 2
-    COMPONENT_WEIGHT = 300
-    EXPECTED_DEDUPED_COMPONENT_QUANTITY = 3
 
     def setUp(self) -> None:
         """Create reusable fixtures and services."""
         self.service = ProductCreateService()
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
         self.store = Store.objects.create(name="growth", display_name="Growth")
 
-    def test_execute_creates_simple_product_with_taxonomy_nutrition_and_store(
-        self,
-    ) -> None:
-        """Simple product creation should persist related catalog data."""
+    def test_execute_creates_product_with_taxonomy_and_store(self) -> None:
+        """Product creation should persist brand, category, tags and store listing."""
+        supplements = Category.add_root(name="Supplements")
+        protein = supplements.add_child(name="Protein")
+        goal = Tag.add_root(name="Goal")
+        muscle = goal.add_child(name="Muscle")
+        type_tag = Tag.add_root(name="Type")
+        whey_tag = type_tag.add_child(name="Whey")
+
         product = self.service.execute(
             ProductCreateInput(
                 name="Whey Isolate",
                 weight=900,
-                brand_name="Growth",
-                category_name=["Supplements", "Protein"],
+                brand_id=self.brand.id,
+                category_id=protein.id,
                 ean="1234567890123",
                 description="Lean whey isolate",
                 is_published=True,
-                tags=[["Goal", "Muscle"], ["Type", "Whey"]],
+                tag_ids=[muscle.id, whey_tag.id],
                 stores=[
                     StoreListingPayload(
-                        store_name="Growth",
+                        store_id=self.store.id,
                         external_id="growth-900",
                         product_link="https://growth.example/whey",
                         price=149.90,
-                    ),
-                ],
-                nutrition=[
-                    ProductNutritionPayload(
-                        nutrition_facts=NutritionFactsPayload(
-                            description="Isolate profile",
-                            serving_size_grams=30,
-                            energy_kcal=120,
-                            proteins=26,
-                            carbohydrates=2,
-                            total_fats=1,
-                        ),
                     ),
                 ],
             ),
         )
 
         product.refresh_from_db()
-        assert product.type == Product.Type.SIMPLE
-        assert product.brand.display_name == "Growth"
+        assert product.brand.id == self.brand.id
         assert product.category is not None
         assert product.category.name == "Protein"
         assert product.tags.count() == self.EXPECTED_TAG_COUNT
         assert product.store_links.count() == 1
-        assert product.nutrition_profiles.count() == 1
         listing = product.store_links.first()
         assert listing is not None
         assert listing.offer.price_observations.count() == 1
 
-    def test_execute_creates_combo_component_product_with_rich_payload_when_unmatched(
-        self,
-    ) -> None:
-        """Combo creation should create component products with the submitted data."""
-        product = self.service.execute(
-            ProductCreateInput(
-                name="Combo Pré + Creatina",
-                weight=1300,
-                brand_name="Growth",
-                packaging=Product.Packaging.CONTAINER,
-                is_combo=True,
-                components=[
-                    ComboComponentInput(
-                        name="Pré-treino",
-                        weight=self.COMPONENT_WEIGHT,
-                        brand_name="Growth",
-                        category_name=["Energy", "Pre-Workout"],
-                        ean="7891000000001",
-                        description="Pré-treino do combo",
-                        packaging=Product.Packaging.CONTAINER,
-                        stores=[
-                            StoreListingPayload(
-                                store_name="Growth",
-                                external_id="pre-300",
-                                product_link="https://growth.example/pre-300",
-                                price=79.90,
-                            ),
-                        ],
-                        quantity=1,
-                    ),
-                    ComboComponentInput(
-                        name="Creatina",
-                        weight=self.COMPONENT_WEIGHT,
-                        category_name=["Energy", "Creatine"],
-                        description="Creatina do combo",
-                        packaging=Product.Packaging.REFILL,
-                        quantity=1,
-                    ),
-                ],
-            ),
-        )
-        assert product.type == Product.Type.COMBO
-        component_links = list(
-            ProductComponent.objects.filter(parent=product).select_related("component"),
-        )
-        assert len(component_links) == self.EXPECTED_COMPONENT_COUNT
-
-        first_component = component_links[0].component
-        second_component = component_links[1].component
-
-        assert first_component.name == "Pré-treino"
-        assert first_component.weight == self.COMPONENT_WEIGHT
-        assert first_component.ean == "7891000000001"
-        assert first_component.packaging == Product.Packaging.CONTAINER
-        assert first_component.category is not None
-        assert first_component.category.name == "Pre-Workout"
-        assert first_component.store_links.count() == 1
-        assert first_component.is_published is False
-
-        assert second_component.name == "Creatina"
-        assert second_component.weight == self.COMPONENT_WEIGHT
-        assert second_component.packaging == Product.Packaging.REFILL
-        assert second_component.is_published is False
-
-    def test_execute_sums_duplicate_combo_component_quantities(self) -> None:
-        """Duplicate component inputs should produce one link with summed quantity."""
-        product = self.service.execute(
-            ProductCreateInput(
-                name="Combo Creatina",
-                weight=600,
-                brand_name="Growth",
-                is_combo=True,
-                components=[
-                    ComboComponentInput(
-                        name="Creatina",
-                        weight=self.COMPONENT_WEIGHT,
-                        brand_name="Growth",
-                        ean="7891000000002",
-                        quantity=1,
-                    ),
-                    ComboComponentInput(
-                        name="Creatina",
-                        weight=self.COMPONENT_WEIGHT,
-                        brand_name="Growth",
-                        ean="7891000000002",
-                        quantity=2,
-                    ),
-                ],
-            ),
-        )
-
-        link = product.component_links.get()
-        assert link.quantity == self.EXPECTED_DEDUPED_COMPONENT_QUANTITY
-
-    def test_combo_resolution_rejects_simple_parent(self) -> None:
-        """Component links should only be managed for combo products."""
-        brand = Brand.objects.create(name="simple-brand", display_name="Simple Brand")
-        product = Product.objects.create(
-            name="Simple Product",
-            brand=brand,
-            packaging=Product.Packaging.CONTAINER,
-        )
-
-        raised_validation_error = False
+    def test_execute_rejects_unknown_brand(self) -> None:
+        """Product creation should fail when the brand ID does not exist."""
+        validation_error = None
         try:
-            ComboResolutionService().resolve_combo_components(
-                product,
-                [
-                    ComboComponentInput(
-                        name="Creatina",
-                        brand_name="Growth",
-                    ),
-                ],
+            self.service.execute(
+                ProductCreateInput(
+                    name="Whey",
+                    weight=900,
+                    brand_id=99999,
+                ),
             )
-        except ValidationError:
-            raised_validation_error = True
+        except ValidationError as error:
+            validation_error = error
 
-        assert raised_validation_error
+        assert validation_error is not None
+        assert "brand_id" in validation_error.message_dict
 
     def test_execute_rejects_duplicate_ean(self) -> None:
         """Product creation should reject duplicate EAN values."""
-        Brand.objects.create(name="existing-brand", display_name="Existing Brand")
         Product.objects.create(
             name="Existing Whey",
-            brand=Brand.objects.get(name="existing-brand"),
+            brand=self.brand,
             weight=900,
             ean="1234567890123",
             packaging=Product.Packaging.CONTAINER,
         )
 
-        raised_validation_error = False
-
+        validation_error = None
         try:
             self.service.execute(
                 ProductCreateInput(
                     name="Another Whey",
                     weight=900,
-                    brand_name="Growth",
+                    brand_id=self.brand.id,
                     ean="1234567890123",
                 ),
             )
-        except ValidationError:
-            raised_validation_error = True
+        except ValidationError as error:
+            validation_error = error
 
-        assert raised_validation_error
+        assert validation_error is not None
+        assert "ean" in validation_error.message_dict
 
 
 class ProductMetadataUpdateServiceTests(TestCase):
     """Essential coverage for product metadata updates."""
 
     EXPECTED_TAG_COUNT = 2
+    UPDATED_WEIGHT = 450
 
     def setUp(self) -> None:
         """Create a baseline product for metadata update tests."""
@@ -507,14 +389,21 @@ class ProductMetadataUpdateServiceTests(TestCase):
         self,
     ) -> None:
         """Metadata updates should apply resolved taxonomy."""
+        supplements = Category.add_root(name="Supplements")
+        protein = supplements.add_child(name="Protein")
+        goal = Tag.add_root(name="Goal")
+        muscle = goal.add_child(name="Muscle")
+        type_tag = Tag.add_root(name="Type")
+        whey_tag = type_tag.add_child(name="Whey")
+
         updated_product = self.service.execute(
             product_id=self.product.id,
             data=ProductMetadataUpdateInput(
                 name="New Whey",
                 description="New description",
                 packaging=Product.Packaging.REFILL,
-                category_name=["Supplements", "Protein"],
-                tags=[["Goal", "Muscle"], ["Type", "Whey"]],
+                category_id=protein.id,
+                tag_ids=[muscle.id, whey_tag.id],
             ),
         )
 
@@ -526,15 +415,33 @@ class ProductMetadataUpdateServiceTests(TestCase):
         assert updated_product.category.name == "Protein"
         assert updated_product.tags.count() == self.EXPECTED_TAG_COUNT
 
-    def test_execute_can_clear_category_when_empty_string_is_provided(self) -> None:
-        """Empty-string category updates should remove the current category."""
+    def test_execute_updates_brand_weight_and_ean(self) -> None:
+        """Manager-facing product edits should persist core product identity fields."""
+        new_brand = Brand.objects.create(name="dux", display_name="Dux")
+
+        updated_product = self.service.execute(
+            product_id=self.product.id,
+            data=ProductMetadataUpdateInput(
+                brand_id=new_brand.id,
+                weight=self.UPDATED_WEIGHT,
+                ean="7891234567890",
+            ),
+        )
+
+        updated_product.refresh_from_db()
+        assert updated_product.brand == new_brand
+        assert updated_product.weight == self.UPDATED_WEIGHT
+        assert updated_product.ean == "7891234567890"
+
+    def test_execute_can_clear_category(self) -> None:
+        """Passing category_id=None explicitly should remove the current category."""
         category = Category.add_root(name="Supplements")
         self.product.category = category
         self.product.save()
 
         updated_product = self.service.execute(
             product_id=self.product.id,
-            data=ProductMetadataUpdateInput(category_name=""),
+            data=ProductMetadataUpdateInput(category_id=None),
         )
 
         assert updated_product.category is None
@@ -552,99 +459,16 @@ class ProductMetadataUpdateServiceTests(TestCase):
         assert updated_product.is_published is True
 
 
-class ProductNutritionServiceTests(TestCase):
-    """Essential coverage for admin-facing nutrition selection workflow."""
+class NutritionFactsAdminTests(TestCase):
+    """Coverage for manager-facing nutrition admin behavior."""
 
-    REPEATED_PAYLOAD_COUNT = 2
+    def test_nutrition_facts_can_be_deleted_from_admin(self) -> None:
+        """Nutrition tables are normal manager-owned catalog records."""
+        nutrition_admin = NutritionFactsAdmin(NutritionFacts, django_admin.site)
+        request = RequestFactory().get("/admin/core/nutritionfacts/")
+        request.user = Mock(has_perm=Mock(return_value=True))
 
-    def setUp(self) -> None:
-        """Create a product and reusable nutrition facts."""
-        self.service = ProductNutritionService()
-        self.brand = Brand.objects.create(name="growth", display_name="Growth")
-        self.product = Product.objects.create(
-            name="Whey",
-            brand=self.brand,
-            weight=900,
-            packaging=Product.Packaging.CONTAINER,
-        )
-        self.existing_facts = NutritionFacts.objects.create(
-            description="Existing table",
-            serving_size_grams=30,
-            energy_kcal=120,
-            proteins=Decimal(24),
-            carbohydrates=Decimal(3),
-            total_fats=Decimal(2),
-        )
-
-    def test_attach_profiles_creates_new_facts_for_repeated_payloads(self) -> None:
-        """Repeated payloads should not be deduplicated by nutrition content."""
-        payload = ProductNutritionPayload(
-            nutrition_facts=NutritionFactsPayload(
-                description="Repeated table",
-                serving_size_grams=30,
-                energy_kcal=120,
-                proteins=24,
-                carbohydrates=3,
-                total_fats=2,
-            ),
-        )
-
-        self.service.attach_profiles(self.product, [payload])
-        self.service.attach_profiles(self.product, [payload])
-
-        assert (
-            NutritionFacts.objects.filter(description="Repeated table").count()
-            == self.REPEATED_PAYLOAD_COUNT
-        )
-        assert self.product.nutrition_profiles.count() == self.REPEATED_PAYLOAD_COUNT
-
-    def test_attach_profiles_truncates_long_facts_description(self) -> None:
-        """Nutrition facts descriptions should fit the model field."""
-        long_description = "x" * 250
-        payload = ProductNutritionPayload(
-            nutrition_facts=NutritionFactsPayload(
-                description=long_description,
-                serving_size_grams=30,
-                energy_kcal=120,
-                proteins=24,
-                carbohydrates=3,
-                total_fats=2,
-            ),
-        )
-
-        self.service.attach_profiles(self.product, [payload])
-
-        facts = self.product.nutrition_profiles.get().nutrition_facts
-        max_length = ProductNutritionService.MAX_FACTS_DESCRIPTION_LENGTH
-        assert len(facts.description) == max_length
-        assert facts.description == long_description[:max_length]
-
-    def test_attach_profiles_normalizes_invalid_micronutrient_unit(self) -> None:
-        """Micronutrient units from model output should fall back to unknown."""
-        payload = ProductNutritionPayload(
-            nutrition_facts=NutritionFactsPayload(
-                description="Micronutrients",
-                serving_size_grams=30,
-                energy_kcal=120,
-                proteins=24,
-                carbohydrates=3,
-                total_fats=2,
-                micronutrients=[
-                    {
-                        "name": "Glicina",
-                        "value": 360,
-                        "unit": "mg,value:360},{name:",
-                    },
-                ],
-            ),
-        )
-
-        self.service.attach_profiles(self.product, [payload])
-
-        micronutrient = (
-            self.product.nutrition_profiles.get().nutrition_facts.micronutrients.get()
-        )
-        assert micronutrient.unit == ProductNutritionService.DEFAULT_MICRONUTRIENT_UNIT
+        assert nutrition_admin.has_delete_permission(request) is True
 
 
 class ProductAdminActionTests(TestCase):
