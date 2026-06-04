@@ -14,19 +14,22 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, NullIf
 
+from offers.models import PriceObservation
+
 from .dtos import CatalogProductsFilters
-from .models import NutritionFacts, Product, ProductPriceHistory
+from .models import NutritionFacts, Product
 
 
-def _latest_price_history_subquery() -> QuerySet[ProductPriceHistory]:
-    """Return the latest price history rows for the outer product.
+def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
+    """Return the latest price observations for the outer product.
 
-    The ordering is stable so every annotated field comes from the same
-    latest history row even when multiple rows share the same timestamp.
+    Prices live on the merchant offers linked to the product's store listings.
+    The ordering is stable so every annotated field comes from the same latest
+    observation even when multiple rows share the same timestamp.
     """
-    return ProductPriceHistory.objects.filter(
-        store_product_link__product=OuterRef("pk"),
-    ).order_by("-collected_at", "-pk")
+    return PriceObservation.objects.filter(
+        offer__product_store__product=OuterRef("pk"),
+    ).order_by("-observed_at", "-pk")
 
 
 def _catalog_nutrition_facts_subquery() -> QuerySet[NutritionFacts]:
@@ -65,7 +68,7 @@ def _catalog_nutrition_facts_subquery() -> QuerySet[NutritionFacts]:
 
 def _annotate_catalog_base_fields(queryset: QuerySet[Product]) -> QuerySet[Product]:
     """Annotate catalog fields loaded directly from subqueries."""
-    latest_prices = _latest_price_history_subquery()
+    latest_prices = _latest_price_observation_subquery()
     nutrition_facts = _catalog_nutrition_facts_subquery()
 
     return queryset.annotate(
@@ -74,7 +77,7 @@ def _annotate_catalog_base_fields(queryset: QuerySet[Product]) -> QuerySet[Produ
             output_field=DecimalField(max_digits=10, decimal_places=2),
         ),
         external_link=Subquery(
-            latest_prices.values("store_product_link__product_link")[:1],
+            latest_prices.values("offer__url")[:1],
             output_field=URLField(),
         ),
         protein_per_serving=Subquery(

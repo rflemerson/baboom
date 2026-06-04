@@ -27,7 +27,6 @@ from .models import (
     Micronutrient,
     NutritionFacts,
     Product,
-    ProductPriceHistory,
     ProductStore,
     Store,
     Tag,
@@ -260,7 +259,7 @@ class ProductAdmin(admin.ModelAdmin):
         )
 
     @admin.action(
-        description="Excluir products selecionados com links e histórico",
+        description="Excluir products selecionados com links",
         permissions=["delete"],
     )
     def delete_products_with_related_data(
@@ -268,19 +267,19 @@ class ProductAdmin(admin.ModelAdmin):
         request: HttpRequest,
         queryset: QuerySet[Product],
     ) -> None:
-        """Delete selected products plus their store links and price history."""
+        """Delete selected products plus their store links.
+
+        Merchant offers and their price observations are intentionally kept:
+        they are raw observations that outlive any single catalog product.
+        """
         products = list(queryset)
         if not products:
             return
 
         product_ids = [product.id for product in products]
         store_links = ProductStore.objects.filter(product_id__in=product_ids)
-        price_history = ProductPriceHistory.objects.filter(
-            store_product_link__in=store_links,
-        )
 
         with transaction.atomic():
-            deleted_price_history_count, _ = price_history.delete()
             deleted_store_link_count, _ = store_links.delete()
             deleted_product_count, _ = Product.objects.filter(
                 id__in=product_ids,
@@ -290,9 +289,8 @@ class ProductAdmin(admin.ModelAdmin):
             request,
             (
                 "Excluded "
-                f"{deleted_product_count} product(s), "
-                f"{deleted_store_link_count} store link(s), and "
-                f"{deleted_price_history_count} price history record(s)."
+                f"{deleted_product_count} product(s) and "
+                f"{deleted_store_link_count} store link(s)."
             ),
             level=messages.SUCCESS,
         )
@@ -351,15 +349,14 @@ class ProductStoreAdmin(admin.ModelAdmin):
     """Technical support admin for product-store links."""
 
     show_facets = admin.ShowFacets.ALWAYS
-    list_display = ("product", "store", "external_id", "get_last_price")
+    list_display = ("product", "store", "get_external_id", "get_last_price")
     list_filter = ("store",)
-    search_fields = ("product__name", "store__name", "external_id")
+    search_fields = ("product__name", "store__name", "offer__external_id")
     autocomplete_fields: ClassVar[list[str]] = ["product", "store"]
     readonly_fields = (
         "product",
         "store",
-        "external_id",
-        "product_link",
+        "offer",
         "affiliate_link",
     )
 
@@ -368,14 +365,21 @@ class ProductStoreAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("product", "store")
-            .prefetch_related("price_history")
+            .select_related("product", "store", "offer")
+            .prefetch_related("offer__price_observations")
         )
+
+    @admin.display(description="Store Product ID")
+    def get_external_id(self, obj: ProductStore) -> str:
+        """Return the merchant identifier from the linked offer."""
+        return obj.external_id or "-"
 
     @admin.display(description="Last Price")
     def get_last_price(self, obj: ProductStore) -> str:
-        """Return formatted last price."""
-        last = obj.price_history.first()
+        """Return formatted last price from the linked offer."""
+        if obj.offer is None:
+            return "-"
+        last = obj.offer.price_observations.first()
         return f"R$ {last.price}" if last else "-"
 
     def has_add_permission(self, _request: HttpRequest) -> bool:
@@ -388,41 +392,6 @@ class ProductStoreAdmin(admin.ModelAdmin):
         _obj: ProductStore | None = None,
     ) -> bool:
         """Disallow direct deletion; use ProductAdmin instead."""
-        return False
-
-
-@admin.register(ProductPriceHistory)
-class ProductPriceHistoryAdmin(admin.ModelAdmin):
-    """Technical read-only admin for price history."""
-
-    list_display = ("store_product_link", "price", "stock_status", "collected_at")
-    list_filter = ("stock_status", "collected_at", "store_product_link__store")
-    autocomplete_fields: ClassVar[list[str]] = ["store_product_link"]
-    readonly_fields: ClassVar[list[str]] = [
-        "store_product_link",
-        "price",
-        "stock_status",
-        "collected_at",
-    ]
-
-    def has_add_permission(self, _request: HttpRequest) -> bool:
-        """Disallow direct creation; history should come from service workflows."""
-        return False
-
-    def has_change_permission(
-        self,
-        _request: HttpRequest,
-        _obj: ProductPriceHistory | None = None,
-    ) -> bool:
-        """Disallow direct editing; price history is append-only support data."""
-        return False
-
-    def has_delete_permission(
-        self,
-        _request: HttpRequest,
-        _obj: ProductPriceHistory | None = None,
-    ) -> bool:
-        """Disallow direct deletion; keep history immutable in the admin."""
         return False
 
 

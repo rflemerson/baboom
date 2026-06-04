@@ -2,36 +2,28 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import secrets
+from typing import ClassVar, TypedDict
 
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from simple_history.models import HistoricalRecords
 from treebeard.mp_tree import MP_Node
+
+from common.models import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class BaseModel(models.Model):
-    """Base abstract model with timestamps."""
+class MicronutrientHashInput(TypedDict):
+    """Micronutrient values included in nutrition content hashes."""
 
-    created_at = models.DateTimeField(
-        _("Created At"),
-        db_index=True,
-        default=timezone.now,
-    )
-    updated_at = models.DateTimeField(
-        _("Updated At"),
-        auto_now=True,
-    )
-
-    class Meta:
-        """Meta options."""
-
-        abstract = True
+    name: str
+    value: float
+    unit: str
 
 
 class Brand(BaseModel):
@@ -105,13 +97,13 @@ class Flavor(BaseModel):
 class Tag(MP_Node, BaseModel):
     """Hierarchical tag model."""
 
-    name: models.CharField = models.CharField(
+    name = models.CharField(
         _("Name"),
         max_length=100,
         unique=True,
         help_text=_("Unique tag name"),
     )
-    description: models.TextField = models.TextField(
+    description = models.TextField(
         _("Description"),
         blank=True,
         help_text=_("Tag description"),
@@ -133,14 +125,14 @@ class Tag(MP_Node, BaseModel):
 class Category(MP_Node, BaseModel):
     """Hierarchical category model."""
 
-    name: models.CharField = models.CharField(
+    name = models.CharField(
         _("Name"),
         max_length=100,
         unique=True,
         help_text=_("Unique category name"),
     )
 
-    description: models.TextField = models.TextField(
+    description = models.TextField(
         _("Description"),
         blank=True,
         help_text=_("Category description"),
@@ -204,7 +196,6 @@ class Product(BaseModel):
         unique=True,
         null=True,
         blank=True,
-        db_index=True,
         help_text=_("European Article Number / Global Trade Item Number"),
     )
 
@@ -223,20 +214,20 @@ class Product(BaseModel):
         verbose_name=_("Product Category"),
     )
 
-    stores: models.ManyToManyField = models.ManyToManyField(
+    stores = models.ManyToManyField(
         Store,
         through="ProductStore",
         verbose_name=_("Available In Stores"),
         blank=True,
     )
 
-    tags: models.ManyToManyField = models.ManyToManyField(
+    tags = models.ManyToManyField(
         Tag,
         verbose_name=_("Product Tags"),
         blank=True,
     )
 
-    components: models.ManyToManyField = models.ManyToManyField(
+    components = models.ManyToManyField(
         "self",
         through="ProductComponent",
         symmetrical=False,
@@ -258,21 +249,12 @@ class Product(BaseModel):
         help_text=_("Timestamp of last content update by LLM agent"),
     )
 
-    history = HistoricalRecords()
-
     class Meta:
         """Meta options."""
 
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ("brand__name", "name")
-
-        constraints = (
-            models.UniqueConstraint(
-                fields=["brand", "name", "weight"],
-                name="unique_product_brand_weight",
-            ),
-        )
 
         indexes = (
             models.Index(fields=["name"]),
@@ -282,7 +264,7 @@ class Product(BaseModel):
     def __str__(self) -> str:
         """Return string representation."""
         weight_display = f"{self.weight}g" if self.weight is not None else "No weight"
-        return f"{self.brand.name} - {self.name} ({weight_display})"
+        return f"{self.brand.display_name} - {self.name} ({weight_display})"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Validate rules on save."""
@@ -300,19 +282,6 @@ class Product(BaseModel):
             if qs.exists():
                 raise ValidationError(
                     {"ean": _("Product with this EAN already exists.")},
-                )
-
-        if self.brand_id and self.name and self.weight:
-            qs = Product.objects.filter(
-                brand_id=self.brand_id,
-                name=self.name,
-                weight=self.weight,
-            )
-            if self.pk:
-                qs = qs.exclude(pk=self.pk)
-            if qs.exists():
-                raise ValidationError(
-                    _("Product with this brand, name, and weight already exists."),
                 )
 
 
@@ -351,7 +320,12 @@ class ProductComponent(BaseModel):
 
 
 class ProductStore(BaseModel):
-    """Link between Product and Store."""
+    """Curated link between a Product and the merchant Offer that fulfils it.
+
+    The store identity and price series live on the linked :class:`offers.Offer`.
+    This model holds only the catalog-side curation: which Store the offer maps
+    to and the affiliate tracking URL.
+    """
 
     product = models.ForeignKey(
         Product,
@@ -366,20 +340,19 @@ class ProductStore(BaseModel):
         verbose_name=_("Associated Store"),
     )
 
-    external_id = models.CharField(
-        _("Store Product ID"),
-        max_length=100,
-        help_text=_("Unique identifier in store system (e.g., SKU)"),
+    offer = models.OneToOneField(
+        "offers.Offer",
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-    )
-
-    product_link = models.URLField(
-        _("Store Product URL"),
-        help_text=_("Direct URL to product page in the store"),
+        verbose_name=_("Merchant Offer"),
+        related_name="product_store",
+        help_text=_("Merchant offer that holds the price series for this listing"),
     )
 
     affiliate_link = models.URLField(
         _("Affiliate Tracking URL"),
+        max_length=500,
         help_text=_("URL with affiliate tracking parameters"),
         blank=True,
         default="",
@@ -397,81 +370,41 @@ class ProductStore(BaseModel):
                 fields=["product", "store"],
                 name="unique_product_store",
             ),
-            models.UniqueConstraint(
-                fields=["store", "external_id"],
-                name="unique_store_external_id",
-                condition=models.Q(external_id__isnull=False)
-                & ~models.Q(external_id=""),
-            ),
         )
 
-        indexes = (
-            models.Index(fields=["external_id"]),
-            models.Index(fields=["store", "product"]),
-        )
+        indexes = (models.Index(fields=["store", "product"]),)
 
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.store.name} -> {self.product.name}"
 
+    @property
+    def external_id(self) -> str:
+        """Return the merchant identifier from the linked offer."""
+        return self.offer.external_id if self.offer else ""
 
-class ProductPriceHistory(models.Model):
-    """Historical price record."""
-
-    class StockStatus(models.TextChoices):
-        """Stock availability status."""
-
-        AVAILABLE = "A", _("Available")
-        LAST_UNITS = "L", _("Last Units")
-        OUT_OF_STOCK = "O", _("Out of Stock")
-
-    store_product_link = models.ForeignKey(
-        ProductStore,
-        on_delete=models.CASCADE,
-        verbose_name=_("Store Product Link"),
-        related_name="price_history",
-    )
-
-    price = models.DecimalField(
-        _("Current Price"),
-        max_digits=10,
-        decimal_places=2,
-    )
-
-    stock_status = models.CharField(
-        _("Inventory Status"),
-        max_length=1,
-        choices=StockStatus.choices,
-        default=StockStatus.AVAILABLE,
-    )
-
-    collected_at = models.DateTimeField(
-        _("Collection Timestamp"),
-        auto_now_add=True,
-    )
-
-    class Meta:
-        """Meta options."""
-
-        ordering = ("-collected_at",)
-        get_latest_by = "collected_at"
-        verbose_name = _("Price Tracking Record")
-        verbose_name_plural = _("Price Tracking Records")
-
-        indexes = (
-            models.Index(fields=["collected_at"]),
-            models.Index(fields=["stock_status"]),
-            models.Index(fields=["store_product_link", "collected_at"]),
-        )
-
-    def __str__(self) -> str:
-        """Return string representation."""
-        collected_at = self.collected_at.strftime("%d/%m %H:%M")
-        return f"{self.store_product_link} | R${self.price} @ {collected_at}"
+    @property
+    def product_link(self) -> str:
+        """Return the store product URL from the linked offer."""
+        return self.offer.url if self.offer else ""
 
 
 class NutritionFacts(BaseModel):
     """Nutritional information model."""
+
+    HASH_FIELDS: ClassVar[tuple[str, ...]] = (
+        "serving_size_grams",
+        "energy_kcal",
+        "proteins",
+        "carbohydrates",
+        "total_sugars",
+        "added_sugars",
+        "total_fats",
+        "saturated_fats",
+        "trans_fats",
+        "dietary_fiber",
+        "sodium",
+    )
 
     description = models.CharField(
         _("Internal Label"),
@@ -532,15 +465,52 @@ class NutritionFacts(BaseModel):
         default=0,
     )
 
+    content_hash = models.CharField(
+        _("Content Hash"),
+        max_length=64,
+        blank=True,
+        db_index=True,
+        help_text=_(
+            "SHA-256 of nutritional values — used to suggest reuse in the admin",
+        ),
+    )
+
     class Meta:
         """Meta options."""
 
         verbose_name = _("Nutrition Facts")
         verbose_name_plural = _("Nutrition Facts")
 
+        constraints = (
+            models.CheckConstraint(
+                condition=models.Q(serving_size_grams__gt=0),
+                name="nutrition_facts_positive_serving_size",
+            ),
+        )
+
+    @classmethod
+    def compute_hash(
+        cls,
+        field_values: dict[str, object],
+        *,
+        micronutrients: list[MicronutrientHashInput] | None = None,
+    ) -> str:
+        """Compute a stable SHA-256 from nutritional field values and micronutrients."""
+        data: dict[str, object] = {
+            field: float(field_values[field]) for field in cls.HASH_FIELDS
+        }
+        data["micronutrients"] = sorted(
+            micronutrients or [],
+            key=lambda micronutrient: micronutrient["name"],
+        )
+        return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.description or 'Generic Nutrition Facts'}"
+        short_hash = self.content_hash[:7] if self.content_hash else "-------"
+        if self.description:
+            return f"{short_hash} — {self.description}"
+        return short_hash
 
 
 class Micronutrient(BaseModel):
@@ -686,4 +656,5 @@ class APIKey(BaseModel):
         """Generate key on save if missing."""
         if not self.key:
             self.key = secrets.token_urlsafe(32)
+            logger.debug("Generated API key for client: %s", self.name)
         super().save(*args, **kwargs)

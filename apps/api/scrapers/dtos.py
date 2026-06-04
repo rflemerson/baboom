@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .models import ScrapedItem
+from offers.models import StockStatus
 
 _PYDANTIC_RUNTIME_TYPES = (decimal.Decimal,)
 
@@ -26,7 +26,7 @@ class ScrapedItemIngestionInput(BaseModel):
     name: str = ""
     price: str | float | decimal.Decimal | None = None
     stock_quantity: int | None = None
-    stock_status: str = ScrapedItem.StockStatus.AVAILABLE
+    stock_status: str = StockStatus.AVAILABLE
     ean: str = ""
     sku: str = ""
     pid: str = ""

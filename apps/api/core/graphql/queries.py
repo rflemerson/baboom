@@ -30,7 +30,7 @@ def _product_detail_queryset() -> QuerySet[Product]:
     return Product.objects.select_related("brand", "category").prefetch_related(
         "tags",
         "store_links__store",
-        "store_links__price_history",
+        "store_links__offer__price_observations",
         "nutrition_profiles__nutrition_facts__micronutrients",
         "nutrition_profiles__flavors",
     )

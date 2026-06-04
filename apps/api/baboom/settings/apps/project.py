@@ -1,14 +1,10 @@
 """Project-specific Django settings for installed apps and templates."""
 
-from baboom.settings.base import INSTALLED_APPS, MIDDLEWARE
+from baboom.settings.base import INSTALLED_APPS
 from baboom.settings.env import BASE_DIR
 
 # Project apps
-INSTALLED_APPS += ["core", "scrapers"]
-
-# Simple History
-INSTALLED_APPS += ["simple_history"]
-MIDDLEWARE += ["simple_history.middleware.HistoryRequestMiddleware"]
+INSTALLED_APPS += ["common", "offers", "core", "scrapers"]
 
 # Treebeard
 INSTALLED_APPS += ["treebeard"]

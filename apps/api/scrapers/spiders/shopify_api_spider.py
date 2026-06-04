@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 
+from offers.models import StockStatus
+
 from ..dtos import ScrapedItemIngestionInput
-from ..models import ScrapedItem
 from ..services import ScraperService
 from .catalog_api_spider import CatalogApiSpider
 from .common import parse_positive_price, persist_json_context
@@ -270,9 +271,7 @@ class ShopifyApiSpider(CatalogApiSpider):
                 stock_quantity = None
 
             stock_status = (
-                ScrapedItem.StockStatus.AVAILABLE
-                if is_available
-                else ScrapedItem.StockStatus.OUT_OF_STOCK
+                StockStatus.AVAILABLE if is_available else StockStatus.OUT_OF_STOCK
             )
             if not is_available:
                 stock_quantity = 0

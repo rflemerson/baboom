@@ -10,6 +10,7 @@ from unittest.mock import Mock
 
 from django.contrib import admin as django_admin
 from django.core.exceptions import ValidationError
+from django.forms.models import inlineformset_factory
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from strawberry.django.views import GraphQLView
@@ -25,6 +26,7 @@ from core.dtos import (
     ProductNutritionPayload,
     StoreListingPayload,
 )
+from core.forms import ProductStoreInlineForm, ProductStoreInlineFormSet
 from core.models import (
     AlertSubscriber,
     APIKey,
@@ -34,7 +36,6 @@ from core.models import (
     Product,
     ProductComponent,
     ProductNutrition,
-    ProductPriceHistory,
     ProductStore,
     Store,
 )
@@ -45,10 +46,72 @@ from core.services import (
     ProductNutritionService,
     ProductStoreService,
 )
+from offers.models import Offer, PriceObservation, StockStatus
 from scrapers.models import ScrapedItem, ScrapedPage
 
 if TYPE_CHECKING:
     from django.http import HttpResponse
+
+
+def _link_offer(
+    **kwargs: object,
+) -> ProductStore:
+    """Create an offer-backed store listing for tests.
+
+    Mirrors the production model: the price series lives on the merchant offer,
+    while ``ProductStore`` only links the product to that offer.
+    """
+    product = cast("Product", kwargs["product"])
+    store = cast("Store", kwargs["store"])
+    external_id = cast("str | None", kwargs.get("external_id"))
+    product_link = cast("str", kwargs.get("product_link", ""))
+    price = cast("float | Decimal | None", kwargs.get("price"))
+    stock_status = cast("str", kwargs.get("stock_status", StockStatus.AVAILABLE))
+    resolved_external_id = (
+        external_id if external_id is not None else f"{store.name}-{product.pk}"
+    )
+    resolved_price = Decimal(str(price)) if price is not None else None
+    offer = Offer.objects.create(
+        store_slug=store.name,
+        external_id=resolved_external_id,
+        url=product_link,
+        current_price=resolved_price,
+        current_stock_status=stock_status,
+    )
+    if resolved_price is not None:
+        PriceObservation.objects.create(
+            offer=offer,
+            price=resolved_price,
+            stock_status=stock_status,
+        )
+    return ProductStore.objects.create(product=product, store=store, offer=offer)
+
+
+def _scraped_item(
+    **kwargs: object,
+) -> ScrapedItem:
+    """Create a pipeline scraped item backed by a merchant offer for tests."""
+    store_slug = cast("str", kwargs["store_slug"])
+    external_id = cast("str", kwargs["external_id"])
+    name = cast("str", kwargs.get("name", ""))
+    price = cast("float | Decimal | None", kwargs.get("price"))
+    stock_status = cast("str", kwargs.get("stock_status", StockStatus.AVAILABLE))
+    source_page = cast("ScrapedPage | None", kwargs.get("source_page"))
+    status = cast("str", kwargs.get("status", ScrapedItem.Status.NEW))
+    resolved_price = Decimal(str(price)) if price is not None else None
+    offer = Offer.objects.create(
+        store_slug=store_slug,
+        external_id=external_id,
+        name=name,
+        url=source_page.url if source_page else "",
+        current_price=resolved_price,
+        current_stock_status=stock_status,
+    )
+    return ScrapedItem.objects.create(
+        offer=offer,
+        source_page=source_page,
+        status=status,
+    )
 
 
 class CatalogAnnotatedProduct(Protocol):
@@ -84,17 +147,12 @@ class ProductStoreServiceTests(TestCase):
         self,
     ) -> None:
         """Existing listings should keep identity while mutable fields are updated."""
-        original_listing = ProductStore.objects.create(
+        original_listing = _link_offer(
             product=self.product,
             store=self.store,
             external_id="sku-1",
             product_link="https://growth.example/old",
-            affiliate_link="https://aff.example/old",
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=original_listing,
-            price="99.90",
-            stock_status=ProductPriceHistory.StockStatus.AVAILABLE,
+            price=99.90,
         )
 
         self.service.replace_listings(
@@ -106,7 +164,7 @@ class ProductStoreServiceTests(TestCase):
                     product_link="https://growth.example/new",
                     affiliate_link="https://aff.example/new",
                     price=99.90,
-                    stock_status=ProductPriceHistory.StockStatus.AVAILABLE,
+                    stock_status=StockStatus.AVAILABLE,
                 ),
             ],
         )
@@ -119,22 +177,56 @@ class ProductStoreServiceTests(TestCase):
         assert updated_listing.external_id == "sku-2"
         assert updated_listing.product_link == "https://growth.example/new"
         assert updated_listing.affiliate_link == "https://aff.example/new"
-        assert updated_listing.price_history.count() == 1
+        assert updated_listing.offer.price_observations.count() == 1
+
+    def test_store_inline_requires_external_id_for_listing_rows(self) -> None:
+        """Manual listings need a stable merchant id before creating an offer."""
+        formset_class = inlineformset_factory(
+            Product,
+            ProductStore,
+            form=ProductStoreInlineForm,
+            formset=ProductStoreInlineFormSet,
+            fields=(
+                "store",
+                "external_id",
+                "product_link",
+                "affiliate_link",
+                "price",
+                "stock_status",
+            ),
+            extra=1,
+            can_delete=True,
+        )
+        formset = formset_class(
+            data={
+                "store_links-TOTAL_FORMS": "1",
+                "store_links-INITIAL_FORMS": "0",
+                "store_links-MIN_NUM_FORMS": "0",
+                "store_links-MAX_NUM_FORMS": "1000",
+                "store_links-0-store": str(self.store.id),
+                "store_links-0-external_id": "",
+                "store_links-0-product_link": "https://growth.example/item",
+                "store_links-0-affiliate_link": "",
+                "store_links-0-price": "99.90",
+                "store_links-0-stock_status": StockStatus.AVAILABLE,
+            },
+            instance=self.product,
+            prefix="store_links",
+        )
+
+        assert not formset.is_valid()
+        assert "store product ID" in str(formset.non_form_errors())
 
     def test_replace_listings_adds_history_only_when_price_or_stock_changes(
         self,
     ) -> None:
-        """A new price history row should be appended only for meaningful changes."""
-        listing = ProductStore.objects.create(
+        """A new price observation should be appended only for meaningful changes."""
+        listing = _link_offer(
             product=self.product,
             store=self.store,
             external_id="sku-1",
             product_link="https://growth.example/item",
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=listing,
-            price="99.90",
-            stock_status=ProductPriceHistory.StockStatus.AVAILABLE,
+            price=99.90,
         )
 
         self.service.replace_listings(
@@ -145,41 +237,34 @@ class ProductStoreServiceTests(TestCase):
                     external_id="sku-1",
                     product_link="https://growth.example/item",
                     price=109.90,
-                    stock_status=ProductPriceHistory.StockStatus.LAST_UNITS,
+                    stock_status=StockStatus.LAST_UNITS,
                 ),
             ],
         )
 
         listing.refresh_from_db()
-        latest_history = listing.price_history.first()
-        assert listing.price_history.count() == self.UPDATED_HISTORY_COUNT
+        observations = listing.offer.price_observations
+        latest_history = observations.first()
+        assert observations.count() == self.UPDATED_HISTORY_COUNT
         assert latest_history is not None
         assert latest_history.price == self.UPDATED_PRICE
-        assert latest_history.stock_status == ProductPriceHistory.StockStatus.LAST_UNITS
+        assert latest_history.stock_status == StockStatus.LAST_UNITS
 
     def test_replace_listings_deletes_removed_store_links(self) -> None:
         """Listings omitted from the desired state should be removed."""
-        retained_listing = ProductStore.objects.create(
+        retained_listing = _link_offer(
             product=self.product,
             store=self.store,
             external_id="growth-1",
             product_link="https://growth.example/item",
+            price=99.90,
         )
-        removed_listing = ProductStore.objects.create(
+        removed_listing = _link_offer(
             product=self.product,
             store=self.other_store,
             external_id="dux-1",
             product_link="https://dux.example/item",
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=retained_listing,
-            price="99.90",
-            stock_status=ProductPriceHistory.StockStatus.AVAILABLE,
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=removed_listing,
-            price="89.90",
-            stock_status=ProductPriceHistory.StockStatus.AVAILABLE,
+            price=89.90,
         )
 
         self.service.replace_listings(
@@ -276,7 +361,7 @@ class ProductCreateServiceTests(TestCase):
 
         product.refresh_from_db()
         assert product.type == Product.Type.SIMPLE
-        assert product.brand.name == "Growth"
+        assert product.brand.display_name == "Growth"
         assert product.category is not None
         assert product.category.name == "Protein"
         assert product.tags.count() == self.EXPECTED_TAG_COUNT
@@ -284,7 +369,7 @@ class ProductCreateServiceTests(TestCase):
         assert product.nutrition_profiles.count() == 1
         listing = product.store_links.first()
         assert listing is not None
-        assert listing.price_history.count() == 1
+        assert listing.offer.price_observations.count() == 1
 
     def test_execute_creates_combo_component_product_with_rich_payload_when_unmatched(
         self,
@@ -383,12 +468,11 @@ class ProductCreateServiceTests(TestCase):
             store_slug="growth",
             url="https://growth.example/whey",
         )
-        origin_item = ScrapedItem.objects.create(
+        origin_item = _scraped_item(
             store_slug="growth",
             external_id="growth-origin-900",
             name="Whey Isolate",
             price=Decimal("149.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
             source_page=page,
         )
 
@@ -412,7 +496,7 @@ class ProductCreateServiceTests(TestCase):
         origin_item.refresh_from_db()
         listing = product.store_links.get(store=self.store)
 
-        assert origin_item.product_store_id == listing.id
+        assert listing is not None
         assert origin_item.status == ScrapedItem.Status.LINKED
 
     def test_execute_reuses_existing_origin_listing_on_retry(self) -> None:
@@ -424,18 +508,18 @@ class ProductCreateServiceTests(TestCase):
             brand=brand,
             ean="7890000000001",
         )
-        existing_listing = ProductStore.objects.create(
+        existing_listing = _link_offer(
             product=existing_product,
             store=self.store,
             external_id="growth-900",
             product_link="https://growth.example/whey",
+            price=149.90,
         )
-        origin_item = ScrapedItem.objects.create(
+        origin_item = _scraped_item(
             store_slug="growth",
             external_id="growth-origin-900",
             name="Whey Isolate",
             price=Decimal("149.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
         )
 
         product = self.service.execute(
@@ -460,15 +544,16 @@ class ProductCreateServiceTests(TestCase):
 
         assert product.id == existing_product.id
         assert Product.objects.count() == 1
-        assert origin_item.product_store_id == existing_listing.id
+        assert existing_listing.pk is not None
         assert origin_item.status == ScrapedItem.Status.LINKED
 
     def test_execute_rejects_origin_link_without_matching_store_listing(self) -> None:
         """Origin links should fail when no target listing can be resolved."""
-        origin_item = ScrapedItem.objects.create(
+        origin_item = _scraped_item(
             store_slug="growth",
             external_id="growth-origin-900",
             name="Whey Isolate",
+            price=Decimal("149.90"),
         )
 
         raised_validation_error = False
@@ -670,7 +755,7 @@ class ProductNutritionServiceTests(TestCase):
 
         self.service.attach_profiles(self.product, [payload])
 
-        facts = NutritionFacts.objects.get()
+        facts = self.product.nutrition_profiles.get().nutrition_facts
         max_length = ProductNutritionService.MAX_FACTS_DESCRIPTION_LENGTH
         assert len(facts.description) == max_length
         assert facts.description == long_description[:max_length]
@@ -719,19 +804,17 @@ class ProductAdminActionTests(TestCase):
             weight=900,
             packaging=Product.Packaging.REFILL,
         )
-        self.store_link = ProductStore.objects.create(
+        self.store_link = _link_offer(
             product=self.product,
             store=self.store,
             external_id="568",
             product_link="https://example.com/whey",
+            price=72.90,
         )
-        self.price_history = ProductPriceHistory.objects.create(
-            store_product_link=self.store_link,
-            price=Decimal("72.90"),
-        )
+        self.offer = self.store_link.offer
 
     def test_delete_products_with_related_data_removes_related_records(self) -> None:
-        """Admin action should remove related price history and store links."""
+        """Admin action should remove store links while keeping offer observations."""
         request = self.factory.post("/admin/core/product/")
 
         self.admin.delete_products_with_related_data(
@@ -741,7 +824,9 @@ class ProductAdminActionTests(TestCase):
 
         assert Product.objects.filter(id=self.product.id).count() == 0
         assert ProductStore.objects.filter(id=self.store_link.id).count() == 0
-        assert ProductPriceHistory.objects.filter(id=self.price_history.id).count() == 0
+        # Offers and their observations outlive the catalog product.
+        assert Offer.objects.filter(id=self.offer.id).count() == 1
+        assert PriceObservation.objects.filter(offer=self.offer).count() == 1
         self.admin.message_user.assert_called_once()
 
 
@@ -772,14 +857,11 @@ class ProductStatsTest(TestCase):
             nutrition_facts=self.nutrition,
         )
 
-        self.link = ProductStore.objects.create(
+        self.link = _link_offer(
             product=self.product,
             store=self.store,
             product_link="https://example.com",
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=self.link,
-            price=Decimal("100.00"),
+            price=100.00,
         )
 
     def test_protein_calculations(self) -> None:
@@ -820,29 +902,24 @@ class ProductStatsTest(TestCase):
     def test_latest_price_and_external_link_use_same_history_row_on_timestamp_tie(
         self,
     ) -> None:
-        """Latest price annotations should stay consistent under collected_at ties."""
+        """Latest price annotations should stay consistent under observed_at ties."""
         second_store = Store.objects.create(
             name="Second Store",
             display_name="Second Store",
         )
-        second_link = ProductStore.objects.create(
+        second_link = _link_offer(
             product=self.product,
             store=second_store,
             product_link="https://example.com/second",
+            price=150.00,
         )
 
-        first_history = ProductPriceHistory.objects.create(
-            store_product_link=self.link,
-            price=Decimal("100.00"),
-        )
-        second_history = ProductPriceHistory.objects.create(
-            store_product_link=second_link,
-            price=Decimal("150.00"),
-        )
+        first_history = self.link.offer.price_observations.first()
+        second_history = second_link.offer.price_observations.first()
         tied_timestamp = timezone.now()
-        ProductPriceHistory.objects.filter(
+        PriceObservation.objects.filter(
             id__in=[first_history.id, second_history.id],
-        ).update(collected_at=tied_timestamp)
+        ).update(observed_at=tied_timestamp)
 
         product = cast(
             "CatalogAnnotatedProduct | None",
@@ -901,23 +978,17 @@ class ProductStatsTest(TestCase):
                 nutrition_facts=self.nutrition,
             )
 
-        alpha_store = ProductStore.objects.create(
+        _link_offer(
             product=alpha,
             store=self.store,
             product_link="https://example.com/alpha",
+            price=100.00,
         )
-        beta_store = ProductStore.objects.create(
+        _link_offer(
             product=beta,
             store=self.store,
             product_link="https://example.com/beta",
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=alpha_store,
-            price=Decimal("100.00"),
-        )
-        ProductPriceHistory.objects.create(
-            store_product_link=beta_store,
-            price=Decimal("100.00"),
+            price=100.00,
         )
 
         items = list(
@@ -984,12 +1055,11 @@ class GraphQLProductCreateTests(TestCase):
             store_slug="growth",
             url="https://growth.example/whey",
         )
-        self.origin_item = ScrapedItem.objects.create(
+        self.origin_item = _scraped_item(
             store_slug="growth",
             external_id="growth-origin-900",
             name="Whey Isolate",
             price=Decimal("149.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
             source_page=self.page,
         )
 
@@ -1041,7 +1111,6 @@ class GraphQLProductCreateTests(TestCase):
         self.origin_item.refresh_from_db()
         assert payload["data"]["createProduct"]["errors"] is None
         assert payload["data"]["createProduct"]["product"]["id"] is not None
-        assert self.origin_item.product_store_id is not None
         assert self.origin_item.status == ScrapedItem.Status.LINKED
 
     def test_create_product_reuses_existing_origin_listing_on_retry(self) -> None:
@@ -1054,11 +1123,12 @@ class GraphQLProductCreateTests(TestCase):
             brand=brand,
             ean="7890000000001",
         )
-        existing_listing = ProductStore.objects.create(
+        existing_listing = _link_offer(
             product=existing_product,
             store=store,
             external_id="growth-900",
             product_link="https://growth.example/whey",
+            price=149.90,
         )
         mutation = """
         mutation CreateProduct($data: ProductInput!) {
@@ -1104,7 +1174,7 @@ class GraphQLProductCreateTests(TestCase):
 
         assert payload["data"]["createProduct"]["errors"] is None
         assert Product.objects.count() == 1
-        assert self.origin_item.product_store_id == existing_listing.id
+        assert existing_listing.pk is not None
         assert self.origin_item.status == ScrapedItem.Status.LINKED
 
     def test_create_product_accepts_rich_combo_component_payload(self) -> None:

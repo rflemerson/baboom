@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from offers.models import StockStatus
+
 from .dtos import (
     NutritionFactsPayload,
     ProductCreateInput,
@@ -12,7 +14,6 @@ from .dtos import (
     StoreListingPayload,
 )
 from .forms import ProductStoreInlineFormSet
-from .models import ProductPriceHistory
 
 if TYPE_CHECKING:
     from django.forms import BaseInlineFormSet
@@ -125,8 +126,7 @@ def build_store_listing_payloads(
                 affiliate_link=cleaned_data.get("affiliate_link") or "",
                 price=float(price),
                 stock_status=(
-                    cleaned_data.get("stock_status")
-                    or ProductPriceHistory.StockStatus.AVAILABLE
+                    cleaned_data.get("stock_status") or StockStatus.AVAILABLE
                 ),
             ),
         )

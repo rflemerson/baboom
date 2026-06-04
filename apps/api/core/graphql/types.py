@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import cast
 
 import strawberry
 from strawberry import auto
@@ -17,11 +18,11 @@ from core.models import (
     NutritionFacts,
     Product,
     ProductNutrition,
-    ProductPriceHistory,
     ProductStore,
     Store,
     Tag,
 )
+from offers.models import PriceObservation
 
 _STRAWBERRY_RUNTIME_TYPES = (Decimal, ValidationError)
 
@@ -109,14 +110,14 @@ class ProductNutritionType:
     flavors: list[FlavorType]
 
 
-@django_type(ProductPriceHistory)
-class ProductPriceHistoryType:
-    """Product Price History GraphQL type."""
+@django_type(PriceObservation)
+class PriceObservationType:
+    """Merchant offer price observation GraphQL type."""
 
     id: auto
     price: auto
     stock_status: auto
-    collected_at: auto
+    observed_at: auto
 
 
 @django_type(ProductStore)
@@ -125,10 +126,27 @@ class ProductStoreType:
 
     id: auto
     store: StoreType
-    external_id: auto
-    product_link: auto
     affiliate_link: auto
-    price_history: list[ProductPriceHistoryType]
+
+    @strawberry.field
+    def external_id(self) -> str:
+        """Return the merchant identifier from the linked offer."""
+        item = cast("ProductStore", self)
+        return item.external_id
+
+    @strawberry.field
+    def product_link(self) -> str:
+        """Return the store product URL from the linked offer."""
+        item = cast("ProductStore", self)
+        return item.product_link
+
+    @strawberry.field
+    def price_history(self) -> list[PriceObservationType]:
+        """Return the price series from the linked merchant offer."""
+        item = cast("ProductStore", self)
+        if item.offer is None:
+            return []
+        return list(item.offer.price_observations.all())
 
 
 @django_type(Product)

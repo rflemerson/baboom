@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
 import extruct
@@ -15,7 +16,8 @@ from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
-from core.models import ProductPriceHistory, ProductStore
+from core.models import ProductStore
+from offers.models import Offer, PriceObservation, StockStatus
 
 from .dtos import AgentExtractionSubmitInput
 from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
@@ -139,7 +141,11 @@ class ScrapedItemErrorService:
 
 
 class ScrapedItemLinkService:
-    """Link a scraped item to an explicitly selected product store listing."""
+    """Mark a scraped item as linked once its offer is claimed by a product.
+
+    The price connection is implicit: the catalog ``ProductStore`` references the
+    same merchant offer as the scraped item, so there is no price to copy here.
+    """
 
     def execute(
         self,
@@ -147,7 +153,7 @@ class ScrapedItemLinkService:
         scraped_item_id: int,
         product_store_id: int,
     ) -> ScrapedItem | None:
-        """Link and sync a scraped item using an explicit target listing."""
+        """Flag the scraped item as linked to its now-cataloged offer."""
         product_store = ProductStore.objects.filter(id=product_store_id).first()
         if product_store is None:
             return None
@@ -156,10 +162,11 @@ class ScrapedItemLinkService:
         if item is None:
             return None
 
-        item.product_store = product_store
+        if product_store.offer_id != item.offer_id:
+            return None
+
         item.status = ScrapedItem.Status.LINKED
-        item.save(update_fields=["product_store", "status"])
-        ScraperService.sync_price_to_core(item)
+        item.save(update_fields=["status", "updated_at"])
         return item
 
 
@@ -200,7 +207,9 @@ class ScrapedItemExtractionSubmitService:
     def _get_item(self, item_id: int) -> ScrapedItem:
         """Return the origin item or raise a GraphQL-friendly validation error."""
         item = (
-            ScrapedItem.objects.select_related("source_page").filter(id=item_id).first()
+            ScrapedItem.objects.select_related("source_page", "offer")
+            .filter(id=item_id)
+            .first()
         )
         if item is None:
             raise DjangoValidationError(
@@ -229,7 +238,7 @@ class ScrapedItemExtractionSubmitService:
         if data.source_page_url:
             page, _ = ScrapedPage.objects.get_or_create(
                 url=data.source_page_url,
-                defaults={"store_slug": data.store_slug or item.store_slug},
+                defaults={"store_slug": data.store_slug or item.offer.store_slug},
             )
             return page
 
@@ -254,8 +263,13 @@ class ScraperService:
 
     @staticmethod
     @transaction.atomic
-    def save_product(data: ScrapedItemIngestionInput) -> ScrapedItem | None:
-        """Create or update a ScrapedItem."""
+    def save_product(data: ScrapedItemIngestionInput) -> ScrapedItem:
+        """Record the merchant offer and ensure its pipeline record exists.
+
+        The offer (identity, price, stock) is upserted on every run; the pipeline
+        record is created once and only touched on status transitions, so the
+        daily scrape no longer churns the scraped-item audit history.
+        """
         page, _ = ScrapedPage.objects.get_or_create(
             url=data.url,
             defaults={"store_slug": data.store_slug},
@@ -264,71 +278,101 @@ class ScraperService:
             page.store_slug = data.store_slug
             page.save(update_fields=["store_slug"])
 
-        obj, created = ScrapedItem.objects.update_or_create(
-            store_slug=data.store_slug,
-            external_id=data.external_id,
-            defaults={
-                "name": data.name,
-                "price": data.price,
-                "stock_quantity": data.stock_quantity,
-                "stock_status": data.stock_status,
-                "ean": data.ean,
-                "sku": data.sku,
-                "pid": data.pid,
-                "category": data.category,
-                "source_page": page,
-            },
+        offer = ScraperService.record_offer_observation(data)
+
+        item, created = ScrapedItem.objects.get_or_create(
+            offer=offer,
+            defaults={"source_page": page},
         )
+        if not created and item.source_page_id != page.id:
+            item.source_page = page
+            item.save(update_fields=["source_page", "updated_at"])
 
         action = "Created" if created else "Updated"
         logger.debug("%s item %s for %s", action, data.external_id, data.store_slug)
 
-        if obj.product_store_id and obj.status == ScrapedItem.Status.LINKED:
-            ScraperService.sync_price_to_core(obj)
-
-        return obj
+        return item
 
     @staticmethod
-    def sync_price_to_core(scraped_item: ScrapedItem) -> bool:
-        """Sync price and stock from a linked scraped item to price history."""
-        if not scraped_item.product_store_id:
-            return False
+    def record_offer_observation(data: ScrapedItemIngestionInput) -> Offer:
+        """Upsert the merchant offer and append a price snapshot when it changes.
 
-        if scraped_item.price is None:
-            return False
+        This is the price source of truth for the pricing domain. It is written
+        from the first time the scraper sees an offer, independent of whether the
+        offer has been linked to a catalog product yet.
+        """
+        price = ScraperService._normalize_price(data.price)
+        stock_status = ScraperService._normalize_stock_status(data.stock_status)
 
-        product_store = scraped_item.product_store
-        if product_store is None:
-            return False
-
-        last_history = product_store.price_history.values(
-            "price",
-            "stock_status",
-        ).first()
-
-        price_changed = (
-            last_history is None or last_history["price"] != scraped_item.price
-        )
-        stock_changed = (
-            last_history is None
-            or last_history["stock_status"] != scraped_item.stock_status
-        )
-
-        if not price_changed and not stock_changed:
-            return False
-
-        ProductPriceHistory.objects.create(
-            store_product_link=product_store,
-            price=scraped_item.price,
-            stock_status=scraped_item.stock_status,
+        offer, _created = Offer.objects.update_or_create(
+            store_slug=data.store_slug,
+            external_id=data.external_id,
+            defaults={
+                "name": data.name,
+                "category": data.category,
+                "url": data.url,
+                "ean": data.ean,
+                "sku": data.sku,
+                "pid": data.pid,
+                "current_price": price,
+                "current_stock_status": stock_status,
+                "current_stock_quantity": data.stock_quantity,
+            },
         )
 
+        if price is None:
+            return offer
+
+        ScraperService._append_price_observation_if_changed(
+            offer=offer,
+            price=price,
+            stock_status=stock_status,
+        )
+        return offer
+
+    @staticmethod
+    def _append_price_observation_if_changed(
+        *,
+        offer: Offer,
+        price: Decimal,
+        stock_status: str,
+    ) -> None:
+        """Append a price observation only when price or stock status changed."""
+        latest = offer.price_observations.values("price", "stock_status").first()
+        if (
+            latest is not None
+            and latest["price"] == price
+            and latest["stock_status"] == stock_status
+        ):
+            return
+
+        PriceObservation.objects.create(
+            offer=offer,
+            price=price,
+            stock_status=stock_status,
+        )
         logger.info(
-            "Synced price for %s: R$%s",
-            scraped_item.store_slug,
-            scraped_item.price,
+            "Recorded price observation for %s: R$%s",
+            offer.store_slug,
+            price,
         )
-        return True
+
+    @staticmethod
+    def _normalize_price(value: str | float | Decimal | None) -> Decimal | None:
+        """Convert a raw scraped price into a Decimal, or None when absent."""
+        if value is None or value == "":
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            logger.warning("Could not parse scraped price value: %r", value)
+            return None
+
+    @staticmethod
+    def _normalize_stock_status(value: str) -> str:
+        """Return a supported stock status, defaulting to available."""
+        valid = {choice for choice, _label in StockStatus.choices}
+        return value if value in valid else StockStatus.AVAILABLE
 
     @staticmethod
     def _normalize_api_context_payload(context_payload: str | dict) -> dict:

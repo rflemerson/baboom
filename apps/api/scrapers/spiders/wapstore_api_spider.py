@@ -6,8 +6,9 @@ import os
 
 import urllib3
 
+from offers.models import StockStatus
+
 from ..dtos import ScrapedItemIngestionInput
-from ..models import ScrapedItem
 from ..services import ScraperService
 from .catalog_api_spider import CatalogApiSpider
 from .common import (
@@ -325,8 +326,8 @@ class WapStoreApiSpider(CatalogApiSpider):
 
     def _resolve_stock_status(self, stock_quantity: int | None) -> str:
         if stock_quantity is None or stock_quantity > 0:
-            return ScrapedItem.StockStatus.AVAILABLE
-        return ScrapedItem.StockStatus.OUT_OF_STOCK
+            return StockStatus.AVAILABLE
+        return StockStatus.OUT_OF_STOCK
 
     def is_valid_category_path(self, path: str) -> bool:
         """Return whether a menu path should be crawled as a category."""

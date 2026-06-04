@@ -6,8 +6,9 @@ import base64
 import json
 import logging
 
+from offers.models import StockStatus
+
 from ..dtos import ScrapedItemIngestionInput
-from ..models import ScrapedItem
 from ..services import ScraperService
 from .catalog_api_spider import CatalogApiSpider
 from .common import (
@@ -269,9 +270,9 @@ class VtexGraphqlSpider(CatalogApiSpider):
 
             stock_quantity = self._parse_stock(comm_offer.get("AvailableQuantity"))
             stock_status = (
-                ScrapedItem.StockStatus.AVAILABLE
+                StockStatus.AVAILABLE
                 if stock_quantity is None or stock_quantity > 0
-                else ScrapedItem.StockStatus.OUT_OF_STOCK
+                else StockStatus.OUT_OF_STOCK
             )
 
             if not is_http_url(url):

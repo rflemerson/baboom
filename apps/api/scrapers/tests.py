@@ -13,7 +13,8 @@ from django.test import RequestFactory, SimpleTestCase, TestCase
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
-from core.models import APIKey, Brand, Product, ProductPriceHistory, ProductStore, Store
+from core.models import APIKey, Brand, Product, ProductStore, Store
+from offers.models import Offer, PriceObservation, StockStatus
 from scrapers.admin import queue_for_agents
 from scrapers.approval import ScrapedItemExtractionApproveService
 from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
@@ -21,6 +22,7 @@ from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage, Scr
 from scrapers.services import (
     ScrapedItemCheckoutService,
     ScrapedItemExtractionSubmitService,
+    ScrapedItemLinkService,
     ScraperService,
 )
 from scrapers.spiders.blackskull import BlackSkullSpider
@@ -52,6 +54,33 @@ type ScrapedJsonObject = dict[str, object]
 
 # Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
+
+
+def _scraped_item(
+    **kwargs: object,
+) -> ScrapedItem:
+    """Create a pipeline scraped item backed by a merchant offer for tests."""
+    store_slug = cast("str", kwargs["store_slug"])
+    external_id = cast("str", kwargs["external_id"])
+    name = cast("str", kwargs.get("name", ""))
+    price = cast("Decimal | float | None", kwargs.get("price"))
+    stock_status = cast("str", kwargs.get("stock_status", StockStatus.AVAILABLE))
+    status = cast("str", kwargs.get("status", ScrapedItem.Status.NEW))
+    source_page = cast("ScrapedPage | None", kwargs.get("source_page"))
+    resolved_price = Decimal(str(price)) if price is not None else None
+    offer = Offer.objects.create(
+        store_slug=store_slug,
+        external_id=external_id,
+        name=name,
+        url=source_page.url if source_page else "",
+        current_price=resolved_price,
+        current_stock_status=stock_status,
+    )
+    return ScrapedItem.objects.create(
+        offer=offer,
+        status=status,
+        source_page=source_page,
+    )
 
 
 class ScrapedItemIngestionInputTests(SimpleTestCase):
@@ -147,9 +176,9 @@ class ScraperIntegrationTests(TestCase):
         items = spider.crawl()
 
         assert len(items) > 0, "BlackSkull spider should return items"
-        assert ScrapedItem.objects.filter(store_slug="black_skull").count() > 0
+        assert ScrapedItem.objects.filter(offer__store_slug="black_skull").count() > 0
 
-        first = ScrapedItem.objects.filter(store_slug="black_skull").first()
+        first = ScrapedItem.objects.filter(offer__store_slug="black_skull").first()
         assert first is not None
 
     def test_darklab_spider(self) -> None:
@@ -159,9 +188,9 @@ class ScraperIntegrationTests(TestCase):
         items = spider.crawl()
 
         assert len(items) > 0, "DarkLab spider should return items"
-        assert ScrapedItem.objects.filter(store_slug="dark_lab").count() > 0
+        assert ScrapedItem.objects.filter(offer__store_slug="dark_lab").count() > 0
 
-        first = ScrapedItem.objects.filter(store_slug="dark_lab").first()
+        first = ScrapedItem.objects.filter(offer__store_slug="dark_lab").first()
         assert first is not None
 
     def test_dux_spider(self) -> None:
@@ -171,9 +200,9 @@ class ScraperIntegrationTests(TestCase):
         items = spider.crawl()
 
         assert len(items) > 0, "Dux spider should return items"
-        assert ScrapedItem.objects.filter(store_slug="dux_nutrition").count() > 0
+        assert ScrapedItem.objects.filter(offer__store_slug="dux_nutrition").count() > 0
 
-        first = ScrapedItem.objects.filter(store_slug="dux_nutrition").first()
+        first = ScrapedItem.objects.filter(offer__store_slug="dux_nutrition").first()
         assert first is not None
 
     def test_growth_spider(self) -> None:
@@ -183,109 +212,67 @@ class ScraperIntegrationTests(TestCase):
         items = spider.crawl()
 
         assert len(items) > 0, "Growth spider should return items"
-        assert ScrapedItem.objects.filter(store_slug="growth").count() > 0
+        assert ScrapedItem.objects.filter(offer__store_slug="growth").count() > 0
 
-        first = ScrapedItem.objects.filter(store_slug="growth").first()
+        first = ScrapedItem.objects.filter(offer__store_slug="growth").first()
         assert first is not None
 
 
-class SyncPriceToCoreTests(TestCase):
-    """Unit tests for ScraperService logic (save_product and sync_price_to_core)."""
+class OfferObservationTests(TestCase):
+    """Tests for recording offers and price observations from scraped data."""
 
-    def setUp(self) -> None:
-        """Set up test data."""
-        self.brand = Brand.objects.create(name="test_brand", display_name="Test Brand")
-        self.store = Store.objects.create(name="test_store", display_name="Test Store")
-        self.product = Product.objects.create(
-            name="Test Whey",
-            brand=self.brand,
-            weight=900,
-        )
-        self.product_store = ProductStore.objects.create(
-            product=self.product,
-            store=self.store,
-            external_id="TEST123",
-            product_link="https://test.com/product",
-        )
+    def _ingest(self, **overrides: object) -> ScrapedItemIngestionInput:
+        """Build a scraped-item ingestion payload with sensible defaults."""
+        defaults: dict[str, object] = {
+            "store_slug": "test_store",
+            "external_id": "TEST123",
+            "name": "Test Whey 900g",
+            "price": Decimal("199.90"),
+            "stock_status": "A",
+        }
+        defaults.update(overrides)
+        return ScrapedItemIngestionInput(**defaults)
 
-    def test_save_product_creates_price_history_for_linked_item(self) -> None:
-        """Test that saving a product creates a price history record."""
-        ScrapedItem.objects.create(
-            store_slug="test_store",
-            external_id="TEST123",
-            status=ScrapedItem.Status.LINKED,
-            product_store=self.product_store,
-            price=Decimal("100.00"),
-        )
+    def test_save_product_records_offer_and_observation_without_link(self) -> None:
+        """An offer and its first price are recorded even with no catalog link."""
+        ScraperService.save_product(self._ingest())
 
-        input_data = ScrapedItemIngestionInput(
-            store_slug="test_store",
-            external_id="TEST123",
-            price=Decimal("199.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
-        )
-        ScraperService.save_product(input_data)
+        offer = Offer.objects.get(store_slug="test_store", external_id="TEST123")
+        assert offer.current_price == Decimal("199.90")
+        assert offer.name == "Test Whey 900g"
+        assert offer.price_observations.count() == 1
+        # The pipeline record is created and bound to the offer.
+        assert ScrapedItem.objects.filter(offer=offer).count() == 1
 
-        assert ProductPriceHistory.objects.count() == 1
-        price_record = ProductPriceHistory.objects.first()
+    def test_repeated_same_price_does_not_duplicate_observation(self) -> None:
+        """Re-seeing the same price keeps a single observation."""
+        ScraperService.save_product(self._ingest())
+        ScraperService.save_product(self._ingest())
 
-        # Ensure not None for MyPy
-        if price_record is None:
-            self.fail("Price history record should be created but was None")
-        assert price_record.price == Decimal("199.90")
+        offer = Offer.objects.get(store_slug="test_store", external_id="TEST123")
+        assert offer.price_observations.count() == 1
 
-    def test_sync_logic_skips_if_price_unchanged(self) -> None:
-        """Test that sync skips if price is unchanged."""
-        ProductPriceHistory.objects.create(
-            store_product_link=self.product_store,
-            price=Decimal("199.90"),
-            stock_status="A",
-        )
+    def test_price_change_appends_new_observation(self) -> None:
+        """A changed price appends a second observation to the series."""
+        ScraperService.save_product(self._ingest())
+        ScraperService.save_product(self._ingest(price=Decimal("179.90")))
 
-        item = ScrapedItem.objects.create(
-            store_slug="test_store",
-            external_id="TEST123",
-            price=Decimal("199.90"),
-            stock_status="A",
-            status=ScrapedItem.Status.LINKED,
-            product_store=self.product_store,
-        )
-
-        result = ScraperService.sync_price_to_core(item)
-
-        assert not result
-        assert ProductPriceHistory.objects.count() == 1
-
-    def test_sync_logic_creates_new_record_on_price_change(self) -> None:
-        """Test that sync creates a new record on price change."""
-        item = ScrapedItem.objects.create(
-            store_slug="test_store",
-            external_id="TEST123",
-            price=Decimal("199.90"),
-            stock_status="A",
-            status=ScrapedItem.Status.LINKED,
-            product_store=self.product_store,
-        )
-
-        ScraperService.sync_price_to_core(item)
-        assert ProductPriceHistory.objects.count() == 1
-
-        item.price = Decimal("179.90")
-        item.save()
-
-        ScraperService.sync_price_to_core(item)
-
+        offer = Offer.objects.get(store_slug="test_store", external_id="TEST123")
         assert (
-            ProductPriceHistory.objects.count()
+            offer.price_observations.count()
             == EXPECTED_PRICE_HISTORY_RECORDS_AFTER_UPDATE
         )
-
-        try:
-            latest = ProductPriceHistory.objects.latest("collected_at")
-        except ProductPriceHistory.DoesNotExist:
-            self.fail("Latest history not found")
-
+        assert offer.current_price == Decimal("179.90")
+        latest = PriceObservation.objects.filter(offer=offer).latest("observed_at")
         assert latest.price == Decimal("179.90")
+
+    def test_missing_price_records_offer_without_observation(self) -> None:
+        """An offer with no price is still tracked, but logs no observation."""
+        ScraperService.save_product(self._ingest(price=None))
+
+        offer = Offer.objects.get(store_slug="test_store", external_id="TEST123")
+        assert offer.current_price is None
+        assert offer.price_observations.count() == 0
 
 
 class ScrapedItemQueueTests(TestCase):
@@ -301,7 +288,7 @@ class ScrapedItemQueueTests(TestCase):
 
     def test_queue_for_agents_marks_selected_items(self) -> None:
         """Admin action should move selected items into the explicit queue."""
-        item = ScrapedItem.objects.create(
+        item = _scraped_item(
             store_slug="dark_lab",
             external_id="568",
             status=ScrapedItem.Status.NEW,
@@ -318,13 +305,13 @@ class ScrapedItemQueueTests(TestCase):
 
     def test_checkout_only_consumes_queued_items(self) -> None:
         """Checkout should ignore NEW items until they are explicitly queued."""
-        ScrapedItem.objects.create(
+        _scraped_item(
             store_slug="dark_lab",
             external_id="new-item",
             status=ScrapedItem.Status.NEW,
             source_page=self.page,
         )
-        queued_item = ScrapedItem.objects.create(
+        queued_item = _scraped_item(
             store_slug="dark_lab",
             external_id="queued-item",
             status=ScrapedItem.Status.QUEUED,
@@ -341,6 +328,76 @@ class ScrapedItemQueueTests(TestCase):
         assert queued_item.status == ScrapedItem.Status.PROCESSING
 
 
+class ScrapedItemLinkServiceTests(TestCase):
+    """Tests for explicitly linking scraped items to catalog listings."""
+
+    def setUp(self) -> None:
+        """Create shared catalog objects for link tests."""
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/whey",
+        )
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+        self.product = Product.objects.create(
+            name="Whey Concentrado",
+            brand=self.brand,
+            weight=900,
+            packaging=Product.Packaging.CONTAINER,
+        )
+        self.store = Store.objects.create(name="growth", display_name="Growth")
+        self.service = ScrapedItemLinkService()
+
+    def test_execute_links_item_when_listing_claims_same_offer(self) -> None:
+        """The selected listing must point to the scraped item's offer."""
+        item = _scraped_item(
+            store_slug="growth",
+            external_id="growth-1",
+            status=ScrapedItem.Status.REVIEW,
+            source_page=self.page,
+        )
+        listing = ProductStore.objects.create(
+            product=self.product,
+            store=self.store,
+            offer=item.offer,
+        )
+
+        result = self.service.execute(
+            scraped_item_id=item.id,
+            product_store_id=listing.id,
+        )
+
+        assert result is not None
+        item.refresh_from_db()
+        assert item.status == ScrapedItem.Status.LINKED
+
+    def test_execute_rejects_listing_with_different_offer(self) -> None:
+        """A mismatched listing must not mark the scraped item as linked."""
+        item = _scraped_item(
+            store_slug="growth",
+            external_id="growth-1",
+            status=ScrapedItem.Status.REVIEW,
+            source_page=self.page,
+        )
+        other_offer = Offer.objects.create(
+            store_slug="growth",
+            external_id="growth-2",
+        )
+        listing = ProductStore.objects.create(
+            product=self.product,
+            store=self.store,
+            offer=other_offer,
+        )
+
+        result = self.service.execute(
+            scraped_item_id=item.id,
+            product_store_id=listing.id,
+        )
+
+        assert result is None
+        item.refresh_from_db()
+        assert item.status == ScrapedItem.Status.REVIEW
+
+
 class ScrapedItemExtractionSubmitServiceTests(TestCase):
     """Unit tests for staging agent extraction output."""
 
@@ -350,7 +407,7 @@ class ScrapedItemExtractionSubmitServiceTests(TestCase):
             store_slug="growth",
             url="https://growth.example/whey",
         )
-        self.item = ScrapedItem.objects.create(
+        self.item = _scraped_item(
             store_slug="growth",
             external_id="growth-1",
             name="Whey Growth",
@@ -407,7 +464,7 @@ class ScrapedItemExtractionGraphQLTests(TestCase):
             store_slug="growth",
             url="https://growth.example/whey",
         )
-        self.item = ScrapedItem.objects.create(
+        self.item = _scraped_item(
             store_slug="growth",
             external_id="growth-graphql-1",
             name="Whey Growth",
@@ -477,12 +534,11 @@ class ScrapedItemExtractionApproveServiceTests(TestCase):
             store_slug="growth",
             url="https://growth.example/whey",
         )
-        self.item = ScrapedItem.objects.create(
+        self.item = _scraped_item(
             store_slug="growth",
             external_id="growth-approve-1",
             name="Whey Growth",
             price=Decimal("149.90"),
-            stock_status=ScrapedItem.StockStatus.AVAILABLE,
             status=ScrapedItem.Status.REVIEW,
             source_page=self.page,
         )
@@ -527,7 +583,7 @@ class ScrapedItemExtractionApproveServiceTests(TestCase):
         assert product.store_links.count() == 1
         assert product.nutrition_profiles.count() == 1
         assert self.item.status == ScrapedItem.Status.LINKED
-        assert self.item.product_store_id is not None
+        assert product.store_links.get().offer_id == self.item.offer_id
         assert extraction.approved_product == product
         assert extraction.approved_at is not None
 
@@ -898,7 +954,7 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
 
         payload = mock_save.call_args.args[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == ScrapedItem.StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.AVAILABLE
 
 
 class SoldiersSpiderUnitTests(SimpleTestCase):
@@ -984,7 +1040,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
 
         payload = mock_save.call_args.args[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == ScrapedItem.StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.AVAILABLE
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
     def test_process_and_save_persists_shopify_context(
@@ -1074,7 +1130,7 @@ class GrowthSpiderUnitTests(SimpleTestCase):
 
         payload = mock_save.call_args.args[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == ScrapedItem.StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.AVAILABLE
 
     def test_parse_price_supports_currency_formats(self) -> None:
         """Parses price tokens from common API payload formats."""
@@ -1189,7 +1245,7 @@ class VtexSpiderUnitTests(SimpleTestCase):
 
         payload = mock_save.call_args.args[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == ScrapedItem.StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.AVAILABLE
 
     def test_parse_price_supports_common_formats(self) -> None:
         """Parses decimal strings and rejects invalid price."""
@@ -1290,7 +1346,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
 
         payload = mock_save.call_args.args[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == ScrapedItem.StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.AVAILABLE
 
     @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
     def test_process_and_save_persists_structured_context(

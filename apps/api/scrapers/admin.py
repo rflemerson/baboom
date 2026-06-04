@@ -10,7 +10,6 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
-from simple_history.admin import SimpleHistoryAdmin
 
 from .approval import ScrapedItemExtractionApproveService
 from .models import ScrapedItem, ScrapedItemExtraction, ScraperRun
@@ -57,14 +56,15 @@ def create_product_from_scraped_item(
         )
         return None
 
+    offer = item.offer
     params = {
-        "initial_name": item.name,
-        "initial_ean": item.ean,
+        "initial_name": offer.name,
+        "initial_ean": offer.ean,
     }
 
     desc_parts = []
-    if item.store_slug:
-        desc_parts.append(f"Imported from {item.store_slug}")
+    if offer.store_slug:
+        desc_parts.append(f"Imported from {offer.store_slug}")
     if item.source_page:
         desc_parts.append(f"Link: {item.source_page.url}")
 
@@ -146,38 +146,53 @@ def approve_extractions(
 
 
 @admin.register(ScrapedItem)
-class ScrapedItemAdmin(SimpleHistoryAdmin):
+class ScrapedItemAdmin(admin.ModelAdmin):
     """Admin for scraped items."""
 
     list_display = (
         "id",
-        "store_slug",
+        "get_store_slug",
         "name_summary",
         "status",
         "error_count",
-        "stock_status",
+        "get_stock_status",
         "updated_at",
     )
-    list_filter = ("status", "store_slug", "stock_status")
-    search_fields = ("name", "external_id")
+    list_filter = ("status", "offer__store_slug", "offer__current_stock_status")
+    search_fields = ("offer__name", "offer__external_id")
 
     readonly_fields = (
         "created_at",
         "updated_at",
         "last_attempt_at",
         "last_error_log",
-        "product_store",
+        "offer",
     )
 
     actions = (create_product_from_scraped_item, queue_for_agents, reset_to_new)
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ScrapedItem]:
+        """Load the linked offer used across list columns."""
+        return super().get_queryset(request).select_related("offer")
+
+    @admin.display(description="Store", ordering="offer__store_slug")
+    def get_store_slug(self, obj: ScrapedItem) -> str:
+        """Return the store slug from the linked offer."""
+        return obj.offer.store_slug
+
+    @admin.display(description="Stock", ordering="offer__current_stock_status")
+    def get_stock_status(self, obj: ScrapedItem) -> str:
+        """Return the stock status from the linked offer."""
+        return obj.offer.get_current_stock_status_display()
+
     @admin.display(description="Name")
     def name_summary(self, obj: ScrapedItem) -> str:
-        """Truncate name for display."""
+        """Truncate the offer name for display."""
+        name = obj.offer.name
         return (
-            obj.name[:NAME_SUMMARY_MAX_LENGTH] + "..."
-            if obj.name and len(obj.name) > NAME_SUMMARY_MAX_LENGTH
-            else obj.name
+            name[:NAME_SUMMARY_MAX_LENGTH] + "..."
+            if name and len(name) > NAME_SUMMARY_MAX_LENGTH
+            else name
         )
 
 
@@ -235,10 +250,10 @@ class ScrapedItemExtractionAdmin(admin.ModelAdmin):
         "approved_at",
         "updated_at",
     )
-    list_filter = ("approved_at", "scraped_item__store_slug")
+    list_filter = ("approved_at", "scraped_item__offer__store_slug")
     search_fields = (
-        "scraped_item__name",
-        "scraped_item__external_id",
+        "scraped_item__offer__name",
+        "scraped_item__offer__external_id",
         "source_page__url",
     )
     readonly_fields = (

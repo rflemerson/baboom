@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 from django import forms
 from django.core.exceptions import ValidationError
 
-from .models import NutritionFacts, Product, ProductPriceHistory, ProductStore, Store
+from offers.models import StockStatus
+
+from .models import NutritionFacts, Product, ProductStore, Store
 
 if TYPE_CHECKING:
     from .models import ProductNutrition
@@ -171,13 +173,19 @@ class ProductAdminForm(forms.ModelForm):
 
 
 class ProductStoreInlineForm(forms.ModelForm):
-    """Store listing inline that captures a managed listing plus its latest price."""
+    """Store listing inline that captures a managed listing plus its latest price.
 
+    ``external_id`` and ``product_link`` are merchant-offer fields surfaced here
+    so the admin can enter them; the service layer persists them on the offer.
+    """
+
+    external_id = forms.CharField(required=False, label="Store Product ID")
+    product_link = forms.URLField(required=False, label="Store Product URL")
     price = forms.DecimalField(required=False, min_value=0, decimal_places=2)
     stock_status = forms.ChoiceField(
         required=False,
-        choices=ProductPriceHistory.StockStatus.choices,
-        initial=ProductPriceHistory.StockStatus.AVAILABLE,
+        choices=StockStatus.choices,
+        initial=StockStatus.AVAILABLE,
     )
 
     class Meta:
@@ -194,31 +202,26 @@ class ProductStoreInlineForm(forms.ModelForm):
         )
 
     def __init__(self, *args: object, **kwargs: object) -> None:
-        """Populate price helpers from the latest known price snapshot."""
+        """Populate listing and price helpers from the linked merchant offer."""
         super().__init__(*args, **kwargs)
 
-        if not self.instance.pk:
+        if not self.instance.pk or self.instance.offer is None:
             return
 
-        latest_price = self._get_latest_price_snapshot()
-        if latest_price is None:
-            return
+        self.initial.update(self._build_offer_initial_data())
 
-        self.initial.update(self._build_latest_price_initial_data(latest_price))
-
-    def _get_latest_price_snapshot(self) -> ProductPriceHistory | None:
-        """Return the latest price snapshot for the inline listing."""
-        return self.instance.price_history.first()
-
-    def _build_latest_price_initial_data(
-        self,
-        latest_price: ProductPriceHistory,
-    ) -> dict[str, object]:
-        """Build initial inline values from the latest price snapshot."""
-        return {
-            "price": latest_price.price,
-            "stock_status": latest_price.stock_status,
+    def _build_offer_initial_data(self) -> dict[str, object]:
+        """Build initial inline values from the linked offer and its latest price."""
+        offer = self.instance.offer
+        initial: dict[str, object] = {
+            "external_id": offer.external_id,
+            "product_link": offer.url,
         }
+        latest_price = offer.price_observations.first()
+        if latest_price is not None:
+            initial["price"] = latest_price.price
+            initial["stock_status"] = latest_price.stock_status
+        return initial
 
 
 class ProductStoreInlineFormSet(forms.BaseInlineFormSet):
@@ -253,6 +256,10 @@ class ProductStoreInlineFormSet(forms.BaseInlineFormSet):
                 continue
 
             self._validate_unique_store(cleaned_data, seen_store_ids)
+
+            if not cleaned_data.get("external_id"):
+                error_message = "Each store listing requires a store product ID."
+                raise ValidationError(error_message)
 
             if cleaned_data.get("price") in (None, ""):
                 error_message = "Each store listing requires a current price."

@@ -2,7 +2,8 @@
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from simple_history.models import HistoricalRecords
+
+from common.models import BaseModel
 
 
 class ScrapedPage(models.Model):
@@ -29,15 +30,13 @@ class ScrapedPage(models.Model):
         help_text=_("Structured metadata extracted from the product HTML"),
     )
     scraped_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         """Meta options."""
 
         ordering = ("-scraped_at",)
-        indexes = (
-            models.Index(fields=["url"]),
-            models.Index(fields=["store_slug", "url"]),
-        )
+        indexes = (models.Index(fields=["store_slug", "url"]),)
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -84,8 +83,14 @@ class ScraperRun(models.Model):
         return f"{self.label} - {self.get_status_display()} at {started_at}"
 
 
-class ScrapedItem(models.Model):
-    """Product data scraped from external sources."""
+class ScrapedItem(BaseModel):
+    """Pipeline record tracking one merchant offer through the agent workflow.
+
+    The offer identity, descriptive fields, price and stock now live on the
+    linked :class:`offers.Offer`. This model holds only the cataloging pipeline
+    state, so the daily scraper run no longer rewrites it (and its audit history
+    only grows on genuine status transitions).
+    """
 
     class Status(models.TextChoices):
         """Status of the scraped item in the pipeline."""
@@ -99,75 +104,12 @@ class ScrapedItem(models.Model):
         REVIEW = "review", _("Needs Review")
         IGNORED = "ignored", _("Ignored")
 
-    class StockStatus(models.TextChoices):
-        """Stock availability status."""
-
-        AVAILABLE = "A", _("Available")
-        LAST_UNITS = "L", _("Last Units")
-        OUT_OF_STOCK = "O", _("Out of Stock")
-
-    store_slug = models.CharField(
-        max_length=100,
-        db_index=True,
-        help_text=_("Store identifier"),
-    )
-
-    external_id = models.CharField(
-        max_length=100,
-        db_index=True,
-        help_text=_("Unique ID from Store"),
-    )
-
-    name = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text=_("Name extracted from source"),
-    )
-
-    category = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text=_("Category/Department extracted from source"),
-    )
-
-    price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        blank=True,
-        null=True,
-    )
-
-    stock_quantity = models.IntegerField(
-        blank=True,
-        null=True,
-        help_text=_("Available quantity in stock"),
-    )
-
-    stock_status = models.CharField(
-        max_length=1,
-        blank=True,
-        choices=StockStatus.choices,
-        default=StockStatus.AVAILABLE,
-    )
-
-    pid = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text=_("Product ID extracted from source"),
-    )
-
-    ean = models.CharField(
-        max_length=14,
-        blank=True,
-        db_index=True,
-        help_text=_("EAN/GTIN extracted from source"),
-    )
-
-    sku = models.CharField(
-        max_length=100,
-        blank=True,
-        db_index=True,
-        help_text=_("SKU extracted from source"),
+    offer = models.OneToOneField(
+        "offers.Offer",
+        on_delete=models.CASCADE,
+        related_name="scraped_item",
+        verbose_name=_("Merchant Offer"),
+        help_text=_("Offer this pipeline record tracks"),
     )
 
     status = models.CharField(
@@ -177,17 +119,9 @@ class ScrapedItem(models.Model):
         db_index=True,
     )
 
-    error_count = models.IntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
     last_attempt_at = models.DateTimeField(null=True, blank=True)
     last_error_log = models.TextField(blank=True)
-
-    product_store = models.ForeignKey(
-        "core.ProductStore",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="scraped_items",
-    )
 
     source_page = models.ForeignKey(
         ScrapedPage,
@@ -198,34 +132,17 @@ class ScrapedItem(models.Model):
         help_text=_("Source page where this item was found"),
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    history = HistoricalRecords()
-
     class Meta:
         """Meta options."""
 
-        constraints = (
-            models.UniqueConstraint(
-                fields=["store_slug", "external_id"],
-                name="unique_scraped_item_identity",
-            ),
-        )
-        indexes = (
-            models.Index(fields=["store_slug", "external_id"]),
-            models.Index(fields=["status"]),
-        )
+        indexes = (models.Index(fields=["status"]),)
 
     def __str__(self) -> str:
         """Return string representation."""
-        return (
-            f"[{self.store_slug}] {self.external_id} - "
-            f"{self.get_stock_status_display()}"
-        )
+        return f"Pipeline[{self.get_status_display()}] for {self.offer}"
 
 
-class ScrapedItemExtraction(models.Model):
+class ScrapedItemExtraction(BaseModel):
     """Agent extraction staged for human/backend catalog review."""
 
     scraped_item = models.OneToOneField(
@@ -262,8 +179,6 @@ class ScrapedItemExtraction(models.Model):
         blank=True,
         help_text=_("When this extraction was approved into the catalog"),
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         """Meta options."""

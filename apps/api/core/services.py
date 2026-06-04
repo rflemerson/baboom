@@ -24,11 +24,11 @@ from core.models import (
     Product,
     ProductComponent,
     ProductNutrition,
-    ProductPriceHistory,
     ProductStore,
     Store,
     Tag,
 )
+from offers.models import Offer, PriceObservation, StockStatus
 from scrapers.models import ScrapedItem
 from scrapers.services import ScrapedItemLinkService
 
@@ -157,7 +157,7 @@ class ComboResolutionService:
             Product.objects.filter(
                 type=Product.Type.SIMPLE,
                 brand_id=parent_product.brand_id,
-                store_links__external_id=external_id,
+                store_links__offer__external_id=external_id,
                 store_links__store_id__in=store_ids,
             )
             .distinct()
@@ -186,7 +186,7 @@ class ComboResolutionService:
         """Map one combo component into the standard product-create DTO."""
         return ProductCreateInput(
             name=component_data.name,
-            weight=component_data.weight or 0,
+            weight=component_data.weight,
             brand_name=component_data.brand_name or parent_product.brand.display_name,
             category_name=component_data.category_name,
             ean=component_data.ean,
@@ -346,6 +346,7 @@ class ProductNutritionService:
         """Persist one nutrition facts table from the submitted payload."""
         return NutritionFacts.objects.create(
             **self._build_facts_defaults(facts_payload),
+            content_hash=self._compute_hash(facts_payload),
         )
 
     def _build_facts_defaults(
@@ -369,6 +370,19 @@ class ProductNutritionService:
             "dietary_fiber": Decimal(str(facts_payload.dietary_fiber)),
             "sodium": Decimal(str(facts_payload.sodium)),
         }
+
+    def _compute_hash(self, facts_payload: NutritionFactsPayload) -> str:
+        """Delegate hash computation to NutritionFacts using the payload values."""
+        return NutritionFacts.compute_hash(
+            {
+                field: getattr(facts_payload, field)
+                for field in NutritionFacts.HASH_FIELDS
+            },
+            micronutrients=[
+                {"name": m.name, "value": float(m.value), "unit": m.unit}
+                for m in (facts_payload.micronutrients or [])
+            ],
+        )
 
     def _create_micronutrients(
         self,
@@ -428,7 +442,12 @@ class ProductNutritionService:
 
 
 class ProductStoreService:
-    """Manage product store listings through the official domain workflow."""
+    """Manage product store listings through the official domain workflow.
+
+    Each listing is backed by a merchant :class:`offers.Offer`, which owns the
+    price series. Manually entered prices are recorded as price observations on
+    that offer, exactly like scraper-collected prices.
+    """
 
     def replace_listings(
         self,
@@ -439,7 +458,10 @@ class ProductStoreService:
         with transaction.atomic():
             existing_links = {
                 product_store.store_id: product_store
-                for product_store in product.store_links.select_related("store")
+                for product_store in product.store_links.select_related(
+                    "store",
+                    "offer",
+                )
             }
             desired_store_ids: set[int] = set()
 
@@ -451,51 +473,95 @@ class ProductStoreService:
                     )
 
                 desired_store_ids.add(store.id)
+                offer = self._resolve_offer(store=store, store_payload=store_payload)
                 existing_listing = existing_links.get(store.id)
                 if existing_listing is None:
-                    self._create_listing(product, store, store_payload)
+                    self._create_listing(product, store, offer, store_payload)
                     continue
 
-                self._update_listing(existing_listing, store_payload)
+                self._update_listing(existing_listing, offer, store_payload)
 
             self._remove_deleted_listings(existing_links, desired_store_ids)
+
+    def _resolve_offer(
+        self,
+        *,
+        store: Store,
+        store_payload: StoreListingPayload,
+    ) -> Offer:
+        """Resolve or create the merchant offer and record its price observation."""
+        price = Decimal(str(store_payload.price))
+        stock_status = self._normalize_stock_status(store_payload.stock_status)
+
+        offer, _created = Offer.objects.update_or_create(
+            store_slug=store.name,
+            external_id=store_payload.external_id or "",
+            defaults={
+                "url": store_payload.product_link,
+                "current_price": price,
+                "current_stock_status": stock_status,
+            },
+        )
+        self._append_observation_if_changed(offer, price, stock_status)
+        return offer
+
+    def _append_observation_if_changed(
+        self,
+        offer: Offer,
+        price: Decimal,
+        stock_status: str,
+    ) -> None:
+        """Append a price observation only when price or stock status changed."""
+        latest = offer.price_observations.values("price", "stock_status").first()
+        if (
+            latest is not None
+            and latest["price"] == price
+            and latest["stock_status"] == stock_status
+        ):
+            return
+
+        PriceObservation.objects.create(
+            offer=offer,
+            price=price,
+            stock_status=stock_status,
+        )
+
+    def _normalize_stock_status(self, value: str) -> str:
+        """Return a supported stock status, defaulting to available."""
+        valid = {choice for choice, _label in StockStatus.choices}
+        return value if value in valid else StockStatus.AVAILABLE
 
     def _create_listing(
         self,
         product: Product,
         store: Store,
+        offer: Offer,
         store_payload: StoreListingPayload,
     ) -> ProductStore:
-        """Create a single store listing and its latest price snapshot."""
+        """Create a single store listing bound to its merchant offer."""
         product_store = ProductStore(
             product=product,
             store=store,
-            external_id=store_payload.external_id or "",
-            product_link=store_payload.product_link,
+            offer=offer,
             affiliate_link=store_payload.affiliate_link or "",
         )
         product_store.full_clean()
         product_store.save()
-
-        self._append_price_history_if_changed(product_store, store_payload)
         return product_store
 
     def _update_listing(
         self,
         product_store: ProductStore,
+        offer: Offer,
         store_payload: StoreListingPayload,
     ) -> None:
-        """Update a persisted listing and append a new price snapshot when needed."""
+        """Update a persisted listing's offer link and affiliate URL."""
         updated_fields: list[str] = []
-        resolved_external_id = store_payload.external_id or ""
         resolved_affiliate_link = store_payload.affiliate_link or ""
 
-        if product_store.external_id != resolved_external_id:
-            product_store.external_id = resolved_external_id
-            updated_fields.append("external_id")
-        if product_store.product_link != store_payload.product_link:
-            product_store.product_link = store_payload.product_link
-            updated_fields.append("product_link")
+        if product_store.offer_id != offer.id:
+            product_store.offer = offer
+            updated_fields.append("offer")
         if product_store.affiliate_link != resolved_affiliate_link:
             product_store.affiliate_link = resolved_affiliate_link
             updated_fields.append("affiliate_link")
@@ -503,30 +569,6 @@ class ProductStoreService:
         if updated_fields:
             product_store.full_clean()
             product_store.save(update_fields=updated_fields)
-
-        self._append_price_history_if_changed(product_store, store_payload)
-
-    def _append_price_history_if_changed(
-        self,
-        product_store: ProductStore,
-        store_payload: StoreListingPayload,
-    ) -> None:
-        """Create a new price snapshot only when price or stock status changed."""
-        latest_price = product_store.price_history.first()
-        resolved_price = Decimal(str(store_payload.price))
-        resolved_stock_status = store_payload.stock_status
-
-        if latest_price is not None and (
-            latest_price.price == resolved_price
-            and latest_price.stock_status == resolved_stock_status
-        ):
-            return
-
-        ProductPriceHistory.objects.create(
-            store_product_link=product_store,
-            price=resolved_price,
-            stock_status=resolved_stock_status,
-        )
 
     def _resolve_store(self, store_name: str) -> Store:
         """Resolve a store by display name or slug before creating a new one."""
@@ -637,6 +679,10 @@ class ProductCreateService:
         if listing is None:
             return None
 
+        if listing.offer_id != origin_item.offer_id:
+            listing.offer = origin_item.offer
+            listing.save(update_fields=["offer", "updated_at"])
+
         linked_item = ScrapedItemLinkService().execute(
             scraped_item_id=origin_item.id,
             product_store_id=listing.id,
@@ -664,14 +710,14 @@ class ProductCreateService:
                 continue
 
             store_names = {
-                origin_item.store_slug,
+                origin_item.offer.store_slug,
                 store_payload.store_name,
                 slugify(store_payload.store_name),
             }
             listing = (
                 ProductStore.objects.select_related("product")
                 .filter(
-                    external_id=store_payload.external_id,
+                    offer__external_id=store_payload.external_id,
                     store__name__in=store_names,
                 )
                 .first()
@@ -683,11 +729,14 @@ class ProductCreateService:
 
     def _resolve_brand(self, brand_name: str) -> Brand:
         """Find or create the brand associated with the product."""
-        brand, _created = Brand.objects.get_or_create(
-            name=brand_name,
-            defaults={"display_name": brand_name},
+        brand_slug = slugify(brand_name)
+        brand = (
+            Brand.objects.filter(display_name=brand_name).first()
+            or Brand.objects.filter(name=brand_slug).first()
         )
-        return brand
+        if brand is not None:
+            return brand
+        return Brand.objects.create(name=brand_slug, display_name=brand_name)
 
     def _link_origin_scraped_item(
         self,
@@ -727,13 +776,19 @@ class ProductCreateService:
     ) -> ProductStore:
         """Resolve the product store that should receive the origin link."""
         matching_listing = product.store_links.filter(
-            store__name=origin_item.store_slug,
+            store__name=origin_item.offer.store_slug,
         ).first()
         if matching_listing is not None:
+            if matching_listing.offer_id != origin_item.offer_id:
+                matching_listing.offer = origin_item.offer
+                matching_listing.save(update_fields=["offer", "updated_at"])
             return matching_listing
 
         store_links = list(product.store_links.all())
         if len(store_links) == 1:
+            if store_links[0].offer_id != origin_item.offer_id:
+                store_links[0].offer = origin_item.offer
+                store_links[0].save(update_fields=["offer", "updated_at"])
             return store_links[0]
 
         if not store_links:

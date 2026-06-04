@@ -20,6 +20,7 @@ from core.dtos import (
 )
 from core.models import Product
 from core.services import ProductCreateService, ProductNutritionService
+from offers.models import StockStatus
 
 from .dtos import AgentExtractionSubmitInput, ExtractedProductInput
 from .models import ScrapedItem, ScrapedItemExtraction
@@ -67,6 +68,7 @@ class ScrapedItemExtractionApproveService:
             ScrapedItemExtraction.objects.select_related(
                 "approved_product",
                 "scraped_item",
+                "scraped_item__offer",
                 "source_page",
             )
             .filter(id=extraction_id)
@@ -87,7 +89,7 @@ class ScrapedItemExtractionApproveService:
                     "originScrapedItemId": extraction.scraped_item_id,
                     "sourcePageId": extraction.source_page_id,
                     "sourcePageUrl": extraction.source_page.url,
-                    "storeSlug": extraction.scraped_item.store_slug,
+                    "storeSlug": extraction.scraped_item.offer.store_slug,
                     "imageReport": extraction.image_report,
                     "product": extraction.extracted_product,
                 },
@@ -150,7 +152,8 @@ class ScrapedItemExtractionApproveService:
 
     def _build_store_listing(self, item: ScrapedItem) -> StoreListingPayload:
         """Build the origin store listing required to link the scraped item."""
-        if item.price is None:
+        offer = item.offer
+        if offer.current_price is None:
             raise DjangoValidationError(
                 {"scraped_item": _("Scraped item price is required for approval.")},
             )
@@ -159,11 +162,11 @@ class ScrapedItemExtractionApproveService:
                 {"scraped_item": _("Scraped item source page is required.")},
             )
         return StoreListingPayload(
-            store_name=item.store_slug,
+            store_name=offer.store_slug,
             product_link=item.source_page.url,
-            price=float(item.price),
-            external_id=item.external_id,
-            stock_status=item.stock_status or ScrapedItem.StockStatus.AVAILABLE,
+            price=float(offer.current_price),
+            external_id=offer.external_id,
+            stock_status=offer.current_stock_status or StockStatus.AVAILABLE,
         )
 
     def _build_nutrition_profiles(
