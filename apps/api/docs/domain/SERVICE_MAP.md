@@ -7,8 +7,6 @@ This document maps the main use cases to the current service layer.
 ### Owns
 
 - [UC-07 Manage Product From Admin](./admin.md#uc-07-manage-product-from-admin)
-- [UC-02 Create Simple Product From Agent](./agent.md#uc-02-create-simple-product-from-agent)
-- [UC-03 Create Combo Product From Agent](./agent.md#uc-03-create-combo-product-from-agent)
 
 ### Collaborates with
 
@@ -34,30 +32,31 @@ This document maps the main use cases to the current service layer.
 
 - [UC-09 Manage Product Store Listings From Admin](./admin.md#uc-09-manage-product-store-listings-from-admin)
 
-## ComboResolutionService
-
-### Supports
-
-- [UC-03 Create Combo Product From Agent](./agent.md#uc-03-create-combo-product-from-agent)
-
-## scrapers.services.ScrapedItemLinkService
-
-### Owns
-
-- [UC-04 Link Scraped Item To Product Store From Agent](./agent.md#uc-04-link-scraped-item-to-product-store-from-agent)
-- [UC-01 Link Scraped Item To Product Store](./internal.md#uc-01-link-scraped-item-to-product-store)
-
-### Supports
-
-- Explicit scraped-item linking workflows driven by admin or agent decisions
-
 ## AlertSubscriptionService
 
 ### Owns
 
 - [UC-01 Subscribe To Alerts](./public.md#uc-01-subscribe-to-alerts)
 
-## Query layer
+## scrapers.services.ScrapedItemCheckoutService
+
+### Owns
+
+- [UC-01 Checkout Scraped Item For Processing](./agent.md#uc-01-checkout-scraped-item-for-processing)
+
+## scrapers.services.ScrapedItemExtractionSubmitService
+
+### Owns
+
+- [Agent extraction staging](./agent.md#main-flow)
+
+## scrapers.services.ScrapedItemErrorService
+
+### Owns
+
+- [Agent Error Flow](./agent.md#error-flow)
+
+## REST query layer
 
 ### Public catalog query flow
 
@@ -66,4 +65,4 @@ This document maps the main use cases to the current service layer.
 ### Current implementation
 
 - `selectors.py`
-- GraphQL query boundary
+- REST catalog endpoints

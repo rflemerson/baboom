@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class MicronutrientHashInput(TypedDict):
-    """Micronutrient values included in nutrition content hashes."""
+    """Typed micronutrient data used for nutrition hash computation."""
 
     name: str
     value: float
@@ -240,13 +240,6 @@ class Product(BaseModel):
         _("Published"),
         default=False,
         help_text=_("If checked, this product will be visible on the public website."),
-    )
-
-    last_enriched_at = models.DateTimeField(
-        _("Last Enriched By LLM"),
-        null=True,
-        blank=True,
-        help_text=_("Timestamp of last content update by LLM agent"),
     )
 
     class Meta:
@@ -471,7 +464,7 @@ class NutritionFacts(BaseModel):
         blank=True,
         db_index=True,
         help_text=_(
-            "SHA-256 of nutritional values — used to suggest reuse in the admin",
+            "SHA-256 fingerprint of the nutritional values.",
         ),
     )
 

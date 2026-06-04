@@ -100,7 +100,6 @@ class ScrapedItem(BaseModel):
         PROCESSING = "processing", _("Processing")
         LINKED = "linked", _("Linked")
         ERROR = "error", _("Error (Retry)")
-        DISCARDED = "discarded", _("Discarded (Junk)")
         REVIEW = "review", _("Needs Review")
         IGNORED = "ignored", _("Ignored")
 
@@ -165,19 +164,6 @@ class ScrapedItemExtraction(BaseModel):
         default=dict,
         blank=True,
         help_text=_("Recursive product tree returned by the agent"),
-    )
-    approved_product = models.ForeignKey(
-        "core.Product",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="approved_scraper_extractions",
-        help_text=_("Catalog product created from this extraction"),
-    )
-    approved_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text=_("When this extraction was approved into the catalog"),
     )
 
     class Meta:

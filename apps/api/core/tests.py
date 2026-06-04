@@ -1,11 +1,11 @@
-"""Tests for core services, selectors, and GraphQL boundaries."""
+"""Tests for core services, selectors, and REST boundaries."""
 
 from __future__ import annotations
 
 import json
 from decimal import Decimal
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import Protocol, cast
 from unittest.mock import Mock
 
 from django.contrib import admin as django_admin
@@ -13,9 +13,7 @@ from django.core.exceptions import ValidationError
 from django.forms.models import inlineformset_factory
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
-from strawberry.django.views import GraphQLView
 
-from baboom.schema import schema
 from core.admin import ProductAdmin
 from core.dtos import (
     CatalogProductsFilters,
@@ -29,7 +27,6 @@ from core.dtos import (
 from core.forms import ProductStoreInlineForm, ProductStoreInlineFormSet
 from core.models import (
     AlertSubscriber,
-    APIKey,
     Brand,
     Category,
     NutritionFacts,
@@ -41,16 +38,13 @@ from core.models import (
 )
 from core.selectors import public_catalog_products, public_catalog_products_with_stats
 from core.services import (
+    ComboResolutionService,
     ProductCreateService,
     ProductMetadataUpdateService,
     ProductNutritionService,
     ProductStoreService,
 )
 from offers.models import Offer, PriceObservation, StockStatus
-from scrapers.models import ScrapedItem, ScrapedPage
-
-if TYPE_CHECKING:
-    from django.http import HttpResponse
 
 
 def _link_offer(
@@ -85,33 +79,6 @@ def _link_offer(
             stock_status=stock_status,
         )
     return ProductStore.objects.create(product=product, store=store, offer=offer)
-
-
-def _scraped_item(
-    **kwargs: object,
-) -> ScrapedItem:
-    """Create a pipeline scraped item backed by a merchant offer for tests."""
-    store_slug = cast("str", kwargs["store_slug"])
-    external_id = cast("str", kwargs["external_id"])
-    name = cast("str", kwargs.get("name", ""))
-    price = cast("float | Decimal | None", kwargs.get("price"))
-    stock_status = cast("str", kwargs.get("stock_status", StockStatus.AVAILABLE))
-    source_page = cast("ScrapedPage | None", kwargs.get("source_page"))
-    status = cast("str", kwargs.get("status", ScrapedItem.Status.NEW))
-    resolved_price = Decimal(str(price)) if price is not None else None
-    offer = Offer.objects.create(
-        store_slug=store_slug,
-        external_id=external_id,
-        name=name,
-        url=source_page.url if source_page else "",
-        current_price=resolved_price,
-        current_stock_status=stock_status,
-    )
-    return ScrapedItem.objects.create(
-        offer=offer,
-        source_page=source_page,
-        status=status,
-    )
 
 
 class CatalogAnnotatedProduct(Protocol):
@@ -316,6 +283,7 @@ class ProductCreateServiceTests(TestCase):
     EXPECTED_TAG_COUNT = 2
     EXPECTED_COMPONENT_COUNT = 2
     COMPONENT_WEIGHT = 300
+    EXPECTED_DEDUPED_COMPONENT_QUANTITY = 3
 
     def setUp(self) -> None:
         """Create reusable fixtures and services."""
@@ -435,6 +403,61 @@ class ProductCreateServiceTests(TestCase):
         assert second_component.packaging == Product.Packaging.REFILL
         assert second_component.is_published is False
 
+    def test_execute_sums_duplicate_combo_component_quantities(self) -> None:
+        """Duplicate component inputs should produce one link with summed quantity."""
+        product = self.service.execute(
+            ProductCreateInput(
+                name="Combo Creatina",
+                weight=600,
+                brand_name="Growth",
+                is_combo=True,
+                components=[
+                    ComboComponentInput(
+                        name="Creatina",
+                        weight=self.COMPONENT_WEIGHT,
+                        brand_name="Growth",
+                        ean="7891000000002",
+                        quantity=1,
+                    ),
+                    ComboComponentInput(
+                        name="Creatina",
+                        weight=self.COMPONENT_WEIGHT,
+                        brand_name="Growth",
+                        ean="7891000000002",
+                        quantity=2,
+                    ),
+                ],
+            ),
+        )
+
+        link = product.component_links.get()
+        assert link.quantity == self.EXPECTED_DEDUPED_COMPONENT_QUANTITY
+
+    def test_combo_resolution_rejects_simple_parent(self) -> None:
+        """Component links should only be managed for combo products."""
+        brand = Brand.objects.create(name="simple-brand", display_name="Simple Brand")
+        product = Product.objects.create(
+            name="Simple Product",
+            brand=brand,
+            packaging=Product.Packaging.CONTAINER,
+        )
+
+        raised_validation_error = False
+        try:
+            ComboResolutionService().resolve_combo_components(
+                product,
+                [
+                    ComboComponentInput(
+                        name="Creatina",
+                        brand_name="Growth",
+                    ),
+                ],
+            )
+        except ValidationError:
+            raised_validation_error = True
+
+        assert raised_validation_error
+
     def test_execute_rejects_duplicate_ean(self) -> None:
         """Product creation should reject duplicate EAN values."""
         Brand.objects.create(name="existing-brand", display_name="Existing Brand")
@@ -462,130 +485,6 @@ class ProductCreateServiceTests(TestCase):
 
         assert raised_validation_error
 
-    def test_execute_links_origin_scraped_item_to_created_store_listing(self) -> None:
-        """Origin scraped items should be linked during product creation."""
-        page = ScrapedPage.objects.create(
-            store_slug="growth",
-            url="https://growth.example/whey",
-        )
-        origin_item = _scraped_item(
-            store_slug="growth",
-            external_id="growth-origin-900",
-            name="Whey Isolate",
-            price=Decimal("149.90"),
-            source_page=page,
-        )
-
-        product = self.service.execute(
-            ProductCreateInput(
-                name="Whey Isolate",
-                weight=900,
-                brand_name="Growth",
-                origin_scraped_item_id=origin_item.id,
-                stores=[
-                    StoreListingPayload(
-                        store_name="Growth",
-                        external_id="growth-900",
-                        product_link="https://growth.example/whey",
-                        price=149.90,
-                    ),
-                ],
-            ),
-        )
-
-        origin_item.refresh_from_db()
-        listing = product.store_links.get(store=self.store)
-
-        assert listing is not None
-        assert origin_item.status == ScrapedItem.Status.LINKED
-
-    def test_execute_reuses_existing_origin_listing_on_retry(self) -> None:
-        """Retries should link to an existing listing without duplicating products."""
-        brand = Brand.objects.create(name="growth", display_name="Growth")
-        existing_product = Product.objects.create(
-            name="Whey Isolate",
-            weight=900,
-            brand=brand,
-            ean="7890000000001",
-        )
-        existing_listing = _link_offer(
-            product=existing_product,
-            store=self.store,
-            external_id="growth-900",
-            product_link="https://growth.example/whey",
-            price=149.90,
-        )
-        origin_item = _scraped_item(
-            store_slug="growth",
-            external_id="growth-origin-900",
-            name="Whey Isolate",
-            price=Decimal("149.90"),
-        )
-
-        product = self.service.execute(
-            ProductCreateInput(
-                name="Whey Isolate Updated",
-                weight=900,
-                brand_name="Growth",
-                ean="7890000000001",
-                origin_scraped_item_id=origin_item.id,
-                stores=[
-                    StoreListingPayload(
-                        store_name="Growth",
-                        external_id="growth-900",
-                        product_link="https://growth.example/whey",
-                        price=149.90,
-                    ),
-                ],
-            ),
-        )
-
-        origin_item.refresh_from_db()
-
-        assert product.id == existing_product.id
-        assert Product.objects.count() == 1
-        assert existing_listing.pk is not None
-        assert origin_item.status == ScrapedItem.Status.LINKED
-
-    def test_execute_rejects_origin_link_without_matching_store_listing(self) -> None:
-        """Origin links should fail when no target listing can be resolved."""
-        origin_item = _scraped_item(
-            store_slug="growth",
-            external_id="growth-origin-900",
-            name="Whey Isolate",
-            price=Decimal("149.90"),
-        )
-
-        raised_validation_error = False
-
-        try:
-            self.service.execute(
-                ProductCreateInput(
-                    name="Whey Isolate",
-                    weight=900,
-                    brand_name="Growth",
-                    origin_scraped_item_id=origin_item.id,
-                    stores=[
-                        StoreListingPayload(
-                            store_name="Dux",
-                            external_id="dux-900",
-                            product_link="https://dux.example/whey",
-                            price=149.90,
-                        ),
-                        StoreListingPayload(
-                            store_name="Integralmedica",
-                            external_id="integral-900",
-                            product_link="https://integral.example/whey",
-                            price=159.90,
-                        ),
-                    ],
-                ),
-            )
-        except ValidationError:
-            raised_validation_error = True
-
-        assert raised_validation_error
-
 
 class ProductMetadataUpdateServiceTests(TestCase):
     """Essential coverage for product metadata updates."""
@@ -604,12 +503,10 @@ class ProductMetadataUpdateServiceTests(TestCase):
             description="Old description",
         )
 
-    def test_execute_updates_content_category_tags_and_enrichment_timestamp(
+    def test_execute_updates_content_category_and_tags(
         self,
     ) -> None:
-        """Metadata updates should apply resolved taxonomy and timestamp enrichment."""
-        previous_enriched_at = self.product.last_enriched_at
-
+        """Metadata updates should apply resolved taxonomy."""
         updated_product = self.service.execute(
             product_id=self.product.id,
             data=ProductMetadataUpdateInput(
@@ -628,7 +525,6 @@ class ProductMetadataUpdateServiceTests(TestCase):
         assert updated_product.category is not None
         assert updated_product.category.name == "Protein"
         assert updated_product.tags.count() == self.EXPECTED_TAG_COUNT
-        assert updated_product.last_enriched_at != previous_enriched_at
 
     def test_execute_can_clear_category_when_empty_string_is_provided(self) -> None:
         """Empty-string category updates should remove the current category."""
@@ -679,43 +575,6 @@ class ProductNutritionServiceTests(TestCase):
             carbohydrates=Decimal(3),
             total_fats=Decimal(2),
         )
-
-    def test_apply_selection_switches_between_existing_new_and_none(self) -> None:
-        """Nutrition selection should support existing, new, and clear flows."""
-        self.service.apply_selection(
-            self.product,
-            nutrition_mode=ProductNutritionService.MODE_EXISTING,
-            existing_facts=self.existing_facts,
-        )
-        existing_profile = self.product.nutrition_profiles.first()
-        assert existing_profile is not None
-        assert existing_profile.nutrition_facts == self.existing_facts
-
-        self.service.apply_selection(
-            self.product,
-            nutrition_mode=ProductNutritionService.MODE_NEW,
-            nutrition_profiles_data=[
-                ProductNutritionPayload(
-                    nutrition_facts=NutritionFactsPayload(
-                        description="New table",
-                        serving_size_grams=40,
-                        energy_kcal=150,
-                        proteins=30,
-                        carbohydrates=4,
-                        total_fats=3,
-                    ),
-                ),
-            ],
-        )
-        new_profile = self.product.nutrition_profiles.first()
-        assert new_profile is not None
-        assert new_profile.nutrition_facts.description == "New table"
-
-        self.service.apply_selection(
-            self.product,
-            nutrition_mode=ProductNutritionService.MODE_NONE,
-        )
-        assert self.product.nutrition_profiles.count() == 0
 
     def test_attach_profiles_creates_new_facts_for_repeated_payloads(self) -> None:
         """Repeated payloads should not be deduplicated by nutrition content."""
@@ -1042,251 +901,8 @@ class PublicAlertSubscriptionRESTTests(TestCase):
         assert result["errors"][0]["field"] == "email"
 
 
-class GraphQLProductCreateTests(TestCase):
-    """Tests for the product creation mutation."""
-
-    def setUp(self) -> None:
-        """Set up test environment."""
-        self.factory = RequestFactory()
-        self.api_key_obj = APIKey.objects.create(name="Test Client")
-        self.valid_key = self.api_key_obj.key
-        self.view = GraphQLView.as_view(schema=schema)
-        self.page = ScrapedPage.objects.create(
-            store_slug="growth",
-            url="https://growth.example/whey",
-        )
-        self.origin_item = _scraped_item(
-            store_slug="growth",
-            external_id="growth-origin-900",
-            name="Whey Isolate",
-            price=Decimal("149.90"),
-            source_page=self.page,
-        )
-
-    def test_create_product_accepts_origin_scraped_item_id(self) -> None:
-        """The mutation should link the origin scraped item when provided."""
-        mutation = """
-        mutation CreateProduct($data: ProductInput!) {
-          createProduct(data: $data) {
-            product {
-              id
-              storeLinks {
-                id
-              }
-            }
-            errors {
-              field
-              message
-            }
-          }
-        }
-        """
-        variables = {
-            "data": {
-                "name": "Whey Isolate",
-                "weight": 900,
-                "brandName": "Growth",
-                "originScrapedItemId": self.origin_item.id,
-                "stores": [
-                    {
-                        "storeName": "Growth",
-                        "externalId": "growth-900",
-                        "productLink": "https://growth.example/whey",
-                        "price": 149.9,
-                        "stockStatus": "AVAILABLE",
-                    },
-                ],
-            },
-        }
-        request = self.factory.post(
-            "/graphql/",
-            data=json.dumps({"query": mutation, "variables": variables}),
-            content_type="application/json",
-            HTTP_X_API_KEY=self.valid_key,
-        )
-
-        response = cast("HttpResponse", self.view(request))
-        payload = json.loads(response.content)
-
-        self.origin_item.refresh_from_db()
-        assert payload["data"]["createProduct"]["errors"] is None
-        assert payload["data"]["createProduct"]["product"]["id"] is not None
-        assert self.origin_item.status == ScrapedItem.Status.LINKED
-
-    def test_create_product_reuses_existing_origin_listing_on_retry(self) -> None:
-        """The mutation should be idempotent for already-published origin listings."""
-        store = Store.objects.create(name="growth", display_name="Growth")
-        brand = Brand.objects.create(name="growth", display_name="Growth")
-        existing_product = Product.objects.create(
-            name="Whey Isolate",
-            weight=900,
-            brand=brand,
-            ean="7890000000001",
-        )
-        existing_listing = _link_offer(
-            product=existing_product,
-            store=store,
-            external_id="growth-900",
-            product_link="https://growth.example/whey",
-            price=149.90,
-        )
-        mutation = """
-        mutation CreateProduct($data: ProductInput!) {
-          createProduct(data: $data) {
-            product {
-              id
-            }
-            errors {
-              field
-              message
-            }
-          }
-        }
-        """
-        variables = {
-            "data": {
-                "name": "Whey Isolate Updated",
-                "weight": 900,
-                "brandName": "Growth",
-                "ean": "7890000000001",
-                "originScrapedItemId": self.origin_item.id,
-                "stores": [
-                    {
-                        "storeName": "Growth",
-                        "externalId": "growth-900",
-                        "productLink": "https://growth.example/whey",
-                        "price": 149.9,
-                        "stockStatus": "AVAILABLE",
-                    },
-                ],
-            },
-        }
-        request = self.factory.post(
-            "/graphql/",
-            data=json.dumps({"query": mutation, "variables": variables}),
-            content_type="application/json",
-            HTTP_X_API_KEY=self.valid_key,
-        )
-
-        response = cast("HttpResponse", self.view(request))
-        payload = json.loads(response.content)
-        self.origin_item.refresh_from_db()
-
-        assert payload["data"]["createProduct"]["errors"] is None
-        assert Product.objects.count() == 1
-        assert existing_listing.pk is not None
-        assert self.origin_item.status == ScrapedItem.Status.LINKED
-
-    def test_create_product_accepts_rich_combo_component_payload(self) -> None:
-        """The mutation should accept full combo component payloads."""
-        mutation = """
-        mutation CreateProduct($data: ProductInput!) {
-          createProduct(data: $data) {
-            product {
-              id
-            }
-            errors {
-              field
-              message
-            }
-          }
-        }
-        """
-        variables = {
-            "data": {
-                "name": "Combo Whey + Creatina",
-                "weight": 1200,
-                "brandName": "Growth",
-                "isCombo": True,
-                "components": [
-                    {
-                        "name": "Creatina",
-                        "weight": 300,
-                        "brandName": "Growth",
-                        "categoryPath": ["Energy", "Creatine"],
-                        "description": "Creatina do combo",
-                        "packaging": "REFILL",
-                        "stores": [
-                            {
-                                "storeName": "Growth",
-                                "externalId": "creatina-300",
-                                "productLink": "https://growth.example/creatina-300",
-                                "price": 79.9,
-                                "stockStatus": "AVAILABLE",
-                            },
-                        ],
-                    },
-                ],
-            },
-        }
-        request = self.factory.post(
-            "/graphql/",
-            data=json.dumps({"query": mutation, "variables": variables}),
-            content_type="application/json",
-            HTTP_X_API_KEY=self.valid_key,
-        )
-
-        response = cast("HttpResponse", self.view(request))
-        payload = json.loads(response.content)
-
-        created_component = Product.objects.get(name="Creatina", weight=300)
-        assert payload["data"]["createProduct"]["errors"] is None
-        assert payload["data"]["createProduct"]["product"]["id"] is not None
-        assert created_component.packaging == Product.Packaging.REFILL
-        assert created_component.store_links.count() == 1
-
-
-class GraphQLSecurityTests(TestCase):
-    """Tests for GraphQL API security."""
-
-    def setUp(self) -> None:
-        """Set up test environment."""
-        self.factory = RequestFactory()
-        self.api_key_obj = APIKey.objects.create(name="Test Client")
-        self.valid_key = self.api_key_obj.key
-        self.view = GraphQLView.as_view(schema=schema)
-
-    def _execute_query(
-        self,
-        query: str = "{ hello }",
-        headers: dict[str, str] | None = None,
-    ) -> dict[str, object]:
-        """Execute the hello query and decode the JSON response."""
-        request = self.factory.post(
-            "/graphql/",
-            data=json.dumps({"query": query}),
-            content_type="application/json",
-            **headers if headers else {},
-        )
-        response = self.view(request)
-        if hasattr(response, "content"):
-            return json.loads(cast("HttpResponse", response).content)
-        return json.loads(b"{}")
-
-    def test_query_without_api_key(self) -> None:
-        """Internal requests without API key should be denied."""
-        result = self._execute_query()
-        assert "errors" in result
-        assert result["errors"][0]["message"] == "API Key required"
-
-    def test_public_catalog_query_without_api_key(self) -> None:
-        """GraphQL catalog requests without API key should be denied."""
-        result = self._execute_query(
-            """
-            {
-              catalogProducts {
-                pageInfo {
-                  totalCount
-                }
-                items {
-                  id
-                }
-              }
-            }
-            """,
-        )
-        assert "errors" in result
-        assert result["errors"][0]["message"] == "API Key required"
+class PublicEndpointSecurityTests(TestCase):
+    """Tests for public endpoint access rules."""
 
     def test_public_catalog_rest_query_without_api_key(self) -> None:
         """Public REST catalog requests should be allowed without API key."""
@@ -1314,38 +930,3 @@ class GraphQLSecurityTests(TestCase):
 
         assert response.status_code == HTTPStatus.OK
         assert payload == {"status": "ok"}
-
-    def test_subscribe_alerts_query_without_api_key(self) -> None:
-        """GraphQL alert subscriptions without API key should be denied."""
-        result = self._execute_query(
-            """
-            mutation {
-              subscribeAlerts(email: "user@example.com") {
-                success
-              }
-            }
-            """,
-        )
-        assert "errors" in result
-        assert result["errors"][0]["message"] == "API Key required"
-
-    def test_query_with_valid_api_key(self) -> None:
-        """Requests with valid API key should be allowed."""
-        result = self._execute_query(headers={"HTTP_X_API_KEY": self.valid_key})
-        assert "data" in result
-        assert result["data"]["hello"] == "Baboom GraphQL API is Online"
-
-    def test_query_with_invalid_api_key(self) -> None:
-        """Requests with invalid API key should be denied."""
-        result = self._execute_query(headers={"HTTP_X_API_KEY": "invalid-key"})
-        assert "errors" in result
-        assert result["errors"][0]["message"] == "API Key required"
-
-    def test_query_with_disabled_api_key(self) -> None:
-        """Requests with disabled API key should be denied."""
-        self.api_key_obj.is_active = False
-        self.api_key_obj.save()
-
-        result = self._execute_query(headers={"HTTP_X_API_KEY": self.valid_key})
-        assert "errors" in result
-        assert result["errors"][0]["message"] == "API Key required"

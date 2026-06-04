@@ -11,7 +11,6 @@ class ScrapedItemCheckoutInput:
     """Input for checking out scraped items for processing."""
 
     force: bool = False
-    target_item_id: int | None = None
 
 
 @strawberry.input
@@ -21,14 +20,6 @@ class ScrapedItemErrorInput:
     item_id: int
     message: str
     is_fatal: bool = False
-
-
-@strawberry.input
-class ScrapedItemLinkInput:
-    """Input for explicitly linking a scraped item to a product store."""
-
-    item_id: int
-    product_store_id: int
 
 
 @strawberry.input

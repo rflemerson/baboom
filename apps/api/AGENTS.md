@@ -18,10 +18,9 @@ cd apps/api && .venv/bin/python manage.py runserver
 
 ## Architecture
 
-- Core business workflows live in `core/services.py`.
+- Core business workflows live in `core/services/`.
 - Service DTOs live in `core/dtos.py`; scraper DTOs live in `scrapers/dtos.py`.
-- GraphQL stays thin:
-  - `core/graphql/` and `scrapers/graphql/` map input, call services/selectors, map output.
+- GraphQL is limited to the authenticated agent workflow in `scrapers/graphql/`.
 - Read/query composition lives in `selectors.py`, not in GraphQL and not in form-style filters.
 - Public frontend reads use REST under `/api/catalog/` with `Cache-Control`
   headers for Cloudflare. Tune `CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS` and
@@ -33,14 +32,15 @@ cd apps/api && .venv/bin/python manage.py runserver
   - persistence model: `ScrapedItemExtraction`
   - service: `ScrapedItemExtractionSubmitService`
   - GraphQL mutation: `submitAgentExtraction`
+- Agent checkout failures are reported through:
+  - service: `ScrapedItemErrorService`
+  - GraphQL mutation: `reportScrapedItemError`
 - Dagster queue selection is explicit:
   - newly scraped items stay `ScrapedItem.Status.NEW`
   - the admin action on `ScrapedItemAdmin` must move chosen items to
     `ScrapedItem.Status.QUEUED` before the agents checkout flow will consume them
-- Agent extraction approval also lives in `scrapers`:
-  - service: `scrapers.approval.ScrapedItemExtractionApproveService`
-  - admin action: `approve_extractions`
 - Agent extraction staging must not create or link catalog products directly.
+- Catalog product creation is currently manager-facing only through `ProductAdmin`.
 - Admin forms/formsets live in `core/forms.py`.
 - Admin-to-service mapping helpers live in `core/admin_mappers.py`.
 - Domain docs live in `docs/domain/`; scraper strategy docs live in `docs/scrapers/`.
@@ -52,7 +52,8 @@ cd apps/api && .venv/bin/python manage.py runserver
 - Keep orchestration in services.
 - Prefer typed DTOs over `dict[str, Any]`.
 - Prefer exact identifier matching over fuzzy matching.
-- Treat `ProductAdmin` as the official manager-facing workflow for product metadata, nutrition, and store listings.
+- Treat `ProductAdmin` as the official manager-facing workflow for product metadata and store listings.
+- Manage product nutrition in admin by creating `NutritionFacts` records and linking them through the `ProductNutrition` inline; do not reintroduce `nutrition_mode` form workflows.
 - Wrap manager-facing admin save flows in a transaction when one save coordinates multiple related writes.
 
 ## Typing and Refactors

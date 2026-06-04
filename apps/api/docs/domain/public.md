@@ -15,8 +15,8 @@ This document groups the public-facing use cases exposed to external users.
 
 ### Main entry points
 
-- GraphQL public catalog query
-- GraphQL alert subscription mutation
+- REST public catalog query
+- REST alert subscription endpoint
 
 ## Scope
 
@@ -35,12 +35,12 @@ Subscribe an email address to price alerts.
 
 ### Supporting actors
 
-- GraphQL boundary
+- REST boundary
 - AlertSubscriptionService
 
 ### Trigger
 
-- The actor submits an email address to the alert subscription mutation.
+- The actor submits an email address to the alert subscription endpoint.
 
 ### Preconditions
 
@@ -89,16 +89,16 @@ Return a filtered, sorted, paginated public catalog listing.
 
 ### Supporting actors
 
-- GraphQL boundary
+- REST boundary
 - Catalog query layer in `selectors.py`
 
 ### Trigger
 
-- The actor requests catalog products through GraphQL.
+- The actor requests catalog products through REST.
 
 ### Preconditions
 
-- The GraphQL request is authenticated according to the API rules.
+- The REST request uses public catalog API rules.
 
 ### Postconditions
 
@@ -107,12 +107,12 @@ Return a filtered, sorted, paginated public catalog listing.
 ### Main success flow
 
 1. The actor submits catalog filters and paging parameters.
-2. The GraphQL boundary normalizes the incoming arguments.
+2. The REST boundary normalizes the incoming arguments.
 3. The catalog query layer builds the annotated base queryset.
 4. The query layer applies public visibility rules.
 5. The query layer applies search, brand filtering, numeric filters, and sorting.
 6. The query layer returns a stable ordered queryset.
-7. GraphQL slices the result into the requested page and returns page metadata.
+7. REST serializes the requested page and returns page metadata.
 
 ### Alternate flows
 
@@ -127,6 +127,6 @@ Return a filtered, sorted, paginated public catalog listing.
 
 ### Business rules
 
-- Catalog query composition lives in `selectors.py`, not in GraphQL and not in services.
+- Catalog query composition lives in `selectors.py`, not in REST views and not in services.
 - Latest price selection uses a stable tie-breaker.
 - Public catalog sorting is deterministic.

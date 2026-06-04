@@ -13,10 +13,8 @@ from treebeard.forms import movenodeform_factory
 from .admin_mappers import (
     build_product_create_input,
     build_product_metadata_update_input,
-    build_product_nutrition_payloads,
     build_store_listing_payloads,
     find_product_store_inline_formset,
-    get_selected_existing_nutrition_facts,
 )
 from .forms import ProductAdminForm, ProductStoreInlineForm, ProductStoreInlineFormSet
 from .models import (
@@ -27,6 +25,7 @@ from .models import (
     Micronutrient,
     NutritionFacts,
     Product,
+    ProductNutrition,
     ProductStore,
     Store,
     Tag,
@@ -34,7 +33,6 @@ from .models import (
 from .services import (
     ProductCreateService,
     ProductMetadataUpdateService,
-    ProductNutritionService,
     ProductStoreService,
 )
 
@@ -50,8 +48,6 @@ class MicronutrientInline(nested_admin.NestedTabularInline):
     model = Micronutrient
     extra = 0
     min_num = 0
-    can_delete = False
-    readonly_fields = ("name", "value", "unit")
     classes: ClassVar[list[str]] = ["collapse"]
 
 
@@ -71,6 +67,15 @@ class ProductStoreInline(admin.TabularInline):
         "price",
         "stock_status",
     )
+
+
+class ProductNutritionInline(admin.TabularInline):
+    """Inline for linking products to nutrition tables managed in the admin."""
+
+    model = ProductNutrition
+    extra = 0
+    autocomplete_fields: ClassVar[list[str]] = ["nutrition_facts"]
+    filter_horizontal: ClassVar[list[str]] = ["flavors"]
 
 
 @admin.register(Product)
@@ -99,10 +104,13 @@ class ProductAdmin(admin.ModelAdmin):
     autocomplete_fields: ClassVar[list[str]] = ["brand", "tags", "category"]
     list_per_page = 20
     filter_horizontal: ClassVar[list[str]] = ["tags"]
-    inlines: ClassVar[list[type[admin.TabularInline]]] = [ProductStoreInline]
+    inlines: ClassVar[list[type[admin.TabularInline]]] = [
+        ProductStoreInline,
+        ProductNutritionInline,
+    ]
     actions = ("delete_products_with_related_data",)
     save_on_top = True
-    readonly_fields = ("created_at", "updated_at", "last_enriched_at")
+    readonly_fields = ("created_at", "updated_at")
     fieldsets = (
         (
             None,
@@ -117,31 +125,6 @@ class ProductAdmin(admin.ModelAdmin):
                     "category",
                     "tags",
                     "is_published",
-                ),
-            },
-        ),
-        (
-            "Nutrition",
-            {
-                "fields": (
-                    "nutrition_mode",
-                    "existing_nutrition_facts",
-                    "nutrition_description",
-                    "serving_size_grams",
-                    "energy_kcal",
-                    "proteins",
-                    "carbohydrates",
-                    "total_fats",
-                    "total_sugars",
-                    "added_sugars",
-                    "saturated_fats",
-                    "trans_fats",
-                    "dietary_fiber",
-                    "sodium",
-                ),
-                "description": (
-                    "Select an existing nutrition table or enter a new one. "
-                    "New values are stored as a separate table for review."
                 ),
             },
         ),
@@ -194,28 +177,10 @@ class ProductAdmin(admin.ModelAdmin):
         change: object,
     ) -> None:
         """Persist product changes through the official service layer."""
-        nutrition_service = ProductNutritionService()
-        nutrition_mode = (
-            form.cleaned_data.get("nutrition_mode")
-            or ProductAdminForm.NutritionMode.NONE
-        )
-        existing_nutrition_facts = get_selected_existing_nutrition_facts(form)
-        nutrition_payloads = (
-            build_product_nutrition_payloads(form)
-            if nutrition_mode == ProductAdminForm.NutritionMode.NEW
-            else None
-        )
-
         if change:
             updated_product = ProductMetadataUpdateService().execute(
                 product_id=obj.pk,
                 data=build_product_metadata_update_input(form),
-            )
-            nutrition_service.apply_selection(
-                updated_product,
-                nutrition_mode=nutrition_mode,
-                existing_facts=existing_nutrition_facts,
-                nutrition_profiles_data=nutrition_payloads,
             )
             obj.pk = updated_product.pk
             obj.refresh_from_db()
@@ -224,24 +189,22 @@ class ProductAdmin(admin.ModelAdmin):
         created_product = ProductCreateService().execute(
             build_product_create_input(form),
         )
-        nutrition_service.apply_selection(
-            created_product,
-            nutrition_mode=nutrition_mode,
-            existing_facts=existing_nutrition_facts,
-            nutrition_profiles_data=nutrition_payloads,
-        )
         obj.pk = created_product.pk
         obj.refresh_from_db()
 
     def save_related(
         self,
-        _request: HttpRequest,
+        request: HttpRequest,
         form: ProductAdminForm,
         formsets: list[BaseInlineFormSet],
-        _change: object,
+        change: object,
     ) -> None:
         """Persist service-backed relations after the product itself is saved."""
         self._sync_product_store_listings(form.instance, formsets)
+        for formset in formsets:
+            if isinstance(formset, ProductStoreInlineFormSet):
+                continue
+            self.save_formset(request, form, formset, change)
 
     def _sync_product_store_listings(
         self,
@@ -401,28 +364,10 @@ class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
 
     list_display = ("description", "serving_size_grams", "energy_kcal")
     search_fields = ("description",)
-    readonly_fields = (
-        "description",
-        "serving_size_grams",
-        "energy_kcal",
-        "proteins",
-        "carbohydrates",
-        "total_sugars",
-        "added_sugars",
-        "total_fats",
-        "saturated_fats",
-        "trans_fats",
-        "dietary_fiber",
-        "sodium",
-    )
     inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
         MicronutrientInline,
     ]
     list_per_page = 20
-
-    def has_add_permission(self, _request: HttpRequest) -> bool:
-        """Disallow direct creation; use ProductAdmin nutrition workflows instead."""
-        return False
 
     def has_delete_permission(
         self,

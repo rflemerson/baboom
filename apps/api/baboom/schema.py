@@ -3,28 +3,21 @@
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from core.graphql.schema import CoreMutation, CoreQuery
-from scrapers.graphql.schema import ScrapersMutation, ScrapersQuery
+from scrapers.graphql.schema import ScrapersMutation
 
 
 @strawberry.type
-class Query(
-    CoreQuery,
-    ScrapersQuery,
-):
+class Query:
     """Root GraphQL Query."""
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])
-    def hello(self) -> str:
-        """Return a simple health check response."""
-        return "Baboom GraphQL API is Online"
+    def agent_api(self) -> str:
+        """Return the agent GraphQL API status."""
+        return "ok"
 
 
 @strawberry.type
-class Mutation(
-    CoreMutation,
-    ScrapersMutation,
-):
+class Mutation(ScrapersMutation):
     """Root GraphQL Mutation."""
 
 

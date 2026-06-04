@@ -142,7 +142,7 @@ class Migration(migrations.Migration):
                 ('trans_fats', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Trans Fats (g)')),
                 ('dietary_fiber', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Dietary Fiber (g)')),
                 ('sodium', models.DecimalField(decimal_places=2, default=0, max_digits=10, verbose_name='Sodium (mg)')),
-                ('content_hash', models.CharField(blank=True, db_index=True, help_text='SHA-256 of nutritional values — used to suggest reuse in the admin', max_length=64, verbose_name='Content Hash')),
+                ('content_hash', models.CharField(blank=True, db_index=True, help_text='SHA-256 fingerprint of the nutritional values.', max_length=64, verbose_name='Content Hash')),
             ],
             options={
                 'verbose_name': 'Nutrition Facts',
@@ -163,7 +163,6 @@ class Migration(migrations.Migration):
                 ('ean', models.CharField(blank=True, help_text='European Article Number / Global Trade Item Number', max_length=14, null=True, unique=True, verbose_name='EAN/GTIN')),
                 ('packaging', models.CharField(choices=[('REFILL', 'Refill Package'), ('CONTAINER', 'Container Package'), ('BAR', 'Bar'), ('OTHER', 'Other')], default='CONTAINER', max_length=20, verbose_name='Packaging Type')),
                 ('is_published', models.BooleanField(default=False, help_text='If checked, this product will be visible on the public website.', verbose_name='Published')),
-                ('last_enriched_at', models.DateTimeField(blank=True, help_text='Timestamp of last content update by LLM agent', null=True, verbose_name='Last Enriched By LLM')),
                 ('brand', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.brand', verbose_name='Brand')),
                 ('category', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='core.category', verbose_name='Product Category')),
             ],

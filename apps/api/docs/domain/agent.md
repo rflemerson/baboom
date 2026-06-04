@@ -9,7 +9,7 @@ agent no longer creates catalog products directly.
 - Dagster reads `ScrapedPage.api_context` and `ScrapedPage.html_structured_data`.
 - The agent returns one recursive product tree.
 - Django stores the result in `ScrapedItemExtraction` for review.
-- Catalog creation and linking happen only after admin approval.
+- Catalog creation does not happen from the agent extraction flow.
 
 ## Main Flow
 
@@ -23,23 +23,25 @@ agent no longer creates catalog products directly.
 6. Django upserts `ScrapedItemExtraction` for the origin item.
 7. Django marks the origin item as `REVIEW`.
 
-## Approval Flow
+## Error Flow
 
-The review operator approves staged extractions from Django admin:
+1. The agent calls `reportScrapedItemError` for the checked-out item.
+2. Retryable errors move the item to `ERROR` and increment `error_count`.
+3. Fatal errors move the item to `REVIEW`.
+4. When retryable errors reach the max retry count, the item moves to `REVIEW`.
 
-1. Open `ScrapedItemExtraction`.
-2. Select one or more rows.
-3. Run `Approve selected extractions into catalog`.
-4. Django revalidates the stored extraction JSON.
-5. Django maps the extraction into `ProductCreateInput`.
-6. `ProductCreateService` creates or reuses the catalog product.
-7. The origin `ScrapedItem` is linked and marked `LINKED`.
-8. `ScrapedItemExtraction.approved_product` and `approved_at` are set.
+## GraphQL Mutations
 
-Approval is strict. If required catalog fields are missing, the action reports a
-validation error and does not create a product.
-
-## GraphQL Mutation
+```graphql
+mutation CheckoutScrapedItem($data: ScrapedItemCheckoutInput!) {
+  checkoutScrapedItem(data: $data) {
+    id
+    status
+    sourcePageApiContext
+    sourcePageHtmlStructuredData
+  }
+}
+```
 
 ```graphql
 mutation SubmitAgentExtraction($data: AgentExtractionInput!) {
@@ -58,6 +60,12 @@ mutation SubmitAgentExtraction($data: AgentExtractionInput!) {
 }
 ```
 
+```graphql
+mutation ReportScrapedItemError($data: ScrapedItemErrorInput!) {
+  reportScrapedItemError(data: $data)
+}
+```
+
 Input fields:
 
 - `originScrapedItemId`: required `ScrapedItem` id.
@@ -66,6 +74,12 @@ Input fields:
 - `storeSlug`: store identifier used when a fallback source page must be created.
 - `imageReport`: ordered image text produced by the multimodal step.
 - `product`: recursive extracted product JSON.
+
+Error input fields:
+
+- `itemId`: required checked-out `ScrapedItem` id.
+- `message`: error details.
+- `isFatal`: whether the item should skip retries and move to review.
 
 ## Product Tree
 
@@ -101,5 +115,5 @@ Rules:
 - `scrapers.models.ScrapedItemExtraction` persists the staged result.
 - `scrapers.services.ScrapedItemExtractionSubmitService` owns validation and
   status changes.
-- `scrapers.approval.ScrapedItemExtractionApproveService` owns approval mapping.
-- `core.ProductCreateService` is called only during admin approval.
+- `scrapers.services.ScrapedItemErrorService` owns agent error reporting.
+- Catalog product creation is currently owned by manager-facing admin workflows.

@@ -2,65 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from django import forms
 from django.core.exceptions import ValidationError
 
 from offers.models import StockStatus
 
-from .models import NutritionFacts, Product, ProductStore, Store
-
-if TYPE_CHECKING:
-    from .models import ProductNutrition
+from .models import Product, ProductStore, Store
 
 
 class ProductAdminForm(forms.ModelForm):
     """Service-backed admin form for product create and metadata update flows."""
-
-    REQUIRED_NEW_NUTRITION_FIELDS = (
-        "serving_size_grams",
-        "energy_kcal",
-        "proteins",
-        "carbohydrates",
-        "total_fats",
-    )
-
-    class NutritionMode:
-        """Ways the admin can manage nutrition for a product."""
-
-        NONE = "none"
-        EXISTING = "existing"
-        NEW = "new"
-        CHOICES = (
-            (NONE, "No nutrition profile"),
-            (EXISTING, "Use existing nutrition table"),
-            (NEW, "Create or reuse from entered values"),
-        )
-
-    nutrition_mode = forms.ChoiceField(
-        choices=NutritionMode.CHOICES,
-        required=False,
-        initial=NutritionMode.NONE,
-        label="Nutrition mode",
-    )
-    existing_nutrition_facts = forms.ModelChoiceField(
-        queryset=NutritionFacts.objects.order_by("description", "id"),
-        required=False,
-        label="Existing nutrition table",
-    )
-    nutrition_description = forms.CharField(required=False, label="Nutrition label")
-    serving_size_grams = forms.DecimalField(required=False, min_value=0)
-    energy_kcal = forms.IntegerField(required=False, min_value=0)
-    proteins = forms.DecimalField(required=False, min_value=0)
-    carbohydrates = forms.DecimalField(required=False, min_value=0)
-    total_fats = forms.DecimalField(required=False, min_value=0)
-    total_sugars = forms.DecimalField(required=False, min_value=0)
-    added_sugars = forms.DecimalField(required=False, min_value=0)
-    saturated_fats = forms.DecimalField(required=False, min_value=0)
-    trans_fats = forms.DecimalField(required=False, min_value=0)
-    dietary_fiber = forms.DecimalField(required=False, min_value=0)
-    sodium = forms.DecimalField(required=False, min_value=0)
 
     class Meta:
         """Meta options."""
@@ -76,99 +27,6 @@ class ProductAdminForm(forms.ModelForm):
             "category",
             "tags",
             "is_published",
-        )
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        """Populate nutrition helpers from the current product state."""
-        super().__init__(*args, **kwargs)
-
-        if not self.instance.pk:
-            return
-
-        existing_profile = self._get_existing_nutrition_profile()
-        if existing_profile is None:
-            self.initial["nutrition_mode"] = self.NutritionMode.NONE
-            return
-
-        self.initial.update(
-            self._build_existing_nutrition_initial_data(existing_profile),
-        )
-
-    def clean(self) -> dict[str, object]:
-        """Validate nutrition input according to the selected admin workflow."""
-        cleaned_data = super().clean()
-        nutrition_mode = cleaned_data.get("nutrition_mode") or self.NutritionMode.NONE
-
-        if nutrition_mode == self.NutritionMode.EXISTING:
-            self._validate_existing_nutrition_selection(cleaned_data)
-            return cleaned_data
-
-        if nutrition_mode == self.NutritionMode.NEW:
-            self._validate_new_nutrition_fields(cleaned_data)
-
-        return cleaned_data
-
-    def _get_existing_nutrition_profile(self) -> ProductNutrition | None:
-        """Return the first persisted nutrition profile for the product."""
-        return (
-            self.instance.nutrition_profiles.select_related("nutrition_facts")
-            .order_by("id")
-            .first()
-        )
-
-    def _build_existing_nutrition_initial_data(
-        self,
-        existing_profile: ProductNutrition,
-    ) -> dict[str, object]:
-        """Build initial field values from an existing nutrition profile."""
-        facts = existing_profile.nutrition_facts
-        return {
-            "nutrition_mode": self.NutritionMode.EXISTING,
-            "existing_nutrition_facts": facts,
-            "nutrition_description": facts.description,
-            "serving_size_grams": facts.serving_size_grams,
-            "energy_kcal": facts.energy_kcal,
-            "proteins": facts.proteins,
-            "carbohydrates": facts.carbohydrates,
-            "total_fats": facts.total_fats,
-            "total_sugars": facts.total_sugars,
-            "added_sugars": facts.added_sugars,
-            "saturated_fats": facts.saturated_fats,
-            "trans_fats": facts.trans_fats,
-            "dietary_fiber": facts.dietary_fiber,
-            "sodium": facts.sodium,
-        }
-
-    def _validate_existing_nutrition_selection(
-        self,
-        cleaned_data: dict[str, object],
-    ) -> None:
-        """Require an existing table when that nutrition mode is selected."""
-        if cleaned_data.get("existing_nutrition_facts"):
-            return
-
-        raise ValidationError(
-            {"existing_nutrition_facts": "Select an existing nutrition table."},
-        )
-
-    def _validate_new_nutrition_fields(
-        self,
-        cleaned_data: dict[str, object],
-    ) -> None:
-        """Require the minimum set of fields for a new nutrition entry."""
-        missing_fields = [
-            field_name
-            for field_name in self.REQUIRED_NEW_NUTRITION_FIELDS
-            if cleaned_data.get(field_name) in (None, "")
-        ]
-        if not missing_fields:
-            return
-
-        raise ValidationError(
-            dict.fromkeys(
-                missing_fields,
-                "This field is required when creating nutrition.",
-            ),
         )
 
 

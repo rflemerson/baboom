@@ -7,10 +7,8 @@ from typing import TYPE_CHECKING
 from offers.models import StockStatus
 
 from .dtos import (
-    NutritionFactsPayload,
     ProductCreateInput,
     ProductMetadataUpdateInput,
-    ProductNutritionPayload,
     StoreListingPayload,
 )
 from .forms import ProductStoreInlineFormSet
@@ -19,7 +17,6 @@ if TYPE_CHECKING:
     from django.forms import BaseInlineFormSet
 
     from .forms import ProductAdminForm
-    from .models import NutritionFacts
 
 
 def build_product_create_input(form: ProductAdminForm) -> ProductCreateInput:
@@ -55,37 +52,6 @@ def build_product_metadata_update_input(
         is_published=form.cleaned_data["is_published"],
         tags=[tag.name for tag in form.cleaned_data["tags"]],
     )
-
-
-def get_selected_existing_nutrition_facts(
-    form: ProductAdminForm,
-) -> NutritionFacts | None:
-    """Return the explicitly selected nutrition table from the admin form."""
-    return form.cleaned_data.get("existing_nutrition_facts")
-
-
-def build_product_nutrition_payloads(
-    form: ProductAdminForm,
-) -> list[ProductNutritionPayload]:
-    """Build nutrition payloads from the admin product form."""
-    return [
-        ProductNutritionPayload(
-            nutrition_facts=NutritionFactsPayload(
-                description=form.cleaned_data["nutrition_description"] or "",
-                serving_size_grams=float(form.cleaned_data["serving_size_grams"]),
-                energy_kcal=form.cleaned_data["energy_kcal"],
-                proteins=float(form.cleaned_data["proteins"]),
-                carbohydrates=float(form.cleaned_data["carbohydrates"]),
-                total_fats=float(form.cleaned_data["total_fats"]),
-                total_sugars=float(form.cleaned_data["total_sugars"] or 0),
-                added_sugars=float(form.cleaned_data["added_sugars"] or 0),
-                saturated_fats=float(form.cleaned_data["saturated_fats"] or 0),
-                trans_fats=float(form.cleaned_data["trans_fats"] or 0),
-                dietary_fiber=float(form.cleaned_data["dietary_fiber"] or 0),
-                sodium=float(form.cleaned_data["sodium"] or 0),
-            ),
-        ),
-    ]
 
 
 def find_product_store_inline_formset(

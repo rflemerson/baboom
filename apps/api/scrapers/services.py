@@ -16,7 +16,6 @@ from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
-from core.models import ProductStore
 from offers.models import Offer, PriceObservation, StockStatus
 
 from .dtos import AgentExtractionSubmitInput
@@ -34,10 +33,7 @@ class ScrapedItemCheckoutService:
 
     MAX_RETRIES = 3
     RETRY_COOLDOWN = timedelta(minutes=30)
-    FORCED_ELIGIBLE_STATUSES = (
-        ScrapedItem.Status.LINKED,
-        ScrapedItem.Status.REVIEW,
-    )
+    FORCED_ELIGIBLE_STATUSES = (ScrapedItem.Status.REVIEW,)
 
     def execute(self, data: ScrapedItemCheckoutInput) -> ScrapedItem | None:
         """Select and lock the next scraped item for checkout."""
@@ -94,7 +90,6 @@ class ScrapedItemCheckoutService:
                     When(status=ScrapedItem.Status.QUEUED, then=Value(0)),
                     When(status=ScrapedItem.Status.ERROR, then=Value(1)),
                     When(status=ScrapedItem.Status.REVIEW, then=Value(2)),
-                    When(status=ScrapedItem.Status.LINKED, then=Value(3)),
                     default=Value(99),
                     output_field=IntegerField(),
                 ),
@@ -109,8 +104,6 @@ class ScrapedItemCheckoutService:
         now: datetime,
     ) -> ScrapedItem | None:
         """Return the single scraped item selected for checkout."""
-        if data.target_item_id:
-            return self._checkout_base_query().filter(id=data.target_item_id).first()
         return self._eligible_items(now=now, force=data.force).first()
 
 
@@ -118,56 +111,36 @@ class ScrapedItemErrorService:
     """Report agent-side processing failures for scraped items."""
 
     def execute(self, *, item_id: int, message: str, is_fatal: bool) -> bool:
-        """Persist retry or review state for a scraped item error."""
-        try:
-            item = ScrapedItem.objects.get(id=item_id)
-        except ScrapedItem.DoesNotExist:
+        """Persist retry or review state for a processing scraped item."""
+        item = ScrapedItem.objects.filter(id=item_id).first()
+        if item is None or item.status != ScrapedItem.Status.PROCESSING:
             return False
 
+        item.last_attempt_at = timezone.now()
         if is_fatal:
             item.status = ScrapedItem.Status.REVIEW
             item.last_error_log = f"FATAL: {message}"
         else:
-            item.status = ScrapedItem.Status.ERROR
             item.error_count += 1
             item.last_error_log = message
-
-            if item.error_count >= ScrapedItemCheckoutService.MAX_RETRIES:
-                item.status = ScrapedItem.Status.REVIEW
+            item.status = (
+                ScrapedItem.Status.REVIEW
+                if item.error_count >= ScrapedItemCheckoutService.MAX_RETRIES
+                else ScrapedItem.Status.ERROR
+            )
+            if item.status == ScrapedItem.Status.REVIEW:
                 item.last_error_log += " (Max retries reached)"
 
-        item.save()
+        item.save(
+            update_fields=[
+                "status",
+                "error_count",
+                "last_error_log",
+                "last_attempt_at",
+                "updated_at",
+            ],
+        )
         return True
-
-
-class ScrapedItemLinkService:
-    """Mark a scraped item as linked once its offer is claimed by a product.
-
-    The price connection is implicit: the catalog ``ProductStore`` references the
-    same merchant offer as the scraped item, so there is no price to copy here.
-    """
-
-    def execute(
-        self,
-        *,
-        scraped_item_id: int,
-        product_store_id: int,
-    ) -> ScrapedItem | None:
-        """Flag the scraped item as linked to its now-cataloged offer."""
-        product_store = ProductStore.objects.filter(id=product_store_id).first()
-        if product_store is None:
-            return None
-
-        item = ScrapedItem.objects.filter(id=scraped_item_id).first()
-        if item is None:
-            return None
-
-        if product_store.offer_id != item.offer_id:
-            return None
-
-        item.status = ScrapedItem.Status.LINKED
-        item.save(update_fields=["status", "updated_at"])
-        return item
 
 
 class ScrapedItemExtractionSubmitService:
@@ -177,6 +150,10 @@ class ScrapedItemExtractionSubmitService:
     def execute(self, data: AgentExtractionSubmitInput) -> ScrapedItemExtraction:
         """Persist the agent output and move the origin item to review."""
         item = self._get_item(data.origin_scraped_item_id)
+        if item.status != ScrapedItem.Status.PROCESSING:
+            raise DjangoValidationError(
+                {"originScrapedItemId": ["Scraped item is not processing."]},
+            )
         source_page = self._resolve_source_page(item=item, data=data)
         extraction, _ = ScrapedItemExtraction.objects.update_or_create(
             scraped_item=item,

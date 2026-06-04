@@ -13,16 +13,15 @@ from django.test import RequestFactory, SimpleTestCase, TestCase
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
-from core.models import APIKey, Brand, Product, ProductStore, Store
+from core.models import APIKey
 from offers.models import Offer, PriceObservation, StockStatus
 from scrapers.admin import queue_for_agents
-from scrapers.approval import ScrapedItemExtractionApproveService
 from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage, ScraperRun
 from scrapers.services import (
     ScrapedItemCheckoutService,
+    ScrapedItemErrorService,
     ScrapedItemExtractionSubmitService,
-    ScrapedItemLinkService,
     ScraperService,
 )
 from scrapers.spiders.blackskull import BlackSkullSpider
@@ -46,8 +45,6 @@ EXPECTED_GROWTH_CURRENCY_PRICE = 89.5
 EXPECTED_VTEX_DECIMAL_PRICE = 99.9
 EXPECTED_VTEX_INTEGER_PRICE = 55.0
 EXPECTED_FALLBACK_CATEGORY_COUNT = 2
-EXPECTED_APPROVED_WHEY_WEIGHT = 900
-EXPECTED_COMBO_COMPONENT_COUNT = 2
 EXPECTED_SCRAPER_RUN_ITEMS = 2
 
 type ScrapedJsonObject = dict[str, object]
@@ -319,7 +316,7 @@ class ScrapedItemQueueTests(TestCase):
         )
 
         work = ScrapedItemCheckoutService().execute(
-            data=MagicMock(force=False, target_item_id=None),
+            data=MagicMock(force=False),
         )
 
         assert work is not None
@@ -327,75 +324,114 @@ class ScrapedItemQueueTests(TestCase):
         queued_item.refresh_from_db()
         assert queued_item.status == ScrapedItem.Status.PROCESSING
 
+    def test_checkout_force_reprocesses_review_items(self) -> None:
+        """Forced checkout should allow explicit review reprocessing."""
+        review_item = _scraped_item(
+            store_slug="dark_lab",
+            external_id="review-item",
+            status=ScrapedItem.Status.REVIEW,
+            source_page=self.page,
+        )
 
-class ScrapedItemLinkServiceTests(TestCase):
-    """Tests for explicitly linking scraped items to catalog listings."""
+        work = ScrapedItemCheckoutService().execute(data=MagicMock(force=True))
+
+        assert work is not None
+        assert work.id == review_item.id
+        review_item.refresh_from_db()
+        assert review_item.status == ScrapedItem.Status.PROCESSING
+
+    def test_checkout_force_does_not_reprocess_linked_items(self) -> None:
+        """Forced checkout should not consume already linked items."""
+        _scraped_item(
+            store_slug="dark_lab",
+            external_id="linked-item",
+            status=ScrapedItem.Status.LINKED,
+            source_page=self.page,
+        )
+
+        work = ScrapedItemCheckoutService().execute(data=MagicMock(force=True))
+
+        assert work is None
+
+
+class ScrapedItemErrorServiceTests(TestCase):
+    """Unit tests for agent error reporting."""
 
     def setUp(self) -> None:
-        """Create shared catalog objects for link tests."""
+        """Create one processing item for error reporting tests."""
         self.page = ScrapedPage.objects.create(
             store_slug="growth",
             url="https://growth.example/whey",
         )
-        self.brand = Brand.objects.create(name="growth", display_name="Growth")
-        self.product = Product.objects.create(
-            name="Whey Concentrado",
-            brand=self.brand,
-            weight=900,
-            packaging=Product.Packaging.CONTAINER,
-        )
-        self.store = Store.objects.create(name="growth", display_name="Growth")
-        self.service = ScrapedItemLinkService()
-
-    def test_execute_links_item_when_listing_claims_same_offer(self) -> None:
-        """The selected listing must point to the scraped item's offer."""
-        item = _scraped_item(
+        self.item = _scraped_item(
             store_slug="growth",
-            external_id="growth-1",
-            status=ScrapedItem.Status.REVIEW,
+            external_id="growth-error-1",
+            name="Whey Growth",
+            status=ScrapedItem.Status.PROCESSING,
             source_page=self.page,
         )
-        listing = ProductStore.objects.create(
-            product=self.product,
-            store=self.store,
-            offer=item.offer,
+        self.service = ScrapedItemErrorService()
+
+    def test_execute_records_retryable_error(self) -> None:
+        """Retryable errors move processing items to the retry state."""
+        result = self.service.execute(
+            item_id=self.item.id,
+            message="temporary parse failure",
+            is_fatal=False,
         )
+
+        self.item.refresh_from_db()
+        assert result
+        assert self.item.status == ScrapedItem.Status.ERROR
+        assert self.item.error_count == 1
+        assert self.item.last_error_log == "temporary parse failure"
+
+    def test_execute_moves_to_review_after_max_retries(self) -> None:
+        """Retryable errors become review items after the max retry count."""
+        self.item.error_count = ScrapedItemCheckoutService.MAX_RETRIES - 1
+        self.item.save(update_fields=["error_count"])
 
         result = self.service.execute(
-            scraped_item_id=item.id,
-            product_store_id=listing.id,
+            item_id=self.item.id,
+            message="still failing",
+            is_fatal=False,
         )
 
-        assert result is not None
-        item.refresh_from_db()
-        assert item.status == ScrapedItem.Status.LINKED
+        self.item.refresh_from_db()
+        assert result
+        assert self.item.status == ScrapedItem.Status.REVIEW
+        assert self.item.error_count == ScrapedItemCheckoutService.MAX_RETRIES
+        assert "Max retries reached" in self.item.last_error_log
 
-    def test_execute_rejects_listing_with_different_offer(self) -> None:
-        """A mismatched listing must not mark the scraped item as linked."""
-        item = _scraped_item(
-            store_slug="growth",
-            external_id="growth-1",
-            status=ScrapedItem.Status.REVIEW,
-            source_page=self.page,
+    def test_execute_records_fatal_error_for_review(self) -> None:
+        """Fatal errors should move directly to review."""
+        result = self.service.execute(
+            item_id=self.item.id,
+            message="unsupported page",
+            is_fatal=True,
         )
-        other_offer = Offer.objects.create(
-            store_slug="growth",
-            external_id="growth-2",
-        )
-        listing = ProductStore.objects.create(
-            product=self.product,
-            store=self.store,
-            offer=other_offer,
-        )
+
+        self.item.refresh_from_db()
+        assert result
+        assert self.item.status == ScrapedItem.Status.REVIEW
+        assert self.item.error_count == 0
+        assert self.item.last_error_log == "FATAL: unsupported page"
+
+    def test_execute_rejects_non_processing_item(self) -> None:
+        """Only currently checked out items can receive agent errors."""
+        self.item.status = ScrapedItem.Status.REVIEW
+        self.item.save(update_fields=["status"])
 
         result = self.service.execute(
-            scraped_item_id=item.id,
-            product_store_id=listing.id,
+            item_id=self.item.id,
+            message="late error",
+            is_fatal=False,
         )
 
-        assert result is None
-        item.refresh_from_db()
-        assert item.status == ScrapedItem.Status.REVIEW
+        self.item.refresh_from_db()
+        assert not result
+        assert self.item.status == ScrapedItem.Status.REVIEW
+        assert self.item.error_count == 0
 
 
 class ScrapedItemExtractionSubmitServiceTests(TestCase):
@@ -450,6 +486,28 @@ class ScrapedItemExtractionSubmitServiceTests(TestCase):
         assert self.item.status == ScrapedItem.Status.REVIEW
         assert self.item.error_count == 0
         assert self.item.last_error_log == ""
+
+    def test_execute_rejects_non_processing_item(self) -> None:
+        """Agent submissions must belong to a checked out item."""
+        self.item.status = ScrapedItem.Status.REVIEW
+        self.item.save(update_fields=["status"])
+        data = AgentExtractionSubmitInput.model_validate(
+            {
+                "originScrapedItemId": self.item.id,
+                "sourcePageId": self.page.id,
+                "sourcePageUrl": self.page.url,
+                "storeSlug": "growth",
+                "imageReport": "",
+                "product": {
+                    "name": "Whey Growth",
+                    "brandName": "Growth",
+                    "children": [],
+                },
+            },
+        )
+
+        with self.assertRaisesMessage(Exception, "Scraped item is not processing"):
+            ScrapedItemExtractionSubmitService().execute(data)
 
 
 class ScrapedItemExtractionGraphQLTests(TestCase):
@@ -524,211 +582,35 @@ class ScrapedItemExtractionGraphQLTests(TestCase):
         assert extraction.image_report == "Image 1: label"
         assert self.item.status == ScrapedItem.Status.REVIEW
 
-
-class ScrapedItemExtractionApproveServiceTests(TestCase):
-    """Unit tests for approving staged agent extractions."""
-
-    def setUp(self) -> None:
-        """Set up one staged extraction with enough source data to approve."""
-        self.page = ScrapedPage.objects.create(
-            store_slug="growth",
-            url="https://growth.example/whey",
-        )
-        self.item = _scraped_item(
-            store_slug="growth",
-            external_id="growth-approve-1",
-            name="Whey Growth",
-            price=Decimal("149.90"),
-            status=ScrapedItem.Status.REVIEW,
-            source_page=self.page,
-        )
-
-    def test_execute_creates_product_and_links_origin_item(self) -> None:
-        """Approval creates a catalog product from staged extraction JSON."""
-        extraction = ScrapedItemExtraction.objects.create(
-            scraped_item=self.item,
-            source_page=self.page,
-            image_report="Image 1: whey label",
-            extracted_product={
-                "name": "Whey Growth",
-                "brandName": "Growth",
-                "weightGrams": 900,
-                "packaging": "REFILL",
-                "categoryHierarchy": ["Proteins", "Whey"],
-                "tagsHierarchy": [["Goal", "Hypertrophy"]],
-                "flavorNames": ["Chocolate"],
-                "nutritionFacts": {
-                    "servingSizeGrams": 30,
-                    "energyKcal": 120,
-                    "proteins": 24,
-                    "carbohydrates": 3,
-                    "totalFats": 2,
-                },
-                "children": [],
+    def test_report_scraped_item_error_mutation_records_error(self) -> None:
+        """The mutation lets agents report checkout processing failures."""
+        mutation = """
+        mutation ReportScrapedItemError($data: ScrapedItemErrorInput!) {
+          reportScrapedItemError(data: $data)
+        }
+        """
+        variables = {
+            "data": {
+                "itemId": self.item.id,
+                "message": "temporary model failure",
+                "isFatal": False,
             },
+        }
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": mutation, "variables": variables}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.api_key_obj.key,
         )
 
-        result = ScrapedItemExtractionApproveService().execute(
-            extraction_id=extraction.id,
-        )
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
 
         self.item.refresh_from_db()
-        extraction.refresh_from_db()
-        product = result.product
-        assert product.name == "Whey Growth"
-        assert product.weight == EXPECTED_APPROVED_WHEY_WEIGHT
-        assert product.brand.display_name == "Growth"
-        assert product.packaging == Product.Packaging.REFILL
-        assert product.type == Product.Type.SIMPLE
-        assert product.store_links.count() == 1
-        assert product.nutrition_profiles.count() == 1
-        assert self.item.status == ScrapedItem.Status.LINKED
-        assert product.store_links.get().offer_id == self.item.offer_id
-        assert extraction.approved_product == product
-        assert extraction.approved_at is not None
-
-    def test_execute_creates_combo_with_children_components(self) -> None:
-        """Approval maps extracted children into combo components."""
-        extraction = ScrapedItemExtraction.objects.create(
-            scraped_item=self.item,
-            source_page=self.page,
-            image_report="Image 1: combo",
-            extracted_product={
-                "name": "Combo Whey + Creatina",
-                "brandName": "Growth",
-                "weightGrams": 1200,
-                "packaging": "OTHER",
-                "children": [
-                    {
-                        "name": "Whey Growth",
-                        "brandName": "Growth",
-                        "weightGrams": 900,
-                        "packaging": "REFILL",
-                        "children": [],
-                    },
-                    {
-                        "name": "Creatina Growth",
-                        "brandName": "Growth",
-                        "weightGrams": 300,
-                        "packaging": "CONTAINER",
-                        "quantity": 2,
-                        "children": [],
-                    },
-                ],
-            },
-        )
-
-        result = ScrapedItemExtractionApproveService().execute(
-            extraction_id=extraction.id,
-        )
-
-        self.item.refresh_from_db()
-        product = result.product
-        assert product.type == Product.Type.COMBO
-        assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
-        assert set(
-            product.component_links.values_list("component__name", flat=True),
-        ) == {"Whey Growth", "Creatina Growth"}
-        assert self.item.status == ScrapedItem.Status.LINKED
-
-    def test_execute_allows_combo_without_root_weight(self) -> None:
-        """Combo roots may omit a single total weight."""
-        extraction = ScrapedItemExtraction.objects.create(
-            scraped_item=self.item,
-            source_page=self.page,
-            image_report="Image 1: combo",
-            extracted_product={
-                "name": "Combo Whey + Creatina",
-                "brandName": "Growth",
-                "packaging": "OTHER",
-                "children": [
-                    {
-                        "name": "Whey Growth",
-                        "brandName": "Growth",
-                        "weightGrams": 900,
-                        "packaging": "REFILL",
-                        "children": [],
-                    },
-                    {
-                        "name": "Creatina Growth",
-                        "brandName": "Growth",
-                        "weightGrams": 300,
-                        "packaging": "CONTAINER",
-                        "children": [],
-                    },
-                ],
-            },
-        )
-
-        result = ScrapedItemExtractionApproveService().execute(
-            extraction_id=extraction.id,
-        )
-
-        product = result.product
-        assert product.type == Product.Type.COMBO
-        assert product.weight is None
-        assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
-
-    def test_execute_allows_combo_children_without_weight(self) -> None:
-        """Combo children may omit weight."""
-        extraction = ScrapedItemExtraction.objects.create(
-            scraped_item=self.item,
-            source_page=self.page,
-            image_report="Image 1: combo",
-            extracted_product={
-                "name": "Combo Whey + Creatina",
-                "brandName": "Growth",
-                "packaging": "OTHER",
-                "children": [
-                    {
-                        "name": "Whey Growth",
-                        "brandName": "Growth",
-                        "packaging": "REFILL",
-                        "children": [],
-                    },
-                    {
-                        "name": "Creatina Growth",
-                        "brandName": "Growth",
-                        "packaging": "CONTAINER",
-                        "children": [],
-                    },
-                ],
-            },
-        )
-
-        result = ScrapedItemExtractionApproveService().execute(
-            extraction_id=extraction.id,
-        )
-
-        product = result.product
-        assert product.type == Product.Type.COMBO
-        assert product.component_links.count() == EXPECTED_COMBO_COMPONENT_COUNT
-        assert all(
-            weight is None
-            for weight in product.component_links.values_list(
-                "component__weight",
-                flat=True,
-            )
-        )
-
-    def test_execute_rejects_extraction_missing_required_catalog_fields(self) -> None:
-        """Approval fails clearly when the extracted product is incomplete."""
-        extraction = ScrapedItemExtraction.objects.create(
-            scraped_item=self.item,
-            source_page=self.page,
-            image_report="Image 1: incomplete",
-            extracted_product={
-                "name": "Whey Growth",
-                "children": [],
-            },
-        )
-
-        with self.assertRaisesMessage(Exception, "Product brand is required"):
-            ScrapedItemExtractionApproveService().execute(extraction_id=extraction.id)
-
-        self.item.refresh_from_db()
-        assert Product.objects.count() == 0
-        assert self.item.status == ScrapedItem.Status.REVIEW
+        assert payload["data"]["reportScrapedItemError"]
+        assert self.item.status == ScrapedItem.Status.ERROR
+        assert self.item.error_count == 1
+        assert self.item.last_error_log == "temporary model failure"
 
 
 class _DummyCatalogSpider(CatalogApiSpider):

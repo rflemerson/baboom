@@ -11,7 +11,6 @@ from scrapers.services import (
     ScrapedItemCheckoutService,
     ScrapedItemErrorService,
     ScrapedItemExtractionSubmitService,
-    ScrapedItemLinkService,
     build_agent_extraction_submit_input,
 )
 
@@ -19,7 +18,6 @@ from .inputs import (
     AgentExtractionInput,
     ScrapedItemCheckoutInput,
     ScrapedItemErrorInput,
-    ScrapedItemLinkInput,
 )
 from .types import (
     ScrapedItemExtractionResult,
@@ -31,7 +29,6 @@ _STRAWBERRY_RUNTIME_TYPES = (
     AgentExtractionInput,
     ScrapedItemCheckoutInput,
     ScrapedItemErrorInput,
-    ScrapedItemLinkInput,
     ScrapedItemExtractionResult,
     ScrapedItemExtractionType,
     ScrapedItemType,
@@ -55,22 +52,11 @@ class ScrapersMutation:
         self,
         data: ScrapedItemErrorInput,
     ) -> bool:
-        """Report an error for a scraped item."""
+        """Report an error for a processing scraped item."""
         return ScrapedItemErrorService().execute(
             item_id=data.item_id,
             message=data.message,
             is_fatal=data.is_fatal,
-        )
-
-    @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
-    def link_scraped_item_to_product_store(
-        self,
-        data: ScrapedItemLinkInput,
-    ) -> ScrapedItemType | None:
-        """Explicitly link a scraped item to a chosen product store."""
-        return ScrapedItemLinkService().execute(
-            scraped_item_id=data.item_id,
-            product_store_id=data.product_store_id,
         )
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
