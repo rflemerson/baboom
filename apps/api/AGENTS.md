@@ -2,75 +2,42 @@
 
 ## Scope
 
-- This directory contains the Django API, GraphQL schema, admin, and scraping integration.
-- The public frontend lives in `apps/web`; do not reintroduce Django template frontend work here.
-- Keep this file updated when architecture or tooling changes.
+- Django API, admin, REST catalog, authenticated scraper GraphQL, and scraping integration.
+- Public frontend lives in `apps/web`; do not add Django template frontend flows here.
 
-## Workflow
+## Commands
 
 ```bash
-cd apps/api && pip install -e .[dev]
-cd apps/api && prek run --all-files
-cd apps/api && .venv/bin/python manage.py check
-cd apps/api && .venv/bin/python manage.py test
-cd apps/api && .venv/bin/python manage.py runserver
+pip install -e .[dev]
+prek run --all-files
+.venv/bin/python manage.py check
+.venv/bin/python manage.py test
+.venv/bin/python manage.py runserver
 ```
 
 ## Architecture
 
-- Core business workflows live in `core/services/`.
-- Service DTOs live in `core/dtos.py`; scraper DTOs live in `scrapers/dtos.py`.
-- GraphQL is limited to the authenticated agent workflow in `scrapers/graphql/`.
-- Read/query composition lives in `selectors.py`, not in GraphQL and not in form-style filters.
-- Public frontend reads use REST under `/api/catalog/` with `Cache-Control`
-  headers for Cloudflare. Tune `CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS` and
-  `CATALOG_PRODUCTS_EDGE_CACHE_SECONDS`.
-- Keep GraphQL fields and mutations protected with `IsAuthenticatedWithAPIKey`;
-  public frontend flows should use explicit REST endpoints instead of API keys.
-- Scraper workflows live in `scrapers/services.py`.
-- Agent extraction review staging lives in `scrapers`:
-  - persistence model: `ScrapedItemExtraction`
-  - service: `ScrapedItemExtractionSubmitService`
-  - GraphQL mutation: `submitAgentExtraction`
-- Agent checkout failures are reported through:
-  - service: `ScrapedItemErrorService`
-  - GraphQL mutation: `reportScrapedItemError`
-- Dagster queue selection is explicit:
-  - newly scraped items stay `ScrapedItem.Status.NEW`
-  - the admin action on `ScrapedItemAdmin` must move chosen items to
-    `ScrapedItem.Status.QUEUED` before the agents checkout flow will consume them
-- Agent extraction staging must not create or link catalog products directly.
-- Catalog product creation is currently manager-facing only through `ProductAdmin`.
-- Admin forms/formsets live in `core/forms.py`.
-- Admin-to-service mapping helpers live in `core/admin_mappers.py`.
-- Domain docs live in `docs/domain/`; scraper strategy docs live in `docs/scrapers/`.
+- Business workflows: `core/services/` and `scrapers/services.py`.
+- DTOs: `core/dtos.py` and `scrapers/dtos.py`.
+- Public catalog and alerts: REST.
+- Agent checkout/extraction/error reporting: GraphQL in `scrapers/graphql/`, protected with `IsAuthenticatedWithAPIKey`.
+- Query composition belongs in `selectors.py`.
+- Product, nutrition, component, flavor, brand, store, tag, category, alert subscriber, and API key management is manager-facing through Django admin.
+- `ProductStore` is managed through the `ProductAdmin` inline, not as direct CRUD.
+- Agent extraction staging must only write review data; catalog creation stays in admin workflows.
 
-## Project Patterns
+## Patterns
 
-- Prefer explicit use-case classes over wrapper helpers.
-- Keep models focused on invariants and persistence.
-- Keep orchestration in services.
-- Prefer typed DTOs over `dict[str, Any]`.
-- Prefer exact identifier matching over fuzzy matching.
-- Treat `ProductAdmin` as the official manager-facing workflow for product metadata and store listings.
-- Manage product nutrition in admin by creating `NutritionFacts` records and linking them through the `ProductNutrition` inline; do not reintroduce `nutrition_mode` form workflows.
-- Wrap manager-facing admin save flows in a transaction when one save coordinates multiple related writes.
-
-## Typing and Refactors
-
-- Public functions need explicit parameter and return types.
-- Avoid `Any`; prefer concrete types and narrow framework types.
-- Move annotation-only imports into `TYPE_CHECKING`.
-- Use `ClassVar[...]` for mutable class metadata.
-- Do not use `# noqa`, `type: ignore`, or broad ignore globs to bypass lint.
+- Use explicit service classes for orchestration.
+- Keep models focused on persistence and invariants.
+- Prefer typed DTOs over untyped dictionaries.
+- Keep public functions typed; move annotation-only imports into `TYPE_CHECKING`.
+- Use `ClassVar[...]` for mutable admin metadata.
+- Avoid `Any`, `# noqa`, `type: ignore`, and broad lint bypasses.
 - Prefer plain `assert` in tests.
 
-## Quality and Security
+## Quality
 
-- Run `prek run --all-files` before finishing substantial changes.
-- Do not use `--no-verify` when committing.
-- Review files modified automatically by hooks and rerun until clean.
-- Keep GraphQL permissions explicit.
-- Do not log secrets, API keys, or sensitive personal data.
-- Keep production host/TLS/cookie settings explicit and strict.
-- Do not commit Django `SECRET_KEY` values; load them from env and only use generated runtime fallbacks for local development.
+- Run `prek run --all-files` for substantial changes and review hook edits.
+- Do not commit secrets or Django `SECRET_KEY` values.
+- Keep production host, TLS, cookie, and GraphQL permission settings explicit.
