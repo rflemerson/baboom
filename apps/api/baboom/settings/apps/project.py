@@ -26,9 +26,9 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # i18n: Supported languages
-LANGUAGE_CODE = "pt-br"
+LANGUAGE_CODE = "en-us"
 LANGUAGES = [
-    ("pt-br", "Portuguese (Brazil)"),
+    ("en", "English"),
 ]
 LOCALE_PATHS = [BASE_DIR / "locale"]
 

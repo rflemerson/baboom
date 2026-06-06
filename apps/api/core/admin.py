@@ -154,7 +154,7 @@ class ProductAdmin(admin.ModelAdmin):
             .prefetch_related("tags")
         )
 
-    @admin.display(description="Categoria", ordering="category__name")
+    @admin.display(description="Category", ordering="category__name")
     def get_category(self, obj: Product) -> str:
         """Return category name."""
         return obj.category.name if obj.category else "-"
@@ -288,7 +288,7 @@ class ProductAdmin(admin.ModelAdmin):
         ProductStoreService().replace_listings(product, store_listings_data)
 
     @admin.action(
-        description="Excluir products selecionados com links",
+        description="Delete selected products with links",
         permissions=["delete"],
     )
     def delete_products_with_related_data(

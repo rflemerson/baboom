@@ -12,6 +12,7 @@ class BaseModel(models.Model):
         _("Created At"),
         db_index=True,
         default=timezone.now,
+        editable=False,
     )
     updated_at = models.DateTimeField(
         _("Updated At"),

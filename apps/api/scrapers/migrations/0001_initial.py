@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             name='ScrapedItem',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('status', models.CharField(choices=[('new', 'New'), ('queued', 'Queued for Agents'), ('processing', 'Processing'), ('linked', 'Linked'), ('error', 'Error (Retry)'), ('review', 'Needs Review'), ('ignored', 'Ignored')], db_index=True, default='new', max_length=20)),
                 ('error_count', models.PositiveIntegerField(default=0)),
@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
             name='ScrapedItemExtraction',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('image_report', models.TextField(blank=True, help_text='Ordered text report extracted from product images')),
                 ('extracted_product', models.JSONField(blank=True, default=dict, help_text='Recursive product tree returned by the agent')),

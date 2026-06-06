@@ -433,6 +433,7 @@ class NutritionFacts(BaseModel):
         max_length=64,
         blank=True,
         db_index=True,
+        editable=False,
         help_text=_(
             "SHA-256 fingerprint of the nutritional values.",
         ),

@@ -14,4 +14,5 @@ class SubmitLineComponent(Component):
 
     def get_context_data(self, **kwargs: object) -> dict[str, Any]:
         """Get component context data."""
-        return submit_row(kwargs).flatten()
+        cleaned_kwargs = {k: v for k, v in kwargs.items() if v not in (None, "")}
+        return submit_row(cleaned_kwargs).flatten()

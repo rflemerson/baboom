@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             name='Offer',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('store_slug', models.CharField(db_index=True, help_text='Raw store identifier as seen by the scraper', max_length=100, verbose_name='Store Slug')),
                 ('external_id', models.CharField(db_index=True, help_text='Unique identifier in the store system (e.g., SKU)', max_length=100, verbose_name='Store Product ID')),
@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
             name='PriceObservation',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('price', models.DecimalField(decimal_places=2, max_digits=10, verbose_name='Price')),
                 ('stock_status', models.CharField(choices=[('A', 'Available'), ('L', 'Last Units'), ('O', 'Out of Stock')], default='A', max_length=1, verbose_name='Stock Status')),

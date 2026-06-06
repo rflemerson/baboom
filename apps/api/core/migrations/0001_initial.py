@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             name='AlertSubscriber',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('email', models.EmailField(max_length=254, unique=True, verbose_name='Email')),
                 ('is_active', models.BooleanField(default=True, verbose_name='Active')),
@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
             name='APIKey',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('name', models.CharField(help_text='Who is this key for?', max_length=100, verbose_name='Client Name')),
                 ('key', models.CharField(db_index=True, editable=False, max_length=64, unique=True, verbose_name='API Key')),
@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
             name='Brand',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
                 ('display_name', models.CharField(max_length=100, unique=True, verbose_name='Display Name')),
@@ -63,7 +63,7 @@ class Migration(migrations.Migration):
             name='Category',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('path', models.CharField(max_length=255, unique=True)),
                 ('depth', models.PositiveIntegerField()),
@@ -80,7 +80,7 @@ class Migration(migrations.Migration):
             name='Flavor',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
                 ('description', models.TextField(blank=True, help_text='Flavor description', verbose_name='Description')),
@@ -95,7 +95,7 @@ class Migration(migrations.Migration):
             name='Store',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
                 ('display_name', models.CharField(max_length=100, unique=True, verbose_name='Display Name')),
@@ -111,7 +111,7 @@ class Migration(migrations.Migration):
             name='Tag',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('path', models.CharField(max_length=255, unique=True)),
                 ('depth', models.PositiveIntegerField()),
@@ -128,7 +128,7 @@ class Migration(migrations.Migration):
             name='NutritionFacts',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('description', models.CharField(blank=True, help_text="E.g. 'Saborizada' or 'Natural' to identify this table in the admin.", max_length=200, verbose_name='Internal Label')),
                 ('serving_size_grams', models.DecimalField(decimal_places=2, max_digits=6, verbose_name='Serving Size (g)')),
@@ -142,7 +142,7 @@ class Migration(migrations.Migration):
                 ('trans_fats', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Trans Fats (g)')),
                 ('dietary_fiber', models.DecimalField(decimal_places=1, default=0, max_digits=5, verbose_name='Dietary Fiber (g)')),
                 ('sodium', models.DecimalField(decimal_places=2, default=0, max_digits=10, verbose_name='Sodium (mg)')),
-                ('content_hash', models.CharField(blank=True, db_index=True, help_text='SHA-256 fingerprint of the nutritional values.', max_length=64, verbose_name='Content Hash')),
+                ('content_hash', models.CharField(blank=True, db_index=True, editable=False, help_text='SHA-256 fingerprint of the nutritional values.', max_length=64, verbose_name='Content Hash')),
             ],
             options={
                 'verbose_name': 'Nutrition Facts',
@@ -154,7 +154,7 @@ class Migration(migrations.Migration):
             name='Product',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('name', models.CharField(max_length=200, verbose_name='Product Name')),
                 ('description', models.TextField(blank=True, help_text='Marketing description', verbose_name='Description')),
@@ -175,7 +175,7 @@ class Migration(migrations.Migration):
             name='ProductStore',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('affiliate_link', models.URLField(blank=True, default='', help_text='URL with affiliate tracking parameters', max_length=500, verbose_name='Affiliate Tracking URL')),
                 ('offer', models.OneToOneField(blank=True, help_text='Merchant offer that holds the price series for this listing', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='product_store', to='offers.offer', verbose_name='Merchant Offer')),
@@ -202,7 +202,7 @@ class Migration(migrations.Migration):
             name='Micronutrient',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('name', models.CharField(help_text='e.g., Vitamin C, Iron', max_length=100, verbose_name='Nutrient Name')),
                 ('value', models.DecimalField(decimal_places=3, max_digits=10, verbose_name='Quantity')),
@@ -219,7 +219,7 @@ class Migration(migrations.Migration):
             name='ProductComponent',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('quantity', models.PositiveIntegerField(default=1, verbose_name='Quantity')),
                 ('component', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='parent_links', to='core.product', verbose_name='Component')),
@@ -235,7 +235,7 @@ class Migration(migrations.Migration):
             name='ProductNutrition',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created At')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('flavors', models.ManyToManyField(blank=True, to='core.flavor', verbose_name='Flavors')),
                 ('nutrition_facts', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='product_profiles', to='core.nutritionfacts', verbose_name='Nutrition Facts')),
