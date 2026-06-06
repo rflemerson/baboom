@@ -9,6 +9,7 @@ from celery.utils.log import get_task_logger
 from django.utils import timezone
 
 from .models import ScrapedItem, ScraperRun
+from .services import ScraperService
 from .spiders.blackskull import BlackSkullSpider
 from .spiders.dark_lab import DarkLabSpider
 from .spiders.dux import DuxSpider
@@ -27,7 +28,11 @@ STUCK_ITEM_TIMEOUT_MINUTES = 60
 
 
 def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
-    """Run a scraper spider and return a standardized status message."""
+    """Run a light catalog spider (price/stock/basic) and return a status message.
+
+    Product-page HTML enrichment is a separate, on-demand job
+    (:func:`enrich_store_pages`); the monitors never touch it.
+    """
     started_at = timezone.now()
     current_task = get_current_task()
     run = ScraperRun.objects.create(
@@ -122,6 +127,26 @@ def scrape_dux_monitor() -> str:
 def scrape_soldiers_monitor() -> str:
     """Scrape Soldiers Nutrition."""
     return _run_spider_monitor(SoldiersSpider, "Soldiers")
+
+
+@shared_task
+def enrich_store_pages(
+    store_slug: str | None = None,
+    limit: int | None = None,
+) -> str:
+    """On-demand heavy pass: refresh product-page HTML for scraped pages.
+
+    Run this when you want fresh structured data (e.g.
+    ``enrich_store_pages.delay("dark_lab")``). Each page is re-fetched with a
+    conditional GET, so only pages the store reports as changed are updated.
+    """
+    stats = ScraperService.enrich_pages(store_slug=store_slug, limit=limit)
+    scope = store_slug or "all stores"
+    return (
+        f"Enrichment ({scope}): checked {stats['checked']}, "
+        f"updated {stats['updated']}, unchanged {stats['unchanged']}, "
+        f"failed {stats['failed']}."
+    )
 
 
 @shared_task

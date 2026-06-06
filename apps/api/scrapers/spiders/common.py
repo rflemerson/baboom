@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 
-from ..services import ScraperService
-
 PRICE_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 
 
@@ -66,17 +64,3 @@ def parse_optional_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def persist_json_context(
-    saved_item: object | None,
-    context_payload: str,
-    *,
-    headers: dict[str, str] | None = None,
-) -> None:
-    """Persist structured JSON context in source page when available."""
-    ScraperService.persist_page_context(
-        saved_item,
-        context_payload,
-        headers=headers,
-    )

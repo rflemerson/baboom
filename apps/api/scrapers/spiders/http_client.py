@@ -1,4 +1,4 @@
-"""HTTP client helpers with optional WAF bypass support.
+"""HTTP client helpers with WAF bypass support.
 
 This module provides a generic HTTP client that can bypass Sucuri WAF
 and other bot protection systems using TLS fingerprint impersonation.
@@ -15,25 +15,62 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC
+from email.utils import parsedate_to_datetime
+
+from curl_cffi import requests as cffi_requests
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 HTTP_SUCCESS_CODE = 200
 HTTP_FORBIDDEN_CODE = 403
 
-# Try to import curl_cffi (preferred for WAF bypass)
-try:
-    from curl_cffi import requests as cffi_requests
+# Transient statuses worth retrying with backoff (rate limit / gateway errors).
+RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+# Never honor a server-provided Retry-After longer than this (seconds), so a
+# hostile or misconfigured header cannot park a worker for minutes/hours.
+MAX_RETRY_AFTER_SECONDS = 120.0
 
-    HAS_CURL_CFFI = True
-except ImportError:
-    HAS_CURL_CFFI = False
-    import requests as std_requests
 
-    logger.warning(
-        "curl_cffi not installed. WAF bypass may not work. "
-        "Install with: pip install curl_cffi",
-    )
+def parse_retry_after(
+    response: object,
+    *,
+    max_seconds: float = MAX_RETRY_AFTER_SECONDS,
+) -> float | None:
+    """Return the wait in seconds requested by a ``Retry-After`` header, if any.
+
+    Handles both the delta-seconds form (``Retry-After: 120``) and the HTTP-date
+    form (``Retry-After: Wed, 21 Oct 2025 07:28:00 GMT``). Honoring this header
+    is the politest possible response to a 429/503 and avoids escalation. The
+    value is clamped to ``max_seconds`` so a bad header cannot stall a worker.
+    """
+    wait: float | None = None
+    headers = getattr(response, "headers", None)
+    raw = headers.get("Retry-After") or headers.get("retry-after") if headers else None
+    if raw:
+        raw = str(raw).strip()
+    if raw and raw.isdigit():
+        wait = min(float(raw), max_seconds)
+    elif raw:
+        wait = _parse_retry_after_date(raw, max_seconds=max_seconds)
+    return wait
+
+
+def _parse_retry_after_date(raw: str, *, max_seconds: float) -> float | None:
+    """Return seconds until an HTTP-date Retry-After value, if valid."""
+    try:
+        retry_at = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if retry_at is None:
+        return None
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=UTC)
+    delta = (retry_at - timezone.now()).total_seconds()
+    if delta <= 0:
+        return None
+    return min(delta, max_seconds)
 
 
 @dataclass(slots=True)
@@ -45,13 +82,11 @@ class HttpRequestOptions:
     verify: bool = True
     impersonate: str | None = None
     try_all_impersonations: bool = False
+    timeout: int | None = None
 
 
 class HttpClient:
-    """HTTP Client with automatic WAF bypass using TLS fingerprint impersonation.
-
-    Falls back to standard requests if curl_cffi is not available.
-    """
+    """HTTP Client with automatic WAF bypass using TLS fingerprint impersonation."""
 
     # Browser impersonations to try (in order of preference)
     IMPERSONATIONS = ("chrome120", "chrome119", "chrome116", "safari17_0")
@@ -61,9 +96,16 @@ class HttpClient:
         default_impersonate: str = "chrome120",
         timeout: int = 30,
     ) -> None:
-        """Initialize the HTTP client with a default browser fingerprint."""
+        """Initialize the HTTP client with a default browser fingerprint.
+
+        A single ``Session`` is reused for the client's lifetime so connections
+        to the same host are kept alive (TCP/TLS reuse, HTTP/2 multiplexing).
+        Besides being faster, reusing one connection per identity is what a real
+        browser does, so it reads as less robotic.
+        """
         self.default_impersonate = default_impersonate
         self.timeout = timeout
+        self._session = cffi_requests.Session()
 
     def _is_blocked(self, content: str) -> bool:
         """Check if response indicates WAF block."""
@@ -75,6 +117,12 @@ class HttpClient:
             "cf-browser-verification",
         ]
         return any(indicator in content for indicator in blocked_indicators)
+
+    def _is_blocked_response(self, response: object) -> bool:
+        """Return whether a nominally successful response is a WAF block page."""
+        return response.status_code == HTTP_SUCCESS_CODE and self._is_blocked(
+            str(getattr(response, "text", "")),
+        )
 
     def get(
         self,
@@ -97,27 +145,15 @@ class HttpClient:
         headers = resolved_options.headers
         impersonate = resolved_options.impersonate or self.default_impersonate
 
-        if HAS_CURL_CFFI:
-            return self._get_with_curl_cffi(
-                url,
-                options=HttpRequestOptions(
-                    headers=headers,
-                    params=resolved_options.params,
-                    verify=resolved_options.verify,
-                    impersonate=impersonate,
-                    try_all_impersonations=resolved_options.try_all_impersonations,
-                ),
-            )
-        return self._get_with_requests(
-            url,
-            options=HttpRequestOptions(
-                headers=headers,
-                params=resolved_options.params,
-                verify=resolved_options.verify,
-                impersonate=impersonate,
-                try_all_impersonations=resolved_options.try_all_impersonations,
-            ),
+        normalized = HttpRequestOptions(
+            headers=headers,
+            params=resolved_options.params,
+            verify=resolved_options.verify,
+            impersonate=impersonate,
+            try_all_impersonations=resolved_options.try_all_impersonations,
+            timeout=resolved_options.timeout,
         )
+        return self._get_with_curl_cffi(url, options=normalized)
 
     def _get_with_curl_cffi(
         self,
@@ -130,23 +166,25 @@ class HttpClient:
         impersonations = (
             self.IMPERSONATIONS if options.try_all_impersonations else [impersonate]
         )
+        timeout = options.timeout or self.timeout
 
         for browser in impersonations:
             try:
                 logger.debug("Trying %s impersonation for: %s", browser, url)
 
-                response = cffi_requests.get(
+                response = self._session.get(
                     url,
                     headers=options.headers,
                     params=options.params,
                     impersonate=browser,
-                    timeout=self.timeout,
+                    timeout=timeout,
                     verify=options.verify,
                 )
 
-                if response.status_code == HTTP_SUCCESS_CODE and not self._is_blocked(
-                    response.text,
-                ):
+                if response.status_code == HTTP_SUCCESS_CODE:
+                    if self._is_blocked_response(response):
+                        logger.debug("%s returned a WAF block page", browser)
+                        continue
                     logger.debug("Success with %s", browser)
                     return response
 
@@ -162,22 +200,3 @@ class HttpClient:
 
         logger.warning("All impersonations failed for: %s", url)
         return None
-
-    def _get_with_requests(
-        self,
-        url: str,
-        *,
-        options: HttpRequestOptions,
-    ) -> object | None:
-        """Fallback to standard requests library."""
-        try:
-            return std_requests.get(
-                url,
-                headers=options.headers,
-                params=options.params,
-                timeout=self.timeout,
-                verify=options.verify,
-            )
-        except std_requests.exceptions.RequestException:
-            logger.exception("Request failed")
-            return None

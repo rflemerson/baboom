@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
-import requests
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from strawberry.django.views import GraphQLView
 
@@ -29,6 +28,7 @@ from scrapers.spiders.catalog_api_spider import CatalogApiSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
 from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
+from scrapers.spiders.http_client import HttpClient
 from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
 from scrapers.tasks import _run_spider_monitor
@@ -51,6 +51,38 @@ type ScrapedJsonObject = dict[str, object]
 
 # Disable logging during tests
 logging.getLogger("scrapers").setLevel(logging.CRITICAL)
+
+
+class HttpClientTests(SimpleTestCase):
+    """Unit tests for the shared HTTP client."""
+
+    def test_get_treats_success_status_waf_block_as_failure(self) -> None:
+        """A 200 block page should not be returned as a usable response."""
+        response = MagicMock()
+        response.status_code = 200
+        response.text = "Cloudflare Access Denied"
+        session = MagicMock()
+        session.get.return_value = response
+
+        with patch("scrapers.spiders.http_client.cffi_requests.Session") as session_cls:
+            session_cls.return_value = session
+            result = HttpClient().get("https://example.com/protected")
+
+        assert result is None
+
+
+def _fake_html_response(
+    status: int = 200,
+    *,
+    etag: str = 'W/"x"',
+    last_modified: str = "",
+) -> MagicMock:
+    """Build a fake HTML response for the conditional enrichment path."""
+    response = MagicMock()
+    response.status_code = status
+    response.text = "<html></html>"
+    response.headers = {"ETag": etag, "Last-Modified": last_modified}
+    return response
 
 
 def _scraped_item(
@@ -247,6 +279,17 @@ class OfferObservationTests(TestCase):
         ScraperService.save_product(self._ingest())
 
         offer = Offer.objects.get(store_slug="test_store", external_id="TEST123")
+        assert offer.price_observations.count() == 1
+
+    def test_repeated_same_price_updates_changed_api_context(self) -> None:
+        """Catalog context should stay fresh even when price/stock are unchanged."""
+        payload = self._ingest(url="https://example.com/test-product")
+        ScraperService.save_product(payload, api_context={"version": 1})
+        ScraperService.save_product(payload, api_context={"version": 2})
+
+        page = ScrapedPage.objects.get(url="https://example.com/test-product")
+        offer = Offer.objects.get(store_slug="test_store", external_id="TEST123")
+        assert page.api_context == {"version": 2}
         assert offer.price_observations.count() == 1
 
     def test_price_change_appends_new_observation(self) -> None:
@@ -668,70 +711,85 @@ class CatalogApiSpiderTests(SimpleTestCase):
         assert spider.metrics["categories_crawled"] == EXPECTED_FALLBACK_CATEGORY_COUNT
 
 
-class ScraperServiceContextPersistenceTests(SimpleTestCase):
-    """Unit tests for Django-side context persistence helper."""
+class ScraperEnrichmentTests(TestCase):
+    """Unit tests for the on-demand HTML enrichment pass."""
 
-    @patch("scrapers.services.extruct.extract")
-    @patch("scrapers.services.requests.get")
-    def test_extract_html_structured_data_skips_missing_product_page(
-        self,
-        mock_get: MagicMock,
-        mock_extract: MagicMock,
-    ) -> None:
-        """Missing product pages should not be reported as extraction errors."""
-        response = MagicMock()
-        response.status_code = 404
-        mock_get.return_value = response
-
-        result = ScraperService.extract_html_structured_data(
-            url="https://example.com/missing-product/p",
+    @staticmethod
+    def _page(etag: str = "", last_modified: str = "") -> ScrapedPage:
+        return ScrapedPage.objects.create(
+            store_slug="dark_lab",
+            url="https://example.com/product",
+            http_etag=etag,
+            http_last_modified=last_modified,
         )
 
-        assert result == {}
-        response.raise_for_status.assert_not_called()
-        mock_extract.assert_not_called()
-
-    @patch("scrapers.services.requests.get")
-    def test_extract_html_structured_data_logs_unexpected_http_error(
-        self,
-        mock_get: MagicMock,
-    ) -> None:
-        """Unexpected HTTP failures should still be logged with exception context."""
-        response = MagicMock()
-        response.status_code = 500
-        response.raise_for_status.side_effect = requests.HTTPError("server error")
-        mock_get.return_value = response
-
-        with self.assertLogs("scrapers.services", level="ERROR") as logs:
-            result = ScraperService.extract_html_structured_data(
-                url="https://example.com/error-product/p",
-            )
-
-        assert result == {}
-        assert "Failed to fetch HTML for structured extraction" in logs.output[0]
-
-    def test_persist_page_context_updates_source_page_json_fields(
-        self,
-    ) -> None:
-        """Writes API and HTML-structured payloads into source page."""
-        fake_page = MagicMock()
-        fake_page.url = "https://example.com/product"
-        fake_item = MagicMock()
-        fake_item.source_page_id = 123
-        fake_item.source_page = fake_page
-
+    def test_enrich_page_skips_unchanged_304(self) -> None:
+        """A 304 keeps stored data and writes nothing."""
+        page = self._page(etag='W/"abc"')
         with patch.object(
             ScraperService,
-            "extract_html_structured_data",
-            return_value={"json-ld": []},
+            "_fetch_html_for_extraction",
+            return_value=_fake_html_response(304),
         ):
-            ScraperService.persist_page_context(fake_item, '{"platform":"shopify"}')
+            stats = ScraperService.enrich_pages(limit=1)
 
-        assert fake_page.api_context == {"platform": "shopify"}
-        assert fake_page.html_structured_data == {"json-ld": []}
-        fake_page.save.assert_called_once_with(
-            update_fields=["api_context", "html_structured_data"],
+        page.refresh_from_db()
+        assert stats["unchanged"] == 1
+        assert page.http_etag == 'W/"abc"'
+
+    def test_enrich_page_updates_on_200(self) -> None:
+        """A 200 re-parses the HTML and records the fresh validators."""
+        page = self._page()
+        response = _fake_html_response(
+            etag='W/"new"',
+            last_modified="Wed, 21 Oct 2025 07:28:00 GMT",
         )
+        with (
+            patch.object(
+                ScraperService,
+                "_fetch_html_for_extraction",
+                return_value=response,
+            ),
+            patch("scrapers.services.extruct.extract", return_value={"json-ld": []}),
+        ):
+            stats = ScraperService.enrich_pages(limit=1)
+
+        page.refresh_from_db()
+        assert stats["updated"] == 1
+        assert page.html_structured_data == {"json-ld": []}
+        assert page.http_etag == 'W/"new"'
+        assert page.http_last_modified == "Wed, 21 Oct 2025 07:28:00 GMT"
+
+    def test_enrich_page_failed_on_no_response(self) -> None:
+        """A blocked/failed fetch reports failure without writing."""
+        self._page()
+        with patch.object(
+            ScraperService,
+            "_fetch_html_for_extraction",
+            return_value=None,
+        ):
+            stats = ScraperService.enrich_pages(limit=1)
+
+        assert stats["failed"] == 1
+
+    def test_enrich_page_sends_conditional_validators(self) -> None:
+        """Stored ETag/Last-Modified are sent as conditional request headers."""
+        _ = self._page(etag='W/"abc"', last_modified="some-date")
+        with patch.object(
+            ScraperService,
+            "_fetch_html_for_extraction",
+            return_value=_fake_html_response(304),
+        ) as mock_fetch:
+            ScraperService.enrich_pages(limit=1)
+
+        sent_headers = mock_fetch.call_args.args[1]
+        assert sent_headers["If-None-Match"] == 'W/"abc"'
+        assert sent_headers["If-Modified-Since"] == "some-date"
+
+    def test_enrich_pages_rejects_non_positive_limit(self) -> None:
+        """Invalid limits should fail before building a queryset slice."""
+        with self.assertRaisesMessage(ValueError, "limit must be a positive integer"):
+            ScraperService.enrich_pages(limit=0)
 
 
 class DarkLabSpiderUnitTests(SimpleTestCase):
@@ -795,32 +853,21 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
         assert value == EXPECTED_COMMA_DECIMAL_PRICE
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_persists_shopify_context(
+    def test_process_and_save_passes_api_context(
         self,
         mock_save: MagicMock,
     ) -> None:
-        """Writes structured Shopify context into source_page api_context."""
-        fake_source_page = MagicMock()
-        fake_source_page.url = "https://example.com/product"
+        """Light path hands the catalog context to save_product as api_context."""
         fake_obj = MagicMock()
-        fake_obj.source_page_id = 10
-        fake_obj.source_page = fake_source_page
         mock_save.return_value = fake_obj
 
-        with patch.object(
-            ScraperService,
-            "extract_html_structured_data",
-            return_value={"json-ld": []},
-        ):
-            result = self.spider.process_item(self.base_item, "whey-protein")
+        result = self.spider.process_item(self.base_item, "whey-protein")
 
         assert result == fake_obj
-        assert fake_source_page.api_context["platform"] == "shopify"
-        assert "variants" in fake_source_page.api_context
-        assert "options" in fake_source_page.api_context
-        fake_source_page.save.assert_called_once_with(
-            update_fields=["api_context", "html_structured_data"],
-        )
+        context = json.loads(mock_save.call_args.kwargs["api_context"])
+        assert context["platform"] == "shopify"
+        assert "variants" in context
+        assert "options" in context
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
     def test_process_and_save_keeps_available_on_unknown_shopify_stock(
@@ -870,7 +917,7 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
             ],
         }
 
-    @patch("scrapers.spiders.catalog_api_spider.requests.get")
+    @patch("scrapers.spiders.catalog_api_spider.HttpClient.get")
     def test_fetch_categories_from_collections_api(self, mock_get: MagicMock) -> None:
         """Loads category handles from collections endpoint."""
         response = MagicMock()
@@ -925,32 +972,21 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
         assert payload.stock_status == StockStatus.AVAILABLE
 
     @patch("scrapers.spiders.shopify_api_spider.ScraperService.save_product")
-    def test_process_and_save_persists_shopify_context(
+    def test_process_and_save_passes_api_context(
         self,
         mock_save: MagicMock,
     ) -> None:
-        """Writes structured Shopify context into source_page api_context."""
-        fake_source_page = MagicMock()
-        fake_source_page.url = "https://example.com/product"
+        """Light path hands the catalog context to save_product as api_context."""
         fake_obj = MagicMock()
-        fake_obj.source_page_id = 20
-        fake_obj.source_page = fake_source_page
         mock_save.return_value = fake_obj
 
-        with patch.object(
-            ScraperService,
-            "extract_html_structured_data",
-            return_value={"json-ld": []},
-        ):
-            result = self.spider.process_item(self.base_item, "barra")
+        result = self.spider.process_item(self.base_item, "barra")
 
         assert result == fake_obj
-        assert fake_source_page.api_context["platform"] == "shopify"
-        assert "variants" in fake_source_page.api_context
-        assert "options" in fake_source_page.api_context
-        fake_source_page.save.assert_called_once_with(
-            update_fields=["api_context", "html_structured_data"],
-        )
+        context = json.loads(mock_save.call_args.kwargs["api_context"])
+        assert context["platform"] == "shopify"
+        assert "variants" in context
+        assert "options" in context
 
     def test_parse_price_handles_shopify_js_cents(self) -> None:
         """Converts integer cents from product.js into decimal reais."""
@@ -1027,31 +1063,20 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         assert self.spider.is_valid_category_path("/proteina/")
 
     @patch("scrapers.spiders.wapstore_api_spider.ScraperService.save_product")
-    def test_process_and_save_persists_structured_context(
+    def test_process_and_save_passes_api_context(
         self,
         mock_save: MagicMock,
     ) -> None:
-        """Writes structured Growth context into source_page api_context."""
-        fake_source_page = MagicMock()
-        fake_source_page.url = "https://example.com/product"
+        """Light path hands the catalog context to save_product as api_context."""
         fake_obj = MagicMock()
-        fake_obj.source_page_id = 30
-        fake_obj.source_page = fake_source_page
         mock_save.return_value = fake_obj
 
-        with patch.object(
-            ScraperService,
-            "extract_html_structured_data",
-            return_value={"json-ld": []},
-        ):
-            result = self.spider.process_item(self.base_item, "/proteina/")
+        result = self.spider.process_item(self.base_item, "/proteina/")
 
         assert result == fake_obj
-        assert fake_source_page.api_context["platform"] == "uappi_wapstore"
-        assert "prices" in fake_source_page.api_context["product"]
-        fake_source_page.save.assert_called_once_with(
-            update_fields=["api_context", "html_structured_data"],
-        )
+        context = json.loads(mock_save.call_args.kwargs["api_context"])
+        assert context["platform"] == "uappi_wapstore"
+        assert "prices" in context["product"]
 
 
 class _DummyVtexSpider(VtexSearchSpider):
@@ -1136,31 +1161,20 @@ class VtexSpiderUnitTests(SimpleTestCase):
         assert self.spider.parse_price("N/A") is None
 
     @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
-    def test_process_and_save_persists_structured_context(
+    def test_process_and_save_passes_api_context(
         self,
         mock_save: MagicMock,
     ) -> None:
-        """Writes structured VTEX context into source_page api_context."""
-        fake_source_page = MagicMock()
-        fake_source_page.url = "https://example.com/product"
+        """Light path hands the catalog context to save_product as api_context."""
         fake_obj = MagicMock()
-        fake_obj.source_page_id = 40
-        fake_obj.source_page = fake_source_page
         mock_save.return_value = fake_obj
 
-        with patch.object(
-            ScraperService,
-            "extract_html_structured_data",
-            return_value={"json-ld": []},
-        ):
-            result = self.spider.process_item(self.base_item, "proteina")
+        result = self.spider.process_item(self.base_item, "proteina")
 
         assert result == fake_obj
-        assert fake_source_page.api_context["platform"] == "vtex_legacy"
-        assert "items" in fake_source_page.api_context
-        fake_source_page.save.assert_called_once_with(
-            update_fields=["api_context", "html_structured_data"],
-        )
+        context = json.loads(mock_save.call_args.kwargs["api_context"])
+        assert context["platform"] == "vtex_legacy"
+        assert "items" in context
 
 
 class BlackSkullSpiderUnitTests(SimpleTestCase):
@@ -1190,7 +1204,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
             ],
         }
 
-    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
     def test_process_and_save_skips_without_valid_url(
         self,
         mock_save: MagicMock,
@@ -1204,7 +1218,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         assert result is None
         mock_save.assert_not_called()
 
-    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
     def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
         """Skips item when price is not parseable."""
         item = dict(self.base_item)
@@ -1215,7 +1229,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         assert result is None
         mock_save.assert_not_called()
 
-    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
     def test_process_and_save_keeps_available_on_unknown_stock(
         self,
         mock_save: MagicMock,
@@ -1230,29 +1244,18 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         assert payload.stock_quantity is None
         assert payload.stock_status == StockStatus.AVAILABLE
 
-    @patch("scrapers.spiders.vtex_graphql_spider.ScraperService.save_product")
-    def test_process_and_save_persists_structured_context(
+    @patch("scrapers.spiders.vtex_search_spider.ScraperService.save_product")
+    def test_process_and_save_passes_api_context(
         self,
         mock_save: MagicMock,
     ) -> None:
-        """Writes structured VTEX GraphQL context into source_page api_context."""
-        fake_source_page = MagicMock()
-        fake_source_page.url = "https://example.com/product"
+        """Light path hands the catalog context to save_product as api_context."""
         fake_obj = MagicMock()
-        fake_obj.source_page_id = 50
-        fake_obj.source_page = fake_source_page
         mock_save.return_value = fake_obj
 
-        with patch.object(
-            ScraperService,
-            "extract_html_structured_data",
-            return_value={"json-ld": []},
-        ):
-            result = self.spider.process_item(self.base_item, "proteina")
+        result = self.spider.process_item(self.base_item, "proteina")
 
         assert result == fake_obj
-        assert fake_source_page.api_context["platform"] == "vtex_graphql"
-        assert "items" in fake_source_page.api_context
-        fake_source_page.save.assert_called_once_with(
-            update_fields=["api_context", "html_structured_data"],
-        )
+        context = json.loads(mock_save.call_args.kwargs["api_context"])
+        assert context["platform"] == "vtex_legacy"
+        assert "items" in context

@@ -14,7 +14,6 @@ from .common import (
     is_http_url,
     parse_optional_int,
     parse_positive_price,
-    persist_json_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -213,11 +212,9 @@ class VtexSearchSpider(CatalogApiSpider):
                 pid=str(pid),
                 category=category,
             )
-            saved = ScraperService.save_product(input_data)
-            persist_json_context(
-                saved,
-                self._build_product_context(item),
-                headers=self.get_headers(),
+            saved = ScraperService.save_product(
+                input_data,
+                api_context=self._build_product_context(item),
             )
         except VTEX_ITEM_PROCESSING_EXCEPTIONS as exc:
             logger.debug("Item parse error: %s", exc)

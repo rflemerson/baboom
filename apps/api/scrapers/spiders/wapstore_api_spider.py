@@ -15,9 +15,7 @@ from .common import (
     is_http_url,
     parse_optional_int,
     parse_positive_price,
-    persist_json_context,
 )
-from .http_client import HttpClient, HttpRequestOptions
 
 # Disable warnings for verify=False as per API strategy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -25,8 +23,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 30
-HTTP_FAILURE_LIMIT = 8
-HTTP_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 WAPSTORE_SUCCESS_CODE = 200
 
 
@@ -52,9 +48,7 @@ class WapStoreApiSpider(CatalogApiSpider):
     def __init__(self, categories: list[str] | None = None) -> None:
         """Initialize Wap.Store spider state and HTTP client configuration."""
         super().__init__(categories)
-        self.http_client = HttpClient(timeout=30)
         self.ssl_verify = os.getenv("GROWTH_SSL_VERIFY", "0") == "1"
-        self._consecutive_http_failures = 0
 
     def get_headers(self) -> dict[str, str]:
         """Get API headers."""
@@ -79,7 +73,7 @@ class WapStoreApiSpider(CatalogApiSpider):
         """Fetch category paths from the menu endpoint."""
         logger.info("Fetching dynamic categories...")
         try:
-            resp = self._http_client_get(
+            resp = self._request_get(
                 self.API_MENU,
                 verify=self.ssl_verify,
             )
@@ -191,7 +185,7 @@ class WapStoreApiSpider(CatalogApiSpider):
     ) -> list[dict] | None:
         """Fetch one category page from Wap.Store listing endpoint."""
         params = {"url": category_path, "offset": cursor, "limit": page_size}
-        resp = self._http_client_get(
+        resp = self._request_get(
             self.API_LISTING,
             params=params,
             verify=self.ssl_verify,
@@ -201,39 +195,6 @@ class WapStoreApiSpider(CatalogApiSpider):
 
         data = resp.json()
         return self._extract_products_list(data)
-
-    def _http_client_get(
-        self,
-        url: str,
-        *,
-        params: dict[str, object] | None = None,
-        verify: bool = True,
-    ) -> object | None:
-        """Retry wrapper for HttpClient with simple circuit-breaker behavior."""
-        # Prevent hammering blocked origins when consecutive failures keep happening.
-        if self._consecutive_http_failures >= HTTP_FAILURE_LIMIT:
-            logger.error("Circuit breaker open for %s after repeated failures", url)
-            return None
-
-        attempts = max(1, int(self.HTTP_RETRIES))
-        for attempt in range(1, attempts + 1):
-            resp = self.http_client.get(
-                url,
-                options=HttpRequestOptions(
-                    params=params,
-                    headers=self.get_headers(),
-                    verify=verify,
-                ),
-            )
-            if resp is not None and resp.status_code not in HTTP_RETRYABLE_STATUS_CODES:
-                self._consecutive_http_failures = 0
-                return resp
-            if attempt < attempts:
-                backoff = self.HTTP_RETRY_BACKOFF_SECONDS * attempt
-                self.sleep_random(backoff, backoff + 0.2)
-
-        self._consecutive_http_failures += 1
-        return resp
 
     def _extract_products_list(
         self,
@@ -296,11 +257,9 @@ class WapStoreApiSpider(CatalogApiSpider):
                 pid=external_id,
                 category=category,
             )
-            saved = ScraperService.save_product(input_data)
-            persist_json_context(
-                saved,
-                self._build_product_context(item),
-                headers=self.get_headers(),
+            saved = ScraperService.save_product(
+                input_data,
+                api_context=self._build_product_context(item),
             )
         except Exception:
             logger.exception("Error processing item %s", item.get("id"))

@@ -29,6 +29,16 @@ class ScrapedPage(models.Model):
         blank=True,
         help_text=_("Structured metadata extracted from the product HTML"),
     )
+    http_etag = models.CharField(
+        max_length=250,
+        blank=True,
+        help_text=_("Last ETag seen for the product HTML, for conditional GETs"),
+    )
+    http_last_modified = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text=_("Last Last-Modified seen for the product HTML"),
+    )
     scraped_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

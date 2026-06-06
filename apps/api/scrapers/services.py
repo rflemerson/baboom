@@ -4,30 +4,31 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from secrets import SystemRandom
 from typing import TYPE_CHECKING
 
 import extruct
-import requests
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
-from offers.services import OfferObservationService
+from offers.services import OfferObservationResult, OfferObservationService
 
 from .dtos import AgentExtractionSubmitInput
 from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
+from .spiders.http_client import HttpClient, HttpRequestOptions, parse_retry_after
 
 if TYPE_CHECKING:
-    from offers.models import Offer
-
     from .dtos import ScrapedItemIngestionInput
     from .graphql.inputs import ScrapedItemCheckoutInput
 
 logger = logging.getLogger(__name__)
+JITTER_RANDOM = SystemRandom()
 
 
 class ScrapedItemCheckoutService:
@@ -239,41 +240,82 @@ class ScraperService:
     """Service for handling scraped data."""
 
     HTML_EXTRACTION_TIMEOUT_SECONDS = 20
+    HTML_EXTRACTION_THROTTLE_SECONDS = (0.5, 1.5)
+    # Jittered backoff windows applied after each 429 before retrying.
+    HTML_EXTRACTION_RETRY_BACKOFFS = ((0.5, 1.5), (5.0, 10.0), (15.0, 25.0))
+    HTML_EXTRACTION_RATE_LIMITED_STATUS = 429
+    HTML_EXTRACTION_MISSING_STATUSES = (404, 410)
+    HTML_EXTRACTION_OK_STATUS = 200
+    HTML_NOT_MODIFIED_STATUS = 304
+
+    # Reused across the many per-product fetches of a weekly run so connections
+    # to the same store are kept alive (faster + steadier fingerprint).
+    _html_client: HttpClient | None = None
+
+    @classmethod
+    def _get_html_client(cls) -> HttpClient:
+        """Return the shared keep-alive HTTP client for HTML enrichment."""
+        if cls._html_client is None:
+            cls._html_client = HttpClient(timeout=cls.HTML_EXTRACTION_TIMEOUT_SECONDS)
+        return cls._html_client
 
     @staticmethod
     @transaction.atomic
-    def save_product(data: ScrapedItemIngestionInput) -> ScrapedItem:
+    def save_product(
+        data: ScrapedItemIngestionInput,
+        *,
+        api_context: str | dict | None = None,
+    ) -> ScrapedItem:
         """Record the merchant offer and ensure its pipeline record exists.
 
-        The offer (identity, price, stock) is upserted on every run; the pipeline
-        record is created once and only touched on status transitions, so the
-        daily scrape no longer churns the scraped-item audit history.
+        This is the light path: the offer (identity, price, stock) is upserted
+        on every run and the page's ``api_context`` keeps the latest raw catalog
+        payload. The heavy product-page HTML lives entirely in
+        :meth:`enrich_pages`, run on demand.
         """
-        page, _ = ScrapedPage.objects.get_or_create(
-            url=data.url,
-            defaults={"store_slug": data.store_slug},
+        normalized_context = (
+            ScraperService._normalize_api_context_payload(api_context)
+            if api_context is not None
+            else None
         )
+        page, _created = ScrapedPage.objects.get_or_create(
+            url=data.url,
+            defaults={
+                "store_slug": data.store_slug,
+                "api_context": normalized_context or {},
+            },
+        )
+
+        page_updates: list[str] = []
         if page.store_slug != data.store_slug:
             page.store_slug = data.store_slug
-            page.save(update_fields=["store_slug"])
+            page_updates.append("store_slug")
 
-        offer = ScraperService.record_offer_observation(data)
+        observation = ScraperService.record_offer_observation(data)
 
-        item, created = ScrapedItem.objects.get_or_create(
-            offer=offer,
+        item, item_created = ScrapedItem.objects.get_or_create(
+            offer=observation.offer,
             defaults={"source_page": page},
         )
-        if not created and item.source_page_id != page.id:
+        if not item_created and item.source_page_id != page.id:
             item.source_page = page
             item.save(update_fields=["source_page", "updated_at"])
 
-        action = "Created" if created else "Updated"
+        if normalized_context is not None and page.api_context != normalized_context:
+            page.api_context = normalized_context
+            page_updates.append("api_context")
+        if page_updates:
+            page.save(update_fields=page_updates)
+
+        action = "Created" if item_created else "Updated"
         logger.debug("%s item %s for %s", action, data.external_id, data.store_slug)
 
         return item
 
     @staticmethod
-    def record_offer_observation(data: ScrapedItemIngestionInput) -> Offer:
+    def record_offer_observation(
+        data: ScrapedItemIngestionInput,
+    ) -> OfferObservationResult:
         """Record the merchant offer and its price via the offers domain service.
 
         This is the price source of truth for the pricing domain. It is written
@@ -322,33 +364,56 @@ class ScraperService:
         return parsed if isinstance(parsed, dict) else {}
 
     @staticmethod
-    def extract_html_structured_data(
-        *,
+    def _fetch_html_for_extraction(
         url: str,
-        headers: dict[str, str] | None = None,
-    ) -> dict:
-        """Fetch one product page and extract structured metadata from the HTML."""
-        try:
-            response = requests.get(
-                url,
-                headers=headers,
-                timeout=ScraperService.HTML_EXTRACTION_TIMEOUT_SECONDS,
-            )
-        except requests.RequestException:
-            logger.exception("Failed to fetch HTML for structured extraction: %s", url)
-            return {}
-        if response.status_code in {404, 410}:
-            logger.info(
-                "Skipping HTML structured extraction for missing product page: %s",
-                url,
-            )
-            return {}
-        try:
-            response.raise_for_status()
-        except requests.RequestException:
-            logger.exception("Failed to fetch HTML for structured extraction: %s", url)
-            return {}
+        headers: dict[str, str] | None,
+    ) -> object | None:
+        """Fetch a product page using browser TLS impersonation.
 
+        Uses ``HttpClient`` (curl_cffi) plus jittered throttling and 429-aware
+        backoff so stores that rate-limit plain ``requests`` traffic keep
+        serving the product HTML. Returns the response, or ``None`` on failure.
+        """
+        client = ScraperService._get_html_client()
+        request_headers = headers or {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        backoffs = ScraperService.HTML_EXTRACTION_RETRY_BACKOFFS
+        response = None
+        for attempt, backoff in enumerate(backoffs):
+            time.sleep(
+                JITTER_RANDOM.uniform(*ScraperService.HTML_EXTRACTION_THROTTLE_SECONDS),
+            )
+            response = client.get(
+                url,
+                options=HttpRequestOptions(
+                    headers=request_headers,
+                    try_all_impersonations=attempt > 0,
+                ),
+            )
+            if response is None:
+                logger.warning("No response fetching HTML for extraction: %s", url)
+                return None
+            if (
+                response.status_code
+                != ScraperService.HTML_EXTRACTION_RATE_LIMITED_STATUS
+            ):
+                return response
+            # Honor the server's own pacing when it tells us; else jittered backoff.
+            wait = parse_retry_after(response) or JITTER_RANDOM.uniform(*backoff)
+            logger.warning(
+                "Rate limited (429) fetching %s; waiting %.1fs (retry %s/%s)",
+                url,
+                wait,
+                attempt + 1,
+                len(backoffs),
+            )
+            time.sleep(wait)
+        return response
+
+    @staticmethod
+    def _parse_structured_html(response: object, url: str) -> dict:
+        """Run extruct over a fetched HTML response body."""
         try:
             extracted = extruct.extract(
                 response.text,
@@ -363,23 +428,92 @@ class ScraperService:
         return extracted if isinstance(extracted, dict) else {}
 
     @staticmethod
-    def persist_page_context(
-        saved_item: ScrapedItem | None,
-        api_context_payload: str | dict,
+    def _conditional_headers(page: ScrapedPage) -> dict[str, str]:
+        """Build HTML headers with ETag/Last-Modified validators for a 304 GET."""
+        headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        if page.http_etag:
+            headers["If-None-Match"] = page.http_etag
+        if page.http_last_modified:
+            headers["If-Modified-Since"] = page.http_last_modified
+        return headers
+
+    @staticmethod
+    def _apply_html_response(page: ScrapedPage, response: object | None) -> str:
+        """Update ``page`` HTML fields from a response and return an outcome.
+
+        A ``304 Not Modified`` keeps the stored data untouched (the whole point of
+        the conditional GET); a missing page clears it; a good page re-parses and
+        records the fresh ETag/Last-Modified validators.
+        """
+        if response is None:
+            return "failed"
+        status = response.status_code
+        if status == ScraperService.HTML_NOT_MODIFIED_STATUS:
+            logger.info("HTML unchanged (304) for %s; keeping stored data", page.url)
+            return "unchanged"
+        if status in ScraperService.HTML_EXTRACTION_MISSING_STATUSES:
+            page.html_structured_data = {}
+            page.http_etag = ""
+            page.http_last_modified = ""
+            return "updated"
+        if status != ScraperService.HTML_EXTRACTION_OK_STATUS:
+            logger.error("Failed to enrich HTML (%s) for %s", status, page.url)
+            return "failed"
+
+        page.html_structured_data = ScraperService._parse_structured_html(
+            response,
+            page.url,
+        )
+        response_headers = getattr(response, "headers", None) or {}
+        page.http_etag = str(response_headers.get("ETag", "") or "")[:250]
+        page.http_last_modified = str(
+            response_headers.get("Last-Modified", "") or "",
+        )[:100]
+        return "updated"
+
+    @staticmethod
+    def enrich_pages(
         *,
-        headers: dict[str, str] | None = None,
-    ) -> None:
-        """Persist API context and HTML-structured data into source page."""
-        if not saved_item or not saved_item.source_page_id:
-            return
-        page = saved_item.source_page
-        if page is None:
-            return
-        page.api_context = ScraperService._normalize_api_context_payload(
-            api_context_payload,
+        store_slug: str | None = None,
+        limit: int | None = None,
+    ) -> dict[str, int]:
+        """Heavy, on-demand pass: refresh HTML structured data for scraped pages.
+
+        Each page is fetched with a conditional GET (its stored ETag /
+        Last-Modified). Pages the store reports as unchanged (``304``) are skipped
+        without re-parsing, so this only does real work where the product page
+        actually moved. Runs independently of the light catalog crawl.
+        """
+        if limit is not None and limit < 1:
+            msg = "limit must be a positive integer."
+            raise ValueError(msg)
+
+        pages = ScrapedPage.objects.all()
+        if store_slug:
+            pages = pages.filter(store_slug=store_slug)
+        if limit:
+            pages = pages[:limit]
+
+        stats = {"checked": 0, "updated": 0, "unchanged": 0, "failed": 0}
+        for page in pages.iterator():
+            stats["checked"] += 1
+            stats[ScraperService._enrich_page(page)] += 1
+        logger.info("Enrichment finished (store=%s): %s", store_slug or "all", stats)
+        return stats
+
+    @staticmethod
+    def _enrich_page(page: ScrapedPage) -> str:
+        """Conditionally refresh one page's HTML data; return the outcome key."""
+        response = ScraperService._fetch_html_for_extraction(
+            page.url,
+            ScraperService._conditional_headers(page),
         )
-        page.html_structured_data = ScraperService.extract_html_structured_data(
-            url=page.url,
-            headers=headers,
+        outcome = ScraperService._apply_html_response(page, response)
+        if outcome != "updated":
+            return outcome
+        page.save(
+            update_fields=["html_structured_data", "http_etag", "http_last_modified"],
         )
-        page.save(update_fields=["api_context", "html_structured_data"])
+        return outcome

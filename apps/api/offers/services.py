@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
 
@@ -18,6 +19,20 @@ class OfferListingInput(Protocol):
     product_link: str
     price: float
     stock_status: str
+
+
+@dataclass(frozen=True)
+class OfferObservationResult:
+    """Outcome of recording an offer observation.
+
+    ``changed`` is True when the offer was newly created or its price/stock
+    moved since the last observation. Callers (e.g. the weekly HTML enrichment)
+    use it to skip unchanged offers.
+    """
+
+    offer: Offer
+    created: bool
+    changed: bool
 
 
 class OfferObservationService:
@@ -40,7 +55,7 @@ class OfferObservationService:
             price=Decimal(str(listing.price)),
             stock_status=listing.stock_status,
             snapshot={"url": listing.product_link},
-        )
+        ).offer
 
     def record(
         self,
@@ -50,16 +65,17 @@ class OfferObservationService:
         price: Decimal | None,
         stock_status: str,
         snapshot: dict[str, object],
-    ) -> Offer:
+    ) -> OfferObservationResult:
         """Upsert the offer with a snapshot and append a price observation.
 
         ``snapshot`` carries the descriptive fields the caller observed (url and,
         for the scraper, name/category/identifiers). The current price and stock
         status are always refreshed; a new observation is appended only when the
-        price or stock status changed.
+        price or stock status changed. The returned result reports whether the
+        offer was created or moved, so callers can act only on real changes.
         """
         normalized_status = StockStatus.normalize(stock_status)
-        offer, _created = Offer.objects.update_or_create(
+        offer, created = Offer.objects.update_or_create(
             store_slug=store_slug,
             external_id=external_id,
             defaults={
@@ -68,24 +84,28 @@ class OfferObservationService:
                 "current_stock_status": normalized_status,
             },
         )
+        changed = created
         if price is not None:
-            self._append_observation_if_changed(offer, price, normalized_status)
-        return offer
+            changed = (
+                self._append_observation_if_changed(offer, price, normalized_status)
+                or created
+            )
+        return OfferObservationResult(offer=offer, created=created, changed=changed)
 
     def _append_observation_if_changed(
         self,
         offer: Offer,
         price: Decimal,
         stock_status: str,
-    ) -> None:
-        """Append a price observation only when price or stock status changed."""
+    ) -> bool:
+        """Append a price observation when price or stock changed; report change."""
         latest = offer.price_observations.values("price", "stock_status").first()
         if (
             latest is not None
             and latest["price"] == price
             and latest["stock_status"] == stock_status
         ):
-            return
+            return False
 
         PriceObservation.objects.create(
             offer=offer,
@@ -93,3 +113,4 @@ class OfferObservationService:
             stock_status=stock_status,
         )
         logger.info("Recorded price observation for %s: R$%s", offer.store_slug, price)
+        return True

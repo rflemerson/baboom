@@ -10,7 +10,7 @@ from offers.models import StockStatus
 from ..dtos import ScrapedItemIngestionInput
 from ..services import ScraperService
 from .catalog_api_spider import CatalogApiSpider
-from .common import parse_positive_price, persist_json_context
+from .common import parse_positive_price
 
 logger = logging.getLogger(__name__)
 
@@ -292,11 +292,9 @@ class ShopifyApiSpider(CatalogApiSpider):
                 pid=pid,
                 category=category_name,
             )
-            saved = ScraperService.save_product(input_data)
-            persist_json_context(
-                saved,
-                self._build_product_context(data),
-                headers=self.get_headers(),
+            saved = ScraperService.save_product(
+                input_data,
+                api_context=self._build_product_context(data),
             )
         except Exception:
             logger.exception("Error processing item %s", data.get("id"))

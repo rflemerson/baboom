@@ -5,13 +5,15 @@ from __future__ import annotations
 import logging
 import time
 
-import requests
-
 from .base_spider import BaseSpider
+from .http_client import (
+    RETRYABLE_STATUS_CODES,
+    HttpClient,
+    HttpRequestOptions,
+    parse_retry_after,
+)
 
 logger = logging.getLogger(__name__)
-
-HTTP_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class CatalogApiSpider(BaseSpider):
@@ -22,15 +24,27 @@ class CatalogApiSpider(BaseSpider):
     HTTP_TIMEOUT_SECONDS = 30
     HTTP_RETRIES = 3
     HTTP_RETRY_BACKOFF_SECONDS = 0.6
+    # Stop hitting an origin once this many requests in a row come back blocked
+    # or failed: hammering a host that is already refusing us is exactly what
+    # turns a temporary throttle into a hard ban.
+    HTTP_FAILURE_LIMIT = 8
+    # Random delay before a scheduled full run starts, so the eight store tasks
+    # firing on the same beat tick do not all hit their targets simultaneously.
+    STARTUP_JITTER_SECONDS = (0.0, 5.0)
 
     def __init__(self, categories: list[str] | None = None) -> None:
-        """Initialize shared metrics for category-driven API spiders."""
+        """Initialize the light catalog spider (price/stock/basic only).
+
+        The heavy product-page HTML enrichment is a separate, on-demand pass
+        (:meth:`ScraperService.enrich_pages`) and never runs from the crawl.
+        """
         super().__init__(categories)
+        self.http_client = HttpClient(timeout=self.HTTP_TIMEOUT_SECONDS)
+        self._consecutive_failures = 0
         self.metrics: dict[str, int | float] = {
             "categories_discovered": 0,
             "categories_crawled": 0,
             "products_collected": 0,
-            "crawl_duration_ms": 0.0,
         }
 
     def _new_processed_registry(self) -> set[str]:
@@ -75,6 +89,10 @@ class CatalogApiSpider(BaseSpider):
     def crawl(self) -> list[object]:
         """Template crawl flow for category-based API sources."""
         started = time.perf_counter()
+        # Spread scheduled runs that fire on the same beat tick (explicit
+        # category runs — manual/tests — start immediately).
+        if not self.categories_to_crawl:
+            self.sleep_random(*self.STARTUP_JITTER_SECONDS)
         logger.info("Starting API crawl for %s...", self.BRAND_NAME)
         all_products: list[object] = []
         processed_ids = self._new_processed_registry()
@@ -109,28 +127,72 @@ class CatalogApiSpider(BaseSpider):
         params: dict[str, object] | None = None,
         headers: dict[str, str] | None = None,
         timeout: int | None = None,
-    ) -> requests.Response | None:
-        """HTTP GET with retries for transient errors."""
+        verify: bool = True,
+    ) -> object | None:
+        """HTTP GET via browser TLS impersonation, with polite retries.
+
+        This is the single HTTP entry point for every catalog spider. It routes
+        through ``HttpClient`` (curl_cffi keep-alive session) so the TLS/JA3
+        fingerprint matches a real browser and Sucuri/Cloudflare soft blocks are
+        detected. On a transient failure it honors ``Retry-After``, backs off
+        with jitter, and rotates to a fresh identity; after too many consecutive
+        blocks a circuit breaker stops hammering the origin.
+        """
+        if self._consecutive_failures >= self.HTTP_FAILURE_LIMIT:
+            logger.error(
+                "Circuit breaker open for %s after %s consecutive failures; "
+                "skipping %s",
+                self.BRAND_NAME,
+                self._consecutive_failures,
+                url,
+            )
+            return None
+
         attempts = max(1, int(self.HTTP_RETRIES))
         timeout_value = timeout or self.HTTP_TIMEOUT_SECONDS
+        response = None
         for attempt in range(1, attempts + 1):
-            try:
-                response = requests.get(
-                    url,
+            request_headers = {**(headers or self.get_headers())}
+            request_headers["User-Agent"] = self.user_agent
+
+            response = self.http_client.get(
+                url,
+                options=HttpRequestOptions(
+                    headers=request_headers,
                     params=params,
-                    headers=headers or self.get_headers(),
+                    impersonate=self.impersonation,
                     timeout=timeout_value,
-                )
-                if response.status_code not in HTTP_RETRYABLE_STATUS_CODES:
-                    return response
-                if attempt == attempts:
-                    return response
-                backoff = self.HTTP_RETRY_BACKOFF_SECONDS * attempt
-                self.sleep_random(backoff, backoff + 0.2)
-            except Exception:
-                if attempt == attempts:
-                    logger.exception("HTTP GET failed for %s", url)
-                    return None
-                backoff = self.HTTP_RETRY_BACKOFF_SECONDS * attempt
-                self.sleep_random(backoff, backoff + 0.2)
-        return None
+                    verify=verify,
+                ),
+            )
+
+            if (
+                response is not None
+                and response.status_code not in RETRYABLE_STATUS_CODES
+            ):
+                self._consecutive_failures = 0
+                return response
+            if attempt == attempts:
+                break
+            # Blocked or transient: wait politely, then switch to a new identity.
+            self._sleep_before_retry(response, attempt)
+            self.rotate_fingerprint()
+
+        self._consecutive_failures += 1
+        if response is None:
+            logger.warning("HTTP GET blocked/failed for %s", url)
+        return response
+
+    def _sleep_before_retry(self, response: object | None, attempt: int) -> None:
+        """Wait before a retry, honoring ``Retry-After`` when the server sends it."""
+        retry_after = parse_retry_after(response) if response is not None else None
+        if retry_after is not None:
+            logger.info(
+                "Honoring Retry-After=%.1fs for %s",
+                retry_after,
+                self.BRAND_NAME,
+            )
+            time.sleep(retry_after)
+            return
+        backoff = self.HTTP_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+        self.sleep_random(backoff, backoff + 1.0)
