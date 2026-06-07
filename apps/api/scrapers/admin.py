@@ -83,7 +83,7 @@ def reset_to_new(
     )
 
 
-@admin.action(description="Queue selected items for Dagster")
+@admin.action(description="Queue selected items for agents")
 def queue_for_agents(
     modeladmin: admin.ModelAdmin,
     request: HttpRequest,
@@ -98,7 +98,7 @@ def queue_for_agents(
     )
     modeladmin.message_user(
         request,
-        _("%(count)s items queued for Dagster processing.") % {"count": updated},
+        _("%(count)s items queued for agent processing.") % {"count": updated},
     )
 
 

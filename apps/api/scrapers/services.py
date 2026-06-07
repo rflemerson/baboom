@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from secrets import SystemRandom
 from typing import TYPE_CHECKING
@@ -13,7 +12,6 @@ from typing import TYPE_CHECKING
 import extruct
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
@@ -24,8 +22,9 @@ from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
 from .spiders.http_client import HttpClient, HttpRequestOptions, parse_retry_after
 
 if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
     from .dtos import ScrapedItemIngestionInput
-    from .graphql.inputs import ScrapedItemCheckoutInput
 
 logger = logging.getLogger(__name__)
 JITTER_RANDOM = SystemRandom()
@@ -34,21 +33,15 @@ JITTER_RANDOM = SystemRandom()
 class ScrapedItemCheckoutService:
     """Reserve one scraped item for agent processing."""
 
-    MAX_RETRIES = 3
-    RETRY_COOLDOWN = timedelta(minutes=30)
-    FORCED_ELIGIBLE_STATUSES = (ScrapedItem.Status.REVIEW,)
-
-    def execute(self, data: ScrapedItemCheckoutInput) -> ScrapedItem | None:
+    def execute(self) -> ScrapedItem | None:
         """Select and lock the next scraped item for checkout."""
-        now = timezone.now()
-
         with transaction.atomic():
-            item = self._selected_item(data=data, now=now)
+            item = self._selected_item()
             if item is None:
                 return None
 
             item.status = ScrapedItem.Status.PROCESSING
-            item.last_attempt_at = now
+            item.last_attempt_at = timezone.now()
             item.save(update_fields=["status", "last_attempt_at", "updated_at"])
             return item
 
@@ -56,58 +49,20 @@ class ScrapedItemCheckoutService:
         """Return the lockable base queryset used for item checkout."""
         return ScrapedItem.objects.select_for_update(skip_locked=True)
 
-    def _eligible_filters(
-        self,
-        *,
-        now: datetime,
-        force: bool,
-    ) -> Q:
-        """Build the checkout eligibility rules for scraped items."""
-        retry_threshold = now - self.RETRY_COOLDOWN
-        eligible_filters = Q(status=ScrapedItem.Status.QUEUED) | Q(
-            status=ScrapedItem.Status.ERROR,
-            error_count__lt=self.MAX_RETRIES,
-            last_attempt_at__lt=retry_threshold,
-        )
-
-        if force:
-            eligible_filters |= Q(status__in=self.FORCED_ELIGIBLE_STATUSES)
-
-        return eligible_filters
-
-    def _eligible_items(
-        self,
-        *,
-        now: datetime,
-        force: bool,
-    ) -> QuerySet[ScrapedItem]:
+    def _eligible_items(self) -> QuerySet[ScrapedItem]:
         """Return eligible scraped items ordered by checkout priority."""
         return (
             self._checkout_base_query()
             .filter(
-                self._eligible_filters(now=now, force=force),
+                status=ScrapedItem.Status.QUEUED,
                 source_page__url__startswith="http",
             )
-            .annotate(
-                checkout_priority=Case(
-                    When(status=ScrapedItem.Status.QUEUED, then=Value(0)),
-                    When(status=ScrapedItem.Status.ERROR, then=Value(1)),
-                    When(status=ScrapedItem.Status.REVIEW, then=Value(2)),
-                    default=Value(99),
-                    output_field=IntegerField(),
-                ),
-            )
-            .order_by("checkout_priority", "updated_at", "id")
+            .order_by("updated_at", "id")
         )
 
-    def _selected_item(
-        self,
-        *,
-        data: ScrapedItemCheckoutInput,
-        now: datetime,
-    ) -> ScrapedItem | None:
+    def _selected_item(self) -> ScrapedItem | None:
         """Return the single scraped item selected for checkout."""
-        return self._eligible_items(now=now, force=data.force).first()
+        return self._eligible_items().first()
 
 
 class ScrapedItemErrorService:
@@ -126,13 +81,7 @@ class ScrapedItemErrorService:
         else:
             item.error_count += 1
             item.last_error_log = message
-            item.status = (
-                ScrapedItem.Status.REVIEW
-                if item.error_count >= ScrapedItemCheckoutService.MAX_RETRIES
-                else ScrapedItem.Status.ERROR
-            )
-            if item.status == ScrapedItem.Status.REVIEW:
-                item.last_error_log += " (Max retries reached)"
+            item.status = ScrapedItem.Status.ERROR
 
         item.save(
             update_fields=[

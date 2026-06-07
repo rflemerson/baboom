@@ -7,13 +7,6 @@ _STRAWBERRY_RUNTIME_TYPES = (JSON,)
 
 
 @strawberry.input
-class ScrapedItemCheckoutInput:
-    """Input for checking out scraped items for processing."""
-
-    force: bool = False
-
-
-@strawberry.input
 class ScrapedItemErrorInput:
     """Input for reporting scraped item processing failures."""
 

@@ -316,7 +316,7 @@ class OfferObservationTests(TestCase):
 
 
 class ScrapedItemQueueTests(TestCase):
-    """Tests for explicit Dagster queue selection."""
+    """Tests for explicit agent queue selection."""
 
     def setUp(self) -> None:
         """Create one source page shared by queue items."""
@@ -358,43 +358,12 @@ class ScrapedItemQueueTests(TestCase):
             source_page=self.page,
         )
 
-        work = ScrapedItemCheckoutService().execute(
-            data=MagicMock(force=False),
-        )
+        work = ScrapedItemCheckoutService().execute()
 
         assert work is not None
         assert work.id == queued_item.id
         queued_item.refresh_from_db()
         assert queued_item.status == ScrapedItem.Status.PROCESSING
-
-    def test_checkout_force_reprocesses_review_items(self) -> None:
-        """Forced checkout should allow explicit review reprocessing."""
-        review_item = _scraped_item(
-            store_slug="dark_lab",
-            external_id="review-item",
-            status=ScrapedItem.Status.REVIEW,
-            source_page=self.page,
-        )
-
-        work = ScrapedItemCheckoutService().execute(data=MagicMock(force=True))
-
-        assert work is not None
-        assert work.id == review_item.id
-        review_item.refresh_from_db()
-        assert review_item.status == ScrapedItem.Status.PROCESSING
-
-    def test_checkout_force_does_not_reprocess_linked_items(self) -> None:
-        """Forced checkout should not consume already linked items."""
-        _scraped_item(
-            store_slug="dark_lab",
-            external_id="linked-item",
-            status=ScrapedItem.Status.LINKED,
-            source_page=self.page,
-        )
-
-        work = ScrapedItemCheckoutService().execute(data=MagicMock(force=True))
-
-        assert work is None
 
 
 class ScrapedItemErrorServiceTests(TestCase):
@@ -428,23 +397,6 @@ class ScrapedItemErrorServiceTests(TestCase):
         assert self.item.status == ScrapedItem.Status.ERROR
         assert self.item.error_count == 1
         assert self.item.last_error_log == "temporary parse failure"
-
-    def test_execute_moves_to_review_after_max_retries(self) -> None:
-        """Retryable errors become review items after the max retry count."""
-        self.item.error_count = ScrapedItemCheckoutService.MAX_RETRIES - 1
-        self.item.save(update_fields=["error_count"])
-
-        result = self.service.execute(
-            item_id=self.item.id,
-            message="still failing",
-            is_fatal=False,
-        )
-
-        self.item.refresh_from_db()
-        assert result
-        assert self.item.status == ScrapedItem.Status.REVIEW
-        assert self.item.error_count == ScrapedItemCheckoutService.MAX_RETRIES
-        assert "Max retries reached" in self.item.last_error_log
 
     def test_execute_records_fatal_error_for_review(self) -> None:
         """Fatal errors should move directly to review."""

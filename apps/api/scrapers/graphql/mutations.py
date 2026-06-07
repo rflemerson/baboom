@@ -16,7 +16,6 @@ from scrapers.services import (
 
 from .inputs import (
     AgentExtractionInput,
-    ScrapedItemCheckoutInput,
     ScrapedItemErrorInput,
 )
 from .types import (
@@ -27,7 +26,6 @@ from .types import (
 
 _STRAWBERRY_RUNTIME_TYPES = (
     AgentExtractionInput,
-    ScrapedItemCheckoutInput,
     ScrapedItemErrorInput,
     ScrapedItemExtractionResult,
     ScrapedItemExtractionType,
@@ -42,10 +40,9 @@ class ScrapersMutation:
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def checkout_scraped_item(
         self,
-        data: ScrapedItemCheckoutInput,
     ) -> ScrapedItemType | None:
         """Reserve one scraped item for agent processing."""
-        return ScrapedItemCheckoutService().execute(data)
+        return ScrapedItemCheckoutService().execute()
 
     @strawberry.mutation(permission_classes=[IsAuthenticatedWithAPIKey])
     def report_scraped_item_error(
