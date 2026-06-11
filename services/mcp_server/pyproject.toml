@@ -1,0 +1,26 @@
+[project]
+name = "extraction-review-mcp-server"
+version = "0.1.0"
+description = "Local MCP server for extraction review tools."
+requires-python = ">=3.14"
+dependencies = [
+    "mcp",
+    "requests",
+    "pydantic",
+    "python-dotenv",
+    "google-genai",
+    "playwright",
+    "beautifulsoup4",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[project.scripts]
+extraction-review-mcp-server = "mcp_server.server:main"
+
+[tool.setuptools.packages.find]
+include = ["mcp_server*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
