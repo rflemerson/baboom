@@ -3,9 +3,8 @@
 import sys
 import time
 
-from pydantic_ai.exceptions import ModelHTTPError
-
 from dagster import AssetExecutionContext, MetadataValue, asset
+from pydantic_ai.exceptions import ModelHTTPError
 
 from ..acquisition import (
     PreparedExtractionInputs,

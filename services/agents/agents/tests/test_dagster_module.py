@@ -3,6 +3,8 @@
 from unittest import TestCase
 from unittest.mock import patch
 
+from dagster import DefaultSensorStatus, RunRequest, SkipReason, build_asset_context
+
 from agents.acquisition import PreparedExtractionInputs
 from agents.definitions import defs
 from agents.defs.assets import (
@@ -19,7 +21,6 @@ from agents.defs.pipeline import (
 )
 from agents.defs.sensors import work_queue_sensor
 from agents.schemas import ExtractedProduct
-from dagster import DefaultSensorStatus, RunRequest, SkipReason, build_asset_context
 
 
 class _FakeApiClient:
