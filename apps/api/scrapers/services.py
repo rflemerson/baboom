@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import time
 from decimal import Decimal, InvalidOperation
-from secrets import SystemRandom
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import extruct
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -19,7 +18,6 @@ from offers.services import OfferObservationResult, OfferObservationService
 
 from .dtos import AgentExtractionSubmitInput
 from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
-from .spiders.http_client import HttpClient, HttpRequestOptions, parse_retry_after
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -27,7 +25,38 @@ if TYPE_CHECKING:
     from .dtos import ScrapedItemIngestionInput
 
 logger = logging.getLogger(__name__)
-JITTER_RANDOM = SystemRandom()
+
+
+class RenderResult(NamedTuple):
+    """Outcome of a headless render: HTTP status, response headers and HTML."""
+
+    status: int | None
+    headers: dict[str, str]
+    html: str
+
+
+SCHEMA_SYNTAXES = ("json-ld", "microdata", "opengraph", "rdfa", "microformat")
+
+
+def extract_schema_metadata(html: str, url: str) -> dict:
+    """Parse schema.org metadata from HTML with extruct.
+
+    Returns the JSON-LD, microdata, opengraph, rdfa and microformat blocks the
+    page author embedded. The full page is kept separately as ``raw_html`` (the
+    source of truth), so this is just the queryable, semantic view. Stateless,
+    so it lives at module level and can be reused without the service.
+    """
+    try:
+        extracted = extruct.extract(
+            html,
+            base_url=url,
+            syntaxes=list(SCHEMA_SYNTAXES),
+            uniform=True,
+        )
+    except Exception:
+        logger.exception("Failed to extract schema.org metadata for %s", url)
+        return {}
+    return extracted if isinstance(extracted, dict) else {}
 
 
 class ScrapedItemCheckoutService:
@@ -188,25 +217,18 @@ def build_agent_extraction_submit_input(payload: object) -> AgentExtractionSubmi
 class ScraperService:
     """Service for handling scraped data."""
 
-    HTML_EXTRACTION_TIMEOUT_SECONDS = 20
-    HTML_EXTRACTION_THROTTLE_SECONDS = (0.5, 1.5)
-    # Jittered backoff windows applied after each 429 before retrying.
-    HTML_EXTRACTION_RETRY_BACKOFFS = ((0.5, 1.5), (5.0, 10.0), (15.0, 25.0))
-    HTML_EXTRACTION_RATE_LIMITED_STATUS = 429
-    HTML_EXTRACTION_MISSING_STATUSES = (404, 410)
-    HTML_EXTRACTION_OK_STATUS = 200
-    HTML_NOT_MODIFIED_STATUS = 304
+    # Product pages are always captured with a headless browser: it is the only
+    # method robust to every store (server-rendered, SPA, or anti-bot challenge).
+    HTML_MISSING_STATUSES = (404, 410)
 
-    # Reused across the many per-product fetches of a weekly run so connections
-    # to the same store are kept alive (faster + steadier fingerprint).
-    _html_client: HttpClient | None = None
-
-    @classmethod
-    def _get_html_client(cls) -> HttpClient:
-        """Return the shared keep-alive HTTP client for HTML enrichment."""
-        if cls._html_client is None:
-            cls._html_client = HttpClient(timeout=cls.HTML_EXTRACTION_TIMEOUT_SECONDS)
-        return cls._html_client
+    RENDER_USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    )
+    RENDER_NAV_TIMEOUT_MS = 60000
+    RENDER_SETTLE_MS = 3000
+    RENDER_SCROLL_STEPS = 10
+    RENDER_SCROLL_PAUSE_MS = 300
 
     @staticmethod
     @transaction.atomic
@@ -294,7 +316,7 @@ class ScraperService:
             return None
         try:
             return Decimal(str(value))
-        except (InvalidOperation, ValueError):
+        except InvalidOperation, ValueError:
             logger.warning("Could not parse scraped price value: %r", value)
             return None
 
@@ -313,114 +335,51 @@ class ScraperService:
         return parsed if isinstance(parsed, dict) else {}
 
     @staticmethod
-    def _fetch_html_for_extraction(
-        url: str,
-        headers: dict[str, str] | None,
-    ) -> object | None:
-        """Fetch a product page using browser TLS impersonation.
+    async def _render_page_async(url: str) -> RenderResult:
+        """Render ``url`` in headless Chromium; capture status, headers and HTML."""
+        # Imported lazily so the heavy browser dependency only loads where it is
+        # used (the enrichment job), not in every process that imports this module.
+        from playwright.async_api import async_playwright  # noqa: PLC0415
 
-        Uses ``HttpClient`` (curl_cffi) plus jittered throttling and 429-aware
-        backoff so stores that rate-limit plain ``requests`` traffic keep
-        serving the product HTML. Returns the response, or ``None`` on failure.
-        """
-        client = ScraperService._get_html_client()
-        request_headers = headers or {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        }
-        backoffs = ScraperService.HTML_EXTRACTION_RETRY_BACKOFFS
-        response = None
-        for attempt, backoff in enumerate(backoffs):
-            time.sleep(
-                JITTER_RANDOM.uniform(*ScraperService.HTML_EXTRACTION_THROTTLE_SECONDS),
-            )
-            response = client.get(
-                url,
-                options=HttpRequestOptions(
-                    headers=request_headers,
-                    try_all_impersonations=attempt > 0,
-                ),
-            )
-            if response is None:
-                logger.warning("No response fetching HTML for extraction: %s", url)
-                return None
-            if (
-                response.status_code
-                != ScraperService.HTML_EXTRACTION_RATE_LIMITED_STATUS
-            ):
-                return response
-            # Honor the server's own pacing when it tells us; else jittered backoff.
-            wait = parse_retry_after(response) or JITTER_RANDOM.uniform(*backoff)
-            logger.warning(
-                "Rate limited (429) fetching %s; waiting %.1fs (retry %s/%s)",
-                url,
-                wait,
-                attempt + 1,
-                len(backoffs),
-            )
-            time.sleep(wait)
-        return response
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(headless=True)
+            try:
+                context = await browser.new_context(
+                    viewport={"width": 1280, "height": 800},
+                    user_agent=ScraperService.RENDER_USER_AGENT,
+                )
+                page = await context.new_page()
+                response = await page.goto(
+                    url,
+                    timeout=ScraperService.RENDER_NAV_TIMEOUT_MS,
+                    wait_until="load",
+                )
+                # Let client-side rendering and anti-bot challenges settle, then
+                # scroll so sections that mount lazily (e.g. nutrition tables
+                # below the fold) are present in the captured HTML.
+                await page.wait_for_timeout(ScraperService.RENDER_SETTLE_MS)
+                for _ in range(ScraperService.RENDER_SCROLL_STEPS):
+                    await page.mouse.wheel(0, 2000)
+                    await page.wait_for_timeout(ScraperService.RENDER_SCROLL_PAUSE_MS)
+                await page.wait_for_timeout(1000)
+                if response is None:
+                    return RenderResult(None, {}, await page.content())
+                return RenderResult(
+                    response.status,
+                    await response.all_headers(),
+                    await page.content(),
+                )
+            finally:
+                await browser.close()
 
     @staticmethod
-    def _parse_structured_html(response: object, url: str) -> dict:
-        """Run extruct over a fetched HTML response body."""
+    def _render_page(url: str) -> RenderResult | None:
+        """Render a page in a headless browser; ``None`` if rendering fails."""
         try:
-            extracted = extruct.extract(
-                response.text,
-                base_url=url,
-                syntaxes=["json-ld", "microdata", "opengraph", "rdfa", "microformat"],
-                uniform=True,
-            )
+            return asyncio.run(ScraperService._render_page_async(url))
         except Exception:
-            logger.exception("Failed to extract structured HTML data for %s", url)
-            return {}
-
-        return extracted if isinstance(extracted, dict) else {}
-
-    @staticmethod
-    def _conditional_headers(page: ScrapedPage) -> dict[str, str]:
-        """Build HTML headers with ETag/Last-Modified validators for a 304 GET."""
-        headers = {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        }
-        if page.http_etag:
-            headers["If-None-Match"] = page.http_etag
-        if page.http_last_modified:
-            headers["If-Modified-Since"] = page.http_last_modified
-        return headers
-
-    @staticmethod
-    def _apply_html_response(page: ScrapedPage, response: object | None) -> str:
-        """Update ``page`` HTML fields from a response and return an outcome.
-
-        A ``304 Not Modified`` keeps the stored data untouched (the whole point of
-        the conditional GET); a missing page clears it; a good page re-parses and
-        records the fresh ETag/Last-Modified validators.
-        """
-        if response is None:
-            return "failed"
-        status = response.status_code
-        if status == ScraperService.HTML_NOT_MODIFIED_STATUS:
-            logger.info("HTML unchanged (304) for %s; keeping stored data", page.url)
-            return "unchanged"
-        if status in ScraperService.HTML_EXTRACTION_MISSING_STATUSES:
-            page.html_structured_data = {}
-            page.http_etag = ""
-            page.http_last_modified = ""
-            return "updated"
-        if status != ScraperService.HTML_EXTRACTION_OK_STATUS:
-            logger.error("Failed to enrich HTML (%s) for %s", status, page.url)
-            return "failed"
-
-        page.html_structured_data = ScraperService._parse_structured_html(
-            response,
-            page.url,
-        )
-        response_headers = getattr(response, "headers", None) or {}
-        page.http_etag = str(response_headers.get("ETag", "") or "")[:250]
-        page.http_last_modified = str(
-            response_headers.get("Last-Modified", "") or "",
-        )[:100]
-        return "updated"
+            logger.exception("Failed to render %s in a headless browser", url)
+            return None
 
     @staticmethod
     def enrich_pages(
@@ -428,12 +387,13 @@ class ScraperService:
         store_slug: str | None = None,
         limit: int | None = None,
     ) -> dict[str, int]:
-        """Heavy, on-demand pass: refresh HTML structured data for scraped pages.
+        """Heavy, on-demand pass: refresh the captured HTML for scraped pages.
 
-        Each page is fetched with a conditional GET (its stored ETag /
-        Last-Modified). Pages the store reports as unchanged (``304``) are skipped
-        without re-parsing, so this only does real work where the product page
-        actually moved. Runs independently of the light catalog crawl.
+        Each page is rendered in a headless browser. Rendering is the only
+        capture method robust to every store (server-rendered, SPA, or anti-bot
+        challenge), so it is always used. The full HTML, the parsed schema.org
+        metadata and the HTTP response metadata are all stored. Runs
+        independently of the light catalog crawl.
         """
         if limit is not None and limit < 1:
             msg = "limit must be a positive integer."
@@ -445,7 +405,7 @@ class ScraperService:
         if limit:
             pages = pages[:limit]
 
-        stats = {"checked": 0, "updated": 0, "unchanged": 0, "failed": 0}
+        stats = {"checked": 0, "updated": 0, "failed": 0}
         for page in pages.iterator():
             stats["checked"] += 1
             stats[ScraperService._enrich_page(page)] += 1
@@ -454,15 +414,27 @@ class ScraperService:
 
     @staticmethod
     def _enrich_page(page: ScrapedPage) -> str:
-        """Conditionally refresh one page's HTML data; return the outcome key."""
-        response = ScraperService._fetch_html_for_extraction(
-            page.url,
-            ScraperService._conditional_headers(page),
-        )
-        outcome = ScraperService._apply_html_response(page, response)
-        if outcome != "updated":
-            return outcome
+        """Render and store one page's HTML, metadata and response info."""
+        result = ScraperService._render_page(page.url)
+        if result is None:
+            # Transient failure: keep whatever was captured before.
+            return "failed"
+
+        if result.status in ScraperService.HTML_MISSING_STATUSES:
+            # Page is gone: drop stale captures instead of keeping them.
+            page.raw_html = ""
+            page.html_structured_data = {}
+        else:
+            page.raw_html = result.html
+            page.html_structured_data = extract_schema_metadata(result.html, page.url)
+        page.response_meta = {"status": result.status, "headers": result.headers}
+
         page.save(
-            update_fields=["html_structured_data", "http_etag", "http_last_modified"],
+            update_fields=[
+                "raw_html",
+                "html_structured_data",
+                "response_meta",
+                "updated_at",
+            ],
         )
-        return outcome
+        return "updated"

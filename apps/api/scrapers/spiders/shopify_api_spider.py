@@ -129,7 +129,7 @@ class ShopifyApiSpider(CatalogApiSpider):
         if not handle:
             return listing_product
         detail = self._fetch_product_detail(handle)
-        return detail if detail else listing_product
+        return detail or listing_product
 
     def _crawl_category(
         self,

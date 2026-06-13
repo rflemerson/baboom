@@ -53,7 +53,6 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Enrichment ({scope}): checked {stats['checked']}, "
-                f"updated {stats['updated']}, unchanged {stats['unchanged']}, "
-                f"failed {stats['failed']}.",
+                f"updated {stats['updated']}, failed {stats['failed']}.",
             ),
         )

@@ -9,6 +9,7 @@
 
 ```bash
 pip install -e .[dev]
+playwright install chromium  # headless render fallback for enrich_pages
 prek run --all-files
 .venv/bin/python manage.py check
 .venv/bin/python manage.py test

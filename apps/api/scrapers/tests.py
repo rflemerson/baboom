@@ -18,10 +18,12 @@ from scrapers.admin import queue_for_agents
 from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage, ScraperRun
 from scrapers.services import (
+    RenderResult,
     ScrapedItemCheckoutService,
     ScrapedItemErrorService,
     ScrapedItemExtractionSubmitService,
     ScraperService,
+    extract_schema_metadata,
 )
 from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.catalog_api_spider import CatalogApiSpider
@@ -69,20 +71,6 @@ class HttpClientTests(SimpleTestCase):
             result = HttpClient().get("https://example.com/protected")
 
         assert result is None
-
-
-def _fake_html_response(
-    status: int = 200,
-    *,
-    etag: str = 'W/"x"',
-    last_modified: str = "",
-) -> MagicMock:
-    """Build a fake HTML response for the conditional enrichment path."""
-    response = MagicMock()
-    response.status_code = status
-    response.text = "<html></html>"
-    response.headers = {"ETag": etag, "Last-Modified": last_modified}
-    return response
 
 
 def _scraped_item(
@@ -667,81 +655,103 @@ class ScraperEnrichmentTests(TestCase):
     """Unit tests for the on-demand HTML enrichment pass."""
 
     @staticmethod
-    def _page(etag: str = "", last_modified: str = "") -> ScrapedPage:
+    def _page() -> ScrapedPage:
         return ScrapedPage.objects.create(
             store_slug="dark_lab",
             url="https://example.com/product",
-            http_etag=etag,
-            http_last_modified=last_modified,
         )
 
-    def test_enrich_page_skips_unchanged_304(self) -> None:
-        """A 304 keeps stored data and writes nothing."""
-        page = self._page(etag='W/"abc"')
+    def test_enrich_page_renders_and_stores_raw_and_structured(self) -> None:
+        """Every page is rendered; raw HTML, metadata and response info stored.
+
+        Embedded ``<script>`` JSON survives because it lives in ``raw_html``.
+        """
+        page = self._page()
+        rendered_html = (
+            "<html><body>"
+            '<script type="application/ld+json">'
+            '{"@type": "Product", "name": "3W Whey Protein"}'
+            "</script>"
+            '<script>window.__NUXT__={"proteinas":"24g"}</script>'
+            '<div class="nutri"><span>Proteínas</span><span>24 g</span></div>'
+            "</body></html>"
+        )
+        result = RenderResult(200, {"etag": 'W/"abc"'}, rendered_html)
         with patch.object(
             ScraperService,
-            "_fetch_html_for_extraction",
-            return_value=_fake_html_response(304),
-        ):
-            stats = ScraperService.enrich_pages(limit=1)
-
-        page.refresh_from_db()
-        assert stats["unchanged"] == 1
-        assert page.http_etag == 'W/"abc"'
-
-    def test_enrich_page_updates_on_200(self) -> None:
-        """A 200 re-parses the HTML and records the fresh validators."""
-        page = self._page()
-        response = _fake_html_response(
-            etag='W/"new"',
-            last_modified="Wed, 21 Oct 2025 07:28:00 GMT",
-        )
-        with (
-            patch.object(
-                ScraperService,
-                "_fetch_html_for_extraction",
-                return_value=response,
-            ),
-            patch("scrapers.services.extruct.extract", return_value={"json-ld": []}),
-        ):
+            "_render_page",
+            return_value=result,
+        ) as mock_render:
             stats = ScraperService.enrich_pages(limit=1)
 
         page.refresh_from_db()
         assert stats["updated"] == 1
-        assert page.html_structured_data == {"json-ld": []}
-        assert page.http_etag == 'W/"new"'
-        assert page.http_last_modified == "Wed, 21 Oct 2025 07:28:00 GMT"
+        mock_render.assert_called_once()
+        assert page.html_structured_data["json-ld"][0]["name"] == "3W Whey Protein"
+        # raw HTML is the source of truth: it keeps the embedded script dataset.
+        assert "window.__NUXT__" in page.raw_html
+        assert page.response_meta == {"status": 200, "headers": {"etag": 'W/"abc"'}}
 
-    def test_enrich_page_failed_on_no_response(self) -> None:
-        """A blocked/failed fetch reports failure without writing."""
-        self._page()
-        with patch.object(
-            ScraperService,
-            "_fetch_html_for_extraction",
-            return_value=None,
-        ):
+    def test_enrich_page_clears_captures_for_missing_page(self) -> None:
+        """A 404/410 drops stale captures instead of keeping them."""
+        page = self._page()
+        page.raw_html = "<html>old</html>"
+        page.html_structured_data = {"json-ld": [{"@type": "Product"}]}
+        page.save(update_fields=["raw_html", "html_structured_data"])
+
+        result = RenderResult(404, {}, "<html><body>not found</body></html>")
+        with patch.object(ScraperService, "_render_page", return_value=result):
             stats = ScraperService.enrich_pages(limit=1)
 
+        page.refresh_from_db()
+        assert stats["updated"] == 1
+        assert page.raw_html == ""
+        assert page.html_structured_data == {}
+
+    def test_enrich_page_failed_when_render_fails(self) -> None:
+        """A failed render reports failure and leaves stored captures untouched."""
+        page = self._page()
+        page.raw_html = "<html>kept</html>"
+        page.save(update_fields=["raw_html"])
+
+        with patch.object(ScraperService, "_render_page", return_value=None):
+            stats = ScraperService.enrich_pages(limit=1)
+
+        page.refresh_from_db()
         assert stats["failed"] == 1
-
-    def test_enrich_page_sends_conditional_validators(self) -> None:
-        """Stored ETag/Last-Modified are sent as conditional request headers."""
-        _ = self._page(etag='W/"abc"', last_modified="some-date")
-        with patch.object(
-            ScraperService,
-            "_fetch_html_for_extraction",
-            return_value=_fake_html_response(304),
-        ) as mock_fetch:
-            ScraperService.enrich_pages(limit=1)
-
-        sent_headers = mock_fetch.call_args.args[1]
-        assert sent_headers["If-None-Match"] == 'W/"abc"'
-        assert sent_headers["If-Modified-Since"] == "some-date"
+        # Prior capture is preserved rather than wiped on a transient failure.
+        assert page.raw_html == "<html>kept</html>"
 
     def test_enrich_pages_rejects_non_positive_limit(self) -> None:
         """Invalid limits should fail before building a queryset slice."""
         with self.assertRaisesMessage(ValueError, "limit must be a positive integer"):
             ScraperService.enrich_pages(limit=0)
+
+
+class SchemaMetadataParsingTests(SimpleTestCase):
+    """Unit tests for schema.org metadata extraction."""
+
+    def test_extracts_json_ld(self) -> None:
+        """JSON-LD product metadata is parsed from the HTML."""
+        html = """
+        <html><body>
+          <script type="application/ld+json">
+          {"@type": "Product", "name": "Whey", "offers": {"price": "99.90"}}
+          </script>
+        </body></html>
+        """
+        data = extract_schema_metadata(html, "https://x.com/p")
+
+        assert data["json-ld"][0]["name"] == "Whey"
+
+    def test_page_without_metadata_returns_empty_syntaxes(self) -> None:
+        """A page with no embedded metadata yields empty syntax lists."""
+        data = extract_schema_metadata(
+            "<html><body><p>oi</p></body></html>",
+            "https://x.com/p",
+        )
+
+        assert all(not block for block in data.values())
 
 
 class DarkLabSpiderUnitTests(SimpleTestCase):

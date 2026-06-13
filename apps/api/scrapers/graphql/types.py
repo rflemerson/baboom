@@ -89,13 +89,21 @@ class ScrapedItemType:
 
     @strawberry.field
     def source_page_html_structured_data(self) -> str:
-        """Return structured metadata extracted from the page HTML."""
+        """Return schema.org metadata parsed from the page HTML."""
         item = cast("ScrapedItem", self)
         if item.source_page:
             return json.dumps(
                 item.source_page.html_structured_data or {},
                 ensure_ascii=False,
             )
+        return ""
+
+    @strawberry.field
+    def source_page_raw_html(self) -> str:
+        """Return the full rendered page HTML captured by the scraper."""
+        item = cast("ScrapedItem", self)
+        if item.source_page:
+            return item.source_page.raw_html or ""
         return ""
 
     @strawberry.field
