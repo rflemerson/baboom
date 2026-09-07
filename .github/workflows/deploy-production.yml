@@ -15,7 +15,7 @@ jobs:
     name: Pull images and restart stack
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Install SSH key
         run: |
