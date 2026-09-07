@@ -20,6 +20,8 @@ This service exposes local MCP tools for extraction review.
   60-minute inactivity timeout. Release abandoned reservations explicitly.
 - Approval is separate from staging: show `approve_current_item` without confirmation
   first, search catalog candidates, and send `confirm=True` only on explicit approval.
+- Approval submits a mass as `netMass` with its `massUnit`; the API stores it
+  canonically. Extraction drafts keep the units the source page stated.
 - New catalog products are unpublished. Nutrition, flavors and components remain
   available in extraction staging for detailed curation through Django admin.
 - `schemas.py` validates nested local drafts; keep it aligned with the API DTOs.

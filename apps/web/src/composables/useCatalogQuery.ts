@@ -1,6 +1,7 @@
 import { computed, type MaybeRefOrGetter, ref, toValue, watch } from 'vue'
 
 import type {
+  CatalogActive,
   CatalogPageInfo,
   CatalogProduct,
   CatalogProductsResponse,
@@ -28,10 +29,11 @@ function buildCatalogUrl(variables: CatalogProductsVariables) {
   appendOptionalParam(params, 'per_page', filters.perPage)
   appendOptionalParam(params, 'search', filters.search)
   appendOptionalParam(params, 'brand', filters.brand)
+  appendOptionalParam(params, 'active', filters.active)
   appendOptionalParam(params, 'price_min', filters.priceMin)
   appendOptionalParam(params, 'price_max', filters.priceMax)
-  appendOptionalParam(params, 'price_per_protein_gram_min', filters.pricePerProteinGramMin)
-  appendOptionalParam(params, 'price_per_protein_gram_max', filters.pricePerProteinGramMax)
+  appendOptionalParam(params, 'price_per_active_min', filters.pricePerActiveMin)
+  appendOptionalParam(params, 'price_per_active_max', filters.pricePerActiveMax)
   appendOptionalParam(params, 'concentration_min', filters.concentrationMin)
   appendOptionalParam(params, 'concentration_max', filters.concentrationMax)
   appendOptionalParam(params, 'sort_by', filters.sortBy)
@@ -86,7 +88,15 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
 
   const products = computed<CatalogProduct[]>(() => result.value?.items ?? [])
 
+  // The metrics are relative to one active and one unit; the response names
+  // both, so nothing downstream has to assume protein or grams.
+  const active = computed<CatalogActive | null>(() => result.value?.active ?? null)
+
+  const massUnit = computed(() => result.value?.massUnit ?? 'g')
+
   return {
+    active,
+    massUnit,
     error,
     loading,
     pageInfo,

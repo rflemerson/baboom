@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
@@ -9,11 +10,22 @@ from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 
 from core.models import Brand, Category, Product, Tag
+from core.units import to_canonical
 
 from .product_stores import ProductStoreService
 
 if TYPE_CHECKING:
     from core.dtos import ProductCreateInput, ProductMetadataUpdateInput
+
+
+def _canonical_mass(value: float | None, unit: str) -> Decimal | None:
+    """Convert a submitted mass into the canonical unit, or reject the unit."""
+    if value is None:
+        return None
+    canonical = to_canonical(Decimal(str(value)), unit)
+    if canonical is None:
+        raise ValidationError({"mass_unit": _("Unsupported mass unit.")})
+    return canonical
 
 
 class ProductCreateService:
@@ -33,7 +45,7 @@ class ProductCreateService:
 
                 product = Product.objects.create(
                     name=data.name,
-                    weight=data.weight,
+                    net_mass=_canonical_mass(data.net_mass, data.mass_unit),
                     brand=brand,
                     category=category,
                     ean=data.ean,
@@ -98,8 +110,8 @@ class ProductMetadataUpdateService:
         """Apply submitted metadata to the product instance."""
         if data.name is not None:
             product.name = data.name
-        if "weight" in data.model_fields_set:
-            product.weight = data.weight
+        if "net_mass" in data.model_fields_set:
+            product.net_mass = _canonical_mass(data.net_mass, data.mass_unit)
         if "brand_id" in data.model_fields_set:
             if data.brand_id is None:
                 raise ValidationError({"brand_id": _("Brand is required.")})

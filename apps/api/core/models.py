@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import secrets
+from decimal import Decimal
 from typing import ClassVar
 
 from django.core.exceptions import ValidationError
@@ -15,7 +16,100 @@ from treebeard.mp_tree import MP_Node
 
 from common.models import BaseModel
 
+from . import units
+
 logger = logging.getLogger(__name__)
+
+
+def MASS_FIELD(label: object, **kwargs: object) -> models.DecimalField:  # noqa: N802
+    """Return a nullable mass column stored in the canonical unit."""
+    return models.DecimalField(
+        label,
+        max_digits=16,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        **kwargs,
+    )
+
+
+class Unit(models.TextChoices):
+    """Units a nutrition label may state, taken from the unit registry."""
+
+    UNKNOWN = "-", "-"
+    GRAM = "g", "g"
+    MILLIGRAM = "mg", "mg"
+    MICROGRAM = "mcg", "mcg"
+    KILOGRAM = "kg", "kg"
+    KILOCALORIE = "kcal", "kcal"
+    IU = "IU", "IU"
+    PERCENT = "%", "%"
+
+    @classmethod
+    def normalize(cls, value: str) -> str:
+        """Return a supported unit or the unknown fallback."""
+        candidate = value.strip()
+        return candidate if candidate in cls.values else cls.UNKNOWN
+
+
+class Active(BaseModel):
+    """A substance the catalog can rank and filter products by.
+
+    Protein is one row here, not a privileged column: creatine, caffeine, EPA or
+    collagen are described the same way. Macros that the nutrition label carries
+    in a dedicated column point at it through ``nutrition_field``; everything
+    else is read from :class:`NutritionActive` rows.
+    """
+
+    #: Scalar :class:`NutritionFacts` columns an active may be sourced from.
+    NUTRITION_FIELDS: ClassVar[tuple[str, ...]] = (
+        "proteins",
+        "carbohydrates",
+        "total_sugars",
+        "added_sugars",
+        "total_fats",
+        "saturated_fats",
+        "trans_fats",
+        "dietary_fiber",
+        "sodium",
+    )
+
+    name = models.CharField(_("Name"), max_length=100, unique=True)
+    slug = models.SlugField(_("Slug"), max_length=100, unique=True)
+    display_unit = models.CharField(
+        _("Display Unit"),
+        max_length=10,
+        choices=Unit.choices,
+        default=Unit.GRAM,
+        help_text=_("Unit this active is presented in; storage stays canonical."),
+    )
+    nutrition_field = models.CharField(
+        _("Nutrition Label Field"),
+        max_length=30,
+        blank=True,
+        default="",
+        choices=[(field, field) for field in NUTRITION_FIELDS],
+        help_text=_(
+            "Scalar nutrition column carrying this active. Leave empty to read "
+            "it from the nutrition active rows.",
+        ),
+    )
+    description = models.TextField(
+        _("Description"),
+        blank=True,
+        help_text=_("Active description"),
+    )
+
+    class Meta:
+        """Meta options."""
+
+        verbose_name = _("Active")
+        verbose_name_plural = _("Actives")
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        """Return name."""
+        return self.name
 
 
 class Brand(BaseModel):
@@ -130,6 +224,16 @@ class Category(MP_Node, BaseModel):
         help_text=_("Category description"),
     )
 
+    default_active = models.ForeignKey(
+        Active,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="default_for_categories",
+        verbose_name=_("Default Active"),
+        help_text=_("Active this category is ranked by when none is requested."),
+    )
+
     node_order_by = ("name",)
 
     class Meta:
@@ -181,11 +285,13 @@ class Product(BaseModel):
         help_text=_("Marketing description"),
     )
 
-    weight = models.PositiveIntegerField(
-        _("Weight (grams)"),
+    net_mass = models.DecimalField(
+        _("Net Mass"),
+        max_digits=16,
+        decimal_places=3,
         null=True,
         blank=True,
-        help_text=_("Total product weight in grams"),
+        help_text=_("Net content of the package, stored in the canonical unit."),
     )
 
     ean = models.CharField(
@@ -246,8 +352,15 @@ class Product(BaseModel):
 
     def __str__(self) -> str:
         """Return string representation."""
-        weight_display = f"{self.weight}g" if self.weight is not None else "No weight"
-        return f"{self.brand.display_name} - {self.name} ({weight_display})"
+        mass = (
+            None
+            if self.net_mass is None
+            else units.from_canonical(self.net_mass, units.DISPLAY_MASS_UNIT)
+        )
+        mass_display = (
+            f"{mass:g}{units.DISPLAY_MASS_UNIT}" if mass is not None else "No mass"
+        )
+        return f"{self.brand.display_name} - {self.name} ({mass_display})"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Validate rules on save."""
@@ -425,8 +538,8 @@ class NutritionFacts(BaseModel):
     """Nutritional information model."""
 
     HASH_FIELDS: ClassVar[tuple[str, ...]] = (
-        "serving_size_grams",
-        "energy_kcal",
+        "serving_size",
+        "energy",
         "proteins",
         "carbohydrates",
         "total_sugars",
@@ -449,76 +562,31 @@ class NutritionFacts(BaseModel):
 
     # Extraction rarely recovers every value of a label, and an unknown value is
     # not zero: the scalar macros stay nullable so a partial table can be staged
-    # and completed later without inventing numbers.
-    serving_size_grams = models.DecimalField(
-        _("Serving Size (g)"),
-        max_digits=6,
-        decimal_places=2,
+    # and completed later without inventing numbers. Every mass below is stored
+    # in the canonical unit, whatever unit the printed label used.
+    serving_size = models.DecimalField(
+        _("Serving Size"),
+        max_digits=16,
+        decimal_places=3,
         null=True,
         blank=True,
     )
-    energy_kcal = models.PositiveSmallIntegerField(
-        _("Energy (kcal)"),
-        null=True,
-        blank=True,
-    )
-    proteins = models.DecimalField(
-        _("Proteins (g)"),
-        max_digits=5,
-        decimal_places=1,
-        null=True,
-        blank=True,
-    )
-    carbohydrates = models.DecimalField(
-        _("Carbs (g)"),
-        max_digits=5,
-        decimal_places=1,
-        null=True,
-        blank=True,
-    )
-    total_sugars = models.DecimalField(
-        _("Total Sugars (g)"),
-        max_digits=5,
-        decimal_places=1,
-        default=0,
-    )
-    added_sugars = models.DecimalField(
-        _("Added Sugars (g)"),
-        max_digits=5,
-        decimal_places=1,
-        default=0,
-    )
-    total_fats = models.DecimalField(
-        _("Total Fats (g)"),
-        max_digits=5,
-        decimal_places=1,
-        null=True,
-        blank=True,
-    )
-    saturated_fats = models.DecimalField(
-        _("Saturated Fats (g)"),
-        max_digits=5,
-        decimal_places=1,
-        default=0,
-    )
-    trans_fats = models.DecimalField(
-        _("Trans Fats (g)"),
-        max_digits=5,
-        decimal_places=1,
-        default=0,
-    )
-    dietary_fiber = models.DecimalField(
-        _("Dietary Fiber (g)"),
-        max_digits=5,
-        decimal_places=1,
-        default=0,
-    )
-    sodium = models.DecimalField(
-        _("Sodium (mg)"),
+    energy = models.DecimalField(
+        _("Energy"),
         max_digits=10,
-        decimal_places=2,
-        default=0,
+        decimal_places=3,
+        null=True,
+        blank=True,
     )
+    proteins = MASS_FIELD(_("Proteins"))
+    carbohydrates = MASS_FIELD(_("Carbs"))
+    total_sugars = MASS_FIELD(_("Total Sugars"), default=0)
+    added_sugars = MASS_FIELD(_("Added Sugars"), default=0)
+    total_fats = MASS_FIELD(_("Total Fats"))
+    saturated_fats = MASS_FIELD(_("Saturated Fats"), default=0)
+    trans_fats = MASS_FIELD(_("Trans Fats"), default=0)
+    dietary_fiber = MASS_FIELD(_("Dietary Fiber"), default=0)
+    sodium = MASS_FIELD(_("Sodium"), default=0)
 
     content_hash = models.CharField(
         _("Content Hash"),
@@ -539,8 +607,8 @@ class NutritionFacts(BaseModel):
 
         constraints = (
             models.CheckConstraint(
-                condition=models.Q(serving_size_grams__gt=0)
-                | models.Q(serving_size_grams__isnull=True),
+                condition=models.Q(serving_size__gt=0)
+                | models.Q(serving_size__isnull=True),
                 name="nutrition_facts_positive_serving_size",
             ),
         )
@@ -549,28 +617,36 @@ class NutritionFacts(BaseModel):
         """Keep the content hash in sync with the stored values on every write.
 
         The hash is owned by the model: no caller recomputes it. When a
-        micronutrient changes it re-saves its parent facts (see Micronutrient),
-        which lands back here and refreshes the fingerprint.
+        nutrition active changes it re-saves its parent facts (see
+        NutritionActive), which lands back here and refreshes the fingerprint.
         """
         self.content_hash = self._content_hash()
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             kwargs["update_fields"] = {*update_fields, "content_hash", "updated_at"}
         super().save(*args, **kwargs)
+        for profile in self.product_profiles.select_related("product"):
+            ProductActive.objects.sync_for(profile.product)
 
     def _content_hash(self) -> str:
-        """Return a stable SHA-256 of the scalar values and saved micronutrients."""
+        """Return a stable SHA-256 of the scalar values and saved actives."""
         data: dict[str, object] = {
             field: None if (value := getattr(self, field)) is None else float(value)
             for field in self.HASH_FIELDS
         }
+        # "micronutrients" is a frozen key of the fingerprint payload, not a
+        # field name: renaming it would invalidate every stored hash.
         data["micronutrients"] = (
             sorted(
                 (
-                    {"name": item.name, "value": float(item.value), "unit": item.unit}
-                    for item in self.micronutrients.all()
+                    {
+                        "name": item.active.name,
+                        "value": float(item.amount),
+                        "unit": item.declared_unit,
+                    }
+                    for item in self.actives.select_related("active")
                 ),
-                key=lambda micronutrient: micronutrient["name"],
+                key=lambda amount: amount["name"],
             )
             if self.pk
             else []
@@ -585,73 +661,65 @@ class NutritionFacts(BaseModel):
         return short_hash
 
 
-class Micronutrient(BaseModel):
-    """Micronutrient (vitamin/mineral) definition."""
-
-    class Units(models.TextChoices):
-        """Supported units of measurement."""
-
-        UNKNOWN = "-", "-"
-        GRAM = "g", "g"
-        MILLIGRAM = "mg", "mg"
-        MICROGRAM = "mcg", "mcg"
-        IU = "IU", "IU"
-        PERCENT = "%", "%"
-
-        @classmethod
-        def normalize(cls, value: str) -> str:
-            """Return a supported unit or the unknown fallback."""
-            candidate = value.strip()
-            return candidate if candidate in cls.values else cls.UNKNOWN
+class NutritionActive(BaseModel):
+    """The amount of one :class:`Active` measured in a nutrition label."""
 
     nutrition_facts = models.ForeignKey(
         NutritionFacts,
         on_delete=models.CASCADE,
-        related_name="micronutrients",
+        related_name="actives",
     )
 
-    name = models.CharField(
-        _("Nutrient Name"),
-        max_length=100,
-        help_text=_("e.g., Vitamin C, Iron"),
+    active = models.ForeignKey(
+        Active,
+        on_delete=models.PROTECT,
+        related_name="label_amounts",
+        verbose_name=_("Active"),
     )
 
-    value = models.DecimalField(
-        _("Quantity"),
-        max_digits=10,
+    amount = models.DecimalField(
+        _("Amount"),
+        max_digits=16,
         decimal_places=3,
+        help_text=_("Stored in the canonical unit of the declared dimension."),
     )
 
-    unit = models.CharField(
-        _("Unit"),
+    declared_unit = models.CharField(
+        _("Declared Unit"),
         max_length=10,
-        choices=Units.choices,
-        default=Units.UNKNOWN,
+        choices=Unit.choices,
+        default=Unit.UNKNOWN,
+        help_text=_("Unit the printed label used, kept so it can be shown again."),
     )
 
     class Meta:
         """Meta options."""
 
-        verbose_name = _("Micronutrient")
-        verbose_name_plural = _("Micronutrients")
+        verbose_name = _("Nutrition Active")
+        verbose_name_plural = _("Nutrition Actives")
         constraints = (
             models.UniqueConstraint(
-                fields=["nutrition_facts", "name"],
+                fields=["nutrition_facts", "active"],
                 name="unique_nutrient_per_facts",
             ),
         )
 
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.name}: {self.value}{self.unit}"
+        return f"{self.active.name}: {self.declared_amount}{self.declared_unit}"
+
+    @property
+    def declared_amount(self) -> Decimal | None:
+        """Return the amount in the unit the label declared it in."""
+        return units.from_canonical(self.amount, self.declared_unit)
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Persist the micronutrient and refresh its parent facts hash."""
+        """Persist the amount and refresh its parent facts hash."""
         super().save(*args, **kwargs)
         self.nutrition_facts.save(update_fields=["content_hash", "updated_at"])
 
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
-        """Remove the micronutrient and refresh its parent facts hash."""
+        """Remove the amount and refresh its parent facts hash."""
         facts = self.nutrition_facts
         result = super().delete(*args, **kwargs)
         facts.save(update_fields=["content_hash", "updated_at"])
@@ -696,6 +764,142 @@ class ProductNutrition(BaseModel):
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.product.name} - {self.nutrition_facts}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Persist the link and refresh the product's derived concentrations."""
+        super().save(*args, **kwargs)
+        ProductActive.objects.sync_for(self.product)
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Remove the link and refresh the product's derived concentrations."""
+        product = self.product
+        result = super().delete(*args, **kwargs)
+        ProductActive.objects.sync_for(product)
+        return result
+
+
+class ProductActiveManager(models.Manager):
+    """Manager that keeps product concentrations derived from nutrition data."""
+
+    def sync_for(self, product: Product) -> None:
+        """Recompute the product's concentrations from its nutrition profiles.
+
+        A product may carry several labels (one per flavor). The catalog ranks
+        by the strongest one, so each active keeps its highest concentration
+        across the profiles. Rows for actives that no longer appear are dropped.
+        """
+        fractions = self._fractions(product)
+
+        self.filter(product=product).exclude(active_id__in=fractions).delete()
+
+        for active_id, fraction in fractions.items():
+            self.update_or_create(
+                product=product,
+                active_id=active_id,
+                defaults={"fraction": fraction},
+            )
+
+    def _fractions(self, product: Product) -> dict[int, Decimal]:
+        """Return the highest mass fraction of each active across the labels."""
+        actives = list(Active.objects.all())
+        highest: dict[int, Decimal] = {}
+
+        profiles = product.nutrition_profiles.select_related(
+            "nutrition_facts",
+        ).prefetch_related("nutrition_facts__actives")
+
+        for profile in profiles:
+            for active_id, value in self._label_fractions(
+                profile.nutrition_facts,
+                actives,
+            ).items():
+                if value > highest.get(active_id, Decimal(0)):
+                    highest[active_id] = value
+
+        return highest
+
+    def _label_fractions(
+        self,
+        facts: NutritionFacts,
+        actives: list[Active],
+    ) -> dict[int, Decimal]:
+        """Return the mass fraction of each active in one label.
+
+        Both sides of the ratio are already canonical, so the result is a plain
+        dimensionless number and no unit is named anywhere in the arithmetic.
+        """
+        serving = facts.serving_size
+        if not serving:
+            return {}
+
+        amounts: dict[int, Decimal] = {}
+
+        for active in actives:
+            if not active.nutrition_field:
+                continue
+            value = getattr(facts, active.nutrition_field)
+            if value is not None:
+                amounts[active.pk] = Decimal(value) / serving
+
+        for entry in facts.actives.all():
+            # A label may state an active in international units or as a
+            # percentage of a daily value; neither carries a mass to rank.
+            if units.is_convertible(entry.declared_unit):
+                amounts[entry.active_id] = entry.amount / serving
+
+        return amounts
+
+
+class ProductActive(BaseModel):
+    """Mass fraction of one active in a product.
+
+    This is derived from the product's nutrition profiles and is what the public
+    catalog ranks, filters and sorts on. The value is dimensionless -- grams of
+    active per gram of product, milligrams per milligram, the same number -- so
+    every catalog metric is arithmetic over one column, whatever the active is
+    and whatever unit the result is later presented in.
+    """
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="actives",
+        verbose_name=_("Product"),
+    )
+
+    active = models.ForeignKey(
+        Active,
+        on_delete=models.CASCADE,
+        related_name="product_amounts",
+        verbose_name=_("Active"),
+    )
+
+    fraction = models.DecimalField(
+        _("Mass Fraction"),
+        max_digits=12,
+        decimal_places=8,
+        help_text=_("Mass of the active per unit of product mass."),
+    )
+
+    objects = ProductActiveManager()
+
+    class Meta:
+        """Meta options."""
+
+        verbose_name = _("Product Active")
+        verbose_name_plural = _("Product Actives")
+        ordering = ("product__name", "active__name")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["product", "active"],
+                name="unique_product_active",
+            ),
+        )
+        indexes = (models.Index(fields=["active", "fraction"]),)
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return f"{self.product.name} - {self.active.name}: {self.fraction}"
 
 
 class AlertSubscriber(BaseModel):

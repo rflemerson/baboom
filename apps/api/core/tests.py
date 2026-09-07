@@ -24,24 +24,42 @@ from core.dtos import (
 )
 from core.forms import ProductStoreInlineForm, ProductStoreInlineFormSet
 from core.models import (
+    Active,
     AlertSubscriber,
     Brand,
     Category,
+    NutritionActive,
     NutritionFacts,
     Product,
+    ProductActive,
     ProductComponent,
     ProductNutrition,
     ProductStore,
     Store,
     Tag,
 )
-from core.selectors import public_catalog_products, public_catalog_products_with_stats
+from core.selectors import (
+    catalog_active,
+    public_catalog_products,
+    public_catalog_products_with_stats,
+)
 from core.services import (
     ProductCreateService,
     ProductMetadataUpdateService,
     ProductStoreService,
 )
+from core.units import to_canonical
 from offers.models import Offer, PriceObservation, StockStatus
+
+
+def _grams(value: object) -> Decimal:
+    """Return a mass stated in grams in the unit the models store."""
+    return to_canonical(Decimal(str(value)), "g")
+
+
+def _per_gram(value: Decimal) -> Decimal:
+    """Return a per-canonical-mass metric restated per gram."""
+    return value * to_canonical(Decimal(1), "g")
 
 
 def _link_offer(
@@ -82,8 +100,8 @@ class CatalogAnnotatedProduct(Protocol):
     """Typed surface for selector rows with catalog annotations."""
 
     concentration: Decimal | None
-    total_protein: Decimal | None
-    price_per_protein_gram: Decimal | None
+    total_active: Decimal | None
+    price_per_active: Decimal | None
     external_link: str | None
     last_price: Decimal | None
 
@@ -100,7 +118,7 @@ class ProductStoreServiceTests(TestCase):
         self.product = Product.objects.create(
             name="Whey Concentrado",
             brand=self.brand,
-            weight=900,
+            net_mass=_grams(900),
             packaging=Product.Packaging.CONTAINER,
         )
         self.store = Store.objects.create(name="growth", display_name="Growth")
@@ -297,7 +315,7 @@ class ProductCreateServiceTests(TestCase):
         product = self.service.execute(
             ProductCreateInput(
                 name="Whey Isolate",
-                weight=900,
+                net_mass=900,
                 brand_id=self.brand.id,
                 category_id=protein.id,
                 ean="1234567890123",
@@ -332,7 +350,7 @@ class ProductCreateServiceTests(TestCase):
             self.service.execute(
                 ProductCreateInput(
                     name="Whey",
-                    weight=900,
+                    net_mass=900,
                     brand_id=99999,
                 ),
             )
@@ -347,7 +365,7 @@ class ProductCreateServiceTests(TestCase):
         Product.objects.create(
             name="Existing Whey",
             brand=self.brand,
-            weight=900,
+            net_mass=_grams(900),
             ean="1234567890123",
             packaging=Product.Packaging.CONTAINER,
         )
@@ -357,7 +375,7 @@ class ProductCreateServiceTests(TestCase):
             self.service.execute(
                 ProductCreateInput(
                     name="Another Whey",
-                    weight=900,
+                    net_mass=900,
                     brand_id=self.brand.id,
                     ean="1234567890123",
                 ),
@@ -373,7 +391,7 @@ class ProductMetadataUpdateServiceTests(TestCase):
     """Essential coverage for product metadata updates."""
 
     EXPECTED_TAG_COUNT = 2
-    UPDATED_WEIGHT = 450
+    UPDATED_MASS_GRAMS = 450
 
     def setUp(self) -> None:
         """Create a baseline product for metadata update tests."""
@@ -382,7 +400,7 @@ class ProductMetadataUpdateServiceTests(TestCase):
         self.product = Product.objects.create(
             name="Old Whey",
             brand=self.brand,
-            weight=900,
+            net_mass=_grams(900),
             packaging=Product.Packaging.CONTAINER,
             description="Old description",
         )
@@ -417,7 +435,7 @@ class ProductMetadataUpdateServiceTests(TestCase):
         assert updated_product.category.name == "Protein"
         assert updated_product.tags.count() == self.EXPECTED_TAG_COUNT
 
-    def test_execute_updates_brand_weight_and_ean(self) -> None:
+    def test_execute_updates_brand_mass_and_ean(self) -> None:
         """Manager-facing product edits should persist core product identity fields."""
         new_brand = Brand.objects.create(name="dux", display_name="Dux")
 
@@ -425,14 +443,14 @@ class ProductMetadataUpdateServiceTests(TestCase):
             product_id=self.product.id,
             data=ProductMetadataUpdateInput(
                 brand_id=new_brand.id,
-                weight=self.UPDATED_WEIGHT,
+                net_mass=self.UPDATED_MASS_GRAMS,
                 ean="7891234567890",
             ),
         )
 
         updated_product.refresh_from_db()
         assert updated_product.brand == new_brand
-        assert updated_product.weight == self.UPDATED_WEIGHT
+        assert updated_product.net_mass == _grams(self.UPDATED_MASS_GRAMS)
         assert updated_product.ean == "7891234567890"
 
     def test_execute_can_clear_category(self) -> None:
@@ -547,19 +565,198 @@ class NutritionFactsPartialLabelTests(TestCase):
 
     def test_partial_label_is_stored_and_hashed(self) -> None:
         """Unknown macros stay null instead of being recorded as zero."""
-        facts = NutritionFacts.objects.create(description="Parcial", proteins=24)
+        facts = NutritionFacts.objects.create(
+            description="Parcial",
+            proteins=_grams(24),
+        )
 
         facts.refresh_from_db()
-        assert facts.serving_size_grams is None
-        assert facts.energy_kcal is None
+        assert facts.serving_size is None
+        assert facts.energy is None
         assert facts.content_hash != ""
 
     def test_null_and_zero_macros_hash_differently(self) -> None:
         """An unknown value is not the same fact as a measured zero."""
-        unknown = NutritionFacts.objects.create(proteins=24)
-        measured = NutritionFacts.objects.create(proteins=24, carbohydrates=0)
+        unknown = NutritionFacts.objects.create(proteins=_grams(24))
+        measured = NutritionFacts.objects.create(
+            proteins=_grams(24),
+            carbohydrates=_grams(0),
+        )
 
         assert unknown.content_hash != measured.content_hash
+
+
+class ProductActiveTests(TestCase):
+    """Coverage for concentrations derived from nutrition data."""
+
+    def setUp(self) -> None:
+        """Create a product with one label and a non-macro active."""
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+        self.product = Product.objects.create(
+            name="Pre Workout",
+            brand=self.brand,
+            net_mass=_grams(300),
+        )
+        self.caffeine = Active.objects.create(
+            name="Caffeine",
+            slug="caffeine",
+            display_unit="mg",
+        )
+        self.facts = NutritionFacts.objects.create(
+            serving_size=_grams(10),
+            proteins=_grams("2.0"),
+        )
+
+    def test_macro_and_label_actives_are_derived_together(self) -> None:
+        """Scalar columns and label rows both produce concentrations."""
+        NutritionActive.objects.create(
+            nutrition_facts=self.facts,
+            active=self.caffeine,
+            amount=to_canonical(Decimal(200), "mg"),
+            declared_unit="mg",
+        )
+        ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=self.facts,
+        )
+
+        protein = ProductActive.objects.get(
+            product=self.product,
+            active__slug="protein",
+        )
+        caffeine = ProductActive.objects.get(
+            product=self.product,
+            active=self.caffeine,
+        )
+        # 2 g of protein in a 10 g serving is a fifth of the mass; 200 mg is 2%.
+        assert protein.fraction == Decimal("0.20000000")
+        assert caffeine.fraction == Decimal("0.02000000")
+
+    def test_source_unit_is_respected(self) -> None:
+        """Sodium is stored in milligrams, unlike the macros around it."""
+        self.facts.sodium = to_canonical(Decimal(50), "mg")
+        self.facts.save()
+        ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=self.facts,
+        )
+
+        sodium = ProductActive.objects.get(
+            product=self.product,
+            active__slug="sodium",
+        )
+        assert sodium.fraction == Decimal("0.00500000")
+
+    def test_non_mass_units_carry_no_concentration(self) -> None:
+        """A value in IU cannot be converted, so it produces no row."""
+        vitamin = Active.objects.create(
+            name="Vitamin D",
+            slug="vitamin-d",
+            display_unit="IU",
+        )
+        NutritionActive.objects.create(
+            nutrition_facts=self.facts,
+            active=vitamin,
+            amount=Decimal(400),
+            declared_unit="IU",
+        )
+        ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=self.facts,
+        )
+
+        assert not ProductActive.objects.filter(
+            product=self.product,
+            active=vitamin,
+        ).exists()
+
+    def test_unlinking_a_profile_drops_its_concentrations(self) -> None:
+        """Derived rows follow the nutrition profiles they came from."""
+        profile = ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=self.facts,
+        )
+        assert ProductActive.objects.filter(product=self.product).exists()
+
+        profile.delete()
+
+        assert not ProductActive.objects.filter(product=self.product).exists()
+
+
+class CatalogActiveRankingTests(TestCase):
+    """Coverage for ranking the catalog by different actives."""
+
+    def setUp(self) -> None:
+        """Create two products that rank differently per active."""
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+        self.creatine = Active.objects.create(
+            name="Creatine",
+            slug="creatine",
+            display_unit="g",
+        )
+
+        self.whey = self._product("Whey", proteins=_grams(24), creatine=None)
+        self.blend = self._product("Blend", proteins=_grams(12), creatine=_grams(5))
+
+    def _product(
+        self,
+        name: str,
+        proteins: Decimal,
+        creatine: Decimal | None,
+    ) -> Product:
+        """Create a published 1kg product with one nutrition profile."""
+        product = Product.objects.create(
+            name=name,
+            brand=self.brand,
+            net_mass=_grams(1000),
+            is_published=True,
+        )
+        facts = NutritionFacts.objects.create(
+            serving_size=_grams(30),
+            proteins=proteins,
+        )
+        if creatine is not None:
+            NutritionActive.objects.create(
+                nutrition_facts=facts,
+                active=self.creatine,
+                amount=creatine,
+                declared_unit="g",
+            )
+        ProductNutrition.objects.create(product=product, nutrition_facts=facts)
+        _link_offer(
+            product=product,
+            store=Store.objects.create(name=name, display_name=name),
+            product_link=f"https://example.com/{name}",
+            price=100.00,
+        )
+        return product
+
+    def test_default_active_ranks_by_protein(self) -> None:
+        """Without an explicit active the catalog uses the configured default."""
+        results = list(public_catalog_products())
+
+        assert [product.name for product in results] == ["Whey", "Blend"]
+
+    def test_requesting_another_active_changes_the_ranking(self) -> None:
+        """The same expressions rank creatine without a per-active branch."""
+        results = list(
+            public_catalog_products(CatalogProductsFilters(active="creatine")),
+        )
+
+        # Only the blend carries creatine, so it wins on price per gram of it.
+        assert results[0].name == "Blend"
+        assert results[0].price_per_active is not None
+        assert results[1].price_per_active is None
+
+    def test_unknown_active_slug_resolves_to_nothing(self) -> None:
+        """An active the catalog does not know about yields empty metrics."""
+        assert catalog_active("unobtainium") is None
+
+        results = list(
+            public_catalog_products(CatalogProductsFilters(active="unobtainium")),
+        )
+
+        assert all(product.price_per_active is None for product in results)
 
 
 class NutritionFactsAdminTests(TestCase):
@@ -587,7 +784,7 @@ class ProductAdminActionTests(TestCase):
         self.product = Product.objects.create(
             name="Whey One Refil 900g - Dark Lab",
             brand=self.brand,
-            weight=900,
+            net_mass=_grams(900),
             packaging=Product.Packaging.REFILL,
         )
         self.store_link = _link_offer(
@@ -627,16 +824,16 @@ class ProductStatsTest(TestCase):
         self.product = Product.objects.create(
             name="Whey Protein",
             brand=self.brand,
-            weight=1000,
+            net_mass=_grams(1000),
         )
 
         self.nutrition = NutritionFacts.objects.create(
-            serving_size_grams=30,
-            proteins=Decimal("24.0"),
-            carbohydrates=0,
-            total_fats=0,
+            serving_size=_grams(30),
+            proteins=_grams("24.0"),
+            carbohydrates=_grams(0),
+            total_fats=_grams(0),
             description="Standard Whey",
-            energy_kcal=120,
+            energy=120,
         )
         ProductNutrition.objects.create(
             product=self.product,
@@ -650,8 +847,8 @@ class ProductStatsTest(TestCase):
             price=100.00,
         )
 
-    def test_protein_calculations(self) -> None:
-        """Derived protein metrics should be correctly annotated."""
+    def test_active_calculations(self) -> None:
+        """Derived metrics should be annotated for the catalog's default active."""
         product = cast(
             "CatalogAnnotatedProduct | None",
             public_catalog_products_with_stats().first(),
@@ -659,8 +856,8 @@ class ProductStatsTest(TestCase):
 
         assert product is not None
         assert product.concentration == Decimal("80.0")
-        assert product.total_protein == Decimal("800.00")
-        assert round(product.price_per_protein_gram, 3) == Decimal("0.125")
+        assert product.total_active == _grams(800)
+        assert round(_per_gram(product.price_per_active), 3) == Decimal("0.125")
         assert product.external_link == "https://example.com"
 
     def test_missing_price_handling(self) -> None:
@@ -668,7 +865,7 @@ class ProductStatsTest(TestCase):
         product_without_price = Product.objects.create(
             name="No Price Whey",
             brand=self.brand,
-            weight=500,
+            net_mass=_grams(500),
         )
 
         result = cast(
@@ -682,7 +879,7 @@ class ProductStatsTest(TestCase):
 
         assert result is not None
         assert result.last_price is None
-        assert result.price_per_protein_gram is None
+        assert result.price_per_active is None
         assert result.external_link is None
 
     def test_latest_price_and_external_link_use_same_history_row_on_timestamp_tie(
@@ -716,15 +913,15 @@ class ProductStatsTest(TestCase):
         assert product.last_price == Decimal("150.00")
         assert product.external_link == "https://example.com/second"
 
-    def test_catalog_uses_most_protein_dense_nutrition_profile(self) -> None:
-        """Catalog metrics should use the most protein-dense nutrition profile."""
+    def test_catalog_uses_most_concentrated_nutrition_profile(self) -> None:
+        """Catalog metrics should use the most concentrated nutrition profile."""
         denser_profile = NutritionFacts.objects.create(
-            serving_size_grams=30,
-            proteins=Decimal("27.0"),
-            carbohydrates=0,
-            total_fats=0,
+            serving_size=_grams(30),
+            proteins=_grams("27.0"),
+            carbohydrates=_grams(0),
+            total_fats=_grams(0),
             description="Isolate profile",
-            energy_kcal=120,
+            energy=120,
         )
         ProductNutrition.objects.create(
             product=self.product,
@@ -738,8 +935,8 @@ class ProductStatsTest(TestCase):
 
         assert product is not None
         assert product.concentration == Decimal("90.0")
-        assert product.total_protein == Decimal("900.00")
-        assert round(product.price_per_protein_gram, 3) == Decimal("0.111")
+        assert product.total_active == _grams(900)
+        assert round(_per_gram(product.price_per_active), 3) == Decimal("0.111")
 
     def test_catalog_sorting_is_stable_when_metric_values_tie(self) -> None:
         """Sorting should use a stable fallback under metric ties."""
@@ -748,13 +945,13 @@ class ProductStatsTest(TestCase):
         alpha = Product.objects.create(
             name="Whey A",
             brand=alpha_brand,
-            weight=1000,
+            net_mass=_grams(1000),
             is_published=True,
         )
         beta = Product.objects.create(
             name="Whey B",
             brand=beta_brand,
-            weight=1000,
+            net_mass=_grams(1000),
             is_published=True,
         )
 

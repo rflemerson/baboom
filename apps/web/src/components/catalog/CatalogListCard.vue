@@ -7,6 +7,8 @@ import { formatDecimal } from '@/utils/number'
 
 defineProps<{
   product: CatalogProduct
+  activeName?: string
+  massUnit?: string
 }>()
 </script>
 
@@ -24,7 +26,7 @@ defineProps<{
           <span class="app-chip app-chip--accent px-2.5 py-1 text-xs">
             {{ product.packagingDisplay }}
           </span>
-          <span class="app-chip px-3 py-1 text-xs"> {{ product.weight }} g </span>
+          <span class="app-chip px-3 py-1 text-xs"> {{ product.netMass }} {{ massUnit ?? 'g' }} </span>
           <span class="app-chip px-3 py-1 text-xs">
             {{ product.category?.name ?? 'Uncategorized' }}
           </span>
@@ -49,16 +51,16 @@ defineProps<{
           <BaseMetricCard compact label="Total price" :value="formatDecimal(product.lastPrice)" />
           <BaseMetricCard
             compact
-            label="Max protein"
-            :value="formatDecimal(product.totalProtein)"
+            :label="`Total ${activeName ?? 'active'}`"
+            :value="formatDecimal(product.totalActive)"
           />
         </div>
 
         <BaseMetricCard
           class="rounded-3xl"
           inline-action
-          label="Price / protein g"
-          :value="formatDecimal(product.pricePerProteinGram)"
+          :label="`Price / ${activeName ?? 'active'} ${massUnit ?? 'g'}`"
+          :value="formatDecimal(product.pricePerActive)"
         >
           <template #action>
             <a

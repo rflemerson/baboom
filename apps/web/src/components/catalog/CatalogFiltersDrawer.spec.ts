@@ -13,8 +13,8 @@ describe('CatalogFiltersDrawer', () => {
         modelValue: true,
         priceMax: null,
         priceMin: null,
-        pricePerProteinGramMax: null,
-        pricePerProteinGramMin: null,
+        pricePerActiveMax: null,
+        pricePerActiveMin: null,
       },
     })
 
@@ -36,8 +36,8 @@ describe('CatalogFiltersDrawer', () => {
         concentrationMin: 70,
         priceMax: 150,
         priceMin: 50,
-        pricePerProteinGramMax: 0.5,
-        pricePerProteinGramMin: 0.1,
+        pricePerActiveMax: 0.5,
+        pricePerActiveMin: 0.1,
       },
     ])
   })
@@ -51,8 +51,8 @@ describe('CatalogFiltersDrawer', () => {
         modelValue: true,
         priceMax: 150,
         priceMin: 50,
-        pricePerProteinGramMax: 0.5,
-        pricePerProteinGramMin: 0.1,
+        pricePerActiveMax: 0.5,
+        pricePerActiveMin: 0.1,
       },
     })
 
@@ -74,8 +74,8 @@ describe('CatalogFiltersDrawer', () => {
         modelValue: true,
         priceMax: null,
         priceMin: null,
-        pricePerProteinGramMax: null,
-        pricePerProteinGramMin: null,
+        pricePerActiveMax: null,
+        pricePerActiveMin: null,
       },
     })
 

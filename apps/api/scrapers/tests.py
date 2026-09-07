@@ -16,6 +16,7 @@ from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
 from core.models import APIKey, Brand, Product, ProductStore, Store
+from core.units import to_canonical
 from offers.models import Offer, PriceObservation, StockStatus
 from scrapers.admin import queue_for_agents
 from scrapers.dtos import (
@@ -507,7 +508,7 @@ class ScrapedItemApprovalServiceTests(TestCase):
                 "createProduct": {
                     "name": "Whey Test",
                     "brandId": self.brand.id,
-                    "weight": 1000,
+                    "netMass": 1000,
                 },
             },
         )
@@ -517,8 +518,8 @@ class ScrapedItemApprovalServiceTests(TestCase):
         assert not product.is_published
         assert self.service.execute(data).pk == product.pk
         assert Product.objects.count() == 1
-        expected_weight = 1000
-        assert product.weight == expected_weight
+        # Submitted in grams, stored in the canonical unit.
+        assert product.net_mass == to_canonical(Decimal(1000), "g")
         links = ProductStore.objects.filter(product=product, offer=self.item.offer)
         assert links.exists()
 

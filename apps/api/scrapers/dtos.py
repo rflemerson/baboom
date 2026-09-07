@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from core.units import DISPLAY_MASS_UNIT
 from offers.models import StockStatus
 
 _PYDANTIC_RUNTIME_TYPES = (decimal.Decimal,)
@@ -126,7 +127,8 @@ class ReviewedProductCreateInput(BaseModel):
 
     name: str
     brand_id: int = Field(alias="brandId")
-    weight: int | None = None
+    net_mass: float | None = Field(default=None, alias="netMass")
+    mass_unit: str = Field(default=DISPLAY_MASS_UNIT, alias="massUnit")
     category_id: int | None = Field(default=None, alias="categoryId")
     ean: str | None = None
     description: str = ""

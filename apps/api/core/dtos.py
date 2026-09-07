@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from offers.models import StockStatus
 
 from .models import Product
+from .units import DISPLAY_MASS_UNIT
 
 
 class StoreListingPayload(BaseModel):
@@ -19,10 +20,15 @@ class StoreListingPayload(BaseModel):
 
 
 class ProductCreateInput(BaseModel):
-    """DTO for product creation service."""
+    """DTO for product creation service.
+
+    ``net_mass`` is expressed in ``mass_unit``; the service converts it to the
+    canonical unit before it reaches the model.
+    """
 
     name: str
-    weight: int | None = None
+    net_mass: float | None = None
+    mass_unit: str = DISPLAY_MASS_UNIT
     brand_id: int
     category_id: int | None = None
     ean: str | None = None
@@ -37,7 +43,8 @@ class ProductMetadataUpdateInput(BaseModel):
     """DTO for metadata-only product updates."""
 
     name: str | None = None
-    weight: int | None = None
+    net_mass: float | None = None
+    mass_unit: str = DISPLAY_MASS_UNIT
     brand_id: int | None = None
     ean: str | None = None
     description: str | None = None
@@ -52,11 +59,12 @@ class CatalogProductsFilters(BaseModel):
 
     search: str | None = None
     brand: str | None = None
+    active: str | None = None
     price_min: float | None = None
     price_max: float | None = None
-    price_per_protein_gram_min: float | None = None
-    price_per_protein_gram_max: float | None = None
+    price_per_active_min: float | None = None
+    price_per_active_max: float | None = None
     concentration_min: float | None = None
     concentration_max: float | None = None
-    sort_by: str = "price_per_protein_gram"
+    sort_by: str = "price_per_active"
     sort_dir: str = "asc"

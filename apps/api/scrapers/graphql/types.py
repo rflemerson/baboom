@@ -12,6 +12,7 @@ from strawberry.scalars import JSON
 
 from baboom.utils import ValidationError
 from core.models import Brand, Category, Product, Tag
+from core.units import DISPLAY_MASS_UNIT, from_canonical
 from scrapers.images import image_urls
 from scrapers.models import ScrapedItem, ScrapedItemExtraction
 
@@ -206,7 +207,8 @@ class CatalogCandidateType:
     category_id: int | None
     category_name: str
     ean: str
-    weight: int | None
+    net_mass: float | None
+    mass_unit: str
     packaging: str
     is_published: bool
 
@@ -221,7 +223,12 @@ class CatalogCandidateType:
             category_id=product.category_id,
             category_name=product.category.name if product.category else "",
             ean=product.ean or "",
-            weight=product.weight,
+            net_mass=(
+                None
+                if product.net_mass is None
+                else float(from_canonical(product.net_mass, DISPLAY_MASS_UNIT))
+            ),
+            mass_unit=DISPLAY_MASS_UNIT,
             packaging=product.packaging,
             is_published=product.is_published,
         )

@@ -122,7 +122,7 @@ def catalog_candidates(search: str = "", ean: str = "", limit: int = 20) -> list
     query = """
     query($search: String!, $ean: String!, $limit: Int!) {
       catalogCandidates(search: $search, ean: $ean, limit: $limit) {
-        id name brandId brandName categoryId categoryName ean weight packaging isPublished
+        id name brandId brandName categoryId categoryName ean netMass massUnit packaging isPublished
       }
     }
     """
@@ -153,7 +153,7 @@ def approve_scraped_item(payload: dict) -> dict:
     query = """
     mutation($data: ScrapedItemApprovalInput!) {
       approveScrapedItem(data: $data) {
-        product { id name brandId brandName categoryId categoryName ean weight packaging isPublished }
+        product { id name brandId brandName categoryId categoryName ean netMass massUnit packaging isPublished }
         errors { field message }
       }
     }

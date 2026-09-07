@@ -11,7 +11,7 @@ describe('CatalogToolbar', () => {
         advancedFiltersActive: false,
         perPage: 12,
         search: '',
-        sortBy: 'price_per_protein_gram',
+        sortBy: 'price_per_active',
         sortDir: 'asc',
         sortOptions: CATALOG_SORT_OPTIONS,
         viewMode: 'grid',

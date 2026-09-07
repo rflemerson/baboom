@@ -138,7 +138,8 @@ class ScrapersMutation:
                 {
                     "name": create_product.name,
                     "brandId": create_product.brand_id,
-                    "weight": create_product.weight,
+                    "netMass": create_product.net_mass,
+                    "massUnit": create_product.mass_unit,
                     "categoryId": create_product.category_id,
                     "ean": create_product.ean,
                     "description": create_product.description,

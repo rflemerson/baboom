@@ -3,9 +3,9 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { CatalogProductsVariables } from '@/types/catalog'
 
 export const CATALOG_SORT_OPTIONS = [
-  { label: 'Price / protein g', value: 'price_per_protein_gram' },
+  { label: 'Price per active', value: 'price_per_active' },
   { label: 'Price', value: 'last_price' },
-  { label: 'Protein', value: 'total_protein' },
+  { label: 'Total active', value: 'total_active' },
   { label: 'Concentration', value: 'concentration' },
 ] as const
 
@@ -19,11 +19,11 @@ const DEFAULT_CATALOG_PRODUCTS_VARIABLES: CatalogProductsVariables = {
     brand: null,
     priceMin: null,
     priceMax: null,
-    pricePerProteinGramMin: null,
-    pricePerProteinGramMax: null,
+    pricePerActiveMin: null,
+    pricePerActiveMax: null,
     concentrationMin: null,
     concentrationMax: null,
-    sortBy: 'price_per_protein_gram',
+    sortBy: 'price_per_active',
     sortDir: 'asc',
   },
 }
@@ -36,11 +36,11 @@ export function useCatalogFilters() {
   const brand = ref(defaultFilters?.brand ?? '')
   const priceMin = ref<number | null>(defaultFilters?.priceMin ?? null)
   const priceMax = ref<number | null>(defaultFilters?.priceMax ?? null)
-  const pricePerProteinGramMin = ref<number | null>(defaultFilters?.pricePerProteinGramMin ?? null)
-  const pricePerProteinGramMax = ref<number | null>(defaultFilters?.pricePerProteinGramMax ?? null)
+  const pricePerActiveMin = ref<number | null>(defaultFilters?.pricePerActiveMin ?? null)
+  const pricePerActiveMax = ref<number | null>(defaultFilters?.pricePerActiveMax ?? null)
   const concentrationMin = ref<number | null>(defaultFilters?.concentrationMin ?? null)
   const concentrationMax = ref<number | null>(defaultFilters?.concentrationMax ?? null)
-  const sortBy = ref(defaultFilters?.sortBy ?? 'price_per_protein_gram')
+  const sortBy = ref(defaultFilters?.sortBy ?? 'price_per_active')
   const sortDir = ref(defaultFilters?.sortDir ?? 'asc')
   const page = ref(defaultFilters?.page ?? 1)
   const perPage = ref(defaultFilters?.perPage ?? 12)
@@ -74,8 +74,8 @@ export function useCatalogFilters() {
       brand: brand.value.trim() || null,
       priceMin: priceMin.value,
       priceMax: priceMax.value,
-      pricePerProteinGramMin: pricePerProteinGramMin.value,
-      pricePerProteinGramMax: pricePerProteinGramMax.value,
+      pricePerActiveMin: pricePerActiveMin.value,
+      pricePerActiveMax: pricePerActiveMax.value,
       concentrationMin: concentrationMin.value,
       concentrationMax: concentrationMax.value,
       sortBy: sortBy.value,
@@ -103,13 +103,13 @@ export function useCatalogFilters() {
     page.value = 1
   }
 
-  function setPricePerProteinGramMin(value: number | null) {
-    pricePerProteinGramMin.value = value
+  function setPricePerActiveMin(value: number | null) {
+    pricePerActiveMin.value = value
     page.value = 1
   }
 
-  function setPricePerProteinGramMax(value: number | null) {
-    pricePerProteinGramMax.value = value
+  function setPricePerActiveMax(value: number | null) {
+    pricePerActiveMax.value = value
     page.value = 1
   }
 
@@ -149,11 +149,11 @@ export function useCatalogFilters() {
     brand.value = defaultFilters?.brand ?? ''
     priceMin.value = defaultFilters?.priceMin ?? null
     priceMax.value = defaultFilters?.priceMax ?? null
-    pricePerProteinGramMin.value = defaultFilters?.pricePerProteinGramMin ?? null
-    pricePerProteinGramMax.value = defaultFilters?.pricePerProteinGramMax ?? null
+    pricePerActiveMin.value = defaultFilters?.pricePerActiveMin ?? null
+    pricePerActiveMax.value = defaultFilters?.pricePerActiveMax ?? null
     concentrationMin.value = defaultFilters?.concentrationMin ?? null
     concentrationMax.value = defaultFilters?.concentrationMax ?? null
-    sortBy.value = defaultFilters?.sortBy ?? 'price_per_protein_gram'
+    sortBy.value = defaultFilters?.sortBy ?? 'price_per_active'
     sortDir.value = defaultFilters?.sortDir ?? 'asc'
     page.value = defaultFilters?.page ?? 1
     perPage.value = defaultFilters?.perPage ?? 12
@@ -168,8 +168,8 @@ export function useCatalogFilters() {
     perPage,
     priceMax,
     priceMin,
-    pricePerProteinGramMax,
-    pricePerProteinGramMin,
+    pricePerActiveMax,
+    pricePerActiveMin,
     search,
     setBrand,
     setConcentrationMax,
@@ -178,8 +178,8 @@ export function useCatalogFilters() {
     setPerPage,
     setPriceMax,
     setPriceMin,
-    setPricePerProteinGramMax,
-    setPricePerProteinGramMin,
+    setPricePerActiveMax,
+    setPricePerActiveMin,
     setSearch,
     setSortBy,
     sortBy,

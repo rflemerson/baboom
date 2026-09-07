@@ -17,6 +17,7 @@ from pydantic import ValidationError as PydanticValidationError
 from core.dtos import ProductCreateInput
 from core.models import Category, Product, ProductStore, Store, Tag
 from core.services import ProductCreateService
+from core.units import to_canonical
 from offers.services import OfferObservationResult, OfferObservationService
 
 from .dtos import AgentExtractionSubmitInput, ScrapedItemApprovalInput
@@ -208,10 +209,20 @@ class ScrapedItemApprovalService:
         create_data = data.create_product
         if create_data is None or create_data.is_published:
             return False
-        fields = create_data.model_dump(exclude={"tag_ids", "is_published", "ean"})
+        fields = create_data.model_dump(
+            exclude={"tag_ids", "is_published", "ean", "net_mass", "mass_unit"},
+        )
         tag_ids = set(product.tags.values_list("id", flat=True))
+        # The submitted mass carries its own unit, so it is compared after
+        # conversion rather than against the stored canonical number.
+        submitted_mass = (
+            None
+            if create_data.net_mass is None
+            else to_canonical(Decimal(str(create_data.net_mass)), create_data.mass_unit)
+        )
         return (
             all(getattr(product, key) == value for key, value in fields.items())
+            and product.net_mass == submitted_mass
             and (product.ean or "") == (create_data.ean or "")
             and tag_ids == set(create_data.tag_ids)
         )
@@ -248,7 +259,8 @@ class ScrapedItemApprovalService:
         return ProductCreateService().execute(
             ProductCreateInput(
                 name=create_data.name,
-                weight=create_data.weight,
+                net_mass=create_data.net_mass,
+                mass_unit=create_data.mass_unit,
                 brand_id=create_data.brand_id,
                 category_id=create_data.category_id,
                 ean=create_data.ean or None,

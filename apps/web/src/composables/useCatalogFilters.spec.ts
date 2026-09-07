@@ -15,10 +15,10 @@ describe('useCatalogFilters', () => {
         perPage: 12,
         priceMax: null,
         priceMin: null,
-        pricePerProteinGramMax: null,
-        pricePerProteinGramMin: null,
+        pricePerActiveMax: null,
+        pricePerActiveMin: null,
         search: null,
-        sortBy: 'price_per_protein_gram',
+        sortBy: 'price_per_active',
         sortDir: 'asc',
       },
     })

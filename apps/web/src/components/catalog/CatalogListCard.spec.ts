@@ -11,23 +11,25 @@ describe('CatalogListCard', () => {
           id: 1,
           name: 'Whey Isolado 1kg',
           packagingDisplay: 'Container Package',
-          weight: 1000,
+          netMass: '1000',
           lastPrice: '199.90',
-          pricePerProteinGram: '0.23',
+          pricePerActive: '0.23',
           concentration: '86.6',
-          totalProtein: '866',
+          totalActive: '866',
           externalLink: 'https://example.com/whey-isolado',
           brand: { name: 'integralmedica' },
           category: { name: 'Whey Protein' },
           tags: [{ name: 'Whey' }, { name: 'Isolado' }],
         },
+        activeName: 'Protein',
+        massUnit: 'g',
       },
     })
 
     expect(wrapper.text()).toContain('Whey Isolado 1kg')
     expect(wrapper.text()).toContain('integralmedica')
     expect(wrapper.text()).toContain('Container Package')
-    expect(wrapper.text()).toContain('Price / protein g')
+    expect(wrapper.text()).toContain('Price / Protein g')
     expect(wrapper.text()).toContain('0.23')
     expect(wrapper.text()).toContain('86.6% concentration')
     expect(wrapper.get('a[aria-label="View offer for Whey Isolado 1kg"]').attributes('href')).toBe(

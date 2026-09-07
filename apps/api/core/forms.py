@@ -8,10 +8,28 @@ from django.core.exceptions import ValidationError
 from offers.models import StockStatus
 
 from .models import Product, ProductStore, Store
+from .units import DISPLAY_MASS_UNIT, from_canonical
 
 
 class ProductAdminForm(forms.ModelForm):
-    """Service-backed admin form for product create and metadata update flows."""
+    """Service-backed admin form for product create and metadata update flows.
+
+    Masses are stored canonically but edited in the unit the catalog presents,
+    so the operator never types a converted number.
+    """
+
+    net_mass = forms.DecimalField(
+        required=False,
+        min_value=0,
+        label=f"Net mass ({DISPLAY_MASS_UNIT})",
+    )
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Show the stored canonical mass in the display unit."""
+        super().__init__(*args, **kwargs)
+        stored = getattr(self.instance, "net_mass", None)
+        if stored is not None:
+            self.initial["net_mass"] = from_canonical(stored, DISPLAY_MASS_UNIT)
 
     class Meta:
         """Meta options."""
@@ -21,7 +39,7 @@ class ProductAdminForm(forms.ModelForm):
             "name",
             "kind",
             "brand",
-            "weight",
+            "net_mass",
             "ean",
             "description",
             "packaging",

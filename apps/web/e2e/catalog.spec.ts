@@ -4,11 +4,11 @@ type Product = {
   id: number
   name: string
   packagingDisplay: string
-  weight: number
+  netMass: string
   lastPrice: string
-  pricePerProteinGram: string
+  pricePerActive: string
   concentration: string
-  totalProtein: string
+  totalActive: string
   externalLink: string
   brand: { name: string }
   category: { name: string }
@@ -22,8 +22,8 @@ type CatalogVariables = {
   brand?: string | null
   priceMin?: number | null
   priceMax?: number | null
-  pricePerProteinGramMin?: number | null
-  pricePerProteinGramMax?: number | null
+  pricePerActiveMin?: number | null
+  pricePerActiveMax?: number | null
   concentrationMin?: number | null
   concentrationMax?: number | null
   sortBy: string
@@ -35,11 +35,11 @@ const PRODUCTS: Product[] = [
     id: 1,
     name: 'Whey Prime 900g',
     packagingDisplay: 'Refill Package',
-    weight: 900,
+    netMass: '900',
     lastPrice: '129.90',
-    pricePerProteinGram: '0.14',
+    pricePerActive: '0.14',
     concentration: '80',
-    totalProtein: '720',
+    totalActive: '720',
     externalLink: 'https://example.com/whey-prime',
     brand: { name: 'dux' },
     category: { name: 'Whey Protein' },
@@ -49,11 +49,11 @@ const PRODUCTS: Product[] = [
     id: 2,
     name: 'Whey Core 1kg',
     packagingDisplay: 'Container Package',
-    weight: 1000,
+    netMass: '1000',
     lastPrice: '149.90',
-    pricePerProteinGram: '0.16',
+    pricePerActive: '0.16',
     concentration: '78',
-    totalProtein: '780',
+    totalActive: '780',
     externalLink: 'https://example.com/whey-core',
     brand: { name: 'black skull' },
     category: { name: 'Whey Protein' },
@@ -63,11 +63,11 @@ const PRODUCTS: Product[] = [
     id: 3,
     name: 'Isolate Gold 1kg',
     packagingDisplay: 'Container Package',
-    weight: 1000,
+    netMass: '1000',
     lastPrice: '219.90',
-    pricePerProteinGram: '0.22',
+    pricePerActive: '0.22',
     concentration: '86',
-    totalProtein: '860',
+    totalActive: '860',
     externalLink: 'https://example.com/isolate-gold',
     brand: { name: 'integralmedica' },
     category: { name: 'Whey Protein' },
@@ -77,11 +77,11 @@ const PRODUCTS: Product[] = [
     id: 4,
     name: 'Creatine Pure 300g',
     packagingDisplay: 'Container Package',
-    weight: 300,
+    netMass: '300',
     lastPrice: '89.90',
-    pricePerProteinGram: '0.30',
+    pricePerActive: '0.30',
     concentration: '0',
-    totalProtein: '0',
+    totalActive: '0',
     externalLink: 'https://example.com/creatine-pure',
     brand: { name: 'dux' },
     category: { name: 'Creatine' },
@@ -91,11 +91,11 @@ const PRODUCTS: Product[] = [
     id: 5,
     name: 'Night Casein 900g',
     packagingDisplay: 'Refill Package',
-    weight: 900,
+    netMass: '900',
     lastPrice: '159.90',
-    pricePerProteinGram: '0.18',
+    pricePerActive: '0.18',
     concentration: '74',
-    totalProtein: '666',
+    totalActive: '666',
     externalLink: 'https://example.com/night-casein',
     brand: { name: 'black skull' },
     category: { name: 'Casein' },
@@ -105,11 +105,11 @@ const PRODUCTS: Product[] = [
     id: 6,
     name: 'Protein Blend 2kg',
     packagingDisplay: 'Container Package',
-    weight: 2000,
+    netMass: '2000',
     lastPrice: '239.90',
-    pricePerProteinGram: '0.12',
+    pricePerActive: '0.12',
     concentration: '70',
-    totalProtein: '1400',
+    totalActive: '1400',
     externalLink: 'https://example.com/protein-blend',
     brand: { name: 'max titanium' },
     category: { name: 'Protein Blend' },
@@ -119,11 +119,11 @@ const PRODUCTS: Product[] = [
     id: 7,
     name: 'Iso Hydro 900g',
     packagingDisplay: 'Refill Package',
-    weight: 900,
+    netMass: '900',
     lastPrice: '249.90',
-    pricePerProteinGram: '0.28',
+    pricePerActive: '0.28',
     concentration: '90',
-    totalProtein: '810',
+    totalActive: '810',
     externalLink: 'https://example.com/iso-hydro',
     brand: { name: 'dux' },
     category: { name: 'Whey Protein' },
@@ -133,11 +133,11 @@ const PRODUCTS: Product[] = [
     id: 8,
     name: 'Whey Budget 900g',
     packagingDisplay: 'Refill Package',
-    weight: 900,
+    netMass: '900',
     lastPrice: '99.90',
-    pricePerProteinGram: '0.11',
+    pricePerActive: '0.11',
     concentration: '68',
-    totalProtein: '612',
+    totalActive: '612',
     externalLink: 'https://example.com/whey-budget',
     brand: { name: 'max titanium' },
     category: { name: 'Whey Protein' },
@@ -147,11 +147,11 @@ const PRODUCTS: Product[] = [
     id: 9,
     name: 'Pre Rush 300g',
     packagingDisplay: 'Container Package',
-    weight: 300,
+    netMass: '300',
     lastPrice: '109.90',
-    pricePerProteinGram: '0.37',
+    pricePerActive: '0.37',
     concentration: '0',
-    totalProtein: '0',
+    totalActive: '0',
     externalLink: 'https://example.com/pre-rush',
     brand: { name: 'black skull' },
     category: { name: 'Pre Workout' },
@@ -161,11 +161,11 @@ const PRODUCTS: Product[] = [
     id: 10,
     name: 'Mass Gainer 3kg',
     packagingDisplay: 'Bag Package',
-    weight: 3000,
+    netMass: '3000',
     lastPrice: '199.90',
-    pricePerProteinGram: '0.07',
+    pricePerActive: '0.07',
     concentration: '24',
-    totalProtein: '720',
+    totalActive: '720',
     externalLink: 'https://example.com/mass-gainer',
     brand: { name: 'integralmedica' },
     category: { name: 'Mass Gainer' },
@@ -175,11 +175,11 @@ const PRODUCTS: Product[] = [
     id: 11,
     name: 'Egg Protein 1kg',
     packagingDisplay: 'Container Package',
-    weight: 1000,
+    netMass: '1000',
     lastPrice: '179.90',
-    pricePerProteinGram: '0.19',
+    pricePerActive: '0.19',
     concentration: '72',
-    totalProtein: '720',
+    totalActive: '720',
     externalLink: 'https://example.com/egg-protein',
     brand: { name: 'max titanium' },
     category: { name: 'Egg Protein' },
@@ -189,11 +189,11 @@ const PRODUCTS: Product[] = [
     id: 12,
     name: 'Peanut Butter 1kg',
     packagingDisplay: 'Container Package',
-    weight: 1000,
+    netMass: '1000',
     lastPrice: '39.90',
-    pricePerProteinGram: '0.04',
+    pricePerActive: '0.04',
     concentration: '0',
-    totalProtein: '250',
+    totalActive: '250',
     externalLink: 'https://example.com/peanut-butter',
     brand: { name: 'growth' },
     category: { name: 'Snacks' },
@@ -203,11 +203,11 @@ const PRODUCTS: Product[] = [
     id: 13,
     name: 'Bar Box 12x',
     packagingDisplay: 'Box Package',
-    weight: 600,
+    netMass: '600',
     lastPrice: '69.90',
-    pricePerProteinGram: '0.12',
+    pricePerActive: '0.12',
     concentration: '20',
-    totalProtein: '120',
+    totalActive: '120',
     externalLink: 'https://example.com/bar-box',
     brand: { name: 'bold' },
     category: { name: 'Protein Bars' },
@@ -226,14 +226,14 @@ function sortProducts(products: Product[], sortBy: string, sortDir: string) {
     switch (key) {
       case 'last_price':
         return Number(product.lastPrice)
-      case 'price_per_protein_gram':
-        return Number(product.pricePerProteinGram)
-      case 'total_protein':
-        return Number(product.totalProtein)
+      case 'price_per_active':
+        return Number(product.pricePerActive)
+      case 'total_active':
+        return Number(product.totalActive)
       case 'concentration':
         return Number(product.concentration)
       default:
-        return Number(product.pricePerProteinGram)
+        return Number(product.pricePerActive)
     }
   }
 
@@ -252,9 +252,9 @@ function filterProducts(variables: CatalogVariables) {
       matchesBrand(product, brand) &&
       matchesNumericRange(Number(product.lastPrice), variables.priceMin, variables.priceMax) &&
       matchesNumericRange(
-        Number(product.pricePerProteinGram),
-        variables.pricePerProteinGramMin,
-        variables.pricePerProteinGramMax,
+        Number(product.pricePerActive),
+        variables.pricePerActiveMin,
+        variables.pricePerActiveMax,
       ) &&
       matchesNumericRange(
         Number(product.concentration),
@@ -273,6 +273,8 @@ function filterProducts(variables: CatalogVariables) {
 
   return {
     catalogProducts: {
+      active: { slug: 'protein', name: 'Protein' },
+      massUnit: 'g',
       pageInfo: {
         currentPage,
         perPage: variables.perPage,
@@ -330,11 +332,11 @@ async function fulfillCatalog(route: Route) {
     brand: url.searchParams.get('brand'),
     priceMin: readNumberParam('price_min'),
     priceMax: readNumberParam('price_max'),
-    pricePerProteinGramMin: readNumberParam('price_per_protein_gram_min'),
-    pricePerProteinGramMax: readNumberParam('price_per_protein_gram_max'),
+    pricePerActiveMin: readNumberParam('price_per_active_min'),
+    pricePerActiveMax: readNumberParam('price_per_active_max'),
     concentrationMin: readNumberParam('concentration_min'),
     concentrationMax: readNumberParam('concentration_max'),
-    sortBy: url.searchParams.get('sort_by') ?? 'price_per_protein_gram',
+    sortBy: url.searchParams.get('sort_by') ?? 'price_per_active',
     sortDir: url.searchParams.get('sort_dir') ?? 'asc',
   }
   const payload = filterProducts(variables)

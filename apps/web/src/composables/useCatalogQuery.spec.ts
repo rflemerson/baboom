@@ -9,6 +9,8 @@ describe('useCatalogQuery', () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue({
+          active: { slug: 'protein', name: 'Protein' },
+          massUnit: 'g',
           pageInfo: {
             currentPage: 1,
             perPage: 12,
@@ -22,11 +24,11 @@ describe('useCatalogQuery', () => {
               id: 1,
               name: '100% Whey Concentrado 900g',
               packagingDisplay: 'Refill Package',
-              weight: 900,
+              netMass: '900',
               lastPrice: '129.90',
-              pricePerProteinGram: '0.18',
+              pricePerActive: '0.18',
               concentration: '80',
-              totalProtein: '720',
+              totalActive: '720',
               externalLink: 'https://example.com/whey',
               brand: { name: 'max-titanium' },
               category: { name: 'Whey Protein' },
@@ -37,12 +39,12 @@ describe('useCatalogQuery', () => {
       }),
     )
 
-    const { loading, pageInfo, products } = useCatalogQuery({
+    const { active, loading, massUnit, pageInfo, products } = useCatalogQuery({
       filters: {
         page: 1,
         perPage: 12,
         search: null,
-        sortBy: 'price_per_protein_gram',
+        sortBy: 'price_per_active',
         sortDir: 'asc',
       },
     })
@@ -53,5 +55,7 @@ describe('useCatalogQuery', () => {
       expect(products.value).toHaveLength(1)
     })
     expect(products.value[0]?.name).toBe('100% Whey Concentrado 900g')
+    expect(active.value?.slug).toBe('protein')
+    expect(massUnit.value).toBe('g')
   })
 })

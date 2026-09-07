@@ -15,6 +15,8 @@ const emit = defineEmits<{
 }>()
 
 const props = defineProps<{
+  activeName?: string
+  massUnit?: string
   filtersActive?: boolean
   pageInfo: CatalogPageInfo | null
   products: CatalogProduct[]
@@ -119,6 +121,8 @@ const loadingPlaceholders = computed(() =>
       :key="product.id"
       :is="viewMode === 'grid' ? CatalogGridCard : CatalogListCard"
       :product="product"
+      :active-name="activeName"
+      :mass-unit="massUnit"
     />
   </section>
 

@@ -6,8 +6,9 @@ export interface CatalogProductsFilters {
   perPage?: number | null
   priceMax?: number | null
   priceMin?: number | null
-  pricePerProteinGramMax?: number | null
-  pricePerProteinGramMin?: number | null
+  active?: string | null
+  pricePerActiveMax?: number | null
+  pricePerActiveMin?: number | null
   search?: string | null
   sortBy?: string | null
   sortDir?: string | null
@@ -30,11 +31,11 @@ export interface CatalogProduct {
   id: number
   name: string
   packagingDisplay: string
-  weight: number
+  netMass?: string | null
   lastPrice?: string | null
-  pricePerProteinGram?: string | null
+  pricePerActive?: string | null
   concentration?: string | null
-  totalProtein?: string | null
+  totalActive?: string | null
   externalLink?: string | null
   brand: {
     name: string
@@ -47,7 +48,14 @@ export interface CatalogProduct {
   }>
 }
 
+export interface CatalogActive {
+  slug: string
+  name: string
+}
+
 export interface CatalogProductsResponse {
+  active: CatalogActive | null
+  massUnit: string
   pageInfo: CatalogPageInfo
   items: CatalogProduct[]
 }

@@ -18,14 +18,16 @@ from offers.models import StockStatus
 from .dtos import ProductCreateInput, ProductMetadataUpdateInput, StoreListingPayload
 from .forms import ProductAdminForm, ProductStoreInlineForm, ProductStoreInlineFormSet
 from .models import (
+    Active,
     AlertSubscriber,
     APIKey,
     Brand,
     Category,
     Flavor,
-    Micronutrient,
+    NutritionActive,
     NutritionFacts,
     Product,
+    ProductActive,
     ProductComponent,
     ProductNutrition,
     ProductStore,
@@ -37,6 +39,7 @@ from .services import (
     ProductMetadataUpdateService,
     ProductStoreService,
 )
+from .units import DISPLAY_MASS_UNIT, from_canonical
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -44,12 +47,13 @@ if TYPE_CHECKING:
     from django.http import HttpRequest, HttpResponse
 
 
-class MicronutrientInline(nested_admin.NestedTabularInline):
-    """Inline for micronutrients."""
+class NutritionActiveInline(nested_admin.NestedTabularInline):
+    """Inline for the actives measured in a nutrition label."""
 
-    model = Micronutrient
+    model = NutritionActive
     extra = 0
     min_num = 0
+    autocomplete_fields: ClassVar[list[str]] = ["active"]
     classes: ClassVar[list[str]] = ["collapse"]
 
 
@@ -108,7 +112,7 @@ class ProductAdmin(admin.ModelAdmin):
         "name",
         "brand",
         "kind",
-        "weight",
+        "get_net_mass",
         "packaging",
         "get_category",
         "is_published",
@@ -135,7 +139,7 @@ class ProductAdmin(admin.ModelAdmin):
                     "name",
                     "kind",
                     "brand",
-                    "weight",
+                    "net_mass",
                     "ean",
                     "description",
                     "packaging",
@@ -155,6 +159,13 @@ class ProductAdmin(admin.ModelAdmin):
             .select_related("brand", "category")
             .prefetch_related("tags")
         )
+
+    @admin.display(description=f"Net mass ({DISPLAY_MASS_UNIT})", ordering="net_mass")
+    def get_net_mass(self, obj: Product) -> str:
+        """Return the stored canonical mass in the unit the catalog presents."""
+        if obj.net_mass is None:
+            return "-"
+        return f"{from_canonical(obj.net_mass, DISPLAY_MASS_UNIT):g}"
 
     @admin.display(description="Category", ordering="category__name")
     def get_category(self, obj: Product) -> str:
@@ -199,7 +210,8 @@ class ProductAdmin(admin.ModelAdmin):
                 product_id=obj.pk,
                 data=ProductMetadataUpdateInput(
                     name=form.cleaned_data["name"],
-                    weight=form.cleaned_data["weight"],
+                    net_mass=form.cleaned_data["net_mass"],
+                    mass_unit=DISPLAY_MASS_UNIT,
                     brand_id=form.cleaned_data["brand"].id,
                     ean=form.cleaned_data["ean"],
                     description=form.cleaned_data["description"],
@@ -220,7 +232,8 @@ class ProductAdmin(admin.ModelAdmin):
         created_product = ProductCreateService().execute(
             ProductCreateInput(
                 name=form.cleaned_data["name"],
-                weight=form.cleaned_data["weight"],
+                net_mass=form.cleaned_data["net_mass"],
+                mass_unit=DISPLAY_MASS_UNIT,
                 brand_id=form.cleaned_data["brand"].id,
                 category_id=(
                     form.cleaned_data["category"].id
@@ -437,15 +450,53 @@ class ProductNutritionAdmin(admin.ModelAdmin):
     list_per_page = 50
 
 
-@admin.register(Micronutrient)
-class MicronutrientAdmin(admin.ModelAdmin):
-    """Admin for nutrition micronutrients."""
+@admin.register(Active)
+class ActiveAdmin(admin.ModelAdmin):
+    """Admin for the substances the catalog ranks products by."""
 
-    list_display = ("nutrition_facts", "name", "value", "unit")
-    list_filter = ("unit",)
-    search_fields = ("name", "nutrition_facts__description")
-    autocomplete_fields: ClassVar[list[str]] = ["nutrition_facts"]
+    list_display = ("name", "slug", "display_unit", "nutrition_field")
+    list_filter = ("display_unit",)
+    search_fields = ("name", "slug")
+    prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {"slug": ("name",)}
     list_per_page = 50
+
+
+@admin.register(NutritionActive)
+class NutritionActiveAdmin(admin.ModelAdmin):
+    """Admin for the actives measured in a nutrition label."""
+
+    list_display = ("nutrition_facts", "active", "declared_amount", "declared_unit")
+    list_filter = ("declared_unit", "active")
+    search_fields = ("active__name", "nutrition_facts__description")
+    autocomplete_fields: ClassVar[list[str]] = ["nutrition_facts", "active"]
+    list_per_page = 50
+
+
+@admin.register(ProductActive)
+class ProductActiveAdmin(admin.ModelAdmin):
+    """Read-only view of the concentrations derived from nutrition profiles."""
+
+    list_display = ("product", "active", "fraction", "updated_at")
+    list_filter = ("active",)
+    search_fields = ("product__name", "active__name")
+    readonly_fields = ("product", "active", "fraction")
+    list_per_page = 50
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Optimize queryset."""
+        return super().get_queryset(request).select_related("product", "active")
+
+    def has_add_permission(self, _request: HttpRequest) -> bool:
+        """Disallow manual creation; rows are derived from nutrition data."""
+        return False
+
+    def has_change_permission(
+        self,
+        _request: HttpRequest,
+        _obj: ProductActive | None = None,
+    ) -> bool:
+        """Disallow manual edits; rows are derived from nutrition data."""
+        return False
 
 
 @admin.register(ProductStore)
@@ -503,10 +554,10 @@ class ProductStoreAdmin(admin.ModelAdmin):
 class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
     """Technical support admin for nutrition facts."""
 
-    list_display = ("__str__", "serving_size_grams", "energy_kcal")
+    list_display = ("__str__", "serving_size", "energy")
     search_fields = ("description", "content_hash")
     inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
-        MicronutrientInline,
+        NutritionActiveInline,
     ]
     list_per_page = 20
 

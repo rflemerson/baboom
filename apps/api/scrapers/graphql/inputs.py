@@ -3,6 +3,8 @@
 import strawberry
 from strawberry.scalars import JSON
 
+from core.units import DISPLAY_MASS_UNIT
+
 _STRAWBERRY_RUNTIME_TYPES = (JSON,)
 
 
@@ -47,7 +49,8 @@ class ReviewedProductCreateInput:
 
     name: str
     brand_id: int
-    weight: int | None = None
+    net_mass: float | None = None
+    mass_unit: str = DISPLAY_MASS_UNIT
     category_id: int | None = None
     ean: str | None = None
     description: str = ""

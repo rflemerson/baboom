@@ -64,7 +64,8 @@ baboom-review approve --product-id 123 --confirm
 `submit` and `approve` preview their payload by default. Use `--confirm` only
 after the operator approves the corresponding operation. For a new product,
 replace `--product-id` with `--create-product approved-product.json`, containing
-fields such as `{"name":"Whey","brandId":1,"weight":1000}`.
+fields such as `{"name":"Whey","brandId":1,"netMass":1000,"massUnit":"g"}`.
+Masses are submitted with their unit; the API stores them canonically.
 
 Use `resume 42` to reload a review without overwriting local draft/report edits.
 Use `heartbeat` during processing, before the 60-minute inactivity timeout;

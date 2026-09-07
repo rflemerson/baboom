@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -13,13 +14,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from baboom.utils import format_graphql_errors
+from core import units
 from core.dtos import CatalogProductsFilters
-from core.selectors import public_catalog_products
+from core.selectors import catalog_active, public_catalog_products
 from core.services import AlertSubscriptionService
 
 if TYPE_CHECKING:
-    from decimal import Decimal
-
     from core.models import Product
 
 CATALOG_PER_PAGE_CHOICES = {12, 24, 48}
@@ -54,17 +54,18 @@ def _catalog_filters_from_request(request: HttpRequest) -> CatalogProductsFilter
     return CatalogProductsFilters(
         search=_optional_str(query_params.get("search")),
         brand=_optional_str(query_params.get("brand")),
+        active=_optional_str(query_params.get("active")),
         price_min=_optional_float(query_params.get("price_min")),
         price_max=_optional_float(query_params.get("price_max")),
-        price_per_protein_gram_min=_optional_float(
-            query_params.get("price_per_protein_gram_min"),
+        price_per_active_min=_optional_float(
+            query_params.get("price_per_active_min"),
         ),
-        price_per_protein_gram_max=_optional_float(
-            query_params.get("price_per_protein_gram_max"),
+        price_per_active_max=_optional_float(
+            query_params.get("price_per_active_max"),
         ),
         concentration_min=_optional_float(query_params.get("concentration_min")),
         concentration_max=_optional_float(query_params.get("concentration_max")),
-        sort_by=query_params.get("sort_by", "price_per_protein_gram"),
+        sort_by=query_params.get("sort_by", "price_per_active"),
         sort_dir=query_params.get("sort_dir", "asc"),
     )
 
@@ -91,17 +92,32 @@ def _decimal_to_str(value: Decimal | None) -> str | None:
     return str(value)
 
 
+def _mass_to_str(value: Decimal | None) -> str | None:
+    """Present a canonical mass in the unit the catalog publishes."""
+    if value is None:
+        return None
+    return _decimal_to_str(units.from_canonical(value, units.DISPLAY_MASS_UNIT))
+
+
+def _price_per_mass_to_str(value: Decimal | None) -> str | None:
+    """Present a price per canonical mass as a price per published unit."""
+    if value is None:
+        return None
+    per_display = units.to_canonical(Decimal(1), units.DISPLAY_MASS_UNIT)
+    return _decimal_to_str(value * per_display)
+
+
 def _serialize_catalog_product(product: Product) -> dict[str, Any]:
     """Serialize the public catalog product shape used by the frontend."""
     return {
         "id": product.pk,
         "name": product.name,
         "packagingDisplay": product.get_packaging_display(),
-        "weight": product.weight,
+        "netMass": _mass_to_str(product.net_mass),
         "lastPrice": _decimal_to_str(product.last_price),
-        "pricePerProteinGram": _decimal_to_str(product.price_per_protein_gram),
+        "pricePerActive": _price_per_mass_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
-        "totalProtein": _decimal_to_str(product.total_protein),
+        "totalActive": _mass_to_str(product.total_active),
         "externalLink": product.external_link,
         "brand": {"name": product.brand.name},
         "category": {"name": product.category.name} if product.category else None,
@@ -130,10 +146,15 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
         return HttpResponseBadRequest("Invalid catalog query parameter.")
 
     queryset = public_catalog_products(query_filters)
+    active = catalog_active(query_filters.active)
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page)
     response = JsonResponse(
         {
+            # The metrics are relative to one active and expressed in one unit,
+            # so the response names both rather than implying them.
+            "active": ({"slug": active.slug, "name": active.name} if active else None),
+            "massUnit": units.DISPLAY_MASS_UNIT,
             "pageInfo": {
                 "currentPage": page_obj.number,
                 "perPage": per_page,

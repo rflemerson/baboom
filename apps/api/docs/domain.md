@@ -18,6 +18,18 @@
   to `Category`, which describes what a product is.
 - Nutrition macros are nullable: a partially extracted label is stored as-is,
   because an unknown value is not a measured zero.
+- Actives: `Active` names a substance the catalog ranks by. Protein is one row,
+  not a privileged column; label columns point at their active through
+  `nutrition_field`, and everything else is a `NutritionActive` row.
+- `ProductActive` stores the dimensionless mass fraction of each active in a
+  product, derived from its nutrition profiles and refreshed on every write. Run
+  `sync_product_actives` to rebuild it. `Category.default_active` names the
+  active a category is ranked by.
+- Units: `core/units.py` declares one canonical unit per dimension and every
+  conversion factor. Masses are stored in the canonical unit and converted at
+  the boundary, so no column, annotation, or field name carries a unit. Values
+  the catalog cannot convert -- international units, percentages of a daily
+  value -- carry no concentration and simply do not rank.
 - Store listings: manage `ProductStore` only through the `ProductAdmin` inline.
 - Product create/update goes through `ProductCreateService` and `ProductMetadataUpdateService`.
 - Store listing inline rows go through `ProductStoreService`.
@@ -26,6 +38,9 @@
 
 - Alerts use `AlertSubscriptionService`.
 - Catalog reads use `/api/catalog/`, `core/selectors.py`, pagination, filters, sorting, derived metrics, and cache headers.
+- Catalog metrics are relative to one active and one mass unit; the response
+  names both in `active` and `massUnit` rather than implying them. Pass `active`
+  to rank by another substance; an unknown slug yields empty metrics.
 
 ## Local review
 
@@ -49,6 +64,9 @@
 - `approveScrapedItem` requires review state and a staged extraction, plus exactly
   one of `productId` or `createProduct`. Equivalent retries return the linked
   product; conflicting retries fail. Product creation and offer linking are atomic.
+- `approveScrapedItem` submits a mass as `netMass` plus `massUnit`; the service
+  converts it before it reaches the catalog. Extraction staging keeps the units
+  the page stated, since it is a transcript of the source.
 - Remote creation validates references and product fields and always creates an
   unpublished product. `isPublished: true` is rejected. Publication, nutrition,
   flavors, and component curation stay in admin; the complete extracted tree stays

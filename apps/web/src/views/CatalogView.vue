@@ -16,8 +16,8 @@ const {
   perPage,
   priceMax,
   priceMin,
-  pricePerProteinGramMax,
-  pricePerProteinGramMin,
+  pricePerActiveMax,
+  pricePerActiveMin,
   search,
   setBrand,
   setConcentrationMax,
@@ -26,8 +26,8 @@ const {
   setPerPage,
   setPriceMax,
   setPriceMin,
-  setPricePerProteinGramMax,
-  setPricePerProteinGramMin,
+  setPricePerActiveMax,
+  setPricePerActiveMin,
   setSearch,
   setSortBy,
   sortBy,
@@ -36,7 +36,8 @@ const {
   toggleSortDirection,
   variables,
 } = useCatalogFilters()
-const { error, loading, pageInfo, products, refetch } = useCatalogQuery(variables)
+const { active, error, loading, massUnit, pageInfo, products, refetch } =
+  useCatalogQuery(variables)
 const { setViewMode, viewMode } = useCatalogViewMode()
 const filtersOpen = ref(false)
 
@@ -45,8 +46,8 @@ const advancedFiltersActive = computed(() => {
     brand.value ||
     priceMin.value !== null ||
     priceMax.value !== null ||
-    pricePerProteinGramMin.value !== null ||
-    pricePerProteinGramMax.value !== null ||
+    pricePerActiveMin.value !== null ||
+    pricePerActiveMax.value !== null ||
     concentrationMin.value !== null ||
     concentrationMax.value !== null,
   )
@@ -62,14 +63,14 @@ function applyAdvancedFilters(payload: {
   concentrationMin: number | null
   priceMax: number | null
   priceMin: number | null
-  pricePerProteinGramMax: number | null
-  pricePerProteinGramMin: number | null
+  pricePerActiveMax: number | null
+  pricePerActiveMin: number | null
 }) {
   setBrand(payload.brand)
   setPriceMin(payload.priceMin)
   setPriceMax(payload.priceMax)
-  setPricePerProteinGramMin(payload.pricePerProteinGramMin)
-  setPricePerProteinGramMax(payload.pricePerProteinGramMax)
+  setPricePerActiveMin(payload.pricePerActiveMin)
+  setPricePerActiveMax(payload.pricePerActiveMax)
   setConcentrationMin(payload.concentrationMin)
   setConcentrationMax(payload.concentrationMax)
 }
@@ -99,6 +100,8 @@ function applyAdvancedFilters(payload: {
         :filters-active="filtersActive"
         :page-info="pageInfo"
         :products="products"
+        :active-name="active?.name"
+        :mass-unit="massUnit"
         :loading="loading"
         :error-message="error?.message"
         :view-mode="viewMode"
@@ -113,8 +116,8 @@ function applyAdvancedFilters(payload: {
       :brand="brand"
       :price-min="priceMin"
       :price-max="priceMax"
-      :price-per-protein-gram-min="pricePerProteinGramMin"
-      :price-per-protein-gram-max="pricePerProteinGramMax"
+      :price-per-active-min="pricePerActiveMin"
+      :price-per-active-max="pricePerActiveMax"
       :concentration-min="concentrationMin"
       :concentration-max="concentrationMax"
       @apply="applyAdvancedFilters"

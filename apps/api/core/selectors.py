@@ -1,5 +1,8 @@
 """Selectors for public catalog querysets and annotations."""
 
+from decimal import Decimal
+
+from django.conf import settings
 from django.db.models import (
     DecimalField,
     ExpressionWrapper,
@@ -16,8 +19,9 @@ from django.db.models.functions import Cast, NullIf
 
 from offers.models import PriceObservation
 
+from . import units
 from .dtos import CatalogProductsFilters
-from .models import NutritionFacts, Product
+from .models import Active, Product, ProductActive
 
 
 def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
@@ -32,44 +36,32 @@ def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
     ).order_by("-observed_at", "-pk")
 
 
-def _catalog_nutrition_facts_subquery() -> QuerySet[NutritionFacts]:
-    """Return the nutrition facts rows used by the public catalog.
-
-    The public catalog uses the most protein-dense profile for each product.
-    Ties fall back to the profile with more protein per serving and then the
-    oldest persisted profile for deterministic results.
-    """
-    serving_size_safe = NullIf(F("serving_size_grams"), Value(0))
-
-    return (
-        NutritionFacts.objects.filter(
-            product_profiles__product=OuterRef("pk"),
-        )
-        .annotate(
-            protein_concentration=ExpressionWrapper(
-                Cast(
-                    F("proteins"),
-                    output_field=DecimalField(max_digits=10, decimal_places=4),
-                )
-                / Cast(
-                    serving_size_safe,
-                    output_field=DecimalField(max_digits=10, decimal_places=4),
-                ),
-                output_field=DecimalField(max_digits=10, decimal_places=4),
-            ),
-        )
-        .order_by(
-            F("protein_concentration").desc(nulls_last=True),
-            F("proteins").desc(nulls_last=True),
-            "id",
-        )
-    )
+def catalog_active(slug: str | None = None) -> Active | None:
+    """Return the active the catalog ranks by, falling back to the default."""
+    wanted = slug or settings.CATALOG_DEFAULT_ACTIVE_SLUG
+    return Active.objects.filter(slug=wanted).first()
 
 
-def _annotate_catalog_base_fields(queryset: QuerySet[Product]) -> QuerySet[Product]:
+def _annotate_catalog_base_fields(
+    queryset: QuerySet[Product],
+    active: Active | None,
+) -> QuerySet[Product]:
     """Annotate catalog fields loaded directly from subqueries."""
     latest_prices = _latest_price_observation_subquery()
-    nutrition_facts = _catalog_nutrition_facts_subquery()
+
+    # An unknown active has no concentration to look up, and an empty subquery
+    # is not reliably rendered as NULL, so the annotation is stated directly.
+    fraction = (
+        Value(None, output_field=DecimalField(max_digits=12, decimal_places=8))
+        if active is None
+        else Subquery(
+            ProductActive.objects.filter(
+                product=OuterRef("pk"),
+                active=active.pk,
+            ).values("fraction")[:1],
+            output_field=DecimalField(max_digits=12, decimal_places=8),
+        )
+    )
 
     return queryset.annotate(
         last_price=Subquery(
@@ -80,61 +72,62 @@ def _annotate_catalog_base_fields(queryset: QuerySet[Product]) -> QuerySet[Produ
             latest_prices.values("offer__url")[:1],
             output_field=URLField(),
         ),
-        protein_per_serving=Subquery(
-            nutrition_facts.values("proteins")[:1],
-            output_field=DecimalField(max_digits=5, decimal_places=1),
-        ),
-        serving_size_grams_value=Subquery(
-            nutrition_facts.values("serving_size_grams")[:1],
-            output_field=DecimalField(max_digits=5, decimal_places=1),
-        ),
+        fraction=fraction,
     )
 
 
 def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
-    """Annotate derived catalog metrics from the base catalog fields."""
-    serving_size_safe = NullIf(F("serving_size_grams_value"), Value(0))
-    total_protein_safe = NullIf(F("total_protein"), Value(0))
+    """Annotate derived catalog metrics from the stored mass fraction.
+
+    Every metric is arithmetic over one dimensionless column, so the same
+    expressions serve protein, creatine or caffeine without a per-active branch.
+    Masses stay canonical here; the boundary converts them for presentation.
+    """
+    total_active_safe = NullIf(F("total_active"), Value(0))
 
     return queryset.annotate(
-        total_protein=ExpressionWrapper(
-            (F("weight") * Cast(F("protein_per_serving"), output_field=FloatField()))
-            / Cast(serving_size_safe, output_field=FloatField()),
-            output_field=DecimalField(max_digits=10, decimal_places=2),
+        total_active=ExpressionWrapper(
+            Cast(F("net_mass"), output_field=FloatField())
+            * Cast(F("fraction"), output_field=FloatField()),
+            output_field=DecimalField(max_digits=16, decimal_places=3),
         ),
         concentration=ExpressionWrapper(
-            (
-                Cast(F("protein_per_serving"), output_field=FloatField())
-                / Cast(serving_size_safe, output_field=FloatField())
-            )
-            * 100,
+            Cast(F("fraction"), output_field=FloatField()) * 100,
             output_field=DecimalField(max_digits=5, decimal_places=1),
         ),
     ).annotate(
-        price_per_protein_gram=ExpressionWrapper(
-            F("last_price") / Cast(total_protein_safe, output_field=FloatField()),
-            output_field=DecimalField(max_digits=10, decimal_places=2),
+        price_per_active=ExpressionWrapper(
+            F("last_price") / Cast(total_active_safe, output_field=FloatField()),
+            output_field=DecimalField(max_digits=20, decimal_places=10),
         ),
     )
 
 
-def public_catalog_products_with_stats() -> QuerySet[Product]:
-    """Return public catalog products annotated with catalog-facing metrics."""
+def public_catalog_products_with_stats(
+    active_slug: str | None = None,
+) -> QuerySet[Product]:
+    """Return public catalog products annotated with catalog-facing metrics.
+
+    The slug is resolved here and nowhere else, so a slug the catalog does not
+    know about yields empty metrics instead of silently falling back.
+    """
     queryset = Product.objects.select_related("brand", "category").prefetch_related(
         "tags",
     )
-    return _annotate_catalog_metrics(_annotate_catalog_base_fields(queryset))
+    return _annotate_catalog_metrics(
+        _annotate_catalog_base_fields(queryset, catalog_active(active_slug)),
+    )
 
 
 SORTABLE_CATALOG_FIELDS = frozenset(
     {
-        "price_per_protein_gram",
+        "price_per_active",
         "last_price",
-        "total_protein",
+        "total_active",
         "concentration",
     },
 )
-DEFAULT_CATALOG_SORT_BY = "price_per_protein_gram"
+DEFAULT_CATALOG_SORT_BY = "price_per_active"
 DEFAULT_CATALOG_SORT_DIR = "asc"
 
 
@@ -166,16 +159,34 @@ def _apply_catalog_brand_filter(
     return queryset.filter(brand__name__icontains=filters.brand)
 
 
+def _price_per_canonical_mass(value: float | None) -> float | None:
+    """Convert a price per display unit into a price per canonical unit."""
+    if value is None:
+        return None
+    per_display = units.to_canonical(Decimal(1), units.DISPLAY_MASS_UNIT)
+    return float(Decimal(str(value)) / per_display)
+
+
 def _apply_catalog_numeric_filters(
     queryset: QuerySet[Product],
     filters: CatalogProductsFilters,
 ) -> QuerySet[Product]:
-    """Apply numeric range filters to annotated catalog metrics."""
+    """Apply numeric range filters to annotated catalog metrics.
+
+    Price bounds arrive in the display unit the catalog presents, so they are
+    converted before they meet the canonical annotation.
+    """
     numeric_filters = (
         ("last_price__gte", filters.price_min),
         ("last_price__lte", filters.price_max),
-        ("price_per_protein_gram__gte", filters.price_per_protein_gram_min),
-        ("price_per_protein_gram__lte", filters.price_per_protein_gram_max),
+        (
+            "price_per_active__gte",
+            _price_per_canonical_mass(filters.price_per_active_min),
+        ),
+        (
+            "price_per_active__lte",
+            _price_per_canonical_mass(filters.price_per_active_max),
+        ),
         ("concentration__gte", filters.concentration_min),
         ("concentration__lte", filters.concentration_max),
     )
@@ -215,7 +226,9 @@ def public_catalog_products(
 ) -> QuerySet[Product]:
     """Return the public catalog queryset with filters and sorting applied."""
     resolved_filters = filters or CatalogProductsFilters()
-    queryset = public_catalog_products_with_stats().filter(is_published=True)
+    queryset = public_catalog_products_with_stats(resolved_filters.active).filter(
+        is_published=True,
+    )
     queryset = _apply_catalog_search(queryset, resolved_filters)
     queryset = _apply_catalog_brand_filter(queryset, resolved_filters)
     queryset = _apply_catalog_numeric_filters(queryset, resolved_filters)

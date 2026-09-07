@@ -12,6 +12,8 @@ import CatalogView from './CatalogView.vue'
 describe('CatalogView', () => {
   it('renders the fetched item', () => {
     vi.mocked(useCatalogQuery).mockReturnValue({
+      active: computed(() => ({ slug: 'protein', name: 'Protein' })),
+      massUnit: computed(() => 'g'),
       error: computed(() => null),
       loading: computed(() => false),
       pageInfo: computed(() => ({
@@ -27,11 +29,11 @@ describe('CatalogView', () => {
           id: 1,
           name: '100% Whey Concentrado 900g',
           packagingDisplay: 'Refill Package',
-          weight: 900,
+          netMass: '900',
           lastPrice: '129.90',
-          pricePerProteinGram: '0.18',
+          pricePerActive: '0.18',
           concentration: '80',
-          totalProtein: '720',
+          totalActive: '720',
           externalLink: 'https://example.com/whey',
           brand: { name: 'max-titanium' },
           category: { name: 'Whey Protein' },
