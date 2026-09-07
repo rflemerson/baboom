@@ -267,7 +267,7 @@ class ShopifyApiSpider(CatalogApiSpider):
                 stock_quantity = (
                     int(inventory_quantity) if inventory_quantity is not None else None
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 stock_quantity = None
 
             stock_status = (
