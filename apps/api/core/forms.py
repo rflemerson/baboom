@@ -19,6 +19,7 @@ class ProductAdminForm(forms.ModelForm):
         model = Product
         fields = (
             "name",
+            "kind",
             "brand",
             "weight",
             "ean",

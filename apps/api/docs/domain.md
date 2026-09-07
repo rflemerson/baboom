@@ -12,7 +12,12 @@
 - Products: create, edit, publish/unpublish, delete with related store links.
 - Support data: brands, stores, flavors, tags, categories, alert subscribers, API keys.
 - Nutrition: manage `NutritionFacts`, micronutrients, and `ProductNutrition` links.
-- Components: manage `ProductComponent` for combo products.
+- Components: manage `ProductComponent` for products with `kind=COMBO`.
+  Components are always simple products, so an assembly is one level deep and
+  cannot contain itself or form a cycle. `kind` is structural and orthogonal
+  to `Category`, which describes what a product is.
+- Nutrition macros are nullable: a partially extracted label is stored as-is,
+  because an unknown value is not a measured zero.
 - Store listings: manage `ProductStore` only through the `ProductAdmin` inline.
 - Product create/update goes through `ProductCreateService` and `ProductMetadataUpdateService`.
 - Store listing inline rows go through `ProductStoreService`.

@@ -144,7 +144,19 @@ class Category(MP_Node, BaseModel):
 
 
 class Product(BaseModel):
-    """Main product model."""
+    """Main product model.
+
+    ``kind`` is the structural discriminator: a ``COMBO`` is assembled from other
+    products through :class:`ProductComponent`, and a ``SIMPLE`` product never
+    has components. It is orthogonal to :class:`Category`, which describes what
+    the product *is*.
+    """
+
+    class Kind(models.TextChoices):
+        """Structural product kinds."""
+
+        SIMPLE = "SIMPLE", _("Simple Product")
+        COMBO = "COMBO", _("Combo")
 
     class Packaging(models.TextChoices):
         """Packaging types."""
@@ -155,6 +167,13 @@ class Product(BaseModel):
         OTHER = "OTHER", _("Other")
 
     name = models.CharField(_("Product Name"), max_length=200)
+    kind = models.CharField(
+        _("Kind"),
+        max_length=10,
+        choices=Kind.choices,
+        default=Kind.SIMPLE,
+        help_text=_("Combos are assembled from other catalog products."),
+    )
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, verbose_name=_("Brand"))
     description = models.TextField(
         _("Description"),
@@ -222,6 +241,7 @@ class Product(BaseModel):
         indexes = (
             models.Index(fields=["name"]),
             models.Index(fields=["brand", "name"]),
+            models.Index(fields=["kind"]),
         )
 
     def __str__(self) -> str:
@@ -238,6 +258,11 @@ class Product(BaseModel):
         """Validate business rules."""
         super().clean()
 
+        # A blank form field arrives as "", which the unique index treats as a
+        # real value: the second product without an EAN would collide with it.
+        if not self.ean:
+            self.ean = None
+
         if self.ean:
             qs = Product.objects.filter(ean=self.ean)
             if self.pk:
@@ -246,6 +271,16 @@ class Product(BaseModel):
                 raise ValidationError(
                     {"ean": _("Product with this EAN already exists.")},
                 )
+
+        if self.kind == self.Kind.SIMPLE and self.pk and self.component_links.exists():
+            raise ValidationError(
+                {"kind": _("A product with components must be a combo.")},
+            )
+
+    @property
+    def is_combo(self) -> bool:
+        """Return whether this product is assembled from other products."""
+        return self.kind == self.Kind.COMBO
 
 
 class ProductComponent(BaseModel):
@@ -275,11 +310,45 @@ class ProductComponent(BaseModel):
                 fields=["parent", "component"],
                 name="unique_product_component",
             ),
+            models.CheckConstraint(
+                condition=~models.Q(parent=models.F("component")),
+                name="product_component_not_self",
+            ),
         )
 
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.quantity}x {self.component.name}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Validate rules on save."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        """Reject self-references, combo nesting, and simple-product parents."""
+        super().clean()
+
+        parent = self.parent if self.parent_id else None
+        component = self.component if self.component_id else None
+
+        if parent and component and parent.pk == component.pk:
+            raise ValidationError(
+                {"component": _("A product cannot be a component of itself.")},
+            )
+
+        # Components are always simple products, so the assembly is one level
+        # deep by construction: no cycle can be built and no recursion is needed
+        # to resolve a combo into the products it contains.
+        if component and component.is_combo:
+            raise ValidationError(
+                {"component": _("A combo cannot be used as a component.")},
+            )
+
+        if parent and not parent.is_combo:
+            raise ValidationError(
+                {"parent": _("Only combos can have components.")},
+            )
 
 
 class ProductStore(BaseModel):
@@ -378,14 +447,35 @@ class NutritionFacts(BaseModel):
         ),
     )
 
+    # Extraction rarely recovers every value of a label, and an unknown value is
+    # not zero: the scalar macros stay nullable so a partial table can be staged
+    # and completed later without inventing numbers.
     serving_size_grams = models.DecimalField(
         _("Serving Size (g)"),
         max_digits=6,
         decimal_places=2,
+        null=True,
+        blank=True,
     )
-    energy_kcal = models.PositiveSmallIntegerField(_("Energy (kcal)"))
-    proteins = models.DecimalField(_("Proteins (g)"), max_digits=5, decimal_places=1)
-    carbohydrates = models.DecimalField(_("Carbs (g)"), max_digits=5, decimal_places=1)
+    energy_kcal = models.PositiveSmallIntegerField(
+        _("Energy (kcal)"),
+        null=True,
+        blank=True,
+    )
+    proteins = models.DecimalField(
+        _("Proteins (g)"),
+        max_digits=5,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
+    carbohydrates = models.DecimalField(
+        _("Carbs (g)"),
+        max_digits=5,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
     total_sugars = models.DecimalField(
         _("Total Sugars (g)"),
         max_digits=5,
@@ -402,6 +492,8 @@ class NutritionFacts(BaseModel):
         _("Total Fats (g)"),
         max_digits=5,
         decimal_places=1,
+        null=True,
+        blank=True,
     )
     saturated_fats = models.DecimalField(
         _("Saturated Fats (g)"),
@@ -447,7 +539,8 @@ class NutritionFacts(BaseModel):
 
         constraints = (
             models.CheckConstraint(
-                condition=models.Q(serving_size_grams__gt=0),
+                condition=models.Q(serving_size_grams__gt=0)
+                | models.Q(serving_size_grams__isnull=True),
                 name="nutrition_facts_positive_serving_size",
             ),
         )
@@ -468,7 +561,8 @@ class NutritionFacts(BaseModel):
     def _content_hash(self) -> str:
         """Return a stable SHA-256 of the scalar values and saved micronutrients."""
         data: dict[str, object] = {
-            field: float(getattr(self, field)) for field in self.HASH_FIELDS
+            field: None if (value := getattr(self, field)) is None else float(value)
+            for field in self.HASH_FIELDS
         }
         data["micronutrients"] = (
             sorted(

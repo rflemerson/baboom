@@ -8,6 +8,7 @@ from http import HTTPStatus
 from typing import Protocol, cast
 from unittest.mock import Mock
 
+import pytest
 from django.contrib import admin as django_admin
 from django.core.exceptions import ValidationError
 from django.forms.models import inlineformset_factory
@@ -28,6 +29,7 @@ from core.models import (
     Category,
     NutritionFacts,
     Product,
+    ProductComponent,
     ProductNutrition,
     ProductStore,
     Store,
@@ -457,6 +459,107 @@ class ProductMetadataUpdateServiceTests(TestCase):
 
         updated_product.refresh_from_db()
         assert updated_product.is_published is True
+
+
+class ProductEanTests(TestCase):
+    """Coverage for the nullable unique EAN column."""
+
+    def setUp(self) -> None:
+        """Create a reusable brand."""
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+
+    def test_products_without_ean_do_not_collide(self) -> None:
+        """A blank EAN is stored as null so the unique index ignores it."""
+        first = Product.objects.create(name="Whey", brand=self.brand, ean="")
+        second = Product.objects.create(name="Creatine", brand=self.brand, ean="")
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.ean is None
+        assert second.ean is None
+
+
+class ProductComponentTests(TestCase):
+    """Coverage for the combo assembly rules."""
+
+    def setUp(self) -> None:
+        """Create a combo and the simple products it can contain."""
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+        self.combo = Product.objects.create(
+            name="Starter Kit",
+            brand=self.brand,
+            kind=Product.Kind.COMBO,
+        )
+        self.whey = Product.objects.create(name="Whey", brand=self.brand)
+        self.creatine = Product.objects.create(name="Creatine", brand=self.brand)
+
+    def test_combo_accepts_simple_components(self) -> None:
+        """A combo assembles simple products with quantities."""
+        ProductComponent.objects.create(
+            parent=self.combo,
+            component=self.whey,
+            quantity=2,
+        )
+
+        assert self.combo.component_links.count() == 1
+        assert self.combo.is_combo is True
+
+    def test_component_cannot_be_the_parent_itself(self) -> None:
+        """Self-reference is rejected before it reaches the database."""
+        with pytest.raises(ValidationError) as error:
+            ProductComponent.objects.create(parent=self.combo, component=self.combo)
+
+        assert "component" in error.value.message_dict
+
+    def test_component_cannot_be_another_combo(self) -> None:
+        """Assemblies stay one level deep, so no cycle can be built."""
+        nested = Product.objects.create(
+            name="Nested Kit",
+            brand=self.brand,
+            kind=Product.Kind.COMBO,
+        )
+
+        with pytest.raises(ValidationError) as error:
+            ProductComponent.objects.create(parent=self.combo, component=nested)
+
+        assert "component" in error.value.message_dict
+
+    def test_simple_product_cannot_have_components(self) -> None:
+        """Only combos assemble other products."""
+        with pytest.raises(ValidationError) as error:
+            ProductComponent.objects.create(parent=self.whey, component=self.creatine)
+
+        assert "parent" in error.value.message_dict
+
+    def test_combo_cannot_be_downgraded_while_it_has_components(self) -> None:
+        """The kind stays consistent with the rows that depend on it."""
+        ProductComponent.objects.create(parent=self.combo, component=self.whey)
+        self.combo.kind = Product.Kind.SIMPLE
+
+        with pytest.raises(ValidationError) as error:
+            self.combo.save()
+
+        assert "kind" in error.value.message_dict
+
+
+class NutritionFactsPartialLabelTests(TestCase):
+    """Coverage for labels that extraction could only fill in part."""
+
+    def test_partial_label_is_stored_and_hashed(self) -> None:
+        """Unknown macros stay null instead of being recorded as zero."""
+        facts = NutritionFacts.objects.create(description="Parcial", proteins=24)
+
+        facts.refresh_from_db()
+        assert facts.serving_size_grams is None
+        assert facts.energy_kcal is None
+        assert facts.content_hash != ""
+
+    def test_null_and_zero_macros_hash_differently(self) -> None:
+        """An unknown value is not the same fact as a measured zero."""
+        unknown = NutritionFacts.objects.create(proteins=24)
+        measured = NutritionFacts.objects.create(proteins=24, carbohydrates=0)
+
+        assert unknown.content_hash != measured.content_hash
 
 
 class NutritionFactsAdminTests(TestCase):

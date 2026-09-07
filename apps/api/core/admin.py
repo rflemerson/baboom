@@ -80,7 +80,7 @@ class ProductComponentInline(admin.TabularInline):
     autocomplete_fields: ClassVar[list[str]] = ["component"]
     fields = ("component", "quantity")
     verbose_name = "Component"
-    verbose_name_plural = "Components (leave empty for simple products)"
+    verbose_name_plural = "Components"
 
 
 class ProductNutritionInline(admin.TabularInline):
@@ -107,13 +107,14 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "brand",
+        "kind",
         "weight",
         "packaging",
         "get_category",
         "is_published",
         "created_at",
     )
-    list_filter = ("brand", "packaging", "category", "tags", "is_published")
+    list_filter = ("kind", "brand", "packaging", "category", "tags", "is_published")
     search_fields = ("name", "brand__name")
     autocomplete_fields: ClassVar[list[str]] = ["brand", "tags", "category"]
     list_per_page = 20
@@ -132,6 +133,7 @@ class ProductAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "name",
+                    "kind",
                     "brand",
                     "weight",
                     "ean",
