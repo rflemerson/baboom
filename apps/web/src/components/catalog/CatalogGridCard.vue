@@ -22,6 +22,9 @@ defineProps<{
       <h2 class="app-card__title mt-2 text-base font-semibold sm:text-lg">
         {{ product.name }}
       </h2>
+      <p v-if="product.nutritionProfile" class="app-copy-muted mt-2 text-sm">
+        {{ product.nutritionProfile.flavors.join(', ') || 'Unspecified flavor' }}
+      </p>
     </div>
 
     <div class="mb-4 flex flex-wrap items-center gap-2">

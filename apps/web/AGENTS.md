@@ -51,6 +51,9 @@ cd apps/web && npm run format
 - Keep route components under `src/views/`.
 - Keep reusable UI under `src/components/`, grouped by domain (`catalog/`, `alerts/`, `layout/`, `ui/`).
 - Keep REST integration in composables and shared frontend types under `src/types/`.
+- Catalog entries are nutrition profiles, not unique products: use the product
+  ID plus `nutritionProfile.id` as the list key and show the profile's flavors.
+  Different nutrition tables must remain separate when filtering or sorting.
 - Do not add public API keys to Vite env vars. Browser-facing integrations must
   be public REST endpoints with explicit backend boundaries.
 - Keep frontend runtime types under `src/types/`.

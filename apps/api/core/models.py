@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import ClassVar
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
 
@@ -769,42 +769,25 @@ class ProductNutrition(BaseModel):
 class ProductActiveManager(models.Manager):
     """Manager that keeps product concentrations derived from nutrition data."""
 
+    @transaction.atomic
     def sync_for(self, product: Product) -> None:
-        """Recompute the product's concentrations from its nutrition profiles.
-
-        A product may carry several labels (one per flavor). The catalog ranks
-        by the strongest one, so each active keeps its highest concentration
-        across the profiles. Rows for actives that no longer appear are dropped.
-        """
-        fractions = self._fractions(product)
-
-        self.filter(product=product).exclude(active_id__in=fractions).delete()
-
-        for active_id, fraction in fractions.items():
-            self.update_or_create(
-                product=product,
-                active_id=active_id,
-                defaults={"fraction": fraction},
-            )
-
-    def _fractions(self, product: Product) -> dict[int, Decimal]:
-        """Return the highest mass fraction of each active across the labels."""
+        """Refresh concentrations independently for each nutritional profile."""
+        Product.objects.select_for_update().get(pk=product.pk)
         actives = list(Active.objects.all())
-        highest: dict[int, Decimal] = {}
-
         profiles = product.nutrition_profiles.select_related(
             "nutrition_facts",
         ).prefetch_related("nutrition_facts__actives")
-
         for profile in profiles:
-            for active_id, value in self._label_fractions(
-                profile.nutrition_facts,
-                actives,
-            ).items():
-                if value > highest.get(active_id, Decimal(0)):
-                    highest[active_id] = value
-
-        return highest
+            fractions = self._label_fractions(profile.nutrition_facts, actives)
+            self.filter(nutrition_profile=profile).exclude(
+                active_id__in=fractions,
+            ).delete()
+            for active_id, fraction in fractions.items():
+                self.update_or_create(
+                    nutrition_profile=profile,
+                    active_id=active_id,
+                    defaults={"fraction": fraction},
+                )
 
     def _label_fractions(
         self,
@@ -837,20 +820,20 @@ class ProductActiveManager(models.Manager):
 
 
 class ProductActive(BaseModel):
-    """Mass fraction of one active in a product.
+    """Mass fraction of one active in one product nutrition profile.
 
-    This is derived from the product's nutrition profiles and is what the public
+    Each row comes from exactly one nutrition table and is what the public
     catalog ranks, filters and sorts on. The value is dimensionless -- grams of
     active per gram of product, milligrams per milligram, the same number -- so
     every catalog metric is arithmetic over one column, whatever the active is
     and whatever unit the result is later presented in.
     """
 
-    product = models.ForeignKey(
-        Product,
+    nutrition_profile = models.ForeignKey(
+        ProductNutrition,
         on_delete=models.CASCADE,
         related_name="actives",
-        verbose_name=_("Product"),
+        verbose_name=_("Nutrition Profile"),
     )
 
     active = models.ForeignKey(
@@ -874,18 +857,22 @@ class ProductActive(BaseModel):
 
         verbose_name = _("Product Active")
         verbose_name_plural = _("Product Actives")
-        ordering = ("product__name", "active__name")
+        ordering = (
+            "nutrition_profile__product__name",
+            "nutrition_profile_id",
+            "active__name",
+        )
         constraints = (
             models.UniqueConstraint(
-                fields=["product", "active"],
-                name="unique_product_active",
+                fields=["nutrition_profile", "active"],
+                name="unique_profile_active",
             ),
         )
         indexes = (models.Index(fields=["active", "fraction"]),)
 
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.product.name} - {self.active.name}: {self.fraction}"
+        return f"{self.nutrition_profile} - {self.active.name}: {self.fraction}"
 
 
 class AlertSubscriber(BaseModel):

@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db.models import (
     DecimalField,
+    Exists,
     ExpressionWrapper,
     F,
     FloatField,
@@ -21,7 +22,7 @@ from offers.models import PriceObservation
 
 from . import units
 from .dtos import CatalogProductsFilters
-from .models import Active, Product, ProductActive
+from .models import Active, Product, ProductActive, ProductNutrition
 
 
 def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
@@ -54,7 +55,7 @@ def _annotate_catalog_base_fields(
         if active is None
         else Subquery(
             ProductActive.objects.filter(
-                product=OuterRef("pk"),
+                nutrition_profile=OuterRef("nutrition_profile_id"),
                 active=active.pk,
             ).values("fraction")[:1],
             output_field=DecimalField(max_digits=12, decimal_places=8),
@@ -109,8 +110,13 @@ def public_catalog_products_with_stats(
     The slug is resolved here and nowhere else, so a slug the catalog does not
     know about yields empty metrics instead of silently falling back.
     """
-    queryset = Product.objects.select_related("brand", "category").prefetch_related(
-        "tags",
+    queryset = (
+        Product.objects.select_related("brand", "category")
+        .prefetch_related("tags", "nutrition_profiles__flavors")
+        .annotate(
+            nutrition_profile_id=F("nutrition_profiles__id"),
+            nutrition_facts_id=F("nutrition_profiles__nutrition_facts_id"),
+        )
     )
     return _annotate_catalog_metrics(
         _annotate_catalog_base_fields(queryset, catalog_active(active_slug)),
@@ -137,14 +143,22 @@ def _apply_catalog_search(
     if not filters.search:
         return queryset
 
-    return queryset.filter(
-        Q(name__icontains=filters.search)
-        | Q(brand__name__icontains=filters.search)
-        | Q(category__name__icontains=filters.search)
-        | Q(tags__name__icontains=filters.search)
-        | Q(nutrition_profiles__flavors__name__icontains=filters.search)
-        | Q(description__icontains=filters.search),
-    ).distinct()
+    profile_matches = ProductNutrition.objects.filter(
+        pk=OuterRef("nutrition_profile_id"),
+        flavors__name__icontains=filters.search,
+    )
+    return (
+        queryset.alias(profile_matches=Exists(profile_matches))
+        .filter(
+            Q(name__icontains=filters.search)
+            | Q(brand__name__icontains=filters.search)
+            | Q(category__name__icontains=filters.search)
+            | Q(tags__name__icontains=filters.search)
+            | Q(profile_matches=True)
+            | Q(description__icontains=filters.search),
+        )
+        .distinct()
+    )
 
 
 def _apply_catalog_brand_filter(
@@ -212,7 +226,7 @@ def _apply_catalog_sorting(
         else DEFAULT_CATALOG_SORT_DIR
     )
     ordering = F(sort_by)
-    stable_fallback = ["brand__name", "name", "pk"]
+    stable_fallback = ["brand__name", "name", "pk", "nutrition_profile_id"]
 
     if sort_dir == "desc":
         return queryset.order_by(ordering.desc(nulls_last=True), *stable_fallback)

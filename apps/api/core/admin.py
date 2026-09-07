@@ -476,15 +476,23 @@ class NutritionActiveAdmin(admin.ModelAdmin):
 class ProductActiveAdmin(admin.ModelAdmin):
     """Read-only view of the concentrations derived from nutrition profiles."""
 
-    list_display = ("product", "active", "fraction", "updated_at")
+    list_display = ("nutrition_profile", "active", "fraction", "updated_at")
     list_filter = ("active",)
-    search_fields = ("product__name", "active__name")
-    readonly_fields = ("product", "active", "fraction")
+    search_fields = ("nutrition_profile__product__name", "active__name")
+    readonly_fields = ("nutrition_profile", "active", "fraction")
     list_per_page = 50
 
     def get_queryset(self, request: HttpRequest) -> QuerySet:
         """Optimize queryset."""
-        return super().get_queryset(request).select_related("product", "active")
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "nutrition_profile__product",
+                "nutrition_profile__nutrition_facts",
+                "active",
+            )
+        )
 
     def has_add_permission(self, _request: HttpRequest) -> bool:
         """Disallow manual creation; rows are derived from nutrition data."""

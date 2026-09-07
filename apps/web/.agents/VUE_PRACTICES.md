@@ -26,7 +26,7 @@
 
 - Keep unit tests close to the component or composable they cover.
 - Use Playwright for end-to-end coverage of the main user flows.
-- Prefer mocking GraphQL at the browser boundary in Playwright when the goal is to validate frontend behavior without coupling the test to backend process state.
+- Mock the public REST API at the browser boundary in Playwright to validate frontend behavior without coupling tests to backend process state.
 
 ## Sources
 

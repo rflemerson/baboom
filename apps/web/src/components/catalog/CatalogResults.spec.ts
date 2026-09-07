@@ -95,4 +95,36 @@ describe('CatalogResults', () => {
 
     expect(wrapper.text()).toContain('Creatina Monohidratada 300g')
   })
+
+  it.each(['grid', 'list'] as const)(
+    'keeps profiles distinct when sorting %s cards',
+    async (viewMode) => {
+      const base = products[0]!
+      const chocolate = {
+        ...base,
+        nutritionProfile: { id: 10, nutritionFactsId: 100, flavors: ['Chocolate', 'Cocoa'] },
+        concentration: '70',
+      }
+      const vanilla = {
+        ...base,
+        nutritionProfile: { id: 11, nutritionFactsId: 101, flavors: ['Vanilla'] },
+        concentration: '80',
+      }
+      const wrapper = mount(CatalogResults, {
+        props: { pageInfo, products: [chocolate, vanilla], loading: false, viewMode },
+      })
+      const cards = () => wrapper.findAll('article')
+      expect(cards()).toHaveLength(2)
+      expect(cards()[0]!.text()).toContain('Chocolate, Cocoa')
+      expect(cards()[0]!.text()).toContain('70.0% concentration')
+      expect(cards()[1]!.text()).toContain('Vanilla')
+      expect(cards()[1]!.text()).toContain('80.0% concentration')
+      await wrapper.setProps({ products: [vanilla, chocolate] })
+      expect(cards()[0]!.text()).toContain('Vanilla')
+      expect(cards()[1]!.text()).toContain('Chocolate, Cocoa')
+      await wrapper.setProps({ products: [chocolate] })
+      expect(cards()).toHaveLength(1)
+      expect(cards()[0]!.text()).toContain('Chocolate, Cocoa')
+    },
+  )
 })

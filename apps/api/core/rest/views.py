@@ -20,7 +20,7 @@ from core.selectors import catalog_active, public_catalog_products
 from core.services import AlertSubscriptionService
 
 if TYPE_CHECKING:
-    from core.models import Product
+    from core.models import Product, ProductNutrition
 
 CATALOG_PER_PAGE_CHOICES = {12, 24, 48}
 CATALOG_DEFAULT_PER_PAGE = 12
@@ -107,11 +107,38 @@ def _price_per_mass_to_str(value: Decimal | None) -> str | None:
     return _decimal_to_str(value * per_display)
 
 
-def _serialize_catalog_product(product: Product) -> dict[str, Any]:
+def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
+    """Index the prefetched profiles of a page by their own id.
+
+    A product with several labels yields one catalog row per label, and each
+    row needs only its own profile, so the page is indexed once instead of
+    rescanning every product's profiles for every row.
+    """
+    return {
+        profile.pk: profile
+        for product in products
+        for profile in product.nutrition_profiles.all()
+    }
+
+
+def _serialize_catalog_product(
+    product: Product,
+    profiles: dict[int, ProductNutrition],
+) -> dict[str, Any]:
     """Serialize the public catalog product shape used by the frontend."""
+    profile = profiles.get(product.nutrition_profile_id)
     return {
         "id": product.pk,
         "name": product.name,
+        "nutritionProfile": (
+            {
+                "id": profile.pk,
+                "nutritionFactsId": product.nutrition_facts_id,
+                "flavors": [flavor.name for flavor in profile.flavors.all()],
+            }
+            if profile is not None
+            else None
+        ),
         "packagingDisplay": product.get_packaging_display(),
         "netMass": _mass_to_str(product.net_mass),
         "lastPrice": _decimal_to_str(product.last_price),
@@ -149,6 +176,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     active = catalog_active(query_filters.active)
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page)
+    profiles = _profiles_by_id(page_obj.object_list)
     response = JsonResponse(
         {
             "active": ({"slug": active.slug, "name": active.name} if active else None),
@@ -162,7 +190,8 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
                 "hasNextPage": page_obj.has_next(),
             },
             "items": [
-                _serialize_catalog_product(product) for product in page_obj.object_list
+                _serialize_catalog_product(product, profiles)
+                for product in page_obj.object_list
             ],
         },
     )

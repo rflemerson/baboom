@@ -29,6 +29,11 @@ export interface CatalogPageInfo {
 
 export interface CatalogProduct {
   id: number
+  nutritionProfile?: {
+    id: number
+    nutritionFactsId: number
+    flavors: string[]
+  } | null
   name: string
   packagingDisplay: string
   netMass?: string | null

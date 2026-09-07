@@ -21,8 +21,9 @@
 - Actives: `Active` names a substance the catalog ranks by. Protein is one row,
   not a privileged column; label columns point at their active through
   `nutrition_field`, and everything else is a `NutritionActive` row.
-- `ProductActive` stores the dimensionless mass fraction of each active in a
-  product, derived from its nutrition profiles and refreshed on every write. Run
+- `ProductActive` stores the dimensionless mass fraction of each active in one
+  `ProductNutrition` profile, derived only from that profile's table. Concentrations
+  from different labels are never merged or maximized. Run
   `sync_product_actives` to rebuild it. `Category.default_active` names the
   active a category is ranked by.
 - Units: `core/units.py` declares one canonical unit per dimension and every
@@ -41,6 +42,14 @@
 - Catalog metrics are relative to one active and one mass unit; the response
   names both in `active` and `massUnit` rather than implying them. Pass `active`
   to rank by another substance; an unknown slug yields empty metrics.
+- Each catalog row represents one product nutrition profile and includes
+  `nutritionProfile` with its ID, nutrition table ID, and associated flavor names.
+  Several flavors sharing the same profile stay together; distinct tables are
+  independently filtered, sorted, and paginated. Products without profiles keep
+  one row with `nutritionProfile: null` and unknown nutritional metrics.
+- A row's stable identity is `(product.id, nutritionProfile.id)`. Flavor search
+  matches only the corresponding profile. Offers remain linked at product level;
+  the displayed price is a product offer, not a verified price for a specific flavor.
 
 ## Local review
 

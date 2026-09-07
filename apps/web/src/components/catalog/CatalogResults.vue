@@ -118,7 +118,7 @@ const loadingPlaceholders = computed(() =>
   >
     <component
       v-for="product in products"
-      :key="product.id"
+      :key="`${product.id}:${product.nutritionProfile?.id ?? 'none'}`"
       :is="viewMode === 'grid' ? CatalogGridCard : CatalogListCard"
       :product="product"
       :active-name="activeName"

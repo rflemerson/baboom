@@ -27,6 +27,7 @@ from core.models import (
     AlertSubscriber,
     Brand,
     Category,
+    Flavor,
     NutritionActive,
     NutritionFacts,
     Product,
@@ -644,11 +645,11 @@ class ProductActiveTests(TestCase):
         )
 
         protein = ProductActive.objects.get(
-            product=self.product,
+            nutrition_profile__product=self.product,
             active__slug="protein",
         )
         caffeine = ProductActive.objects.get(
-            product=self.product,
+            nutrition_profile__product=self.product,
             active=self.caffeine,
         )
         assert protein.fraction == Decimal("0.20000000")
@@ -664,7 +665,7 @@ class ProductActiveTests(TestCase):
         )
 
         sodium = ProductActive.objects.get(
-            product=self.product,
+            nutrition_profile__product=self.product,
             active__slug="sodium",
         )
         assert sodium.fraction == Decimal("0.00500000")
@@ -688,7 +689,7 @@ class ProductActiveTests(TestCase):
         )
 
         assert not ProductActive.objects.filter(
-            product=self.product,
+            nutrition_profile__product=self.product,
             active=vitamin,
         ).exists()
 
@@ -698,11 +699,51 @@ class ProductActiveTests(TestCase):
             product=self.product,
             nutrition_facts=self.facts,
         )
-        assert ProductActive.objects.filter(product=self.product).exists()
+        assert ProductActive.objects.filter(
+            nutrition_profile__product=self.product,
+        ).exists()
 
         profile.delete()
 
-        assert not ProductActive.objects.filter(product=self.product).exists()
+        assert not ProductActive.objects.filter(
+            nutrition_profile__product=self.product,
+        ).exists()
+
+    def test_profiles_never_borrow_missing_actives_from_each_other(self) -> None:
+        """A missing measurement in one label stays missing after synchronization."""
+        NutritionActive.objects.create(
+            nutrition_facts=self.facts,
+            active=self.caffeine,
+            amount=Decimal(200),
+            declared_unit="mg",
+        )
+        first = ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=self.facts,
+        )
+        other_facts = NutritionFacts.objects.create(
+            serving_size=_grams(10),
+            proteins=_grams(5),
+        )
+        second = ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=other_facts,
+        )
+        fractions = dict(
+            ProductActive.objects.filter(
+                nutrition_profile__product=self.product,
+                active__slug="protein",
+            ).values_list("nutrition_profile_id", "fraction"),
+        )
+        assert fractions == {first.pk: Decimal("0.2"), second.pk: Decimal("0.5")}
+        assert not second.actives.filter(active=self.caffeine).exists()
+        self.facts.proteins = _grams(1)
+        self.facts.save()
+        assert first.actives.get(active__slug="protein").fraction == Decimal("0.1")
+        assert second.actives.get(active__slug="protein").fraction == Decimal("0.5")
+        ProductNutrition.objects.filter(pk=second.pk).delete()
+        assert not ProductActive.objects.filter(nutrition_profile_id=second.pk).exists()
+        assert first.actives.filter(active=self.caffeine).exists()
 
 
 class CatalogActiveRankingTests(TestCase):
@@ -934,8 +975,8 @@ class ProductStatsTest(TestCase):
         assert product.last_price == Decimal("150.00")
         assert product.external_link == "https://example.com/second"
 
-    def test_catalog_uses_most_concentrated_nutrition_profile(self) -> None:
-        """Catalog metrics should use the most concentrated nutrition profile."""
+    def test_catalog_preserves_distinct_nutrition_profiles(self) -> None:
+        """Each label keeps its own concentration and price-per-active metric."""
         denser_profile = NutritionFacts.objects.create(
             serving_size=_grams(30),
             proteins=_grams("27.0"),
@@ -949,15 +990,121 @@ class ProductStatsTest(TestCase):
             nutrition_facts=denser_profile,
         )
 
-        product = cast(
-            "CatalogAnnotatedProduct | None",
-            public_catalog_products_with_stats().get(pk=self.product.pk),
+        products = list(
+            public_catalog_products_with_stats()
+            .filter(pk=self.product.pk)
+            .order_by("concentration"),
         )
+        assert [product.concentration for product in products] == [
+            Decimal("80.0"),
+            Decimal("90.0"),
+        ]
+        assert [product.total_active for product in products] == [
+            _grams(800),
+            _grams(900),
+        ]
+        assert [
+            round(_per_gram(product.price_per_active), 3) for product in products
+        ] == [
+            Decimal("0.125"),
+            Decimal("0.111"),
+        ]
 
-        assert product is not None
-        assert product.concentration == Decimal("90.0")
-        assert product.total_active == _grams(900)
-        assert round(_per_gram(product.price_per_active), 3) == Decimal("0.111")
+    def test_rest_ranks_and_filters_flavors_with_their_own_table(self) -> None:
+        """Search and concentration filters must select the same profile row."""
+        self.product.is_published = True
+        self.product.save()
+        original = self.product.nutrition_profiles.get()
+        chocolate = Flavor.objects.create(name="Chocolate")
+        original.flavors.add(chocolate)
+        vanilla_facts = NutritionFacts.objects.create(
+            serving_size=_grams(30),
+            proteins=_grams(21),
+        )
+        vanilla = ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=vanilla_facts,
+        )
+        vanilla.flavors.add(Flavor.objects.create(name="Vanilla"))
+
+        response = self.client.get("/api/catalog/products/")
+        payload = response.json()
+        assert payload["pageInfo"]["totalCount"] == len([original, vanilla])
+        assert [row["nutritionProfile"]["id"] for row in payload["items"]] == [
+            original.pk,
+            vanilla.pk,
+        ]
+        assert [row["nutritionProfile"]["flavors"] for row in payload["items"]] == [
+            ["Chocolate"],
+            ["Vanilla"],
+        ]
+        assert [Decimal(row["concentration"]) for row in payload["items"]] == [
+            Decimal(80),
+            Decimal(70),
+        ]
+        searched = self.client.get(
+            "/api/catalog/products/",
+            {"search": "Vanilla"},
+        ).json()
+        assert [row["nutritionProfile"]["id"] for row in searched["items"]] == [
+            vanilla.pk,
+        ]
+        filtered = self.client.get(
+            "/api/catalog/products/",
+            {"search": "Vanilla", "concentration_min": 75},
+        ).json()
+        assert filtered["items"] == []
+        price_filtered = self.client.get(
+            "/api/catalog/products/",
+            {"price_per_active_max": 0.13},
+        ).json()
+        assert [row["nutritionProfile"]["id"] for row in price_filtered["items"]] == [
+            original.pk,
+        ]
+
+    def test_same_table_flavors_share_one_catalog_row(self) -> None:
+        """Several flavors of one profile must not duplicate ranking entries."""
+        self.product.is_published = True
+        self.product.save()
+        profile = self.product.nutrition_profiles.get()
+        profile.flavors.add(
+            Flavor.objects.create(name="Chocolate"),
+            Flavor.objects.create(name="Chocolate Hazelnut"),
+        )
+        payload = self.client.get(
+            "/api/catalog/products/",
+            {"search": "Chocolate"},
+        ).json()
+        assert payload["pageInfo"]["totalCount"] == 1
+        assert payload["items"][0]["nutritionProfile"]["flavors"] == [
+            "Chocolate",
+            "Chocolate Hazelnut",
+        ]
+
+    def test_equal_concentrations_keep_separate_profiles_and_stable_pages(self) -> None:
+        """Ties and pagination must preserve identities rather than merge rows."""
+        self.product.is_published = True
+        self.product.save()
+        original = self.product.nutrition_profiles.get()
+        profile_ids = [original.pk]
+        for index in range(12):
+            facts = NutritionFacts.objects.create(
+                serving_size=_grams(30),
+                proteins=_grams(24),
+                description=str(index),
+            )
+            profile_ids.append(
+                ProductNutrition.objects.create(
+                    product=self.product,
+                    nutrition_facts=facts,
+                ).pk,
+            )
+        first = self.client.get("/api/catalog/products/", {"page": 1}).json()
+        second = self.client.get("/api/catalog/products/", {"page": 2}).json()
+        assert [
+            row["nutritionProfile"]["id"] for row in first["items"] + second["items"]
+        ] == profile_ids
+        assert first["pageInfo"]["totalCount"] == len(profile_ids)
 
     def test_catalog_sorting_is_stable_when_metric_values_tie(self) -> None:
         """Sorting should use a stable fallback under metric ties."""
