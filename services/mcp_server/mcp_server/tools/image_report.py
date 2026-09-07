@@ -7,8 +7,7 @@ from google.genai import types
 from .images import load_image_manifest
 from .workspace import get_current_item_id, item_dir
 
-SERVICE_DIR = Path(__file__).resolve().parents[2]
-PACKAGE_DIR = SERVICE_DIR / "mcp_server"
+PACKAGE_DIR = Path(__file__).resolve().parents[1]
 
 
 def prompt_path() -> Path:

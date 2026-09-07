@@ -1,10 +1,13 @@
 from pathlib import Path
 
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
-from .tools.api import checkout_scraped_item as api_checkout_scraped_item
-from .tools.api import report_scraped_item_error
+from .tools.api import (
+    catalog_candidates,
+    catalog_choices,
+    review_queue,
+)
 from .tools.drafts import load_draft
 from .tools.drafts import update_draft as update_draft_file
 from .tools.dynamic_crawler import fetch_page_data
@@ -12,6 +15,13 @@ from .tools.formatting import format_item_summary
 from .tools.image_report import create_image_report as create_image_report_for_item
 from .tools.images import download_images as download_images_to_workspace
 from .tools.preparation import build_prepared_context
+from .tools.review import (
+    act_on_current_item,
+    approve_current_item,
+    checkout_item,
+    report_current_item_error,
+    resume_item,
+)
 from .tools.submission import (
     build_submission_preview as build_submission_preview_payload,
 )
@@ -19,22 +29,28 @@ from .tools.submission import (
     submit_draft as submit_draft_file,
 )
 from .tools.validation import validate_product_draft
-from .tools.workspace import get_current_item, item_dir, set_current_item, write_json
+from .tools.workspace import get_current_item, item_dir, write_json
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
-mcp = FastMCP("extraction-review")
+mcp = MCPServer("extraction-review")
+
+mcp.tool()(review_queue)
+mcp.tool()(catalog_candidates)
+mcp.tool()(catalog_choices)
+mcp.tool()(resume_item)
+mcp.tool()(act_on_current_item)
+mcp.tool()(approve_current_item)
 
 
 @mcp.tool()
-def checkout_scraped_item() -> str:
+def checkout_scraped_item(item_id: int | None = None) -> str:
     """Checkout the next queued scraped item and set it as current."""
-    item = api_checkout_scraped_item()
+    item = checkout_item(item_id)
     if not item:
         return "Nenhum item disponível na fila."
 
-    set_current_item(item)
     return format_item_summary(item)
 
 
@@ -133,12 +149,7 @@ def submit_draft(image_report: str | None = None, confirm: bool = False) -> dict
 @mcp.tool()
 def report_item_error(message: str, is_fatal: bool = False) -> dict:
     """Report an error for the current checked out scraped item."""
-    item = get_current_item()
-    return report_scraped_item_error(
-        item_id=int(item["id"]),
-        message=message,
-        is_fatal=is_fatal,
-    )
+    return report_current_item_error(message, is_fatal)
 
 
 def main() -> None:

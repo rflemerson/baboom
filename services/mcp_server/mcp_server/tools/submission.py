@@ -4,7 +4,7 @@ from .api import submit_agent_extraction
 from .drafts import load_draft
 from .image_report import load_image_report
 from .validation import validate_product_draft
-from .workspace import get_current_item
+from .workspace import get_current_item, set_current_item
 
 
 def build_submission_preview(image_report: str | None = None) -> dict[str, Any]:
@@ -45,6 +45,14 @@ def submit_draft(
 
     payload = build_submission_preview(image_report=image_report)
     result = submit_agent_extraction(payload)
+    if result.get("errors") or not result.get("extraction"):
+        return {
+            "ok": False,
+            "errors": result.get("errors") or ["Extração não retornada."],
+        }
+    item = get_current_item()
+    item["status"] = "review"
+    set_current_item(item)
 
     return {
         "ok": True,

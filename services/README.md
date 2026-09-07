@@ -1,19 +1,7 @@
-# Services Layout
+# Local Review Tools
 
-This folder currently contains the isolated `agents` service deployment contract.
+[`mcp_server`](mcp_server/README.md) provides the operator's MCP server and the
+`baboom-review` CLI. Both share one GraphQL client and a local draft workspace.
 
-The Django API app + scrapers now run from `apps/api`.
-
-## Dockerfiles
-
-- `apps/api/Dockerfile`: Django API image
-- `services/agents/Dockerfile`: Dagster + agents image
-- Future web app should follow the same pattern with `apps/web/Dockerfile`
-
-## Deploy Model
-
-- `services/agents`: runs with `PYTHONPATH=services/agents:. dagster dev -m agents.definitions` or Dagster daemon/processes.
-
-## Shared Code
-
-Both services use code from this repository. In production, deploy both from the same Git revision to avoid API/schema drift.
+The operator runs these tools locally; Django in `apps/api` owns queue state,
+staging and catalog approval. No database credentials are needed by the client.

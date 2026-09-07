@@ -90,23 +90,15 @@ def extract_image_urls_from_html_text(
 def build_prepared_context(item: dict[str, Any]) -> dict[str, Any]:
     base_url = item.get("sourcePageUrl") or item.get("productLink")
 
-    api_context = parse_json_maybe(item.get("sourcePageApiContext"))
-    structured_data = parse_json_maybe(item.get("sourcePageHtmlStructuredData"))
+    api_context = parse_json_maybe(item.get("sourcePageContext"))
+    structured_data = parse_json_maybe(item.get("sourcePageStructuredData"))
 
-    image_urls: list[str] = []
+    image_urls: list[str] = list(item.get("imageUrls") or [])
 
     image_urls.extend(extract_image_urls_from_payload(api_context, base_url=base_url))
     image_urls.extend(
         extract_image_urls_from_payload(structured_data, base_url=base_url)
     )
-
-    if isinstance(item.get("sourcePageHtmlStructuredData"), str):
-        image_urls.extend(
-            extract_image_urls_from_html_text(
-                item.get("sourcePageHtmlStructuredData"),
-                base_url=base_url,
-            ),
-        )
 
     image_urls = list(dict.fromkeys(image_urls))
 

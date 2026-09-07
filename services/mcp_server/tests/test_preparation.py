@@ -56,13 +56,17 @@ def test_build_prepared_context():
         "name": "Whey",
         "price": "99.90",
         "stockStatus": "in_stock",
-        "sourcePageApiContext": '{"image": "https://x.com/a.jpg"}',
-        "sourcePageHtmlStructuredData": None,
+        "sourcePageContext": {"image": "https://x.com/a.jpg"},
+        "sourcePageStructuredData": None,
+        "imageUrls": ["https://x.com/extensionless", "https://x.com/a.jpg"],
     }
 
     prepared = build_prepared_context(item)
 
     assert prepared["itemId"] == "7"
-    assert prepared["imageUrls"] == ["https://x.com/a.jpg"]
+    assert prepared["imageUrls"] == [
+        "https://x.com/extensionless",
+        "https://x.com/a.jpg",
+    ]
     assert prepared["apiContext"] == {"image": "https://x.com/a.jpg"}
     assert prepared["structuredData"] is None

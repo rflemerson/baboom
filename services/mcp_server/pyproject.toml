@@ -1,10 +1,14 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "extraction-review-mcp-server"
 version = "0.1.0"
 description = "Local MCP server for extraction review tools."
 requires-python = ">=3.14"
 dependencies = [
-    "mcp",
+    "mcp>=2,<3",
     "requests",
     "pydantic",
     "python-dotenv",
@@ -18,9 +22,13 @@ dev = ["pytest"]
 
 [project.scripts]
 extraction-review-mcp-server = "mcp_server.server:main"
+baboom-review = "mcp_server.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["mcp_server*"]
+
+[tool.setuptools.package-data]
+mcp_server = ["prompts/*.md", "skills/*/SKILL.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

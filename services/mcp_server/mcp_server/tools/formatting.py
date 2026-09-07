@@ -14,7 +14,7 @@ def format_item_summary(item: dict[str, Any]) -> str:
             f"Link produto: {item.get('productLink')}",
             f"Página fonte: {item.get('sourcePageUrl')}",
             f"Source page ID: {item.get('sourcePageId')}",
-            f"Tem API context: {'sim' if item.get('sourcePageApiContext') else 'não'}",
-            f"Tem structured data: {'sim' if item.get('sourcePageHtmlStructuredData') else 'não'}",
+            f"Tem API context: {'sim' if item.get('sourcePageContext') else 'não'}",
+            f"Tem structured data: {'sim' if item.get('sourcePageStructuredData') else 'não'}",
         ],
     )
