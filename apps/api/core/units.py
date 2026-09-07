@@ -30,7 +30,6 @@ class UnitSpec(NamedTuple):
     factor: Decimal
 
 
-#: Every convertible unit, keyed by the symbol stored on the model rows.
 UNITS: dict[str, UnitSpec] = {
     "kg": UnitSpec(Dimension.MASS, Decimal(1_000_000)),
     "g": UnitSpec(Dimension.MASS, Decimal(1_000)),
@@ -39,17 +38,13 @@ UNITS: dict[str, UnitSpec] = {
     "kcal": UnitSpec(Dimension.ENERGY, Decimal(1)),
 }
 
-#: The unit each dimension is stored in.
 CANONICAL: dict[Dimension, str] = {
     Dimension.MASS: "mg",
     Dimension.ENERGY: "kcal",
 }
 
-#: Units a nutrition label may state that carry no mass, so they cannot take
-#: part in a concentration: international units and percentages of a daily value.
 DIMENSIONLESS: frozenset[str] = frozenset({"-", "IU", "%"})
 
-#: Unit the public catalog presents masses in.
 DISPLAY_MASS_UNIT = "g"
 
 

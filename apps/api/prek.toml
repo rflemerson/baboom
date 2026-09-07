@@ -42,4 +42,6 @@ repo = "https://github.com/econchick/interrogate"
 rev = "1.7.0"
 [[repos.hooks]]
 id = "interrogate"
+language_version = "python3.14"
+exclude = '(^|/)(migrations/|tests\.py$|test_[^/]*\.py$)'
 args = ["-vv"]

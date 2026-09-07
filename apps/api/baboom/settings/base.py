@@ -74,7 +74,6 @@ DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
 }
 
-# Active the public catalog ranks by when the request does not name one.
 CATALOG_DEFAULT_ACTIVE_SLUG = env.str("CATALOG_DEFAULT_ACTIVE_SLUG", "protein")
 
 CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS = env.int(

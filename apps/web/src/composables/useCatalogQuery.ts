@@ -88,8 +88,6 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
 
   const products = computed<CatalogProduct[]>(() => result.value?.items ?? [])
 
-  // The metrics are relative to one active and one unit; the response names
-  // both, so nothing downstream has to assume protein or grams.
   const active = computed<CatalogActive | null>(() => result.value?.active ?? null)
 
   const massUnit = computed(() => result.value?.massUnit ?? 'g')

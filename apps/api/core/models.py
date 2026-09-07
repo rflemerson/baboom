@@ -21,7 +21,7 @@ from . import units
 logger = logging.getLogger(__name__)
 
 
-def MASS_FIELD(label: object, **kwargs: object) -> models.DecimalField:  # noqa: N802
+def mass_field(label: object, **kwargs: object) -> models.DecimalField:
     """Return a nullable mass column stored in the canonical unit."""
     return models.DecimalField(
         label,
@@ -61,7 +61,6 @@ class Active(BaseModel):
     else is read from :class:`NutritionActive` rows.
     """
 
-    #: Scalar :class:`NutritionFacts` columns an active may be sourced from.
     NUTRITION_FIELDS: ClassVar[tuple[str, ...]] = (
         "proteins",
         "carbohydrates",
@@ -79,7 +78,7 @@ class Active(BaseModel):
     display_unit = models.CharField(
         _("Display Unit"),
         max_length=10,
-        choices=Unit.choices,
+        choices=Unit,
         default=Unit.GRAM,
         help_text=_("Unit this active is presented in; storage stays canonical."),
     )
@@ -371,8 +370,6 @@ class Product(BaseModel):
         """Validate business rules."""
         super().clean()
 
-        # A blank form field arrives as "", which the unique index treats as a
-        # real value: the second product without an EAN would collide with it.
         if not self.ean:
             self.ean = None
 
@@ -450,9 +447,6 @@ class ProductComponent(BaseModel):
                 {"component": _("A product cannot be a component of itself.")},
             )
 
-        # Components are always simple products, so the assembly is one level
-        # deep by construction: no cycle can be built and no recursion is needed
-        # to resolve a combo into the products it contains.
         if component and component.is_combo:
             raise ValidationError(
                 {"component": _("A combo cannot be used as a component.")},
@@ -560,10 +554,6 @@ class NutritionFacts(BaseModel):
         ),
     )
 
-    # Extraction rarely recovers every value of a label, and an unknown value is
-    # not zero: the scalar macros stay nullable so a partial table can be staged
-    # and completed later without inventing numbers. Every mass below is stored
-    # in the canonical unit, whatever unit the printed label used.
     serving_size = models.DecimalField(
         _("Serving Size"),
         max_digits=16,
@@ -578,15 +568,15 @@ class NutritionFacts(BaseModel):
         null=True,
         blank=True,
     )
-    proteins = MASS_FIELD(_("Proteins"))
-    carbohydrates = MASS_FIELD(_("Carbs"))
-    total_sugars = MASS_FIELD(_("Total Sugars"), default=0)
-    added_sugars = MASS_FIELD(_("Added Sugars"), default=0)
-    total_fats = MASS_FIELD(_("Total Fats"))
-    saturated_fats = MASS_FIELD(_("Saturated Fats"), default=0)
-    trans_fats = MASS_FIELD(_("Trans Fats"), default=0)
-    dietary_fiber = MASS_FIELD(_("Dietary Fiber"), default=0)
-    sodium = MASS_FIELD(_("Sodium"), default=0)
+    proteins = mass_field(_("Proteins"))
+    carbohydrates = mass_field(_("Carbs"))
+    total_sugars = mass_field(_("Total Sugars"), default=0)
+    added_sugars = mass_field(_("Added Sugars"), default=0)
+    total_fats = mass_field(_("Total Fats"))
+    saturated_fats = mass_field(_("Saturated Fats"), default=0)
+    trans_fats = mass_field(_("Trans Fats"), default=0)
+    dietary_fiber = mass_field(_("Dietary Fiber"), default=0)
+    sodium = mass_field(_("Sodium"), default=0)
 
     content_hash = models.CharField(
         _("Content Hash"),
@@ -634,8 +624,6 @@ class NutritionFacts(BaseModel):
             field: None if (value := getattr(self, field)) is None else float(value)
             for field in self.HASH_FIELDS
         }
-        # "micronutrients" is a frozen key of the fingerprint payload, not a
-        # field name: renaming it would invalidate every stored hash.
         data["micronutrients"] = (
             sorted(
                 (
@@ -687,7 +675,7 @@ class NutritionActive(BaseModel):
     declared_unit = models.CharField(
         _("Declared Unit"),
         max_length=10,
-        choices=Unit.choices,
+        choices=Unit,
         default=Unit.UNKNOWN,
         help_text=_("Unit the printed label used, kept so it can be shown again."),
     )
@@ -842,8 +830,6 @@ class ProductActiveManager(models.Manager):
                 amounts[active.pk] = Decimal(value) / serving
 
         for entry in facts.actives.all():
-            # A label may state an active in international units or as a
-            # percentage of a daily value; neither carries a mass to rank.
             if units.is_convertible(entry.declared_unit):
                 amounts[entry.active_id] = entry.amount / serving
 

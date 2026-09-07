@@ -49,8 +49,6 @@ def _annotate_catalog_base_fields(
     """Annotate catalog fields loaded directly from subqueries."""
     latest_prices = _latest_price_observation_subquery()
 
-    # An unknown active has no concentration to look up, and an empty subquery
-    # is not reliably rendered as NULL, so the annotation is stated directly.
     fraction = (
         Value(None, output_field=DecimalField(max_digits=12, decimal_places=8))
         if active is None

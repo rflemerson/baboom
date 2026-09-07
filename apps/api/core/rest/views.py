@@ -151,8 +151,6 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     page_obj = paginator.get_page(page)
     response = JsonResponse(
         {
-            # The metrics are relative to one active and expressed in one unit,
-            # so the response names both rather than implying them.
             "active": ({"slug": active.slug, "name": active.name} if active else None),
             "massUnit": units.DISPLAY_MASS_UNIT,
             "pageInfo": {

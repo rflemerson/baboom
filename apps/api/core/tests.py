@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 from http import HTTPStatus
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 from unittest.mock import Mock
 
-import pytest
 from django.contrib import admin as django_admin
 from django.core.exceptions import ValidationError
 from django.forms.models import inlineformset_factory
@@ -50,6 +49,19 @@ from core.services import (
 )
 from core.units import to_canonical
 from offers.models import Offer, PriceObservation, StockStatus
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+def _validation_error(operation: Callable[[], object]) -> ValidationError:
+    """Return the validation error raised by a catalog write."""
+    try:
+        operation()
+    except ValidationError as error:
+        return error
+    message = "Expected the operation to raise a ValidationError."
+    raise AssertionError(message)
 
 
 def _grams(value: object) -> Decimal:
@@ -524,10 +536,14 @@ class ProductComponentTests(TestCase):
 
     def test_component_cannot_be_the_parent_itself(self) -> None:
         """Self-reference is rejected before it reaches the database."""
-        with pytest.raises(ValidationError) as error:
-            ProductComponent.objects.create(parent=self.combo, component=self.combo)
+        error = _validation_error(
+            lambda: ProductComponent.objects.create(
+                parent=self.combo,
+                component=self.combo,
+            ),
+        )
 
-        assert "component" in error.value.message_dict
+        assert "component" in error.message_dict
 
     def test_component_cannot_be_another_combo(self) -> None:
         """Assemblies stay one level deep, so no cycle can be built."""
@@ -537,27 +553,34 @@ class ProductComponentTests(TestCase):
             kind=Product.Kind.COMBO,
         )
 
-        with pytest.raises(ValidationError) as error:
-            ProductComponent.objects.create(parent=self.combo, component=nested)
+        error = _validation_error(
+            lambda: ProductComponent.objects.create(
+                parent=self.combo,
+                component=nested,
+            ),
+        )
 
-        assert "component" in error.value.message_dict
+        assert "component" in error.message_dict
 
     def test_simple_product_cannot_have_components(self) -> None:
         """Only combos assemble other products."""
-        with pytest.raises(ValidationError) as error:
-            ProductComponent.objects.create(parent=self.whey, component=self.creatine)
+        error = _validation_error(
+            lambda: ProductComponent.objects.create(
+                parent=self.whey,
+                component=self.creatine,
+            ),
+        )
 
-        assert "parent" in error.value.message_dict
+        assert "parent" in error.message_dict
 
     def test_combo_cannot_be_downgraded_while_it_has_components(self) -> None:
         """The kind stays consistent with the rows that depend on it."""
         ProductComponent.objects.create(parent=self.combo, component=self.whey)
         self.combo.kind = Product.Kind.SIMPLE
 
-        with pytest.raises(ValidationError) as error:
-            self.combo.save()
+        error = _validation_error(self.combo.save)
 
-        assert "kind" in error.value.message_dict
+        assert "kind" in error.message_dict
 
 
 class NutritionFactsPartialLabelTests(TestCase):
@@ -628,7 +651,6 @@ class ProductActiveTests(TestCase):
             product=self.product,
             active=self.caffeine,
         )
-        # 2 g of protein in a 10 g serving is a fifth of the mass; 200 mg is 2%.
         assert protein.fraction == Decimal("0.20000000")
         assert caffeine.fraction == Decimal("0.02000000")
 
@@ -743,7 +765,6 @@ class CatalogActiveRankingTests(TestCase):
             public_catalog_products(CatalogProductsFilters(active="creatine")),
         )
 
-        # Only the blend carries creatine, so it wins on price per gram of it.
         assert results[0].name == "Blend"
         assert results[0].price_per_active is not None
         assert results[1].price_per_active is None

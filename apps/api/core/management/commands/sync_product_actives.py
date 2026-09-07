@@ -1,7 +1,5 @@
 """Rebuild the derived product concentrations from nutrition data."""
 
-from typing import Any
-
 from django.core.management.base import BaseCommand
 
 from core.models import Product, ProductActive
@@ -12,7 +10,7 @@ class Command(BaseCommand):
 
     help = "Rebuild product active concentrations from nutrition profiles."
 
-    def handle(self, *_args: Any, **_options: Any) -> None:  # noqa: ANN401
+    def handle(self, *_args: object, **_options: object) -> None:
         """Sync every product and report how many rows resulted."""
         products = Product.objects.prefetch_related(
             "nutrition_profiles__nutrition_facts__actives",

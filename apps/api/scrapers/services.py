@@ -213,8 +213,6 @@ class ScrapedItemApprovalService:
             exclude={"tag_ids", "is_published", "ean", "net_mass", "mass_unit"},
         )
         tag_ids = set(product.tags.values_list("id", flat=True))
-        # The submitted mass carries its own unit, so it is compared after
-        # conversion rather than against the stored canonical number.
         submitted_mass = (
             None
             if create_data.net_mass is None

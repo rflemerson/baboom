@@ -518,7 +518,6 @@ class ScrapedItemApprovalServiceTests(TestCase):
         assert not product.is_published
         assert self.service.execute(data).pk == product.pk
         assert Product.objects.count() == 1
-        # Submitted in grams, stored in the canonical unit.
         assert product.net_mass == to_canonical(Decimal(1000), "g")
         links = ProductStore.objects.filter(product=product, offer=self.item.offer)
         assert links.exists()

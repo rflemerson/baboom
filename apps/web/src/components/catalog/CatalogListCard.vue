@@ -26,7 +26,9 @@ defineProps<{
           <span class="app-chip app-chip--accent px-2.5 py-1 text-xs">
             {{ product.packagingDisplay }}
           </span>
-          <span class="app-chip px-3 py-1 text-xs"> {{ product.netMass }} {{ massUnit ?? 'g' }} </span>
+          <span class="app-chip px-3 py-1 text-xs">
+            {{ product.netMass }} {{ massUnit ?? 'g' }}
+          </span>
           <span class="app-chip px-3 py-1 text-xs">
             {{ product.category?.name ?? 'Uncategorized' }}
           </span>
