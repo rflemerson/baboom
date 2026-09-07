@@ -42,11 +42,19 @@ from scrapers.spiders.dark_lab import DarkLabSpider
 from scrapers.spiders.dux import DuxSpider
 from scrapers.spiders.growth import GrowthSpider
 from scrapers.spiders.http_client import HttpClient
+from scrapers.spiders.integral_medica import IntegralMedicaSpider
+from scrapers.spiders.shopify_api_spider import ShopifyApiSpider
 from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
-from scrapers.tasks import _run_spider_monitor, release_stuck_items
+from scrapers.tasks import (
+    EmptyMonitorRunError,
+    _run_spider_monitor,
+    release_stuck_items,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from django.http import HttpResponse
 
 EXPECTED_EXTERNAL_STOCK_QUANTITY = 100
@@ -57,6 +65,20 @@ EXPECTED_GROWTH_DECIMAL_PRICE = 139.9
 EXPECTED_GROWTH_CURRENCY_PRICE = 89.5
 EXPECTED_VTEX_DECIMAL_PRICE = 99.9
 EXPECTED_VTEX_INTEGER_PRICE = 55.0
+DUX_EXPECTED_STOCK = 42
+EXPECTED_MONITOR_ITEMS = 2
+
+
+def _raised(operation: Callable[[], object], expected: type[Exception]) -> Exception:
+    """Return the exception an operation is expected to raise."""
+    try:
+        operation()
+    except expected as error:
+        return error
+    message = f"Expected {expected.__name__} to be raised."
+    raise AssertionError(message)
+
+
 EXPECTED_FALLBACK_CATEGORY_COUNT = 2
 EXPECTED_SCRAPER_RUN_ITEMS = 2
 
@@ -174,8 +196,12 @@ class ScraperRunHistoryTests(TestCase):
                 msg = "blocked by upstream"
                 raise RuntimeError(msg)
 
-        with self.assertRaisesRegex(RuntimeError, "blocked by upstream"):  # noqa: PT027
-            _run_spider_monitor(FailingSpider, "Blocked Store")
+        error = _raised(
+            lambda: _run_spider_monitor(FailingSpider, "Blocked Store"),
+            RuntimeError,
+        )
+
+        assert str(error) == "blocked by upstream"
 
         run = ScraperRun.objects.get()
         assert run.label == "Blocked Store"
@@ -223,7 +249,7 @@ class ScraperIntegrationTests(TestCase):
 
     def test_dux_spider(self) -> None:
         """Test Dux spider execution."""
-        spider = DuxSpider(categories=["proteinas"])
+        spider = DuxSpider(categories=["produtos"])
 
         items = spider.crawl()
 
@@ -231,6 +257,20 @@ class ScraperIntegrationTests(TestCase):
         assert ScrapedItem.objects.filter(offer__store_slug="dux_nutrition").count() > 0
 
         first = ScrapedItem.objects.filter(offer__store_slug="dux_nutrition").first()
+        assert first is not None
+
+    def test_integral_medica_spider(self) -> None:
+        """Test Integralmedica spider execution."""
+        spider = IntegralMedicaSpider(categories=["colecao-proteinas"])
+
+        items = spider.crawl()
+
+        assert len(items) > 0, "Integralmedica spider should return items"
+        assert (
+            ScrapedItem.objects.filter(offer__store_slug="integral_medica").count() > 0
+        )
+
+        first = ScrapedItem.objects.filter(offer__store_slug="integral_medica").first()
         assert first is not None
 
     def test_growth_spider(self) -> None:
@@ -1658,3 +1698,215 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         context = json.loads(mock_save.call_args.kwargs["api_context"])
         assert context["platform"] == "vtex_legacy"
         assert "items" in context
+
+
+class DuxNuvemshopSpiderUnitTests(SimpleTestCase):
+    """Unit tests for the Nuvemshop JSON-LD ingestion used by Dux."""
+
+    LISTING_HTML = """
+    <html><head>
+      <script type="application/ld+json">
+      {"@type": "Organization", "name": "Dux"}
+      </script>
+      <script type="application/ld+json">
+      {"@type": "Product", "name": "Whey Protein Concentrado - Pote 900g",
+       "sku": "410713009", "gtin13": "7898604470045",
+       "offers": {"@type": "Offer",
+         "url": "https://duxhumanhealth.com/produtos/whey-concentrado-900g/",
+         "priceCurrency": "BRL", "price": "159.90",
+         "availability": "http://schema.org/InStock",
+         "inventoryLevel": {"@type": "QuantitativeValue", "value": "42"}}}
+      </script>
+      <script type="application/ld+json">not json at all</script>
+    </head></html>
+    """
+
+    def setUp(self) -> None:
+        """Create the spider and a reusable JSON-LD product entry."""
+        self.spider = DuxSpider()
+        self.base_item: ScrapedJsonObject = {
+            "@type": "Product",
+            "name": "Whey Protein Concentrado - Pote 900g",
+            "sku": "410713009",
+            "gtin13": "7898604470045",
+            "offers": {
+                "@type": "Offer",
+                "url": "https://duxhumanhealth.com/produtos/whey-900g/",
+                "price": "159.90",
+                "availability": "http://schema.org/InStock",
+                "inventoryLevel": {"value": "42"},
+            },
+        }
+
+    def test_extract_products_keeps_only_product_blocks(self) -> None:
+        """Organization blocks and malformed JSON must not become products."""
+        products = self.spider.extract_products(self.LISTING_HTML)
+
+        assert len(products) == 1
+        assert products[0]["sku"] == "410713009"
+
+    @patch("scrapers.spiders.nuvemshop_spider.ScraperService.save_product")
+    def test_process_and_save_maps_offer_fields(self, mock_save: MagicMock) -> None:
+        """Price, stock and identifiers come from the embedded offer."""
+        fake_obj = MagicMock()
+        mock_save.return_value = fake_obj
+
+        result = self.spider.process_item(self.base_item, "produtos")
+
+        assert result == fake_obj
+        payload = mock_save.call_args.args[0]
+        assert payload.external_id == "410713009"
+        assert payload.ean == "7898604470045"
+        assert payload.stock_quantity == DUX_EXPECTED_STOCK
+        assert payload.stock_status == StockStatus.AVAILABLE
+        assert payload.url == "https://duxhumanhealth.com/produtos/whey-900g/"
+
+    @patch("scrapers.spiders.nuvemshop_spider.ScraperService.save_product")
+    def test_out_of_stock_offer_zeroes_quantity(self, mock_save: MagicMock) -> None:
+        """An unavailable offer is stored as out of stock with no units."""
+        item = dict(self.base_item)
+        item["offers"] = dict(
+            cast("ScrapedJsonObject", self.base_item["offers"]),
+            availability="http://schema.org/OutOfStock",
+        )
+
+        self.spider.process_item(item, "produtos")
+
+        payload = mock_save.call_args.args[0]
+        assert payload.stock_status == StockStatus.OUT_OF_STOCK
+        assert payload.stock_quantity == 0
+
+    @patch("scrapers.spiders.nuvemshop_spider.ScraperService.save_product")
+    def test_process_and_save_skips_item_without_sku(
+        self,
+        mock_save: MagicMock,
+    ) -> None:
+        """The SKU is the external identifier, so an entry without one is skipped."""
+        item = dict(self.base_item)
+        item["sku"] = ""
+
+        result = self.spider.process_item(item, "produtos")
+
+        assert result is None
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.nuvemshop_spider.ScraperService.save_product")
+    def test_process_and_save_skips_invalid_price(self, mock_save: MagicMock) -> None:
+        """An offer without a usable price is not persisted."""
+        item = dict(self.base_item)
+        item["offers"] = dict(
+            cast("ScrapedJsonObject", self.base_item["offers"]),
+            price="sob consulta",
+        )
+
+        result = self.spider.process_item(item, "produtos")
+
+        assert result is None
+        mock_save.assert_not_called()
+
+    @patch("scrapers.spiders.nuvemshop_spider.ScraperService.save_product")
+    def test_process_and_save_passes_api_context(self, mock_save: MagicMock) -> None:
+        """The full JSON-LD entry is handed downstream as the api context."""
+        self.spider.process_item(self.base_item, "produtos")
+
+        context = json.loads(mock_save.call_args.kwargs["api_context"])
+        assert context["platform"] == "nuvemshop"
+        assert context["product"]["sku"] == "410713009"
+
+
+class IntegralMedicaSpiderUnitTests(SimpleTestCase):
+    """Integralmedica now ingests through the Shopify template."""
+
+    def test_spider_uses_the_shopify_template(self) -> None:
+        """The VTEX endpoints are gone, so the spider must be Shopify-based."""
+        spider = IntegralMedicaSpider()
+
+        assert isinstance(spider, ShopifyApiSpider)
+        assert spider.STORE_SLUG == "integral_medica"
+        assert spider.BASE_URL.endswith(".myshopify.com")
+
+
+class HttpClientBlockDetectionTests(SimpleTestCase):
+    """The WAF detector must separate a challenge page from ordinary content."""
+
+    def setUp(self) -> None:
+        """Create a client to exercise the detector."""
+        self.client = HttpClient()
+
+    def test_cloudflare_analytics_is_not_a_block(self) -> None:
+        """A catalog page shipping Cloudflare scripts is legitimate content."""
+        page = (
+            "<html><body><script>/* Cloudflare cache status of the request. */"
+            "console.error('[web-vitals] could not read the Cloudflare cache status');"
+            "</script><h1>Whey Protein</h1></body></html>"
+        )
+
+        assert self.client.is_blocked(page) is False
+
+    def test_cloudflare_challenge_is_a_block(self) -> None:
+        """The interstitial challenge page must still be detected."""
+        page = "<html><title>Attention Required! | Cloudflare</title></html>"
+
+        assert self.client.is_blocked(page) is True
+
+    def test_sucuri_firewall_is_a_block(self) -> None:
+        """Sucuri denial pages remain detected."""
+        page = "<html><body>Sucuri WebSite Firewall - Access Denied</body></html>"
+
+        assert self.client.is_blocked(page) is True
+
+
+class EmptyMonitorRunTests(TestCase):
+    """An empty run is an error only for a monitor that used to produce items."""
+
+    LABEL = "Dux"
+
+    def _run(self, items: list[object]) -> str:
+        """Run the monitor helper with a spider returning the given items."""
+        spider_class = MagicMock()
+        spider_class.return_value.crawl.return_value = items
+        return _run_spider_monitor(spider_class, self.LABEL)
+
+    def test_empty_run_is_success_for_a_monitor_without_history(self) -> None:
+        """A store that never produced items may legitimately return none."""
+        message = self._run([])
+
+        run = ScraperRun.objects.get()
+        assert run.status == ScraperRun.Status.SUCCESS
+        assert run.items_count == 0
+        assert "0 items" in message
+
+    def test_empty_run_fails_after_the_monitor_has_produced_items(self) -> None:
+        """Going silently to zero is what hid the Dux and Integral breakages."""
+        ScraperRun.objects.create(
+            label=self.LABEL,
+            status=ScraperRun.Status.SUCCESS,
+            items_count=112,
+        )
+
+        _raised(lambda: self._run([]), EmptyMonitorRunError)
+
+        run = ScraperRun.objects.filter(items_count=0).get()
+        assert run.status == ScraperRun.Status.ERROR
+        assert "most likely changed" in run.error_message
+
+    def test_empty_run_of_another_monitor_does_not_raise(self) -> None:
+        """History is per monitor, so a healthy store does not fail its peer."""
+        ScraperRun.objects.create(
+            label="Growth",
+            status=ScraperRun.Status.SUCCESS,
+            items_count=199,
+        )
+
+        self._run([])
+
+        run = ScraperRun.objects.get(label=self.LABEL)
+        assert run.status == ScraperRun.Status.SUCCESS
+
+    def test_run_with_items_records_success(self) -> None:
+        """The normal path still records the item count."""
+        self._run([object(), object()])
+
+        run = ScraperRun.objects.get()
+        assert run.status == ScraperRun.Status.SUCCESS
+        assert run.items_count == EXPECTED_MONITOR_ITEMS

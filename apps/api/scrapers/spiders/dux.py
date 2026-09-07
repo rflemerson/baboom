@@ -1,25 +1,21 @@
-"""VTEX search spider for Dux Nutrition."""
+"""Nuvemshop storefront spider for Dux Nutrition.
+
+The store migrated off VTEX to Nuvemshop, and the ``www`` host now redirects
+to the apex domain.
+"""
 
 import logging
 
-from .vtex_search_spider import VtexSearchSpider
+from .nuvemshop_spider import NuvemshopSpider
 
 logger = logging.getLogger(__name__)
 
 
-class DuxSpider(VtexSearchSpider):
-    """Spider for Dux Nutrition."""
+class DuxSpider(NuvemshopSpider):
+    """Spider for Dux Nutrition (Nuvemshop storefront)."""
 
     BRAND_NAME = "Dux Nutrition"
     STORE_SLUG = "dux_nutrition"
-    BASE_URL = "https://www.duxhumanhealth.com"
-    API_TREE = "https://www.duxhumanhealth.com/api/catalog_system/pub/category/tree/3"
-    FALLBACK_CATEGORIES = (
-        "proteinas",
-        "creatina",
-        "saude",
-        "vestuario",
-        "acessorios",
-        "barras",
-        "vegan",
-    )
+    BASE_URL = "https://duxhumanhealth.com"
+
+    FALLBACK_CATEGORIES = ("produtos",)

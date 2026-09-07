@@ -61,7 +61,7 @@ def _parse_retry_after_date(raw: str, *, max_seconds: float) -> float | None:
     """Return seconds until an HTTP-date Retry-After value, if valid."""
     try:
         retry_at = parsedate_to_datetime(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if retry_at is None:
         return None
@@ -83,6 +83,19 @@ class HttpRequestOptions:
     impersonate: str | None = None
     try_all_impersonations: bool = False
     timeout: int | None = None
+
+
+#: Markers of an actual challenge or denial page served with a 200 status.
+BLOCKED_INDICATORS = (
+    "Sucuri WebSite Firewall",
+    "sucuri-firewall-block",
+    "Attention Required! | Cloudflare",
+    "cf-browser-verification",
+    "cf-challenge-running",
+    "__cf_chl_",
+    "Checking your browser before accessing",
+    "Access Denied",
+)
 
 
 class HttpClient:
@@ -107,20 +120,18 @@ class HttpClient:
         self.timeout = timeout
         self._session = cffi_requests.Session()
 
-    def _is_blocked(self, content: str) -> bool:
-        """Check if response indicates WAF block."""
-        blocked_indicators = [
-            "Sucuri WebSite Firewall",
-            "sucuri-firewall-block",
-            "Access Denied",
-            "Cloudflare",
-            "cf-browser-verification",
-        ]
-        return any(indicator in content for indicator in blocked_indicators)
+    def is_blocked(self, content: str) -> bool:
+        """Check if a nominally successful response is really a WAF block page.
+
+        The markers must identify a challenge or denial page, never the mere
+        presence of a vendor name: stores legitimately ship Cloudflare analytics
+        and CDN scripts, and matching the bare word discards a good catalog page.
+        """
+        return any(indicator in content for indicator in BLOCKED_INDICATORS)
 
     def _is_blocked_response(self, response: object) -> bool:
         """Return whether a nominally successful response is a WAF block page."""
-        return response.status_code == HTTP_SUCCESS_CODE and self._is_blocked(
+        return response.status_code == HTTP_SUCCESS_CODE and self.is_blocked(
             str(getattr(response, "text", "")),
         )
 
