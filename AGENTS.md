@@ -16,7 +16,6 @@
 ## Extended context index (load on demand)
 
 - API backend: `apps/api/AGENTS.md`
-- Agents service: `services/agents/AGENTS.md`
 - Infra and deploy: `infra/AGENTS.md`
 - Web frontend: `apps/web/AGENTS.md`
 
@@ -37,18 +36,10 @@ You are the guardian of this project's "Brain". Keep it sharp.
 ```bash
 # Workflow
 Test: python apps/api/manage.py test
-Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
-Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
 Lint: prek run --all-files
-Lint (Just): just check
-Lint API (Just): just api-lint
-Lint Agents (Just): just agents-lint
 Run: python apps/api/manage.py runserver
-Orchestration: PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 API Deps: cd apps/api && pip install -e .
-Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
 API Image: docker build -f apps/api/Dockerfile -t baboom-api .
-Agents Image: docker build -f services/agents/Dockerfile -t baboom-agents .
 ```
 
 ## 4. Commit Protocol

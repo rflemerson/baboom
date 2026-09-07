@@ -29,9 +29,6 @@ jobs:
           - name: web
             image: baboom-web
             dockerfile: apps/web/Dockerfile
-          - name: agents
-            image: baboom-agents
-            dockerfile: services/agents/Dockerfile
 
     steps:
       - name: Checkout

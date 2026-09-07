@@ -3,11 +3,11 @@
 import strawberry
 
 from core.graphql.permissions import IsAuthenticatedWithAPIKey
-from scrapers.graphql.schema import ScrapersMutation
+from scrapers.graphql.schema import ScrapersMutation, ScrapersQuery
 
 
 @strawberry.type
-class Query:
+class Query(ScrapersQuery):
     """Root GraphQL Query."""
 
     @strawberry.field(permission_classes=[IsAuthenticatedWithAPIKey])

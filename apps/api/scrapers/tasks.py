@@ -151,7 +151,7 @@ def enrich_store_pages(
 
 @shared_task
 def release_stuck_items() -> str:
-    """Move stale processing items back into the retry flow."""
+    """Return expired interactive reservations to the review queue."""
     timeout = timezone.now() - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
 
     stuck_items = ScrapedItem.objects.filter(
@@ -159,12 +159,12 @@ def release_stuck_items() -> str:
         last_attempt_at__lt=timeout,
     )
 
-    count = stuck_items.count()
+    count = stuck_items.update(
+        status=ScrapedItem.Status.QUEUED,
+        last_attempt_at=None,
+        updated_at=timezone.now(),
+    )
     if count > 0:
-        stuck_items.update(
-            status=ScrapedItem.Status.ERROR,
-            last_error_log="System: Timeout - Agent stopped responding (Zombie Task).",
-        )
         return f"Cleaned up {count} stuck items."
 
     return "No stuck items found."

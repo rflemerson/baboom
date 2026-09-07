@@ -3,25 +3,35 @@
 import json
 import logging
 import os
+from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.utils import timezone
 from strawberry.django.views import GraphQLView
 
 from baboom.schema import schema
-from core.models import APIKey
+from core.models import APIKey, Brand, Product, ProductStore, Store
 from offers.models import Offer, PriceObservation, StockStatus
 from scrapers.admin import queue_for_agents
-from scrapers.dtos import AgentExtractionSubmitInput, ScrapedItemIngestionInput
+from scrapers.dtos import (
+    AgentExtractionSubmitInput,
+    ScrapedItemApprovalInput,
+    ScrapedItemIngestionInput,
+)
+from scrapers.images import image_urls
 from scrapers.models import ScrapedItem, ScrapedItemExtraction, ScrapedPage, ScraperRun
 from scrapers.services import (
     RenderResult,
+    ScrapedItemApprovalService,
     ScrapedItemCheckoutService,
     ScrapedItemErrorService,
     ScrapedItemExtractionSubmitService,
+    ScrapedItemReviewStateService,
     ScraperService,
     extract_schema_metadata,
 )
@@ -33,7 +43,7 @@ from scrapers.spiders.growth import GrowthSpider
 from scrapers.spiders.http_client import HttpClient
 from scrapers.spiders.soldiers import SoldiersSpider
 from scrapers.spiders.vtex_search_spider import VtexSearchSpider
-from scrapers.tasks import _run_spider_monitor
+from scrapers.tasks import _run_spider_monitor, release_stuck_items
 
 if TYPE_CHECKING:
     from django.http import HttpResponse
@@ -353,6 +363,273 @@ class ScrapedItemQueueTests(TestCase):
         queued_item.refresh_from_db()
         assert queued_item.status == ScrapedItem.Status.PROCESSING
 
+    def test_checkout_can_target_one_queued_item(self) -> None:
+        """Interactive review can reserve the item selected by the operator."""
+        first = _scraped_item(
+            store_slug="dark_lab",
+            external_id="first-queued",
+            status=ScrapedItem.Status.QUEUED,
+            source_page=self.page,
+        )
+        selected = _scraped_item(
+            store_slug="dark_lab",
+            external_id="selected-queued",
+            status=ScrapedItem.Status.QUEUED,
+            source_page=self.page,
+        )
+
+        work = ScrapedItemCheckoutService().execute(item_id=selected.id)
+
+        assert work is not None
+        assert work.id == selected.id
+        first.refresh_from_db()
+        assert first.status == ScrapedItem.Status.QUEUED
+
+
+class ScrapedItemReviewStateServiceTests(TestCase):
+    """Tests for resumable local review state transitions."""
+
+    def setUp(self) -> None:
+        """Create one active interactive review."""
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/review",
+        )
+        self.item = _scraped_item(
+            store_slug="growth",
+            external_id="review-state",
+            status=ScrapedItem.Status.PROCESSING,
+            source_page=self.page,
+        )
+        self.service = ScrapedItemReviewStateService()
+
+    def test_heartbeat_refreshes_last_attempt(self) -> None:
+        """A local conversation can keep its checkout active."""
+        previous_attempt = self.item.last_attempt_at
+
+        item = self.service.heartbeat(item_id=self.item.id)
+
+        assert item.status == ScrapedItem.Status.PROCESSING
+        assert item.last_attempt_at is not None
+        assert item.last_attempt_at != previous_attempt
+
+    def test_release_returns_item_to_queue(self) -> None:
+        """Abandoning a conversation should not manufacture an error."""
+        item = self.service.release(item_id=self.item.id)
+
+        assert item.status == ScrapedItem.Status.QUEUED
+        assert item.last_attempt_at is None
+
+    def test_heartbeat_and_release_reject_inactive_items(self) -> None:
+        """Completed review must not be returned to processing by state actions."""
+        self.item.status = ScrapedItem.Status.LINKED
+        self.item.save(update_fields=["status"])
+        for action, message in (
+            (self.service.heartbeat, "not processing"),
+            (self.service.release, "not processing"),
+            (self.service.ignore, "cannot be ignored"),
+        ):
+            with (
+                self.subTest(action=action.__name__),
+                self.assertRaisesMessage(DjangoValidationError, message),
+            ):
+                action(item_id=self.item.id)
+        self.item.refresh_from_db()
+        assert self.item.status == ScrapedItem.Status.LINKED
+
+    def test_timeout_requeues_expired_reservations_but_respects_heartbeat(self) -> None:
+        """Only inactive reservations expire, without counting an extraction error."""
+        old_attempt = timezone.now() - timedelta(hours=2)
+        ScrapedItem.objects.filter(id=self.item.id).update(last_attempt_at=old_attempt)
+        self.service.heartbeat(item_id=self.item.id)
+        release_stuck_items()
+        self.item.refresh_from_db()
+        assert self.item.status == ScrapedItem.Status.PROCESSING
+        ScrapedItem.objects.filter(id=self.item.id).update(last_attempt_at=old_attempt)
+        release_stuck_items()
+        self.item.refresh_from_db()
+        assert self.item.status == ScrapedItem.Status.QUEUED
+        assert self.item.last_attempt_at is None
+        assert self.item.error_count == 0
+
+
+class ScrapedItemApprovalServiceTests(TestCase):
+    """Tests for explicit and idempotent catalog approval."""
+
+    def setUp(self) -> None:
+        """Create a reviewed extraction and matching catalog references."""
+        self.brand = Brand.objects.create(
+            name="growth",
+            display_name="Growth",
+        )
+        self.store = Store.objects.create(
+            name="growth",
+            display_name="Growth",
+        )
+        self.page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://growth.example/approved",
+        )
+        self.item = _scraped_item(
+            store_slug="growth",
+            external_id="approved-item",
+            name="Whey Test",
+            status=ScrapedItem.Status.REVIEW,
+            source_page=self.page,
+        )
+        ScrapedItemExtraction.objects.create(
+            scraped_item=self.item,
+            source_page=self.page,
+            extracted_product={"name": "Whey Test", "brandName": "Growth"},
+        )
+        self.service = ScrapedItemApprovalService()
+
+    def test_approval_can_link_an_existing_product_idempotently(self) -> None:
+        """Repeating the approved request must not duplicate the store link."""
+        product = Product.objects.create(name="Whey Test", brand=self.brand)
+        data = ScrapedItemApprovalInput(itemId=self.item.id, productId=product.id)
+
+        first_result = self.service.execute(data)
+        second_result = self.service.execute(data)
+
+        self.item.refresh_from_db()
+        assert first_result == product
+        assert second_result == product
+        assert self.item.status == ScrapedItem.Status.LINKED
+        links = ProductStore.objects.filter(product=product, offer=self.item.offer)
+        assert links.count() == 1
+
+    def test_approval_can_create_an_unpublished_product(self) -> None:
+        """New products stay unpublished until a manager explicitly publishes them."""
+        data = ScrapedItemApprovalInput.model_validate(
+            {
+                "itemId": self.item.id,
+                "createProduct": {
+                    "name": "Whey Test",
+                    "brandId": self.brand.id,
+                    "weight": 1000,
+                },
+            },
+        )
+
+        product = self.service.execute(data)
+
+        assert not product.is_published
+        assert self.service.execute(data).pk == product.pk
+        assert Product.objects.count() == 1
+        expected_weight = 1000
+        assert product.weight == expected_weight
+        links = ProductStore.objects.filter(product=product, offer=self.item.offer)
+        assert links.exists()
+
+    def test_approval_rejects_publication_and_invalid_metadata(self) -> None:
+        """Rejected catalog input leaves both the review and catalog unchanged."""
+        invalid_fields = (
+            {"isPublished": True},
+            {"name": ""},
+            {"packaging": "INVALID"},
+            {"categoryId": 999999},
+            {"tagIds": [999999]},
+        )
+        for fields in invalid_fields:
+            with self.subTest(fields=fields):
+                data = ScrapedItemApprovalInput.model_validate(
+                    {
+                        "itemId": self.item.id,
+                        "createProduct": {
+                            "name": "Whey",
+                            "brandId": self.brand.id,
+                            **fields,
+                        },
+                    },
+                )
+                with self.assertRaisesMessage(
+                    DjangoValidationError,
+                    next(iter(fields)),
+                ):
+                    self.service.execute(data)
+                assert not Product.objects.exists()
+                assert not ProductStore.objects.exists()
+                self.item.refresh_from_db()
+                assert self.item.status == ScrapedItem.Status.REVIEW
+
+    def test_approval_rolls_back_new_product_when_store_is_missing(self) -> None:
+        """A failed offer link must not leave an orphan product."""
+        self.store.delete()
+        data = ScrapedItemApprovalInput.model_validate(
+            {
+                "itemId": self.item.id,
+                "createProduct": {"name": "Whey", "brandId": self.brand.id},
+            },
+        )
+        with self.assertRaisesMessage(DjangoValidationError, "not configured"):
+            self.service.execute(data)
+        assert not Product.objects.exists()
+
+    def test_approval_requires_staging_and_one_target(self) -> None:
+        """Approval cannot bypass staging or accept ambiguous targets."""
+        product = Product.objects.create(name="Whey", brand=self.brand)
+        for payload in (
+            {"itemId": self.item.id},
+            {
+                "itemId": self.item.id,
+                "productId": product.id,
+                "createProduct": {"name": "Whey", "brandId": self.brand.id},
+            },
+        ):
+            with (
+                self.subTest(payload=payload),
+                self.assertRaisesMessage(
+                    DjangoValidationError,
+                    "exactly one",
+                ),
+            ):
+                self.service.execute(ScrapedItemApprovalInput.model_validate(payload))
+        self.item.agent_extraction.delete()
+        with self.assertRaisesMessage(DjangoValidationError, "no staged extraction"):
+            self.service.execute(
+                ScrapedItemApprovalInput(itemId=self.item.id, productId=product.id),
+            )
+        assert not ProductStore.objects.exists()
+
+    def test_approved_item_cannot_be_retargeted(self) -> None:
+        """A repeated approval for a different product must report a conflict."""
+        first = Product.objects.create(name="First", brand=self.brand)
+        other = Product.objects.create(name="Other", brand=self.brand)
+        self.service.execute(
+            ScrapedItemApprovalInput(itemId=self.item.id, productId=first.id),
+        )
+        with self.assertRaisesMessage(DjangoValidationError, "already approved"):
+            self.service.execute(
+                ScrapedItemApprovalInput(itemId=self.item.id, productId=other.id),
+            )
+        assert ProductStore.objects.get(offer=self.item.offer).product_id == first.id
+
+
+class ReviewImageTests(SimpleTestCase):
+    """Image normalization must preserve evidence without returning page links."""
+
+    def test_image_references_are_normalized_and_deduplicated(self) -> None:
+        """Support extensionless image fields, relative URLs and nested images."""
+        payload = {
+            "url": "https://shop.example/product",
+            "@context": "https://schema.org",
+            "images": [
+                {"url": "/media/label", "alt": "Nutrition"},
+                "//cdn.example/photo.jpg",
+                "",
+                "http://[malformed",
+            ],
+            "nested": {"imageUrl": "/media/label"},
+            "properties": [["og:image", "/preview"]],
+            "unsafe": {"image": "javascript:alert(1)"},
+        }
+        assert image_urls(payload, base_url="https://shop.example/product") == [
+            "https://shop.example/media/label",
+            "https://cdn.example/photo.jpg",
+            "https://shop.example/preview",
+        ]
+
 
 class ScrapedItemErrorServiceTests(TestCase):
     """Unit tests for agent error reporting."""
@@ -472,7 +749,7 @@ class ScrapedItemExtractionSubmitServiceTests(TestCase):
 
     def test_execute_rejects_non_processing_item(self) -> None:
         """Agent submissions must belong to a checked out item."""
-        self.item.status = ScrapedItem.Status.REVIEW
+        self.item.status = ScrapedItem.Status.LINKED
         self.item.save(update_fields=["status"])
         data = AgentExtractionSubmitInput.model_validate(
             {
@@ -489,8 +766,37 @@ class ScrapedItemExtractionSubmitServiceTests(TestCase):
             },
         )
 
-        with self.assertRaisesMessage(Exception, "Scraped item is not processing"):
+        with self.assertRaisesMessage(DjangoValidationError, "processing or in review"):
             ScrapedItemExtractionSubmitService().execute(data)
+
+    def test_review_draft_can_be_revised_without_creating_catalog_data(self) -> None:
+        """Resubmission replaces the staged tree and keeps the item in review."""
+        service = ScrapedItemExtractionSubmitService()
+        data = AgentExtractionSubmitInput.model_validate(
+            {"originScrapedItemId": self.item.id, "product": {"name": "First"}},
+        )
+        first = service.execute(data)
+        data.product.name = "Corrected"
+        second = service.execute(data)
+        self.item.refresh_from_db()
+        assert first.pk == second.pk
+        assert second.extracted_product["name"] == "Corrected"
+        assert self.item.status == ScrapedItem.Status.REVIEW
+        assert not Product.objects.exists()
+
+    def test_submission_rejects_another_items_source_page(self) -> None:
+        """A draft cannot silently change the source evidence to another page."""
+        other = ScrapedPage.objects.create(url="https://growth.example/other")
+        data = AgentExtractionSubmitInput.model_validate(
+            {
+                "originScrapedItemId": self.item.id,
+                "sourcePageId": other.id,
+                "product": {"name": "Wrong source"},
+            },
+        )
+        with self.assertRaisesMessage(DjangoValidationError, "does not belong"):
+            ScrapedItemExtractionSubmitService().execute(data)
+        assert not ScrapedItemExtraction.objects.exists()
 
 
 class ScrapedItemExtractionGraphQLTests(TestCase):
@@ -594,6 +900,137 @@ class ScrapedItemExtractionGraphQLTests(TestCase):
         assert self.item.status == ScrapedItem.Status.ERROR
         assert self.item.error_count == 1
         assert self.item.last_error_log == "temporary model failure"
+
+    def test_review_item_query_can_resume_without_changing_state(self) -> None:
+        """A local client can reload the full item context by stable id."""
+        query = """
+        query ReviewItem($itemId: Int!) {
+          reviewItem(itemId: $itemId) {
+            id
+            name
+            status
+            sourcePageId
+            sourcePageContext
+            sourcePageStructuredData
+            imageUrls
+          }
+        }
+        """
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": query, "variables": {"itemId": self.item.id}}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.api_key_obj.key,
+        )
+
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
+
+        self.item.refresh_from_db()
+        assert "errors" not in payload
+        assert int(payload["data"]["reviewItem"]["id"]) == self.item.id
+        assert self.item.status == ScrapedItem.Status.PROCESSING
+
+    def _graphql(self, query: str, *, authenticated: bool = True) -> dict:
+        """Execute a GraphQL document through the HTTP authentication boundary."""
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps({"query": query}),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.api_key_obj.key if authenticated else "",
+        )
+        response = cast("HttpResponse", self.view(request))
+        return json.loads(response.content)
+
+    def test_queue_defaults_to_queued_and_does_not_reserve(self) -> None:
+        """Discovery excludes active items unless a status is explicitly requested."""
+        queued = _scraped_item(
+            store_slug="growth",
+            external_id="queued-discovery",
+            status=ScrapedItem.Status.QUEUED,
+            source_page=self.page,
+        )
+        payload = self._graphql("{ reviewQueue { id status } }")
+        assert "errors" not in payload
+        assert [int(item["id"]) for item in payload["data"]["reviewQueue"]] == [
+            queued.id,
+        ]
+        queued.refresh_from_db()
+        assert queued.status == ScrapedItem.Status.QUEUED
+
+    def test_catalog_discovery_includes_unpublished_products(self) -> None:
+        """Duplicate search must include drafts as well as published catalog data."""
+        brand = Brand.objects.create(name="growth", display_name="Growth")
+        product = Product.objects.create(name="Whey", brand=brand)
+        payload = self._graphql(
+            '{ catalogCandidates(search: "Whey") { id isPublished } '
+            'catalogBrands(search: "Growth") { id name } '
+            "catalogCategories { id name } catalogTags { id name } }",
+        )
+        assert "errors" not in payload
+        assert payload["data"]["catalogCandidates"] == [
+            {"id": product.id, "isPublished": False},
+        ]
+        assert payload["data"]["catalogBrands"] == [{"id": brand.id, "name": "Growth"}]
+
+    def test_review_discovery_requires_api_key(self) -> None:
+        """The review queue must not expose merchant context to public clients."""
+        payload = self._graphql("{ reviewQueue { id } }", authenticated=False)
+        assert payload.get("errors")
+        assert not payload.get("data")
+
+    def test_approval_mutation_returns_validation_errors_then_links(self) -> None:
+        """The remote approval boundary requires staging and returns catalog output."""
+        brand = Brand.objects.create(name="growth", display_name="Growth")
+        Store.objects.create(name="growth", display_name="Growth")
+        product = Product.objects.create(name="Whey", brand=brand)
+        query = (
+            "mutation { approveScrapedItem(data: {"
+            f"itemId: {self.item.id}, productId: {product.id}"
+            "}) { product { id } errors { field message } } }"
+        )
+        rejected = self._graphql(query)
+        assert rejected["data"]["approveScrapedItem"]["errors"]
+        ScrapedItemExtractionSubmitService().execute(
+            AgentExtractionSubmitInput.model_validate(
+                {"originScrapedItemId": self.item.id, "product": {"name": "Whey"}},
+            ),
+        )
+        accepted = self._graphql(query)
+        assert "errors" not in accepted
+        assert accepted["data"]["approveScrapedItem"] == {
+            "product": {"id": product.id},
+            "errors": None,
+        }
+
+    def test_release_scraped_item_mutation_returns_item_to_queue(self) -> None:
+        """The GraphQL contract exposes a non-error abandonment path."""
+        mutation = """
+        mutation ReleaseItem($data: ScrapedItemActionInput!) {
+          releaseScrapedItem(data: $data) {
+            item { id status }
+            errors { field message }
+          }
+        }
+        """
+        request = self.factory.post(
+            "/graphql/",
+            data=json.dumps(
+                {
+                    "query": mutation,
+                    "variables": {"data": {"itemId": self.item.id}},
+                },
+            ),
+            content_type="application/json",
+            HTTP_X_API_KEY=self.api_key_obj.key,
+        )
+
+        response = cast("HttpResponse", self.view(request))
+        payload = json.loads(response.content)
+
+        self.item.refresh_from_db()
+        assert payload["data"]["releaseScrapedItem"]["errors"] is None
+        assert self.item.status == ScrapedItem.Status.QUEUED
 
 
 class _DummyCatalogSpider(CatalogApiSpider):

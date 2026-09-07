@@ -4,9 +4,7 @@
 
 - `apps/api/Dockerfile`: Django API image
 - `apps/web/Dockerfile`: public web image
-- `services/agents/Dockerfile`: agents service image
 - `docker-compose.yml`: VM1 web/API/database/queue/worker orchestration
-- `docker-compose.agents.yml`: VM2 Dagster/agents orchestration
 
 ## Rules
 
@@ -26,11 +24,10 @@
   validate the origin certificate. `infra/nginx/local.conf` is HTTP-only.
 - VM1 production should pull prebuilt `API_IMAGE` and `WEB_IMAGE` from GHCR,
   then run `docker compose up -d --no-build ...` on small hosts.
-- VM2 agents should pull prebuilt `AGENTS_IMAGE` from GHCR and use
-  `docker-compose.agents.yml`.
+- Interactive product review runs on an operator workstation and calls the
+  Django GraphQL API.
 - Use clear service names in compose:
   - `web` for the public frontend
   - `api` for Django
   - `celery` for task execution
   - `celery-beat` for database-backed periodic task scheduling
-  - `agents` for Dagster in `docker-compose.agents.yml`

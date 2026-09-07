@@ -11,6 +11,8 @@ from strawberry.django import type as django_type
 from strawberry.scalars import JSON
 
 from baboom.utils import ValidationError
+from core.models import Brand, Category, Product, Tag
+from scrapers.images import image_urls
 from scrapers.models import ScrapedItem, ScrapedItemExtraction
 
 _STRAWBERRY_RUNTIME_TYPES = (datetime, Decimal, JSON, ValidationError)
@@ -26,6 +28,8 @@ class ScrapedItemType:
 
     id: auto
     status: auto
+    last_attempt_at: auto
+    updated_at: auto
 
     @strawberry.field
     def store_slug(self) -> str:
@@ -59,7 +63,7 @@ class ScrapedItemType:
 
     @strawberry.field
     def product_link(self) -> str:
-        """Backward-compatible URL field used by agent workers."""
+        """Return the product page URL for review clients."""
         item = cast("ScrapedItem", self)
         if item.source_page:
             return item.source_page.url
@@ -75,7 +79,7 @@ class ScrapedItemType:
 
     @strawberry.field
     def source_page_id(self) -> int | None:
-        """Return source page id for storage bucket mapping."""
+        """Return the stable identifier of the stored source page."""
         item = cast("ScrapedItem", self)
         return item.source_page_id
 
@@ -88,6 +92,12 @@ class ScrapedItemType:
         return ""
 
     @strawberry.field
+    def source_page_context(self) -> JSON:
+        """Return API-backed context as JSON for new review clients."""
+        item = cast("ScrapedItem", self)
+        return item.source_page.api_context if item.source_page else {}
+
+    @strawberry.field
     def source_page_html_structured_data(self) -> str:
         """Return schema.org metadata parsed from the page HTML."""
         item = cast("ScrapedItem", self)
@@ -97,6 +107,12 @@ class ScrapedItemType:
                 ensure_ascii=False,
             )
         return ""
+
+    @strawberry.field
+    def source_page_structured_data(self) -> JSON:
+        """Return parsed HTML metadata as JSON for new review clients."""
+        item = cast("ScrapedItem", self)
+        return item.source_page.html_structured_data if item.source_page else {}
 
     @strawberry.field
     def source_page_raw_html(self) -> str:
@@ -112,6 +128,29 @@ class ScrapedItemType:
         item = cast("ScrapedItem", self)
         store_slug = item.offer.store_slug
         return store_slug.replace("_", " ").title()
+
+    @strawberry.field
+    def ean(self) -> str:
+        """Return the merchant EAN used for duplicate candidate lookup."""
+        item = cast("ScrapedItem", self)
+        return item.offer.ean
+
+    @strawberry.field
+    def category(self) -> str:
+        """Return the merchant category label."""
+        item = cast("ScrapedItem", self)
+        return item.offer.category
+
+    @strawberry.field
+    def image_urls(self) -> list[str]:
+        """Return stable, de-duplicated image URLs from stored page context."""
+        item = cast("ScrapedItem", self)
+        if item.source_page is None:
+            return []
+        return image_urls(
+            [item.source_page.api_context, item.source_page.html_structured_data],
+            base_url=item.source_page.url,
+        )
 
 
 @strawberry.type
@@ -145,4 +184,66 @@ class ScrapedItemExtractionResult:
     """Result for staging agent extractions."""
 
     extraction: ScrapedItemExtractionType | None = None
+    errors: list[ValidationError] | None = None
+
+
+@strawberry.type
+class ScrapedItemResult:
+    """Result for a validated review state transition."""
+
+    item: ScrapedItemType | None = None
+    errors: list[ValidationError] | None = None
+
+
+@strawberry.type
+class CatalogCandidateType:
+    """Compact canonical product returned during duplicate resolution."""
+
+    id: int
+    name: str
+    brand_id: int
+    brand_name: str
+    category_id: int | None
+    category_name: str
+    ean: str
+    weight: int | None
+    packaging: str
+    is_published: bool
+
+    @classmethod
+    def from_model(cls, product: Product) -> CatalogCandidateType:
+        """Build a candidate without exposing manager-only model internals."""
+        return cls(
+            id=product.id,
+            name=product.name,
+            brand_id=product.brand_id,
+            brand_name=product.brand.display_name,
+            category_id=product.category_id,
+            category_name=product.category.name if product.category else "",
+            ean=product.ean or "",
+            weight=product.weight,
+            packaging=product.packaging,
+            is_published=product.is_published,
+        )
+
+
+@strawberry.type
+class CatalogChoiceType:
+    """Identifier and name for catalog taxonomy choices."""
+
+    id: int
+    name: str
+
+    @classmethod
+    def from_model(cls, choice: Brand | Category | Tag) -> CatalogChoiceType:
+        """Build a compact choice from one catalog reference model."""
+        display_name = choice.display_name if isinstance(choice, Brand) else choice.name
+        return cls(id=choice.id, name=display_name)
+
+
+@strawberry.type
+class ScrapedItemApprovalResult:
+    """Result of an explicit catalog approval."""
+
+    product: CatalogCandidateType | None = None
     errors: list[ValidationError] | None = None

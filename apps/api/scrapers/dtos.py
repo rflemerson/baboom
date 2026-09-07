@@ -117,3 +117,32 @@ class AgentExtractionSubmitInput(BaseModel):
     def product_payload(self) -> JsonObject:
         """Return the validated product tree using the agent-facing aliases."""
         return self.product.model_dump(by_alias=True, exclude_none=True)
+
+
+class ReviewedProductCreateInput(BaseModel):
+    """Explicit catalog fields approved by a human reviewer."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: str
+    brand_id: int = Field(alias="brandId")
+    weight: int | None = None
+    category_id: int | None = Field(default=None, alias="categoryId")
+    ean: str | None = None
+    description: str = ""
+    packaging: str = "CONTAINER"
+    tag_ids: list[int] = Field(default_factory=list, alias="tagIds")
+    is_published: bool = Field(default=False, alias="isPublished")
+
+
+class ScrapedItemApprovalInput(BaseModel):
+    """Approve a staged extraction by linking or creating a catalog product."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    item_id: int = Field(alias="itemId")
+    product_id: int | None = Field(default=None, alias="productId")
+    create_product: ReviewedProductCreateInput | None = Field(
+        default=None,
+        alias="createProduct",
+    )

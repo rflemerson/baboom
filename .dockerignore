@@ -15,7 +15,4 @@ node_modules
 apps/web/node_modules
 apps/web/dist
 apps/api/.venv
-services/agents/.venv
-services/agents/.pytest_cache
-services/agents/.ruff_cache
-services/agents/htmlcov
+services/

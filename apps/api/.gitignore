@@ -3,12 +3,8 @@
 
 # Agents temp folder
 .tmp*
-dagster_home/
-dagster.yaml
-workspace.yaml
 *.db
 history/
-agents/tmp/
 temp/
 .vscode
 

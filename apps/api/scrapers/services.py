@@ -14,9 +14,12 @@ from django.db import transaction
 from django.utils import timezone
 from pydantic import ValidationError as PydanticValidationError
 
+from core.dtos import ProductCreateInput
+from core.models import Category, Product, ProductStore, Store, Tag
+from core.services import ProductCreateService
 from offers.services import OfferObservationResult, OfferObservationService
 
-from .dtos import AgentExtractionSubmitInput
+from .dtos import AgentExtractionSubmitInput, ScrapedItemApprovalInput
 from .models import ScrapedItem, ScrapedItemExtraction, ScrapedPage
 
 if TYPE_CHECKING:
@@ -62,10 +65,10 @@ def extract_schema_metadata(html: str, url: str) -> dict:
 class ScrapedItemCheckoutService:
     """Reserve one scraped item for agent processing."""
 
-    def execute(self) -> ScrapedItem | None:
+    def execute(self, *, item_id: int | None = None) -> ScrapedItem | None:
         """Select and lock the next scraped item for checkout."""
         with transaction.atomic():
-            item = self._selected_item()
+            item = self._selected_item(item_id=item_id)
             if item is None:
                 return None
 
@@ -89,17 +92,212 @@ class ScrapedItemCheckoutService:
             .order_by("updated_at", "id")
         )
 
-    def _selected_item(self) -> ScrapedItem | None:
+    def _selected_item(self, *, item_id: int | None = None) -> ScrapedItem | None:
         """Return the single scraped item selected for checkout."""
-        return self._eligible_items().first()
+        queryset = self._eligible_items()
+        if item_id is not None:
+            queryset = queryset.filter(id=item_id)
+        return queryset.first()
+
+
+class ScrapedItemReviewStateService:
+    """Manage resumable state transitions for local interactive review."""
+
+    @transaction.atomic
+    def heartbeat(self, *, item_id: int) -> ScrapedItem:
+        """Extend an active review by updating its last activity timestamp."""
+        item = self._processing_item(item_id)
+        item.last_attempt_at = timezone.now()
+        item.save(update_fields=["last_attempt_at", "updated_at"])
+        return item
+
+    @transaction.atomic
+    def release(self, *, item_id: int) -> ScrapedItem:
+        """Return an active review to the explicit queue without recording an error."""
+        item = self._processing_item(item_id)
+        item.status = ScrapedItem.Status.QUEUED
+        item.last_attempt_at = None
+        item.save(update_fields=["status", "last_attempt_at", "updated_at"])
+        return item
+
+    @transaction.atomic
+    def ignore(self, *, item_id: int) -> ScrapedItem:
+        """Mark a queued, processing, or review item as intentionally ignored."""
+        item = ScrapedItem.objects.select_for_update().filter(id=item_id).first()
+        if item is None:
+            raise DjangoValidationError({"itemId": ["Scraped item does not exist."]})
+        if item.status not in {
+            ScrapedItem.Status.QUEUED,
+            ScrapedItem.Status.PROCESSING,
+            ScrapedItem.Status.REVIEW,
+        }:
+            raise DjangoValidationError(
+                {"itemId": ["Scraped item cannot be ignored from its current state."]},
+            )
+        item.status = ScrapedItem.Status.IGNORED
+        item.last_attempt_at = timezone.now()
+        item.save(update_fields=["status", "last_attempt_at", "updated_at"])
+        return item
+
+    def _processing_item(self, item_id: int) -> ScrapedItem:
+        item = ScrapedItem.objects.select_for_update().filter(id=item_id).first()
+        if item is None:
+            raise DjangoValidationError({"itemId": ["Scraped item does not exist."]})
+        if item.status != ScrapedItem.Status.PROCESSING:
+            raise DjangoValidationError(
+                {"itemId": ["Scraped item is not processing."]},
+            )
+        return item
+
+
+class ScrapedItemApprovalService:
+    """Apply an explicitly approved review to the canonical catalog."""
+
+    @transaction.atomic
+    def execute(self, data: ScrapedItemApprovalInput) -> Product:
+        """Link the offer to one existing or newly created unpublished product."""
+        if (data.product_id is None) == (data.create_product is None):
+            raise DjangoValidationError(
+                {"approval": ["Provide exactly one of productId or createProduct."]},
+            )
+        item = (
+            ScrapedItem.objects.select_for_update()
+            .select_related("offer")
+            .filter(id=data.item_id)
+            .first()
+        )
+        if item is None:
+            raise DjangoValidationError({"itemId": ["Scraped item does not exist."]})
+
+        linked_product = self._linked_product(item)
+        if item.status == ScrapedItem.Status.LINKED and linked_product is not None:
+            if self._matches_approval(data, linked_product):
+                return linked_product
+            raise DjangoValidationError(
+                {"itemId": ["Item is already approved with different product data."]},
+            )
+        if item.status != ScrapedItem.Status.REVIEW:
+            raise DjangoValidationError(
+                {"itemId": ["Scraped item must be in review before approval."]},
+            )
+        if not hasattr(item, "agent_extraction"):
+            raise DjangoValidationError(
+                {"itemId": ["Scraped item has no staged extraction to approve."]},
+            )
+
+        product = self._resolve_product(data)
+        self._link_offer(item=item, product=product)
+        item.status = ScrapedItem.Status.LINKED
+        item.last_attempt_at = timezone.now()
+        item.last_error_log = ""
+        item.save(
+            update_fields=[
+                "status",
+                "last_attempt_at",
+                "last_error_log",
+                "updated_at",
+            ],
+        )
+        return product
+
+    @staticmethod
+    def _matches_approval(data: ScrapedItemApprovalInput, product: Product) -> bool:
+        """Recognize equivalent retries without accepting a changed target."""
+        if data.product_id is not None:
+            return data.product_id == product.id
+        create_data = data.create_product
+        if create_data is None or create_data.is_published:
+            return False
+        fields = create_data.model_dump(exclude={"tag_ids", "is_published", "ean"})
+        tag_ids = set(product.tags.values_list("id", flat=True))
+        return (
+            all(getattr(product, key) == value for key, value in fields.items())
+            and (product.ean or "") == (create_data.ean or "")
+            and tag_ids == set(create_data.tag_ids)
+        )
+
+    def _resolve_product(self, data: ScrapedItemApprovalInput) -> Product:
+        if data.product_id is not None:
+            product = (
+                Product.objects.select_for_update().filter(id=data.product_id).first()
+            )
+            if product is None:
+                raise DjangoValidationError({"productId": ["Product does not exist."]})
+            return product
+
+        create_data = data.create_product
+        if create_data is None:
+            raise DjangoValidationError(
+                {"createProduct": ["Product data is required."]},
+            )
+        if create_data.is_published:
+            raise DjangoValidationError(
+                {"isPublished": ["Publish products through the catalog admin."]},
+            )
+        if (
+            create_data.category_id is not None
+            and not Category.objects.filter(
+                id=create_data.category_id,
+            ).exists()
+        ):
+            raise DjangoValidationError({"categoryId": ["Category does not exist."]})
+        if set(create_data.tag_ids) != set(
+            Tag.objects.filter(id__in=create_data.tag_ids).values_list("id", flat=True),
+        ):
+            raise DjangoValidationError({"tagIds": ["One or more tags do not exist."]})
+        return ProductCreateService().execute(
+            ProductCreateInput(
+                name=create_data.name,
+                weight=create_data.weight,
+                brand_id=create_data.brand_id,
+                category_id=create_data.category_id,
+                ean=create_data.ean or None,
+                description=create_data.description,
+                packaging=create_data.packaging,
+                is_published=False,
+                tag_ids=create_data.tag_ids,
+            ),
+        )
+
+    def _link_offer(self, *, item: ScrapedItem, product: Product) -> None:
+        existing_offer_link = ProductStore.objects.filter(offer=item.offer).first()
+        if existing_offer_link is not None:
+            if existing_offer_link.product_id == product.id:
+                return
+            raise DjangoValidationError(
+                {"productId": ["Offer is already linked to another product."]},
+            )
+
+        store = Store.objects.filter(name=item.offer.store_slug).first()
+        if store is None:
+            raise DjangoValidationError(
+                {"store": [f"Store '{item.offer.store_slug}' is not configured."]},
+            )
+        if ProductStore.objects.filter(product=product, store=store).exists():
+            raise DjangoValidationError(
+                {"productId": ["Product already has another offer for this store."]},
+            )
+        product_store = ProductStore(product=product, store=store, offer=item.offer)
+        product_store.full_clean()
+        product_store.save()
+
+    @staticmethod
+    def _linked_product(item: ScrapedItem) -> Product | None:
+        link = (
+            ProductStore.objects.select_related("product")
+            .filter(offer=item.offer)
+            .first()
+        )
+        return link.product if link is not None else None
 
 
 class ScrapedItemErrorService:
     """Report agent-side processing failures for scraped items."""
 
+    @transaction.atomic
     def execute(self, *, item_id: int, message: str, is_fatal: bool) -> bool:
         """Persist retry or review state for a processing scraped item."""
-        item = ScrapedItem.objects.filter(id=item_id).first()
+        item = ScrapedItem.objects.select_for_update().filter(id=item_id).first()
         if item is None or item.status != ScrapedItem.Status.PROCESSING:
             return False
 
@@ -131,9 +329,12 @@ class ScrapedItemExtractionSubmitService:
     def execute(self, data: AgentExtractionSubmitInput) -> ScrapedItemExtraction:
         """Persist the agent output and move the origin item to review."""
         item = self._get_item(data.origin_scraped_item_id)
-        if item.status != ScrapedItem.Status.PROCESSING:
+        if item.status not in {
+            ScrapedItem.Status.PROCESSING,
+            ScrapedItem.Status.REVIEW,
+        }:
             raise DjangoValidationError(
-                {"originScrapedItemId": ["Scraped item is not processing."]},
+                {"originScrapedItemId": ["Item must be processing or in review."]},
             )
         source_page = self._resolve_source_page(item=item, data=data)
         extraction, _ = ScrapedItemExtraction.objects.update_or_create(
@@ -165,7 +366,8 @@ class ScrapedItemExtractionSubmitService:
     def _get_item(self, item_id: int) -> ScrapedItem:
         """Return the origin item or raise a GraphQL-friendly validation error."""
         item = (
-            ScrapedItem.objects.select_related("source_page", "offer")
+            ScrapedItem.objects.select_for_update(of=("self",))
+            .select_related("source_page", "offer")
             .filter(id=item_id)
             .first()
         )
@@ -183,6 +385,10 @@ class ScrapedItemExtractionSubmitService:
     ) -> ScrapedPage:
         """Resolve the source page used by this extraction."""
         if data.source_page_id:
+            if item.source_page_id and data.source_page_id != item.source_page_id:
+                raise DjangoValidationError(
+                    {"sourcePageId": ["Source page does not belong to this item."]},
+                )
             page = ScrapedPage.objects.filter(id=data.source_page_id).first()
             if page is None:
                 raise DjangoValidationError(

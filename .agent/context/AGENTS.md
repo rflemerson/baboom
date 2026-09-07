@@ -29,24 +29,16 @@ Explicit commands for common tasks. Don't let the agent guess.
 ```bash
 # Workflow
 Test: python apps/api/manage.py test
-Test (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests -q
-Coverage (Pytest): PYTHONPATH=services/agents:. pytest services/agents/agents/tests --cov=agents --cov-report=term-missing
 Lint: prek run --all-files
-Lint (Just): just check
-Lint API (Just): just api-lint
-Lint Agents (Just): just agents-lint
 Run: python apps/api/manage.py runserver
-Orchestration (Agents): PYTHONPATH=services/agents:. dagster dev -m agents.definitions
 API Isolated Deps: cd apps/api && pip install -e .
-Agents Isolated Deps: cd services/agents && python -m venv .venv && source .venv/bin/activate && pip install -e .
 API Image: docker build -f apps/api/Dockerfile -t baboom-api .
-Agents Image: docker build -f services/agents/Dockerfile -t baboom-agents .
 ```
 
 ### IV. Coding Standards (The "Rules")
 Use "Do" and "Don't" format.
 - **Do**: Use explicit typing, small functions, and architecture-aligned boundaries.
-- **Don't**: Silence linters or reintroduce legacy frontend patterns.
+- **Don't**: Silence linters or add public frontend flows to Django templates.
 
 ## 4. Anti-Patterns to Avoid
 - **Duplication**: Don't copy-paste large docs. Import them.
@@ -65,23 +57,23 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 - Fix code to satisfy the active lint/type/test stack. Do not make progress by suppressing the tool.
 - Avoid local escapes such as `noqa`, `type: ignore`, `stylelint-disable`, broad `ignore` globs, or turning rules off unless the code is generated or a framework boundary truly requires it.
 - Prefer stronger types, smaller functions, `TYPE_CHECKING` imports, `ClassVar`, immutable metadata, and clearer names over rule suppression.
-- If the current docs still mention legacy patterns that are no longer the project direction, update the docs before continuing.
-- Do not be afraid to delete legacy files, remove stale abstractions, or rename old view-shaped APIs when the current architecture no longer uses them.
+- Update documentation alongside changes in project direction.
+- Remove unused files and abstractions when the current architecture no longer uses them.
 - Prefer removing dead paths over documenting them forever.
 
 ## 6.2 Frontend Direction Policy
-- Do not use legacy Django template UI patterns for new public frontend work.
+- Public frontend work belongs in Vue, not Django templates.
 - The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/.agents/`.
 
-## 7. Agents Pipeline Contract (Dagster)
-- The Django scrapers are API-first. They persist product context in `ScrapedPage.api_context` and HTML-derived structured data in `ScrapedPage.html_structured_data`.
-- Dagster must consume `sourcePageApiContext` as its primary deterministic input. `sourcePageHtmlStructuredData` is auxiliary context for future enrichment and should not replace `api_context` by default.
-- The agents pipeline no longer owns local HTML scraping, image manifest generation, CV scoring, or storage-side candidate materialization.
-- The deterministic handoff is:
-  - `downloaded_assets` -> normalize the `ScrapedItem` + `ScrapedPage` payload from the API
-  - `prepared_extraction_inputs` -> extract ordered image URLs and JSON context from `api_context`
-- The non-deterministic handoff is:
-  - `image_report` -> send ordered images to the multimodal model and return ordered text
-  - `product_analysis` -> convert JSON context plus image text into one recursive `ExtractedProduct` tree
-- `extraction_handoff` submits the extracted product tree to Django `scrapers` review staging through `submitAgentExtraction`. It must not create catalog products, variants, or components.
-- Combo/kit structure is represented by `ExtractedProduct.children`; there is no `items` list, `components` list, or `is_combo` flag in the agents output.
+## 7. Local Product Review Contract
+- Product review is interactive and runs on an operator workstation; the Baboom
+  server does not host chat or model orchestration.
+- Django owns the authenticated GraphQL contract for queue discovery, targeted
+  checkout, resume, heartbeat, release, extraction staging, duplicate search,
+  and explicit approval.
+- Scraped context remains API-first in `ScrapedPage.api_context` and
+  `ScrapedPage.html_structured_data`; review clients also receive normalized
+  `imageUrls`.
+- Staging a draft moves an item to `review` without touching the catalog.
+- Only explicit approval may link an offer or create an unpublished product.
+- Publication and detailed nutrition/component curation remain in Django admin.
