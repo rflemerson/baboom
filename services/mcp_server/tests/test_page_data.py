@@ -87,5 +87,23 @@ def test_empty_html():
         "meta": {},
         "jsonLd": [],
         "tables": [],
+        "text": "",
         "images": [],
     }
+
+
+def test_visible_text_keeps_values_that_are_not_in_a_table():
+    """Stores that lay a nutrition table out in divs must stay readable."""
+    html = """
+    <html><body>
+      <script>var noise = 1;</script>
+      <div><span>Proteínas</span><span>24 g</span></div>
+      <style>.x { color: red }</style>
+    </body></html>
+    """
+
+    text = extract_page_data(html)["text"]
+
+    assert "Proteínas" in text
+    assert "24 g" in text
+    assert "var noise" not in text

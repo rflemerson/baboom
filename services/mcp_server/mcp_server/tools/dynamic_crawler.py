@@ -103,6 +103,21 @@ def _extract_tables(soup: BeautifulSoup) -> list[list[list[str]]]:
     return tables
 
 
+def _extract_text(soup: BeautifulSoup) -> str:
+    """Return the page's visible text, stripped of script and style noise.
+
+    Nutrition tables are only sometimes real ``<table>`` markup; plenty of
+    stores lay the same values out in divs, where the table extractor cannot
+    see them. The visible text keeps those readable instead of silently
+    dropping the one thing the catalog ranks on.
+    """
+    body = soup.body or soup
+    for tag in body.find_all(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    lines = [line.strip() for line in body.get_text("\n").splitlines()]
+    return "\n".join(line for line in lines if line)
+
+
 def _add_image(
     images: dict[str, dict[str, Any]],
     url: str,
@@ -150,17 +165,20 @@ def _extract_images(
 
 
 def extract_page_data(html: str, base_url: str | None = None) -> dict[str, Any]:
-    """Parse rendered HTML into structured JSON: title, meta, JSON-LD, tables, images."""
+    """Parse rendered HTML into structured JSON: title, meta, JSON-LD, tables, text, images."""
     soup = BeautifulSoup(html, "html.parser")
     json_ld = _extract_json_ld(soup)
     meta = _extract_meta(soup)
+    tables = _extract_tables(soup)
+    images = _extract_images(soup, meta, json_ld, base_url)
 
     return {
         "title": soup.title.get_text(strip=True) if soup.title else None,
         "meta": meta,
         "jsonLd": json_ld,
-        "tables": _extract_tables(soup),
-        "images": _extract_images(soup, meta, json_ld, base_url),
+        "tables": tables,
+        "text": _extract_text(soup),
+        "images": images,
     }
 
 

@@ -10,10 +10,10 @@ from .tools.api import (
 )
 from .tools.drafts import load_draft
 from .tools.drafts import update_draft as update_draft_file
-from .tools.dynamic_crawler import fetch_page_data
 from .tools.formatting import format_item_summary
 from .tools.image_report import create_image_report as create_image_report_for_item
-from .tools.images import download_images as download_images_to_workspace
+from .tools.pages import download_images as download_images_for_item
+from .tools.pages import fetch_source_page as fetch_source_page_data
 from .tools.preparation import build_prepared_context
 from .tools.review import (
     act_on_current_item,
@@ -74,17 +74,7 @@ def fetch_source_page(url: str | None = None) -> dict:
     where it was referenced (JSON-LD, meta, img tag). Also saves page.html and
     page_data.json in the item's workspace.
     """
-    item = get_current_item()
-    target = url or item.get("sourcePageUrl") or item.get("productLink")
-    if not target:
-        return {"ok": False, "error": "Item não tem URL de origem."}
-
-    fetched = fetch_page_data(target)
-    item_path = item_dir(int(item["id"]))
-    (item_path / "page.html").write_text(fetched.pop("html"), encoding="utf-8")
-    write_json(item_path / "page_data.json", fetched)
-
-    return {"ok": True, "url": target, "pageData": fetched}
+    return fetch_source_page_data(url)
 
 
 @mcp.tool()
@@ -93,12 +83,7 @@ def download_images(urls: list[str]) -> dict:
     Pick the URLs that matter for extraction (product photos, nutrition label
     images) from prepare_current_item / fetch_source_page output.
     """
-    manifest = download_images_to_workspace(urls)
-    return {
-        "ok": True,
-        "downloaded": manifest.get("downloaded", []),
-        "errors": manifest.get("errors", []),
-    }
+    return download_images_for_item(urls)
 
 
 @mcp.tool()

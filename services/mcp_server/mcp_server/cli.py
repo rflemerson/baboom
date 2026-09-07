@@ -8,7 +8,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from requests import RequestException
 
-from .tools import api, drafts, preparation, review, submission, workspace
+from .tools import api, drafts, pages, preparation, review, submission, workspace
+from .tools.image_report import create_image_report
 from .tools.validation import validate_product_draft
 
 
@@ -38,6 +39,17 @@ def parser() -> argparse.ArgumentParser:
         commands.add_parser(name)
     update = commands.add_parser("update-draft", help="Apply a local JSON patch file")
     update.add_argument("file", type=Path)
+    fetch = commands.add_parser(
+        "fetch-page", help="Render the source page and store its structured data"
+    )
+    fetch.add_argument("--url", default=None)
+    images = commands.add_parser(
+        "download-images", help="Download chosen image URLs into the workspace"
+    )
+    images.add_argument("urls", nargs="+")
+    commands.add_parser(
+        "image-report", help="Analyse the downloaded images with the vision model"
+    )
     candidates = commands.add_parser("candidates", help="Search for existing products")
     candidates.add_argument("--search", default="")
     candidates.add_argument("--ean", default="")
@@ -83,10 +95,32 @@ def execute(args: argparse.Namespace) -> object:
         return local[args.command]()
     if args.command in {"heartbeat", "release", "ignore"}:
         return review.act_on_current_item(args.command)
+    if args.command == "image-report":
+        return create_image_report()
+    workspace_result = _execute_workspace(args)
+    if workspace_result is not _UNHANDLED:
+        return workspace_result
     return _execute_remote(args)
 
 
+#: Sentinel for a command this dispatcher does not own.
+_UNHANDLED = object()
+
+
+def _execute_workspace(args: argparse.Namespace) -> object:
+    """Run the commands that write to the item workspace."""
+    match args.command:
+        case "update-draft":
+            return drafts.update_draft(_read_object(args.file))
+        case "fetch-page":
+            return pages.fetch_source_page(args.url)
+        case "download-images":
+            return pages.download_images(args.urls)
+    return _UNHANDLED
+
+
 def _execute_remote(args: argparse.Namespace) -> object:
+    """Run the commands that talk to the review API."""
     match args.command:
         case "queue":
             return api.review_queue(args.status, args.search, args.limit)
@@ -94,8 +128,6 @@ def _execute_remote(args: argparse.Namespace) -> object:
             return review.checkout_item(args.item_id)
         case "resume":
             return review.resume_item(args.item_id)
-        case "update-draft":
-            return drafts.update_draft(_read_object(args.file))
         case "candidates":
             return api.catalog_candidates(args.search, args.ean, args.limit)
         case "choices":
