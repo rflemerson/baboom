@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
-import secrets
 from decimal import Decimal
 from typing import ClassVar
 
@@ -17,8 +15,6 @@ from treebeard.mp_tree import MP_Node
 from common.models import BaseModel
 
 from . import units
-
-logger = logging.getLogger(__name__)
 
 
 def mass_field(label: object, **kwargs: object) -> models.DecimalField:
@@ -890,38 +886,3 @@ class AlertSubscriber(BaseModel):
     def __str__(self) -> str:
         """Return email address."""
         return self.email
-
-
-class APIKey(BaseModel):
-    """API Key for external client access."""
-
-    name = models.CharField(
-        _("Client Name"),
-        max_length=100,
-        help_text=_("Who is this key for?"),
-    )
-    key = models.CharField(
-        _("API Key"),
-        max_length=64,
-        unique=True,
-        db_index=True,
-        editable=False,
-    )
-    is_active = models.BooleanField(_("Active"), default=True)
-
-    class Meta:
-        """Meta options."""
-
-        verbose_name = _("API Key")
-        verbose_name_plural = _("API Keys")
-
-    def __str__(self) -> str:
-        """Return string representation."""
-        return f"{self.name} ({self.key[:8]}...)"
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Generate key on save if missing."""
-        if not self.key:
-            self.key = secrets.token_urlsafe(32)
-            logger.debug("Generated API key for client: %s", self.name)
-        super().save(*args, **kwargs)

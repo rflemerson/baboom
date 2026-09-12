@@ -86,6 +86,14 @@ them, it is a resale item -- flag it rather than inventing a brand.
 - Nutrition is per label, not per product: two flavors printing the same table
   share one profile, and two flavors printing different tables are two profiles
   that get ranked independently. Keep each label's values with its flavors.
-- Detailed nutrition, flavors and combo components are curated afterwards in
-  Django admin. Keep the full evidence in the recursive draft so that curation
-  has something to work from.
+- Approval materializes nutrition, flavors and components from the staged draft;
+  only publication remains a separate admin action. Incomplete labels block approval.
+- Use `nutritionProfiles: [{nutritionFacts, flavorNames}]` for multiple labels,
+  or `nutritionFacts` plus `flavorNames` for a single label, never both.
+- Scalar macros and serving size are grams; energy is kcal. Always include
+  `sodiumUnit` with sodium, and explicit units for each micronutrient.
+- Children need quantity and either an existing `productId` or complete metadata
+  (name, brandName, weightGrams, packaging), plus nutrition. No nested combos.
+- To complete an old linked product, preview `apply_current_item_extraction(product_id=...)`
+  and repeat with `confirm=True` only after explicit approval. Catalog conflicts
+  return errors and require deliberate resolution; they never overwrite records.

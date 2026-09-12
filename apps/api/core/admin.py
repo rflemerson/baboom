@@ -20,7 +20,6 @@ from .forms import ProductAdminForm, ProductStoreInlineForm, ProductStoreInlineF
 from .models import (
     Active,
     AlertSubscriber,
-    APIKey,
     Brand,
     Category,
     Flavor,
@@ -568,16 +567,6 @@ class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
         NutritionActiveInline,
     ]
     list_per_page = 20
-
-
-@admin.register(APIKey)
-class APIKeyAdmin(admin.ModelAdmin):
-    """Admin for API keys."""
-
-    list_display = ("name", "key", "is_active", "created_at")
-    list_filter = ("is_active",)
-    search_fields = ("name",)
-    readonly_fields = ("key", "created_at", "updated_at")
 
 
 @admin.register(AlertSubscriber)

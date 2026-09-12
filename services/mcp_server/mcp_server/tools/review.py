@@ -64,6 +64,22 @@ def approve_current_item(
     return {"ok": True, "product": product}
 
 
+def apply_current_item_extraction(product_id: int, confirm: bool = False) -> dict:
+    """Preview or explicitly apply staged evidence to the already linked product."""
+    payload = {"itemId": int(get_current_item()["id"]), "productId": product_id}
+    if not confirm:
+        return {"ok": False, "preview": payload, "confirmationRequired": True}
+    product = api.apply_scraped_item_extraction(payload)
+    write_json(
+        item_dir(payload["itemId"]) / "materialization.json",
+        {
+            "request": payload,
+            "product": product,
+        },
+    )
+    return {"ok": True, "product": product}
+
+
 def report_current_item_error(message: str, is_fatal: bool = False) -> dict:
     """Report failure and update local state only after server acceptance."""
     item = get_current_item()

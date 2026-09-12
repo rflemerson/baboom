@@ -1,6 +1,5 @@
 """Celery tasks for running scraper monitors and recovery jobs."""
 
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from celery import shared_task
@@ -8,7 +7,7 @@ from celery._state import get_current_task
 from celery.utils.log import get_task_logger
 from django.utils import timezone
 
-from .models import ScrapedItem, ScraperRun
+from .models import ScraperRun
 from .services import ScraperService
 from .spiders.blackskull import BlackSkullSpider
 from .spiders.dark_lab import DarkLabSpider
@@ -23,8 +22,6 @@ if TYPE_CHECKING:
     from .spiders.base_spider import BaseSpider
 
 logger = get_task_logger(__name__)
-
-STUCK_ITEM_TIMEOUT_MINUTES = 60
 
 
 class EmptyMonitorRunError(RuntimeError):
@@ -189,24 +186,3 @@ def enrich_store_pages(
         f"updated {stats['updated']}, unchanged {stats['unchanged']}, "
         f"failed {stats['failed']}."
     )
-
-
-@shared_task
-def release_stuck_items() -> str:
-    """Return expired interactive reservations to the review queue."""
-    timeout = timezone.now() - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
-
-    stuck_items = ScrapedItem.objects.filter(
-        status=ScrapedItem.Status.PROCESSING,
-        last_attempt_at__lt=timeout,
-    )
-
-    count = stuck_items.update(
-        status=ScrapedItem.Status.QUEUED,
-        last_attempt_at=None,
-        updated_at=timezone.now(),
-    )
-    if count > 0:
-        return f"Cleaned up {count} stuck items."
-
-    return "No stuck items found."

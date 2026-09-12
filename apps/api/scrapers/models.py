@@ -95,43 +95,15 @@ class ScraperRun(models.Model):
 
 
 class ScrapedItem(BaseModel):
-    """Pipeline record tracking one merchant offer through the agent workflow.
-
-    The offer identity, descriptive fields, price and stock now live on the
-    linked :class:`offers.Offer`. This model holds only the cataloging pipeline
-    state, so the daily scraper run no longer rewrites it (and its audit history
-    only grows on genuine status transitions).
-    """
-
-    class Status(models.TextChoices):
-        """Status of the scraped item in the pipeline."""
-
-        NEW = "new", _("New")
-        QUEUED = "queued", _("Queued for Agents")
-        PROCESSING = "processing", _("Processing")
-        LINKED = "linked", _("Linked")
-        ERROR = "error", _("Error (Retry)")
-        REVIEW = "review", _("Needs Review")
-        IGNORED = "ignored", _("Ignored")
+    """A merchant offer and the source page captured by the scraper."""
 
     offer = models.OneToOneField(
         "offers.Offer",
         on_delete=models.CASCADE,
         related_name="scraped_item",
         verbose_name=_("Merchant Offer"),
-        help_text=_("Offer this pipeline record tracks"),
+        help_text=_("Offer observed by the scraper"),
     )
-
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.NEW,
-        db_index=True,
-    )
-
-    error_count = models.PositiveIntegerField(default=0)
-    last_attempt_at = models.DateTimeField(null=True, blank=True)
-    last_error_log = models.TextField(blank=True)
 
     source_page = models.ForeignKey(
         ScrapedPage,
@@ -142,46 +114,6 @@ class ScrapedItem(BaseModel):
         help_text=_("Source page where this item was found"),
     )
 
-    class Meta:
-        """Meta options."""
-
-        indexes = (models.Index(fields=["status"]),)
-
     def __str__(self) -> str:
         """Return string representation."""
-        return f"Pipeline[{self.get_status_display()}] for {self.offer}"
-
-
-class ScrapedItemExtraction(BaseModel):
-    """Agent extraction staged for human/backend catalog review."""
-
-    scraped_item = models.OneToOneField(
-        ScrapedItem,
-        on_delete=models.CASCADE,
-        related_name="agent_extraction",
-        help_text=_("Scraped item that produced this extraction"),
-    )
-    source_page = models.ForeignKey(
-        ScrapedPage,
-        on_delete=models.CASCADE,
-        related_name="agent_extractions",
-        help_text=_("Source page used by the agent pipeline"),
-    )
-    image_report = models.TextField(
-        blank=True,
-        help_text=_("Ordered text report extracted from product images"),
-    )
-    extracted_product = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text=_("Recursive product tree returned by the agent"),
-    )
-
-    class Meta:
-        """Meta options."""
-
-        ordering = ("-updated_at",)
-
-    def __str__(self) -> str:
-        """Return string representation."""
-        return f"Extraction for scraped item {self.scraped_item_id}"
+        return f"Scraped item for {self.offer}"

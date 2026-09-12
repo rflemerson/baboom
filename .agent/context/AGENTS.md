@@ -65,15 +65,9 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 - Public frontend work belongs in Vue, not Django templates.
 - The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/.agents/`.
 
-## 7. Local Product Review Contract
-- Product review is interactive and runs on an operator workstation; the Baboom
-  server does not host chat or model orchestration.
-- Django owns the authenticated GraphQL contract for queue discovery, targeted
-  checkout, resume, heartbeat, release, extraction staging, duplicate search,
-  and explicit approval.
-- Scraped context remains API-first in `ScrapedPage.api_context` and
-  `ScrapedPage.html_structured_data`; review clients also receive normalized
-  `imageUrls`.
-- Staging a draft moves an item to `review` without touching the catalog.
-- Only explicit approval may link an offer or create an unpublished product.
-- Publication and detailed nutrition/component curation remain in Django admin.
+## 7. Product Curation
+- Scrapers store offers, source metadata, structured HTML data and rendered HTML.
+- Humans inspect captured pages and curate products, nutrition, flavors,
+  components, offer links and publication through Django admin.
+- The public REST endpoints serve catalog browsing and alert subscriptions.
+- No agent-specific queue, staging, approval or GraphQL endpoint belongs in Django.

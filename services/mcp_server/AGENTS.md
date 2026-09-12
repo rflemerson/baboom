@@ -22,8 +22,12 @@ This service exposes local MCP tools for extraction review.
   first, search catalog candidates, and send `confirm=True` only on explicit approval.
 - Approval submits a mass as `netMass` with its `massUnit`; the API stores it
   canonically. Extraction drafts keep the units the source page stated.
-- New catalog products are unpublished. Nutrition, flavors and components remain
-  available in extraction staging for detailed curation through Django admin.
+- New catalog products are unpublished. Approval materializes staged nutrition,
+  flavors and components atomically; conflicting catalog data is never overwritten.
+- `apply_current_item_extraction` completes an already linked product; preview
+  first and use `confirm=True` only on explicit approval, just like initial approval.
+- Multiple labels use `nutritionProfiles`, not `children`. Scalar macros are grams;
+  non-null sodium requires `sodiumUnit`. Micronutrients carry explicit units.
 - `schemas.py` validates nested local drafts; keep it aligned with the API DTOs.
 - Test with `python -m pytest tests -q`; run `prek run --all-files` from this directory.
 - Optional contract tests require API dev dependencies and `DJANGO_SETTINGS_MODULE`

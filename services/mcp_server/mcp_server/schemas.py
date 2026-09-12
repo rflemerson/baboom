@@ -24,17 +24,25 @@ class NutritionFacts(BaseModel):
     trans_fats: float | None = Field(default=None, alias="transFats")
     dietary_fiber: float | None = Field(default=None, alias="dietaryFiber")
     sodium: float | None = None
+    sodium_unit: str | None = Field(default=None, alias="sodiumUnit")
     micronutrients: list[Micronutrient] = Field(default_factory=list)
+
+
+class NutritionProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    flavor_names: list[str] = Field(default_factory=list, alias="flavorNames")
+    nutrition_facts: NutritionFacts = Field(alias="nutritionFacts")
 
 
 class ProductDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str | None = None
+    product_id: int | None = Field(default=None, alias="productId")
     brand_name: str | None = Field(default=None, alias="brandName")
     ean: str | None = ""
     weight_grams: int | None = Field(default=None, alias="weightGrams")
     packaging: str | None = ""
-    quantity: int | None = None
+    quantity: int | None = Field(default=None, strict=True)
     description: str | None = ""
     category_hierarchy: list[str] = Field(
         default_factory=list, alias="categoryHierarchy"
@@ -43,4 +51,7 @@ class ProductDraft(BaseModel):
     flavor_names: list[str] = Field(default_factory=list, alias="flavorNames")
     variant_name: str | None = Field(default=None, alias="variantName")
     nutrition_facts: NutritionFacts | None = Field(default=None, alias="nutritionFacts")
+    nutrition_profiles: list[NutritionProfile] = Field(
+        default_factory=list, alias="nutritionProfiles"
+    )
     children: list[ProductDraft] = Field(default_factory=list)

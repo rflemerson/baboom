@@ -17,6 +17,7 @@ from .tools.pages import fetch_source_page as fetch_source_page_data
 from .tools.preparation import build_prepared_context
 from .tools.review import (
     act_on_current_item,
+    apply_current_item_extraction,
     approve_current_item,
     checkout_item,
     report_current_item_error,
@@ -42,6 +43,7 @@ mcp.tool()(catalog_choices)
 mcp.tool()(resume_item)
 mcp.tool()(act_on_current_item)
 mcp.tool()(approve_current_item)
+mcp.tool()(apply_current_item_extraction)
 
 
 @mcp.tool()

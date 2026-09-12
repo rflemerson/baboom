@@ -24,8 +24,8 @@
   validate the origin certificate. `infra/nginx/local.conf` is HTTP-only.
 - VM1 production should pull prebuilt `API_IMAGE` and `WEB_IMAGE` from GHCR,
   then run `docker compose up -d --no-build ...` on small hosts.
-- Interactive product review runs on an operator workstation and calls the
-  Django GraphQL API.
+- Product curation is currently done in Django admin. Scraper monitors and HTML
+  enrichment continue as Celery tasks.
 - Use clear service names in compose:
   - `web` for the public frontend
   - `api` for Django

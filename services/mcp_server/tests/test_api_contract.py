@@ -77,18 +77,26 @@ def test_full_review_contract(backend):
     assert review.act_on_current_item("heartbeat")["status"] == "processing"
     assert review.act_on_current_item("release")["status"] == "queued"
     review.checkout_item(item.id)
-    update_draft({"name": "Whey", "children": [{"name": "Creatine"}]})
+    update_draft(
+        {"name": "Whey", "nutritionFacts": {"servingSizeGrams": 30, "proteins": 24}}
+    )
     assert submission.submit_draft(confirm=True)["ok"]
     assert review.resume_item(item.id)["reviewItem"]["status"] == "review"
     assert submission.submit_draft(confirm=True)["ok"]
     result = review.approve_current_item(
-        create_product={"name": "Whey", "brandId": brand.id}, confirm=True
+        create_product={"name": "Whey", "brandId": brand.id, "netMass": 450},
+        confirm=True,
     )
     assert not result["product"]["isPublished"]
     assert api.catalog_candidates(search="Whey")[0]["id"] == result["product"]["id"]
     assert review.approve_current_item(
         product_id=result["product"]["id"], confirm=True
     )["ok"]
+    assert review.apply_current_item_extraction(
+        product_id=result["product"]["id"], confirm=True
+    )["ok"]
+    core = pytest.importorskip("core.models")
+    assert core.NutritionFacts.objects.get().proteins == 24000
 
 
 def test_error_and_ignore_contract(backend):

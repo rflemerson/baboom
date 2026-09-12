@@ -13,7 +13,6 @@ from django.http import HttpRequest, HttpResponseBadRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from baboom.utils import format_graphql_errors
 from core import units
 from core.dtos import CatalogProductsFilters
 from core.selectors import catalog_active, public_catalog_products
@@ -86,7 +85,7 @@ def _catalog_page_params(request: HttpRequest) -> tuple[int, int]:
 
 
 def _decimal_to_str(value: Decimal | None) -> str | None:
-    """Serialize nullable Decimal annotations like GraphQL does."""
+    """Serialize nullable Decimal annotations for the public API."""
     if value is None:
         return None
     return str(value)
@@ -228,8 +227,13 @@ def subscribe_alerts(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
                 "alreadySubscribed": False,
                 "email": email,
                 "errors": [
-                    {"field": item.field, "message": item.message}
-                    for item in format_graphql_errors(error)
+                    {"field": field, "message": message}
+                    for field, messages in (
+                        error.message_dict.items()
+                        if hasattr(error, "error_dict")
+                        else [("non_field_errors", error.messages)]
+                    )
+                    for message in messages
                 ],
             },
             status=400,

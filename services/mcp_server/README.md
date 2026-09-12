@@ -76,8 +76,22 @@ Commands emit JSON; failures return a nonzero exit code.
 
 Staging accepts recursive nutrition and combo evidence, but never changes the
 catalog. Approval links an offer or creates an unpublished product using explicit
-basic metadata. Publishing and detailed nutrition/flavor/component curation stay
-in Django admin. API keys are trusted operator access, not per-item ownership.
+basic metadata and materializes its staged nutrition, flavors and combo components
+atomically. Publication remains in Django admin. Missing or conflicting evidence
+returns errors without partial catalog writes. API keys are trusted operator access,
+not per-item ownership.
+
+For an already linked item, run `resume ITEM_ID`, then
+`apply-extraction --product-id PRODUCT_ID` to preview, and repeat with `--confirm`
+after explicit approval. This fills empty relations from the server's staged JSON;
+it never publishes, relinks an offer or overwrites conflicting catalog data.
+
+Drafts accept `nutritionFacts`/`flavorNames` for one label, or `nutritionProfiles`
+with those fields per entry for multiple labels. Macros are grams, energy is kcal,
+and sodium requires `sodiumUnit`. Micronutrients require explicit units. Each simple
+product needs a positive package mass, serving size and at least one measured nutrient.
+Combo `children` require quantity plus `productId` or complete product metadata;
+they are not flavor variants. See the API domain guide for conflict/reference rules.
 
 ## Verification
 

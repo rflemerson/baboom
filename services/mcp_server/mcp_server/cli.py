@@ -69,6 +69,11 @@ def parser() -> argparse.ArgumentParser:
         "--create-product", type=Path, help="Approved catalog fields in JSON"
     )
     approve.add_argument("--confirm", action="store_true")
+    apply = commands.add_parser(
+        "apply-extraction", help="Complete an already linked product from staging"
+    )
+    apply.add_argument("--product-id", type=int, required=True)
+    apply.add_argument("--confirm", action="store_true")
     error = commands.add_parser("report-error")
     error.add_argument("message")
     error.add_argument("--fatal", action="store_true")
@@ -136,6 +141,8 @@ def _execute_remote(args: argparse.Namespace) -> object:
             return _submit(args)
         case "approve":
             return _approve(args)
+        case "apply-extraction":
+            return review.apply_current_item_extraction(args.product_id, args.confirm)
         case "report-error":
             return review.report_current_item_error(args.message, args.fatal)
     raise ValueError("Comando desconhecido.")

@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Django API, admin, REST catalog, authenticated scraper GraphQL, and scraping integration.
+- Django API, admin, public REST catalog, and scraping integration.
 - Public frontend lives in `apps/web`; do not add Django template frontend flows here.
 
 ## Commands
@@ -21,18 +21,15 @@ prek run --all-files
 - Business workflows: `core/services/` and `scrapers/services.py`.
 - DTOs: `core/dtos.py` and `scrapers/dtos.py`.
 - Public catalog and alerts: REST.
-- Local product review: GraphQL in `scrapers/graphql/`, protected with `IsAuthenticatedWithAPIKey`.
-- Review clients run on an operator workstation. The API owns queue discovery,
-  targeted checkout, resume, heartbeat, release, extraction staging, duplicate
-  search, and explicit approval; it does not host chat or model orchestration.
+- Scrapers retain `ScrapedPage` metadata, structured data and rendered HTML;
+  humans inspect captured pages and curate the catalog through Django admin.
 - Query composition belongs in `selectors.py`.
-- Product, nutrition, component, flavor, brand, store, tag, category, alert subscriber, and API key management is manager-facing through Django admin.
+- Product, nutrition, component, flavor, brand, store, tag, category and alert
+  subscriber management is manager-facing through Django admin.
 - `ProductStore` is managed through the `ProductAdmin` inline, not as direct CRUD.
-- Extraction staging only writes review data. `approveScrapedItem` is the sole
-  remote review operation that may link an offer or create an unpublished
-  catalog product, and it requires an item already staged in `review`.
-- See `docs/domain.md` for review transitions, retry semantics, and the boundary
-  between remote approval and detailed catalog curation in admin.
+- The public REST API only serves catalog browsing and alerts. There is no
+  agent-specific mutation or authentication layer in the Django app.
+- See `docs/domain.md` for catalog and human curation boundaries.
 
 ## Patterns
 
@@ -48,4 +45,4 @@ prek run --all-files
 
 - Run `prek run --all-files` for substantial changes and review hook edits.
 - Do not commit secrets or Django `SECRET_KEY` values.
-- Keep production host, TLS, cookie, and GraphQL permission settings explicit.
+- Keep production host, TLS and cookie settings explicit.

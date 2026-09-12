@@ -166,6 +166,24 @@ def approve_scraped_item(payload: dict) -> dict:
     return result["product"]
 
 
+def apply_scraped_item_extraction(payload: dict) -> dict:
+    """Complete an already linked product using the server's staged extraction."""
+    query = """
+    mutation($data: ScrapedItemExtractionApplyInput!) {
+      applyScrapedItemExtraction(data: $data) {
+        product { id name isPublished }
+        errors { field message }
+      }
+    }
+    """
+    result = graphql_request(query, {"data": payload})["applyScrapedItemExtraction"]
+    if result.get("errors"):
+        raise APIError(str(result["errors"]))
+    if not result.get("product"):
+        raise APIError("Aplicação da extração não retornou produto.")
+    return result["product"]
+
+
 def submit_agent_extraction(data: dict[str, Any]) -> dict[str, Any]:
     query = """
     mutation SubmitAgentExtraction($data: AgentExtractionInput!) {

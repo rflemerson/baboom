@@ -4,13 +4,13 @@
 
 - Admin owns catalog curation.
 - REST owns public catalog and alert flows.
-- GraphQL owns authenticated local review, staging, and explicit catalog approval.
+- Scrapers capture merchant offers and source pages; humans curate in admin.
 - Selectors own read/query composition.
 
 ## Admin
 
 - Products: create, edit, publish/unpublish, delete with related store links.
-- Support data: brands, stores, flavors, tags, categories, alert subscribers, API keys.
+- Support data: brands, stores, flavors, tags, categories and alert subscribers.
 - Nutrition: manage `NutritionFacts`, micronutrients, and `ProductNutrition` links.
 - Components: manage `ProductComponent` for products with `kind=COMBO`.
   Components are always simple products, so an assembly is one level deep and
@@ -51,44 +51,18 @@
   matches only the corresponding profile. Offers remain linked at product level;
   the displayed price is a product offer, not a verified price for a specific flavor.
 
-## Local review
+## Scraped evidence
 
-- `checkoutScrapedItem` locks one eligible item and marks it `PROCESSING`.
-- `submitAgentExtraction` stores review data in `ScrapedItemExtraction` and moves the item to `REVIEW`.
-- `reportScrapedItemError` records retryable/fatal failures.
-- Agent extraction never creates catalog products.
-- GraphQL stays protected by `IsAuthenticatedWithAPIKey`.
-- `reviewQueue` lists queued items by default; pass a status to filter or `null`
-  to inspect all states. `reviewItem` and `reviewExtraction` resume without mutation.
-- `checkoutScrapedItem(data: {itemId: ...})` reserves one queued item. Omitting
-  the target reserves the next queued item. Failed work must be requeued in admin.
-- `heartbeatScrapedItem` refreshes processing activity. `releaseScrapedItem`
-  returns it to the queue; the periodic timeout task also requeues expired work.
-- `ignoreScrapedItem` accepts queued, processing, and review items.
-- `submitAgentExtraction` accepts processing or review items, so a reviewer can
-  revise a staged draft. It never changes catalog records.
-- `catalogCandidates` searches published and unpublished products by name/brand
-  and/or exact EAN. `catalogBrands`, `catalogCategories`, and `catalogTags` expose
-  valid reference IDs.
-- `approveScrapedItem` requires review state and a staged extraction, plus exactly
-  one of `productId` or `createProduct`. Equivalent retries return the linked
-  product; conflicting retries fail. Product creation and offer linking are atomic.
-- `approveScrapedItem` submits a mass as `netMass` plus `massUnit`; the service
-  converts it before it reaches the catalog. Extraction staging keeps the units
-  the page stated, since it is a transcript of the source.
-- Remote creation validates references and product fields and always creates an
-  unpublished product. `isPublished: true` is rejected. Publication, nutrition,
-  flavors, and component curation stay in admin; the complete extracted tree stays
-  available in staging and is not automatically materialized into catalog relations.
-- API keys identify trusted review clients. Reservations are item state, not
-  per-user ownership tokens; operators sharing access must coordinate item use.
-- Review clients receive JSON `sourcePageContext`, `sourcePageStructuredData`, and
-  normalized `imageUrls`; string context fields remain available to existing clients.
+- Scraper monitors store merchant offers and `ScrapedItem` source links.
+- Page enrichment stores `ScrapedPage.api_context`, `html_structured_data`,
+  `raw_html` and response metadata. Humans can inspect pages in Django admin.
+- Product creation, offer linking, nutrition profiles, flavors, components and
+  publication are human catalog actions in Django admin.
+
 
 ## Services
 
 - `ProductCreateService`, `ProductMetadataUpdateService`, `ProductStoreService`
 - `AlertSubscriptionService`
-- `ScrapedItemCheckoutService`, `ScrapedItemExtractionSubmitService`, `ScrapedItemErrorService`
-- `ScrapedItemReviewStateService`, `ScrapedItemApprovalService`
+- `ScraperService` for offer snapshots and page enrichment
 - `public_catalog_products(...)` in `core/selectors.py`

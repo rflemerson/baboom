@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
-from .models import ScrapedItem, ScrapedItemExtraction, ScraperRun
+from .models import ScrapedItem, ScrapedPage, ScraperRun
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -64,44 +64,6 @@ def create_product_from_scraped_item(
     return redirect(url)
 
 
-@admin.action(description="Reset selected items to NEW")
-def reset_to_new(
-    modeladmin: admin.ModelAdmin,
-    request: HttpRequest,
-    queryset: QuerySet[ScrapedItem],
-) -> None:
-    """Reset selected items to the NEW state."""
-    updated = queryset.update(
-        status=ScrapedItem.Status.NEW,
-        error_count=0,
-        last_attempt_at=None,
-        last_error_log="",
-    )
-    modeladmin.message_user(
-        request,
-        _("%(count)s items reset to NEW for retrying.") % {"count": updated},
-    )
-
-
-@admin.action(description="Queue selected items for agents")
-def queue_for_agents(
-    modeladmin: admin.ModelAdmin,
-    request: HttpRequest,
-    queryset: QuerySet[ScrapedItem],
-) -> None:
-    """Mark selected scraped items as explicitly ready for agent processing."""
-    updated = queryset.update(
-        status=ScrapedItem.Status.QUEUED,
-        error_count=0,
-        last_attempt_at=None,
-        last_error_log="",
-    )
-    modeladmin.message_user(
-        request,
-        _("%(count)s items queued for agent processing.") % {"count": updated},
-    )
-
-
 @admin.register(ScrapedItem)
 class ScrapedItemAdmin(admin.ModelAdmin):
     """Admin for scraped items."""
@@ -110,23 +72,19 @@ class ScrapedItemAdmin(admin.ModelAdmin):
         "id",
         "get_store_slug",
         "name_summary",
-        "status",
-        "error_count",
         "get_stock_status",
         "updated_at",
     )
-    list_filter = ("status", "offer__store_slug", "offer__current_stock_status")
+    list_filter = ("offer__store_slug", "offer__current_stock_status")
     search_fields = ("offer__name", "offer__external_id")
 
     readonly_fields = (
         "created_at",
         "updated_at",
-        "last_attempt_at",
-        "last_error_log",
         "offer",
     )
 
-    actions = (create_product_from_scraped_item, queue_for_agents, reset_to_new)
+    actions = (create_product_from_scraped_item,)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[ScrapedItem]:
         """Load the linked offer used across list columns."""
@@ -151,6 +109,29 @@ class ScrapedItemAdmin(admin.ModelAdmin):
             if name and len(name) > NAME_SUMMARY_MAX_LENGTH
             else name
         )
+
+
+@admin.register(ScrapedPage)
+class ScrapedPageAdmin(admin.ModelAdmin):
+    """Allow human inspection of captured metadata and rendered HTML."""
+
+    list_display = ("url", "store_slug", "scraped_at", "updated_at")
+    list_filter = ("store_slug",)
+    search_fields = ("url",)
+    readonly_fields = (
+        "store_slug",
+        "url",
+        "api_context",
+        "html_structured_data",
+        "raw_html",
+        "response_meta",
+        "scraped_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, _request: HttpRequest) -> bool:
+        """Disallow manual creation of scraper-captured pages."""
+        return False
 
 
 @admin.register(ScraperRun)
@@ -192,32 +173,3 @@ class ScraperRunAdmin(admin.ModelAdmin):
             if len(obj.error_message) > ERROR_SUMMARY_MAX_LENGTH
             else obj.error_message
         )
-
-
-@admin.register(ScrapedItemExtraction)
-class ScrapedItemExtractionAdmin(admin.ModelAdmin):
-    """Admin for staged agent extractions."""
-
-    list_display = (
-        "id",
-        "scraped_item",
-        "source_page",
-        "root_product_name",
-        "updated_at",
-    )
-    list_filter = ("scraped_item__offer__store_slug",)
-    search_fields = (
-        "scraped_item__offer__name",
-        "scraped_item__offer__external_id",
-        "source_page__url",
-    )
-    readonly_fields = (
-        "created_at",
-        "updated_at",
-    )
-
-    @admin.display(description="Root product")
-    def root_product_name(self, obj: ScrapedItemExtraction) -> str:
-        """Return the extracted root product name for quick review."""
-        name = obj.extracted_product.get("name", "")
-        return str(name)
