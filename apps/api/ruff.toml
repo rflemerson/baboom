@@ -16,7 +16,7 @@ select = [
     "ASYNC", # async/await issues
     "BLE", # blind exception catches
     "C4",  # flake8-comprehensions
-    "COM", # trailing commas
+    # Trailing commas are enforced by ruff-format.
     "EM",  # exception message style
     "EXE", # shebang / executable files
     "FBT", # boolean trap

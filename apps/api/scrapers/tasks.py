@@ -1,5 +1,7 @@
 """Celery tasks for running scraper monitors and recovery jobs."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from celery import shared_task

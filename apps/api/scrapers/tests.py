@@ -1,5 +1,7 @@
 """Tests for scraper spiders and ingestion helpers."""
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -39,7 +41,6 @@ from scrapers.tasks import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
 
 EXPECTED_EXTERNAL_STOCK_QUANTITY = 100
 EXPECTED_PRICE_HISTORY_RECORDS_AFTER_UPDATE = 2

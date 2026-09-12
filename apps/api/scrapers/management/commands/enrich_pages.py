@@ -1,5 +1,7 @@
 """Run the on-demand HTML enrichment pass over scraped pages."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, cast
 
 from django.core.management.base import BaseCommand, CommandError

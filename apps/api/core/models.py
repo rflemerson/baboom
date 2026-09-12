@@ -546,7 +546,7 @@ class NutritionFacts(BaseModel):
         max_length=200,
         blank=True,
         help_text=_(
-            "E.g. 'Saborizada' or 'Natural' to identify this table in the admin.",
+            "E.g. 'Flavored' or 'Natural' to identify this table in the admin.",
         ),
     )
 
