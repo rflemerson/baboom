@@ -66,7 +66,7 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
 - The public frontend lives in `apps/web` and should follow the Vue-specific docs in `apps/web/AGENTS.md` and `apps/web/.agents/`.
 
 ## 7. Product Curation
-- Scrapers store offers, source metadata, structured HTML data and rendered HTML.
+- Scrapers store offers and the source metadata that locates them, never page HTML.
 - Humans inspect captured pages and curate products, nutrition, flavors,
   components, offer links and publication through Django admin.
 - The public REST endpoints serve catalog browsing and alert subscriptions.

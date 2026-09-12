@@ -54,15 +54,12 @@
 ## Scraped evidence
 
 - Scraper monitors store merchant offers and `ScrapedItem` source links.
-- Page enrichment stores `ScrapedPage.api_context`, `html_structured_data`,
-  `raw_html` and response metadata. Humans can inspect pages in Django admin.
-- `html_structured_data` keys the three kinds of evidence separately: `schema`
-  for what the page author declared, `tables` for what it tabulated, and `text`
-  for the visible text with one node per line. Stores keep nutrition in all
-  three, and a label collapsed onto one line stops being parseable.
-- `ScrapedPageAdmin` exposes an action that enqueues page capture on Celery
-  instead of running it in the web process. Every field there is read-only and
-  adding is forbidden; the action is available to users with view permission.
+- A `ScrapedPage` holds the store, the URL and the `api_context` the catalog
+  crawl collected. It points at a page; it does not copy one. Nothing here
+  stores page HTML: a curator opens the live page, which is truer than a
+  stored copy and costs nothing to keep.
+- `ScrapedPageAdmin` is read-only and forbids adding, so a page is inspected
+  in Django admin and changed only by the crawl that produced it.
 - `ensure_catalog_operator --username=<name>` keeps a staff user in the
   `catalog-operator` group with an explicit, delete-free permission set. It is a
   command rather than a migration because access is configuration, not schema.
@@ -77,5 +74,5 @@
 
 - `ProductCreateService`, `ProductMetadataUpdateService`, `ProductStoreService`
 - `AlertSubscriptionService`
-- `ScraperService` for offer snapshots and page enrichment
+- `ScraperService` for offer snapshots
 - `public_catalog_products(...)` in `core/selectors.py`

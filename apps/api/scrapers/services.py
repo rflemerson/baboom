@@ -5,11 +5,8 @@ from __future__ import annotations
 import json
 import logging
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
-import extruct
-from bs4 import BeautifulSoup
-from curl_cffi import requests
 from django.db import transaction
 
 from offers.services import OfferObservationResult, OfferObservationService
@@ -22,84 +19,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RenderResult(NamedTuple):
-    """Outcome of an HTTP capture: status, response headers and HTML."""
-
-    status: int | None
-    headers: dict[str, str]
-    html: str
-
-
-SCHEMA_SYNTAXES = ("json-ld", "microdata", "opengraph", "rdfa", "microformat")
-
-
-def extract_schema_metadata(html: str, url: str) -> dict:
-    """Parse schema.org metadata from HTML with extruct.
-
-    Returns the JSON-LD, microdata, opengraph, rdfa and microformat blocks the
-    page author embedded. The full page is kept separately as ``raw_html`` (the
-    source of truth), so this is just the queryable, semantic view. Stateless,
-    so it lives at module level and can be reused without the service.
-    """
-    try:
-        extracted = extruct.extract(
-            html,
-            base_url=url,
-            syntaxes=list(SCHEMA_SYNTAXES),
-            uniform=True,
-        )
-    except Exception:
-        logger.exception("Failed to extract schema.org metadata for %s", url)
-        return {}
-    return extracted if isinstance(extracted, dict) else {}
-
-
-def _visible_text(soup: BeautifulSoup) -> str:
-    """Return the visible text with one node per line.
-
-    The line breaks are the point: a nutrition table laid out in divs is only
-    readable if each label and value keeps its own line. Collapsing the page
-    into one space-separated run loses the row structure that makes those
-    values parseable at all.
-    """
-    for element in soup.find_all(["script", "style", "noscript", "template"]):
-        element.decompose()
-    lines = (line.strip() for line in soup.get_text("\n").splitlines())
-    return "\n".join(line for line in lines if line)
-
-
-def extract_page_evidence(html: str, url: str) -> dict:
-    """Extract semantic metadata, tables, and visible text from a page.
-
-    The three live under their own keys because they are different kinds of
-    evidence: what the page author declared, what it tabulated, and what it
-    simply shows. Stores keep nutrition in all three places.
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    tables: list[list[list[str]]] = []
-    for table in soup.find_all("table"):
-        rows = []
-        for row in table.find_all("tr"):
-            cells = [
-                cell.get_text(" ", strip=True) for cell in row.find_all(["th", "td"])
-            ]
-            if cells:
-                rows.append(cells)
-        if rows:
-            tables.append(rows)
-
-    return {
-        "schema": extract_schema_metadata(html, url),
-        "tables": tables,
-        "text": _visible_text(soup),
-    }
-
-
 class ScraperService:
     """Service for handling scraped data."""
-
-    HTML_MISSING_STATUSES = (404, 410)
-    CAPTURE_TIMEOUT_SECONDS = 60
 
     @staticmethod
     @transaction.atomic
@@ -110,10 +31,9 @@ class ScraperService:
     ) -> ScrapedItem:
         """Record the merchant offer and its captured source-page link.
 
-        This is the light path: the offer (identity, price, stock) is upserted
-        on every run and the page's ``api_context`` keeps the latest raw catalog
-        payload. The heavy product-page HTML lives entirely in
-        :meth:`enrich_pages`, run on demand.
+        The offer (identity, price, stock) is upserted on every run and the
+        page's ``api_context`` keeps the latest raw catalog payload. The
+        product page itself is never fetched here, or anywhere else.
         """
         normalized_context = (
             ScraperService._normalize_api_context_payload(api_context)
@@ -204,82 +124,3 @@ class ScraperService:
             logger.warning("Could not decode scraper API context payload as JSON")
             return {}
         return parsed if isinstance(parsed, dict) else {}
-
-    @staticmethod
-    def _render_page(url: str) -> RenderResult | None:
-        """Capture a page over HTTP; ``None`` if the request fails."""
-        try:
-            response = requests.get(
-                url,
-                allow_redirects=True,
-                impersonate="chrome",
-                timeout=ScraperService.CAPTURE_TIMEOUT_SECONDS,
-            )
-            return RenderResult(
-                response.status_code,
-                dict(response.headers),
-                response.text,
-            )
-        except Exception:
-            logger.exception("Failed to capture %s over HTTP", url)
-            return None
-
-    @staticmethod
-    def enrich_pages(
-        *,
-        store_slug: str | None = None,
-        limit: int | None = None,
-        page_ids: list[int] | None = None,
-    ) -> dict[str, int]:
-        """Heavy, on-demand pass: refresh the captured HTML for scraped pages.
-
-        Each page is captured over HTTP. The full HTML, parsed schema.org
-        metadata, visible evidence and HTTP response metadata are stored.
-        Interactive browser investigation is handled by the local browser client.
-        This pass runs independently of the light catalog crawl.
-        """
-        if limit is not None and limit < 1:
-            msg = "limit must be a positive integer."
-            raise ValueError(msg)
-
-        pages = ScrapedPage.objects.all()
-        if store_slug:
-            pages = pages.filter(store_slug=store_slug)
-        if page_ids is not None:
-            pages = pages.filter(pk__in=page_ids)
-        if limit:
-            pages = pages[:limit]
-
-        stats = {"checked": 0, "updated": 0, "failed": 0}
-        for page in pages.iterator():
-            stats["checked"] += 1
-            stats[ScraperService._enrich_page(page)] += 1
-        logger.info("Enrichment finished (store=%s): %s", store_slug or "all", stats)
-        return stats
-
-    @staticmethod
-    def _enrich_page(page: ScrapedPage) -> str:
-        """Capture and store one page's HTML, metadata and response info."""
-        result = ScraperService._render_page(page.url)
-        if result is None:
-            # Transient failure: keep whatever was captured before.
-            return "failed"
-
-        if result.status in ScraperService.HTML_MISSING_STATUSES:
-            # Page is gone: drop stale captures instead of keeping them.
-            page.raw_html = ""
-            page.html_structured_data = {}
-        else:
-            page.raw_html = result.html
-            page.html_structured_data = extract_page_evidence(result.html, page.url)
-        page.response_meta = {"status": result.status, "headers": result.headers}
-
-        page.save(
-            update_fields=[
-                "raw_html",
-                "html_structured_data",
-                "response_meta",
-                "updated_at",
-            ],
-        )
-        return "updated"

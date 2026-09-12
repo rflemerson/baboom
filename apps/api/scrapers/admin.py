@@ -11,7 +11,6 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
 from .models import ScrapedItem, ScrapedPage, ScraperRun
-from .tasks import enrich_store_pages
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -19,29 +18,6 @@ if TYPE_CHECKING:
 
 NAME_SUMMARY_MAX_LENGTH = 40
 ERROR_SUMMARY_MAX_LENGTH = 80
-
-
-@admin.action(description="Enrich selected pages")
-def enrich_selected_pages(
-    modeladmin: admin.ModelAdmin,
-    request: HttpRequest,
-    queryset: QuerySet[ScrapedPage],
-) -> None:
-    """Queue a background capture for the selected source pages."""
-    page_ids = list(queryset.values_list("pk", flat=True))
-    if not page_ids:
-        modeladmin.message_user(
-            request,
-            _("No pages selected."),
-            level=messages.WARNING,
-        )
-        return
-    enrich_store_pages.delay(page_ids=page_ids)
-    modeladmin.message_user(
-        request,
-        _("Queued %(count)d page(s) for enrichment.") % {"count": len(page_ids)},
-        level=messages.SUCCESS,
-    )
 
 
 @admin.action(description="Open product creation from selected item")
@@ -129,7 +105,7 @@ class ScrapedItemAdmin(admin.ModelAdmin):
 
 @admin.register(ScrapedPage)
 class ScrapedPageAdmin(admin.ModelAdmin):
-    """Allow human inspection of captured metadata and rendered HTML."""
+    """Allow human inspection of the pages the scrapers pointed at."""
 
     list_display = ("url", "store_slug", "scraped_at", "updated_at")
     list_filter = ("store_slug",)
@@ -138,40 +114,13 @@ class ScrapedPageAdmin(admin.ModelAdmin):
         "store_slug",
         "url",
         "api_context",
-        "html_structured_data",
-        "raw_html",
-        "response_meta",
         "scraped_at",
         "updated_at",
     )
-    actions = (enrich_selected_pages,)
 
     def has_add_permission(self, _request: HttpRequest) -> bool:
         """Disallow manual creation of scraper-captured pages."""
         return False
-
-    def has_change_permission(
-        self,
-        request: HttpRequest,
-        obj: ScrapedPage | None = None,
-    ) -> bool:
-        """Allow the capture action to run with view permission only."""
-        resolver_match = getattr(request, "resolver_match", None)
-        kwargs = getattr(resolver_match, "kwargs", {})
-        if kwargs.get("action_name") == enrich_selected_pages.__name__:
-            return self.has_view_permission(request, obj)
-        return super().has_change_permission(request, obj)
-
-    def get_actions(self, request: HttpRequest) -> dict[str, tuple[object, ...]]:
-        """Expose page enrichment to read-only operators in the action registry."""
-        actions = super().get_actions(request)
-        if not actions and self.has_view_permission(request):
-            actions[enrich_selected_pages.__name__] = (
-                enrich_selected_pages,
-                enrich_selected_pages.__name__,
-                enrich_selected_pages.short_description,
-            )
-        return actions
 
 
 @admin.register(ScraperRun)

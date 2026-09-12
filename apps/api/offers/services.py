@@ -26,8 +26,7 @@ class OfferObservationResult:
     """Outcome of recording an offer observation.
 
     ``changed`` is True when the offer was newly created or its price/stock
-    moved since the last observation. Callers (e.g. the weekly HTML enrichment)
-    use it to skip unchanged offers.
+    moved since the last observation. Callers use it to skip unchanged offers.
     """
 
     offer: Offer

@@ -20,10 +20,10 @@ prek run --all-files
 - Business workflows: `core/services/` and `scrapers/services.py`.
 - DTOs: `core/dtos.py` and `scrapers/dtos.py`.
 - Public catalog and alerts: REST.
-- Scrapers retain `ScrapedPage` metadata, structured data and captured HTML;
-  humans inspect captured pages and curate the catalog through Django admin.
-- The Django enrichment task uses an HTTP capture. Interactive browser
-  investigation belongs to the local browser client, not this application.
+- Scrapers retain `ScrapedPage` metadata and the store's own product context;
+  humans curate the catalog through Django admin.
+- Nothing here fetches or stores product-page HTML. Reading a product page is
+  the curator's job, done live, with a browser.
 - Query composition belongs in `selectors.py`.
 - Product, nutrition, component, flavor, brand, store, tag, category and alert
   subscriber management is manager-facing through Django admin.

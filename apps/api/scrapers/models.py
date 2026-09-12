@@ -24,22 +24,6 @@ class ScrapedPage(models.Model):
         blank=True,
         help_text=_("Normalized product context collected from store APIs"),
     )
-    html_structured_data = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text=_(
-            "Schema.org metadata (JSON-LD, microdata, ...) parsed from the HTML",
-        ),
-    )
-    raw_html = models.TextField(
-        blank=True,
-        help_text=_("Full rendered product-page HTML — the capture source of truth"),
-    )
-    response_meta = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text=_("HTTP response metadata for the capture (status, headers)"),
-    )
     scraped_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

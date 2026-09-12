@@ -7,26 +7,19 @@ import logging
 import os
 from decimal import Decimal
 from http import HTTPStatus
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from core.models import Brand, Product, ProductStore, Store
 from offers.models import Offer, PriceObservation, StockStatus
-from scrapers.admin import ScrapedPageAdmin, enrich_selected_pages
 from scrapers.dtos import ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem, ScrapedPage, ScraperRun
-from scrapers.services import (
-    RenderResult,
-    ScraperService,
-    extract_page_evidence,
-    extract_schema_metadata,
-)
+from scrapers.services import ScraperService
 from scrapers.spiders.blackskull import BlackSkullSpider
 from scrapers.spiders.catalog_api_spider import CatalogApiSpider
 from scrapers.spiders.dark_lab import DarkLabSpider
@@ -477,168 +470,6 @@ class CatalogApiSpiderTests(SimpleTestCase):
             spider.metrics["categories_discovered"] == EXPECTED_FALLBACK_CATEGORY_COUNT
         )
         assert spider.metrics["categories_crawled"] == EXPECTED_FALLBACK_CATEGORY_COUNT
-
-
-class ScraperEnrichmentTests(TestCase):
-    """Unit tests for the on-demand HTML enrichment pass."""
-
-    @staticmethod
-    def _page() -> ScrapedPage:
-        return ScrapedPage.objects.create(
-            store_slug="dark_lab",
-            url="https://example.com/product",
-        )
-
-    def test_enrich_page_renders_and_stores_raw_and_structured(self) -> None:
-        """Every page is rendered; raw HTML, metadata and response info stored.
-
-        Embedded ``<script>`` JSON survives because it lives in ``raw_html``.
-        """
-        page = self._page()
-        rendered_html = (
-            "<html><body>"
-            '<script type="application/ld+json">'
-            '{"@type": "Product", "name": "3W Whey Protein"}'
-            "</script>"
-            '<script>window.__NUXT__={"proteinas":"24g"}</script>'
-            '<div class="nutri"><span>Proteínas</span><span>24 g</span></div>'
-            "</body></html>"
-        )
-        result = RenderResult(200, {"etag": 'W/"abc"'}, rendered_html)
-        with patch.object(
-            ScraperService,
-            "_render_page",
-            return_value=result,
-        ) as mock_render:
-            stats = ScraperService.enrich_pages(limit=1)
-
-        page.refresh_from_db()
-        assert stats["updated"] == 1
-        mock_render.assert_called_once()
-        assert page.html_structured_data["schema"]["json-ld"][0]["name"] == (
-            "3W Whey Protein"
-        )
-        assert page.html_structured_data["tables"] == []
-        assert "Proteínas" in page.html_structured_data["text"]
-        assert "3W Whey Protein" not in page.html_structured_data["text"]
-        # raw HTML is the source of truth: it keeps the embedded script dataset.
-        assert "window.__NUXT__" in page.raw_html
-        assert page.response_meta == {"status": 200, "headers": {"etag": 'W/"abc"'}}
-
-    def test_enrich_page_clears_captures_for_missing_page(self) -> None:
-        """A 404/410 drops stale captures instead of keeping them."""
-        page = self._page()
-        page.raw_html = "<html>old</html>"
-        page.html_structured_data = {"json-ld": [{"@type": "Product"}]}
-        page.save(update_fields=["raw_html", "html_structured_data"])
-
-        result = RenderResult(404, {}, "<html><body>not found</body></html>")
-        with patch.object(ScraperService, "_render_page", return_value=result):
-            stats = ScraperService.enrich_pages(limit=1)
-
-        page.refresh_from_db()
-        assert stats["updated"] == 1
-        assert page.raw_html == ""
-        assert page.html_structured_data == {}
-
-    def test_admin_action_enqueues_selected_page_ids(self) -> None:
-        """The admin action delegates heavy rendering to Celery."""
-        page = self._page()
-        modeladmin = MagicMock()
-        request = MagicMock()
-
-        with patch("scrapers.admin.enrich_store_pages.delay") as enqueue:
-            enrich_selected_pages(modeladmin, request, ScrapedPage.objects.all())
-
-        enqueue.assert_called_once_with(page_ids=[page.pk])
-        modeladmin.message_user.assert_called_once()
-
-    def test_enrichment_action_accepts_view_permission(self) -> None:
-        """Expose only enrichment to read-only page operators."""
-        page_admin = ScrapedPageAdmin(ScrapedPage, MagicMock())
-        request = RequestFactory().get(
-            "/admin-api/api/v1/scrapers/scrapedpage/actions/",
-        )
-        request.user = MagicMock()
-        request.user.has_perm.side_effect = lambda permission: (
-            permission == "scrapers.view_scrapedpage"
-        )
-        request.resolver_match = SimpleNamespace(
-            kwargs={"action_name": enrich_selected_pages.__name__},
-        )
-
-        assert page_admin.has_change_permission(request) is True
-        assert enrich_selected_pages.__name__ in page_admin.get_actions(request)
-
-    def test_enrich_page_failed_when_render_fails(self) -> None:
-        """A failed render reports failure and leaves stored captures untouched."""
-        page = self._page()
-        page.raw_html = "<html>kept</html>"
-        page.save(update_fields=["raw_html"])
-
-        with patch.object(ScraperService, "_render_page", return_value=None):
-            stats = ScraperService.enrich_pages(limit=1)
-
-        page.refresh_from_db()
-        assert stats["failed"] == 1
-        # Prior capture is preserved rather than wiped on a transient failure.
-        assert page.raw_html == "<html>kept</html>"
-
-    def test_enrich_pages_rejects_non_positive_limit(self) -> None:
-        """Invalid limits should fail before building a queryset slice."""
-        with self.assertRaisesMessage(ValueError, "limit must be a positive integer"):
-            ScraperService.enrich_pages(limit=0)
-
-
-class SchemaMetadataParsingTests(SimpleTestCase):
-    """Unit tests for schema.org metadata extraction."""
-
-    def test_extracts_json_ld(self) -> None:
-        """JSON-LD product metadata is parsed from the HTML."""
-        html = """
-        <html><body>
-          <script type="application/ld+json">
-          {"@type": "Product", "name": "Whey", "offers": {"price": "99.90"}}
-          </script>
-        </body></html>
-        """
-        data = extract_schema_metadata(html, "https://x.com/p")
-
-        assert data["json-ld"][0]["name"] == "Whey"
-
-    def test_page_without_metadata_returns_empty_syntaxes(self) -> None:
-        """A page with no embedded metadata yields empty syntax lists."""
-        data = extract_schema_metadata(
-            "<html><body><p>oi</p></body></html>",
-            "https://x.com/p",
-        )
-
-        assert all(not block for block in data.values())
-
-    def test_extracts_tables_and_visible_text_without_script_noise(self) -> None:
-        """Capture table rows and readable text while excluding scripts."""
-        html = """
-        <html><body>
-          <script>window.noise = 'ignore me'</script>
-          <table><tr><th>Serving</th><th>30 g</th></tr>
-            <tr><td>Protein</td><td>24 g</td></tr></table>
-          <div>Visible nutrition note</div>
-        </body></html>
-        """
-
-        data = extract_page_evidence(html, "https://example.com/product")
-
-        assert data["tables"] == [[["Serving", "30 g"], ["Protein", "24 g"]]]
-        # One node per line: a label and its value must not collapse into one
-        # run, or a nutrition table laid out in divs becomes unparseable.
-        assert data["text"].splitlines() == [
-            "Serving",
-            "30 g",
-            "Protein",
-            "24 g",
-            "Visible nutrition note",
-        ]
-        assert "ignore me" not in data["text"]
 
 
 class DarkLabSpiderUnitTests(SimpleTestCase):

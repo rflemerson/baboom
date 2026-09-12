@@ -33,11 +33,7 @@ class CatalogApiSpider(BaseSpider):
     STARTUP_JITTER_SECONDS = (0.0, 5.0)
 
     def __init__(self, categories: list[str] | None = None) -> None:
-        """Initialize the light catalog spider (price/stock/basic only).
-
-        The heavy product-page HTML enrichment is a separate, on-demand pass
-        (:meth:`ScraperService.enrich_pages`) and never runs from the crawl.
-        """
+        """Initialize the light catalog spider (price/stock/basic only)."""
         super().__init__(categories)
         self.http_client = HttpClient(timeout=self.HTTP_TIMEOUT_SECONDS)
         self._consecutive_failures = 0
