@@ -174,6 +174,7 @@ def scrape_soldiers_monitor() -> str:
 def enrich_store_pages(
     store_slug: str | None = None,
     limit: int | None = None,
+    page_ids: list[int] | None = None,
 ) -> str:
     """On-demand heavy pass: refresh product-page HTML for scraped pages.
 
@@ -181,10 +182,14 @@ def enrich_store_pages(
     ``enrich_store_pages.delay("dark_lab")``). Each page is re-fetched with a
     conditional GET, so only pages the store reports as changed are updated.
     """
-    stats = ScraperService.enrich_pages(store_slug=store_slug, limit=limit)
+    stats = ScraperService.enrich_pages(
+        store_slug=store_slug,
+        limit=limit,
+        page_ids=page_ids,
+    )
     scope = store_slug or "all stores"
     return (
         f"Enrichment ({scope}): checked {stats['checked']}, "
-        f"updated {stats['updated']}, unchanged {stats['unchanged']}, "
+        f"updated {stats['updated']}, "
         f"failed {stats['failed']}."
     )

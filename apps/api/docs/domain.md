@@ -56,6 +56,16 @@
 - Scraper monitors store merchant offers and `ScrapedItem` source links.
 - Page enrichment stores `ScrapedPage.api_context`, `html_structured_data`,
   `raw_html` and response metadata. Humans can inspect pages in Django admin.
+- `html_structured_data` keys the three kinds of evidence separately: `schema`
+  for what the page author declared, `tables` for what it tabulated, and `text`
+  for the visible text with one node per line. Stores keep nutrition in all
+  three, and a label collapsed onto one line stops being parseable.
+- `ScrapedPageAdmin` exposes an action that queues the render on Celery instead
+  of rendering in the web process. Every field there is read-only and adding is
+  forbidden, so `change_scrapedpage` grants only the right to run that action.
+- `ensure_catalog_operator --username=<name>` keeps a staff user in the
+  `catalog-operator` group with an explicit, delete-free permission set. It is a
+  command rather than a migration because access is configuration, not schema.
 - The scraped-item admin action opens product creation with offer identity and
   the matching store listing prefilled from the captured offer. Saving the
   product links that offer without creating a duplicate price observation.

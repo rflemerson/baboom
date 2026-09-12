@@ -1,6 +1,6 @@
 # Scrapers
 
-Scrapers are API-first. Each spider stores `ScrapedPage.api_context` from store APIs and `ScrapedPage.html_structured_data` from HTML extraction. `CatalogApiSpider` owns crawl orchestration, retry/backoff, and metrics.
+Scrapers are API-first. Each spider stores `ScrapedPage.api_context` from store APIs and `ScrapedPage.html_structured_data` from HTML extraction (`schema`, `tables` and `text`). `CatalogApiSpider` owns crawl orchestration, retry/backoff, and metrics.
 
 ## Growth
 

@@ -1,34 +1,16 @@
 # MCP Server Agent Instructions
 
-This service exposes local MCP tools for extraction review.
+This service exposes local tools for catalog work that Django does not provide.
 
-## Rules
-
-- Do not access the database directly.
-- Use GraphQL API through the provided tools.
-- Work with local drafts before submitting.
-- Never call `submit_draft(confirm=True)` unless the user explicitly asks to send/submit.
-- `checkout_scraped_item` changes a queued item to processing.
-- `submit_draft` sends the extraction to review staging (requires `confirm=True`).
-- Do not invent fields outside the extraction draft schema.
-- If extraction is impossible, use `report_item_error`.
-- MCP and CLI share `mcp_server/tools/api.py` and `tools/review.py`; do not add a
-  second HTTP client. The CLI entrypoint is `baboom-review`.
-- Use `review_queue` for discovery and `resume_item` to recover remote state.
-  Resume restores staged drafts and image reports only when local files are absent.
-- Use `act_on_current_item("heartbeat")` during processing, before the API's
-  60-minute inactivity timeout. Release abandoned reservations explicitly.
-- Approval is separate from staging: show `approve_current_item` without confirmation
-  first, search catalog candidates, and send `confirm=True` only on explicit approval.
-- Approval submits a mass as `netMass` with its `massUnit`; the API stores it
-  canonically. Extraction drafts keep the units the source page stated.
-- New catalog products are unpublished. Approval materializes staged nutrition,
-  flavors and components atomically; conflicting catalog data is never overwritten.
-- `apply_current_item_extraction` completes an already linked product; preview
-  first and use `confirm=True` only on explicit approval, just like initial approval.
-- Multiple labels use `nutritionProfiles`, not `children`. Scalar macros are grams;
-  non-null sodium requires `sodiumUnit`. Micronutrients carry explicit units.
-- `schemas.py` validates nested local drafts; keep it aligned with the API DTOs.
-- Test with `python -m pytest tests -q`; run `prek run --all-files` from this directory.
-- Optional contract tests require API dev dependencies and `DJANGO_SETTINGS_MODULE`
-  (see README); they exercise the real GraphQL view using a disposable test database.
+- Use the Django admin REST API through `mcp_server.tools.admin_api`.
+- Keep one persisted HTTP session client; do not access the database directly.
+- Send model payloads unchanged and let Django's `ModelForm` validate them.
+- Discover available models from the admin registry instead of hardcoding them.
+- Treat HTTP 403 as a permission result for the signed-in user, separate from
+  network failures.
+- Keep image downloads and vision analysis local. Pass their working directory
+  explicitly to each function.
+- Parse page evidence from Django's stored `raw_html`; this service does not
+  launch a browser.
+- Keep the MCP server runnable over stdio with `python -m pytest tests -q` as
+  the local test command.

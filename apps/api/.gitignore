@@ -1,7 +1,7 @@
 .local/
 .codex
 
-# Agents temp folder
+# Temporary working folder
 .tmp*
 *.db
 history/

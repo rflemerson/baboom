@@ -1,7 +1,8 @@
 # Local Review Tools
 
-[`mcp_server`](mcp_server/README.md) provides the operator's MCP server and the
-`baboom-review` CLI. Both share one GraphQL client and a local draft workspace.
+[`mcp_server`](mcp_server/README.md) provides the operator's MCP server and its
+Django admin API client. The service keeps only local image work and page
+parsing that Django does not provide.
 
-The operator runs these tools locally; Django in `apps/api` owns queue state,
-staging and catalog approval. No database credentials are needed by the client.
+The operator runs these tools locally; Django in `apps/api` owns the catalog
+and its permissions. No database credentials are needed by the client.

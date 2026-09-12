@@ -19,6 +19,7 @@ dependencies = [
   "urllib3",
   "curl_cffi",
   "extruct",
+  "beautifulsoup4",
   "playwright",
   "django-celery-results",
   "django-celery-beat",

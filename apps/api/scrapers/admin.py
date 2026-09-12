@@ -11,6 +11,7 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
 from .models import ScrapedItem, ScrapedPage, ScraperRun
+from .tasks import enrich_store_pages
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -18,6 +19,29 @@ if TYPE_CHECKING:
 
 NAME_SUMMARY_MAX_LENGTH = 40
 ERROR_SUMMARY_MAX_LENGTH = 80
+
+
+@admin.action(description="Enrich selected pages")
+def enrich_selected_pages(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[ScrapedPage],
+) -> None:
+    """Queue a background render for the selected source pages."""
+    page_ids = list(queryset.values_list("pk", flat=True))
+    if not page_ids:
+        modeladmin.message_user(
+            request,
+            _("No pages selected."),
+            level=messages.WARNING,
+        )
+        return
+    enrich_store_pages.delay(page_ids=page_ids)
+    modeladmin.message_user(
+        request,
+        _("Queued %(count)d page(s) for enrichment.") % {"count": len(page_ids)},
+        level=messages.SUCCESS,
+    )
 
 
 @admin.action(description="Open product creation from selected item")
@@ -120,6 +144,7 @@ class ScrapedPageAdmin(admin.ModelAdmin):
         "scraped_at",
         "updated_at",
     )
+    actions = (enrich_selected_pages,)
 
     def has_add_permission(self, _request: HttpRequest) -> bool:
         """Disallow manual creation of scraper-captured pages."""

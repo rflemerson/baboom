@@ -7,21 +7,24 @@ import logging
 import os
 from decimal import Decimal
 from http import HTTPStatus
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 
 from core.models import Brand, Product, ProductStore, Store
 from offers.models import Offer, PriceObservation, StockStatus
+from scrapers.admin import ScrapedPageAdmin, enrich_selected_pages
 from scrapers.dtos import ScrapedItemIngestionInput
 from scrapers.models import ScrapedItem, ScrapedPage, ScraperRun
 from scrapers.services import (
     RenderResult,
     ScraperService,
+    extract_page_evidence,
     extract_schema_metadata,
 )
 from scrapers.spiders.blackskull import BlackSkullSpider
@@ -512,7 +515,12 @@ class ScraperEnrichmentTests(TestCase):
         page.refresh_from_db()
         assert stats["updated"] == 1
         mock_render.assert_called_once()
-        assert page.html_structured_data["json-ld"][0]["name"] == "3W Whey Protein"
+        assert page.html_structured_data["schema"]["json-ld"][0]["name"] == (
+            "3W Whey Protein"
+        )
+        assert page.html_structured_data["tables"] == []
+        assert "Proteínas" in page.html_structured_data["text"]
+        assert "3W Whey Protein" not in page.html_structured_data["text"]
         # raw HTML is the source of truth: it keeps the embedded script dataset.
         assert "window.__NUXT__" in page.raw_html
         assert page.response_meta == {"status": 200, "headers": {"etag": 'W/"abc"'}}
@@ -532,6 +540,33 @@ class ScraperEnrichmentTests(TestCase):
         assert stats["updated"] == 1
         assert page.raw_html == ""
         assert page.html_structured_data == {}
+
+    def test_admin_action_enqueues_selected_page_ids(self) -> None:
+        """The admin action delegates heavy rendering to Celery."""
+        page = self._page()
+        modeladmin = MagicMock()
+        request = MagicMock()
+
+        with patch("scrapers.admin.enrich_store_pages.delay") as enqueue:
+            enrich_selected_pages(modeladmin, request, ScrapedPage.objects.all())
+
+        enqueue.assert_called_once_with(page_ids=[page.pk])
+        modeladmin.message_user.assert_called_once()
+
+    def test_enrichment_action_accepts_view_permission(self) -> None:
+        """Expose only enrichment to read-only page operators."""
+        page_admin = ScrapedPageAdmin(ScrapedPage, MagicMock())
+        request = RequestFactory().get(
+            "/admin-api/api/v1/scrapers/scrapedpage/actions/",
+        )
+        request.user = MagicMock()
+        request.user.has_perm.return_value = True
+        request.resolver_match = SimpleNamespace(
+            kwargs={"action_name": enrich_selected_pages.__name__},
+        )
+
+        assert page_admin.has_change_permission(request) is True
+        assert enrich_selected_pages.__name__ in page_admin.get_actions(request)
 
     def test_enrich_page_failed_when_render_fails(self) -> None:
         """A failed render reports failure and leaves stored captures untouched."""
@@ -577,6 +612,31 @@ class SchemaMetadataParsingTests(SimpleTestCase):
         )
 
         assert all(not block for block in data.values())
+
+    def test_extracts_tables_and_visible_text_without_script_noise(self) -> None:
+        """Capture table rows and readable text while excluding scripts."""
+        html = """
+        <html><body>
+          <script>window.noise = 'ignore me'</script>
+          <table><tr><th>Serving</th><th>30 g</th></tr>
+            <tr><td>Protein</td><td>24 g</td></tr></table>
+          <div>Visible nutrition note</div>
+        </body></html>
+        """
+
+        data = extract_page_evidence(html, "https://example.com/product")
+
+        assert data["tables"] == [[["Serving", "30 g"], ["Protein", "24 g"]]]
+        # One node per line: a label and its value must not collapse into one
+        # run, or a nutrition table laid out in divs becomes unparseable.
+        assert data["text"].splitlines() == [
+            "Serving",
+            "30 g",
+            "Protein",
+            "24 g",
+            "Visible nutrition note",
+        ]
+        assert "ignore me" not in data["text"]
 
 
 class DarkLabSpiderUnitTests(SimpleTestCase):

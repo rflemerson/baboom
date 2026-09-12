@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, NamedTuple
 
 import extruct
+from bs4 import BeautifulSoup
 from django.db import transaction
 
 from offers.services import OfferObservationResult, OfferObservationService
@@ -51,6 +52,47 @@ def extract_schema_metadata(html: str, url: str) -> dict:
         logger.exception("Failed to extract schema.org metadata for %s", url)
         return {}
     return extracted if isinstance(extracted, dict) else {}
+
+
+def _visible_text(soup: BeautifulSoup) -> str:
+    """Return the visible text with one node per line.
+
+    The line breaks are the point: a nutrition table laid out in divs is only
+    readable if each label and value keeps its own line. Collapsing the page
+    into one space-separated run loses the row structure that makes those
+    values parseable at all.
+    """
+    for element in soup.find_all(["script", "style", "noscript", "template"]):
+        element.decompose()
+    lines = (line.strip() for line in soup.get_text("\n").splitlines())
+    return "\n".join(line for line in lines if line)
+
+
+def extract_page_evidence(html: str, url: str) -> dict:
+    """Extract semantic metadata, tables, and visible text from a page.
+
+    The three live under their own keys because they are different kinds of
+    evidence: what the page author declared, what it tabulated, and what it
+    simply shows. Stores keep nutrition in all three places.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    tables: list[list[list[str]]] = []
+    for table in soup.find_all("table"):
+        rows = []
+        for row in table.find_all("tr"):
+            cells = [
+                cell.get_text(" ", strip=True) for cell in row.find_all(["th", "td"])
+            ]
+            if cells:
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+
+    return {
+        "schema": extract_schema_metadata(html, url),
+        "tables": tables,
+        "text": _visible_text(soup),
+    }
 
 
 class ScraperService:
@@ -225,6 +267,7 @@ class ScraperService:
         *,
         store_slug: str | None = None,
         limit: int | None = None,
+        page_ids: list[int] | None = None,
     ) -> dict[str, int]:
         """Heavy, on-demand pass: refresh the captured HTML for scraped pages.
 
@@ -241,6 +284,8 @@ class ScraperService:
         pages = ScrapedPage.objects.all()
         if store_slug:
             pages = pages.filter(store_slug=store_slug)
+        if page_ids is not None:
+            pages = pages.filter(pk__in=page_ids)
         if limit:
             pages = pages[:limit]
 
@@ -265,7 +310,7 @@ class ScraperService:
             page.html_structured_data = {}
         else:
             page.raw_html = result.html
-            page.html_structured_data = extract_schema_metadata(result.html, page.url)
+            page.html_structured_data = extract_page_evidence(result.html, page.url)
         page.response_meta = {"status": result.status, "headers": result.headers}
 
         page.save(
