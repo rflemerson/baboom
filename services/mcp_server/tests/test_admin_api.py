@@ -1,7 +1,7 @@
 """Tests for admin API error classification and session persistence."""
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import pytest
@@ -15,6 +15,11 @@ from mcp_server.tools.admin_api import (
     ValidationError,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+EXPECTED_RETRY_REQUESTS = 3
+
 
 def response(status: int, body: dict, cookies: dict[str, str] | None = None) -> Mock:
     """Build a requests response double."""
@@ -25,9 +30,14 @@ def response(status: int, body: dict, cookies: dict[str, str] | None = None) -> 
     return result
 
 
-def test_failed_login_returns_clear_error(tmp_path: Path) -> None:
+def test_failed_login_returns_clear_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Turn a rejected login into a clear authentication error."""
     client = AdminAPIClient("http://example.test", tmp_path / "session.json")
+    monkeypatch.setenv("ADMIN_API_USERNAME", "operator")
+    monkeypatch.setenv("ADMIN_API_PASSWORD", "wrong")
     client.session.get = Mock(return_value=response(200, {}, {"csrftoken": "token"}))
     client.session.request = Mock(
         return_value=response(
@@ -37,7 +47,76 @@ def test_failed_login_returns_clear_error(tmp_path: Path) -> None:
     )
 
     with pytest.raises(AuthenticationError, match="invalid credentials"):
-        client.login("operator", "wrong")
+        client.login()
+
+
+def test_failed_login_http_401_is_authentication_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Classify an HTTP 401 from the login endpoint as bad credentials."""
+    monkeypatch.setenv("ADMIN_API_USERNAME", "operator")
+    monkeypatch.setenv("ADMIN_API_PASSWORD", "wrong")
+    client = AdminAPIClient("http://example.test", tmp_path / "session.json")
+    client.session.get = Mock(return_value=response(200, {}))
+    client.session.request = Mock(return_value=response(401, {"error": {}}))
+
+    with pytest.raises(AuthenticationError, match="invalid credentials"):
+        client.login()
+
+
+def test_missing_username_names_the_environment_variable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Report the missing credential variable instead of a raw key error."""
+    monkeypatch.delenv("ADMIN_API_USERNAME", raising=False)
+    monkeypatch.setenv("ADMIN_API_PASSWORD", "secret")
+    client = AdminAPIClient("http://example.test", tmp_path / "session.json")
+
+    with pytest.raises(AuthenticationError, match="ADMIN_API_USERNAME"):
+        client.login()
+
+
+def test_expired_session_logs_in_and_retries_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Refresh an expired session once, then repeat the original request."""
+    monkeypatch.setenv("ADMIN_API_USERNAME", "operator")
+    monkeypatch.setenv("ADMIN_API_PASSWORD", "secret")
+    client = AdminAPIClient("http://example.test", tmp_path / "session.json")
+    client.session.get = Mock(return_value=response(200, {}, {"csrftoken": "token"}))
+    client.session.request = Mock(
+        side_effect=[
+            response(403, {"error": {"code": "session_expired", "message": "Expired"}}),
+            response(200, {"user": {}}),
+            response(200, {"results": []}),
+        ],
+    )
+
+    assert client.registry() == {"results": []}
+    assert client.session.request.call_count == EXPECTED_RETRY_REQUESTS
+
+
+def test_password_is_never_written_to_session_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Persist cookies only, never the environment password."""
+    credential = "super-secret-value"
+    monkeypatch.setenv("ADMIN_API_USERNAME", "operator")
+    monkeypatch.setenv("ADMIN_API_PASSWORD", credential)
+    path = tmp_path / "session.json"
+    client = AdminAPIClient("http://example.test", path)
+    client.session.get = Mock(return_value=response(200, {}, {"csrftoken": "token"}))
+    client.session.request = Mock(
+        return_value=response(200, {"user": {}}, {"sessionid": "abc"}),
+    )
+
+    client.login()
+
+    assert credential not in path.read_text()
 
 
 def test_validation_error_preserves_field_errors(tmp_path: Path) -> None:

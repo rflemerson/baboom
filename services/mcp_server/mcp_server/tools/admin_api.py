@@ -62,6 +62,15 @@ class AdminAPIClient:
         self.session = requests.Session()
         self._restore_session()
 
+    @staticmethod
+    def _environment_credential(name: str) -> str:
+        """Return a required credential without exposing its value."""
+        value = os.getenv(name)
+        if not value:
+            message = f"{name} is not configured."
+            raise AuthenticationError(message)
+        return value
+
     def _restore_session(self) -> None:
         if not self.session_path.exists():
             return
@@ -85,6 +94,7 @@ class AdminAPIClient:
             json.dumps(payload, indent=2, sort_keys=True),
             encoding="utf-8",
         )
+        self.session_path.chmod(0o600)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"
@@ -96,6 +106,7 @@ class AdminAPIClient:
         *,
         payload: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        retry_auth: bool = True,
     ) -> dict[str, Any]:
         headers: dict[str, str] = {}
         if method.upper() not in {"GET", "HEAD", "OPTIONS"}:
@@ -116,6 +127,15 @@ class AdminAPIClient:
             raise NetworkError(message) from exc
         self.persist_session()
         body = self._decode_response(response)
+        if retry_auth and self._is_session_expired(response.status_code, body):
+            self.login()
+            return self._request(
+                method,
+                path,
+                payload=payload,
+                params=params,
+                retry_auth=False,
+            )
         if response.status_code == HTTPStatus.FORBIDDEN:
             fallback = "Django denied this operation for the current user."
             raise PermissionDeniedError(
@@ -138,6 +158,21 @@ class AdminAPIClient:
         return body
 
     @staticmethod
+    def _is_session_expired(status_code: int, body: dict[str, Any]) -> bool:
+        """Identify an authentication response without swallowing permission 403s."""
+        if status_code == HTTPStatus.UNAUTHORIZED:
+            return True
+        if status_code != HTTPStatus.FORBIDDEN:
+            return False
+        error = body.get("error")
+        code = error.get("code") if isinstance(error, dict) else None
+        return code in {
+            "session_expired",
+            "not_authenticated",
+            "authentication_required",
+        }
+
+    @staticmethod
     def _decode_response(response: requests.Response) -> dict[str, Any]:
         try:
             body = response.json()
@@ -158,8 +193,10 @@ class AdminAPIClient:
                 return str(message)
         return fallback
 
-    def login(self, username: str, password: str) -> dict[str, Any]:
-        """Authenticate through Django's session login endpoint."""
+    def login(self) -> dict[str, Any]:
+        """Authenticate through Django's session login endpoint and environment."""
+        username = self._environment_credential("ADMIN_API_USERNAME")
+        password = self._environment_credential("ADMIN_API_PASSWORD")
         try:
             self.session.get(self._url("admin/login/"), timeout=60)
         except requests.RequestException as exc:
@@ -171,6 +208,7 @@ class AdminAPIClient:
                 "POST",
                 "admin-api/api/v1/login/",
                 payload={"username": username, "password": password},
+                retry_auth=False,
             )
         except PermissionDeniedError as exc:
             message = (
@@ -182,6 +220,17 @@ class AdminAPIClient:
             ) from exc
         except NetworkError:
             raise
+        except AdminAPIError as exc:
+            if exc.status_code not in {
+                HTTPStatus.BAD_REQUEST,
+                HTTPStatus.UNAUTHORIZED,
+                HTTPStatus.FORBIDDEN,
+            }:
+                raise
+            message = (
+                "Admin login failed: invalid credentials or insufficient permissions."
+            )
+            raise AuthenticationError(message, status_code=exc.status_code) from exc
         return body
 
     def registry(self) -> dict[str, Any]:

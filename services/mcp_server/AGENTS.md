@@ -11,6 +11,11 @@ This service exposes local tools for catalog work that Django does not provide.
 - Keep image downloads and vision analysis local. Pass their working directory
   explicitly to each function.
 - Parse page evidence from Django's stored `raw_html`; this service does not
-  launch a browser.
+  need a browser for ordinary parsing.
+- Browser investigation is local and stdio-only: open only registered
+  `ScrapedPage` ids, keep one Playwright context per domain, block private and
+  cross-domain navigation, and bound every textual return.
+- Admin credentials come only from `ADMIN_API_USERNAME` and
+  `ADMIN_API_PASSWORD`; never expose them as tool arguments or persist them.
 - Keep the MCP server runnable over stdio with `python -m pytest tests -q` as
   the local test command.
