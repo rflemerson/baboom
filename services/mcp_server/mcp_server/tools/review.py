@@ -5,13 +5,16 @@ from .drafts import draft_path
 from .image_report import image_report_path, save_image_report
 from .workspace import get_current_item, item_dir, set_current_item, write_json
 
+ITEM_NOT_FOUND = "Item not found."
+INVALID_APPROVAL_TARGET = "Provide exactly one of product_id or create_product."
+
 
 def resume_item(item_id: int) -> dict:
     """Reload server state and restore evidence without overwriting local edits."""
     snapshot = api.review_item(item_id)
     item = snapshot.get("reviewItem")
     if item is None:
-        raise api.APIError("Item não encontrado.")
+        raise api.APIError(ITEM_NOT_FOUND)
     set_current_item(item)
     extraction = snapshot.get("reviewExtraction")
     if extraction:
@@ -39,6 +42,7 @@ def act_on_current_item(action: str) -> dict:
 
 
 def approve_current_item(
+    *,
     product_id: int | None = None,
     create_product: dict | None = None,
     confirm: bool = False,
@@ -50,7 +54,7 @@ def approve_current_item(
         "createProduct": create_product,
     }
     if (product_id is None) == (create_product is None):
-        raise ValueError("Informe product_id ou create_product, exclusivamente.")
+        raise ValueError(INVALID_APPROVAL_TARGET)
     if not confirm:
         return {"ok": False, "preview": payload, "confirmationRequired": True}
     product = api.approve_scraped_item(payload)
@@ -64,7 +68,7 @@ def approve_current_item(
     return {"ok": True, "product": product}
 
 
-def apply_current_item_extraction(product_id: int, confirm: bool = False) -> dict:
+def apply_current_item_extraction(*, product_id: int, confirm: bool = False) -> dict:
     """Preview or explicitly apply staged evidence to the already linked product."""
     payload = {"itemId": int(get_current_item()["id"]), "productId": product_id}
     if not confirm:
@@ -80,10 +84,14 @@ def apply_current_item_extraction(product_id: int, confirm: bool = False) -> dic
     return {"ok": True, "product": product}
 
 
-def report_current_item_error(message: str, is_fatal: bool = False) -> dict:
+def report_current_item_error(message: str, *, is_fatal: bool = False) -> dict:
     """Report failure and update local state only after server acceptance."""
     item = get_current_item()
-    result = api.report_scraped_item_error(int(item["id"]), message, is_fatal)
+    result = api.report_scraped_item_error(
+        int(item["id"]),
+        message,
+        is_fatal=is_fatal,
+    )
     if result["ok"]:
         item["status"] = "review" if is_fatal else "error"
         set_current_item(item)

@@ -1,3 +1,5 @@
+"""Draft validation and submission helpers for the review workflow."""
+
 from typing import Any
 
 from .api import submit_agent_extraction
@@ -8,6 +10,7 @@ from .workspace import get_current_item, set_current_item
 
 
 def build_submission_preview(image_report: str | None = None) -> dict[str, Any]:
+    """Build the backend submission payload without sending it."""
     item = get_current_item()
     draft = load_draft()
 
@@ -25,13 +28,19 @@ def build_submission_preview(image_report: str | None = None) -> dict[str, Any]:
 
 
 def submit_draft(
-    image_report: str | None = None, confirm: bool = False
+    *,
+    image_report: str | None = None,
+    confirm: bool = False,
 ) -> dict[str, Any]:
+    """Validate and submit the current draft when explicitly confirmed."""
     if not confirm:
         return {
             "ok": False,
             "errors": [
-                "Confirmação explícita obrigatória. Chame com confirm=true apenas quando o usuário pedir para enviar.",
+                (
+                    "Explicit confirmation is required. Call with confirm=true only "
+                    "when the user asks to submit."
+                ),
             ],
         }
 
@@ -48,7 +57,7 @@ def submit_draft(
     if result.get("errors") or not result.get("extraction"):
         return {
             "ok": False,
-            "errors": result.get("errors") or ["Extração não retornada."],
+            "errors": result.get("errors") or ["Extraction was not returned."],
         }
     item = get_current_item()
     item["status"] = "review"

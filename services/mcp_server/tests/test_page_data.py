@@ -1,3 +1,5 @@
+"""Tests for rendered-page parsing and structured data extraction."""
+
 from mcp_server.tools.dynamic_crawler import extract_page_data
 
 SAMPLE_HTML = """
@@ -32,7 +34,8 @@ SAMPLE_HTML = """
 BASE_URL = "https://www.gsuplementos.com.br/produto-p1"
 
 
-def test_extracts_title_and_meta():
+def test_extracts_title_and_meta() -> None:
+    """Extract the page title and non-empty metadata values."""
     data = extract_page_data(SAMPLE_HTML, base_url=BASE_URL)
 
     assert data["title"] == "3W Whey Protein 1Kg - Growth Supplements"
@@ -41,7 +44,8 @@ def test_extracts_title_and_meta():
     assert "empty-content" not in data["meta"]
 
 
-def test_extracts_json_ld_blocks():
+def test_extracts_json_ld_blocks() -> None:
+    """Parse valid JSON-LD blocks and skip malformed blocks."""
     data = extract_page_data(SAMPLE_HTML, base_url=BASE_URL)
 
     types = [block.get("@type") for block in data["jsonLd"]]
@@ -49,13 +53,15 @@ def test_extracts_json_ld_blocks():
     assert data["jsonLd"][0]["offers"]["price"] == "129.90"
 
 
-def test_extracts_tables_skipping_empty_ones():
+def test_extracts_tables_skipping_empty_ones() -> None:
+    """Keep populated tables while dropping empty tables."""
     data = extract_page_data(SAMPLE_HTML, base_url=BASE_URL)
 
     assert data["tables"] == [[["Porção", "30 g"], ["Proteínas", "24 g"]]]
 
 
-def test_extracts_images_with_neutral_metadata():
+def test_extracts_images_with_neutral_metadata() -> None:
+    """Collect images from metadata, JSON-LD, and HTML image tags."""
     data = extract_page_data(SAMPLE_HTML, base_url=BASE_URL)
 
     by_url = {image["url"]: image for image in data["images"]}
@@ -79,7 +85,8 @@ def test_extracts_images_with_neutral_metadata():
     )
 
 
-def test_empty_html():
+def test_empty_html() -> None:
+    """Return empty collections for a document without content."""
     data = extract_page_data("<html></html>")
 
     assert data == {
@@ -92,7 +99,7 @@ def test_empty_html():
     }
 
 
-def test_visible_text_keeps_values_that_are_not_in_a_table():
+def test_visible_text_keeps_values_that_are_not_in_a_table() -> None:
     """Stores that lay a nutrition table out in divs must stay readable."""
     html = """
     <html><body>

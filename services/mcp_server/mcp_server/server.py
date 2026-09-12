@@ -1,3 +1,5 @@
+"""MCP tools for the local extraction-review workflow."""
+
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -51,16 +53,16 @@ def checkout_scraped_item(item_id: int | None = None) -> str:
     """Checkout the next queued scraped item and set it as current."""
     item = checkout_item(item_id)
     if not item:
-        return "Nenhum item disponível na fila."
+        return "No item is available in the queue."
 
     return format_item_summary(item)
 
 
 @mcp.tool()
 def prepare_current_item() -> dict:
-    """Extract the structured context of the current item: parsed API context,
-    parsed structured data and the image URLs found in them. Decide from this
-    output what else is needed (fetch_source_page, download_images).
+    """Extract structured context and image URLs for the current item.
+
+    Use the result to decide whether to fetch the source page or download images.
     """
     item = get_current_item()
     prepared = build_prepared_context(item)
@@ -70,28 +72,24 @@ def prepare_current_item() -> dict:
 
 @mcp.tool()
 def fetch_source_page(url: str | None = None) -> dict:
-    """Render the item's source page in a headless browser (needed for sites that
-    only load content client-side) and return structured page data: title, meta
-    tags, JSON-LD blocks, tables and every referenced image with alt text and
-    where it was referenced (JSON-LD, meta, img tag). Also saves page.html and
-    page_data.json in the item's workspace.
+    """Render the source page and save its structured data in the workspace.
+
+    The result includes metadata, JSON-LD blocks, tables, text, and images.
     """
     return fetch_source_page_data(url)
 
 
 @mcp.tool()
 def download_images(urls: list[str]) -> dict:
-    """Download the chosen image URLs into the current item's workspace.
-    Pick the URLs that matter for extraction (product photos, nutrition label
-    images) from prepare_current_item / fetch_source_page output.
-    """
+    """Download selected product or nutrition-label images to the workspace."""
     return download_images_for_item(urls)
 
 
 @mcp.tool()
 def create_image_report() -> dict:
-    """Analyze the downloaded images with the configured vision model and save
-    the resulting report for the current item.
+    """Analyze downloaded images with the configured vision model.
+
+    Save the resulting report for the current item.
     """
     return create_image_report_for_item()
 
@@ -128,18 +126,23 @@ def build_submission_preview(image_report: str | None = None) -> dict:
 
 
 @mcp.tool()
-def submit_draft(image_report: str | None = None, confirm: bool = False) -> dict:
+def submit_draft(
+    image_report: str | None = None,
+    *,
+    confirm: bool = False,
+) -> dict:
     """Submit the current validated draft to review staging. Requires confirm=True."""
     return submit_draft_file(image_report=image_report, confirm=confirm)
 
 
 @mcp.tool()
-def report_item_error(message: str, is_fatal: bool = False) -> dict:
+def report_item_error(message: str, *, is_fatal: bool = False) -> dict:
     """Report an error for the current checked out scraped item."""
-    return report_current_item_error(message, is_fatal)
+    return report_current_item_error(message, is_fatal=is_fatal)
 
 
 def main() -> None:
+    """Start the MCP server over its configured transport."""
     mcp.run()
 
 

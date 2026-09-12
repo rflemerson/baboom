@@ -1,3 +1,5 @@
+"""GraphQL transport helpers for the extraction-review backend."""
+
 import os
 from typing import Any
 
@@ -5,20 +7,30 @@ import requests
 
 
 class APIError(RuntimeError):
-    pass
+    """Raised when the backend cannot serve a review request."""
+
+
+BACKEND_GRAPHQL_URL_MISSING = "BACKEND_GRAPHQL_URL is not configured."
+BACKEND_API_KEY_MISSING = "BACKEND_API_KEY is not configured."
+INVALID_GRAPHQL_RESPONSE = "Invalid GraphQL response."
+MISSING_GRAPHQL_DATA = "GraphQL response has no data."
+UNKNOWN_REVIEW_ACTION = "Unknown review action."
+UNKNOWN_CATALOG_REFERENCE = "Unknown catalog reference."
+MISSING_APPROVAL_PRODUCT = "Approval did not return a product."
+MISSING_EXTRACTION_PRODUCT = "Applying the extraction did not return a product."
 
 
 def _graphql_url() -> str:
     url = os.getenv("BACKEND_GRAPHQL_URL")
     if not url:
-        raise APIError("BACKEND_GRAPHQL_URL não configurado.")
+        raise APIError(BACKEND_GRAPHQL_URL_MISSING)
     return url
 
 
 def _headers() -> dict[str, str]:
     api_key = os.getenv("BACKEND_API_KEY")
     if not api_key:
-        raise APIError("BACKEND_API_KEY não configurado.")
+        raise APIError(BACKEND_API_KEY_MISSING)
     return {
         "Content-Type": "application/json",
         "X-API-KEY": api_key,
@@ -26,8 +38,10 @@ def _headers() -> dict[str, str]:
 
 
 def graphql_request(
-    query: str, variables: dict[str, Any] | None = None
+    query: str,
+    variables: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Execute a GraphQL request and return its data object."""
     response = requests.post(
         _graphql_url(),
         json={"query": query, "variables": variables or {}},
@@ -38,11 +52,11 @@ def graphql_request(
 
     payload = response.json()
     if not isinstance(payload, dict):
-        raise APIError("Resposta GraphQL inválida.")
+        raise APIError(INVALID_GRAPHQL_RESPONSE)
     if payload.get("errors"):
         raise APIError(str(payload["errors"]))
     if not isinstance(payload.get("data"), dict):
-        raise APIError("Resposta GraphQL sem dados.")
+        raise APIError(MISSING_GRAPHQL_DATA)
     return payload["data"]
 
 
@@ -69,6 +83,7 @@ ITEM_FIELDS = """
 
 
 def checkout_scraped_item(item_id: int | None = None) -> dict[str, Any] | None:
+    """Reserve the requested queued item, or the next available item."""
     query = (
         "mutation($data: ScrapedItemCheckoutInput) { checkoutScrapedItem(data: $data) {"
         + ITEM_FIELDS
@@ -92,6 +107,7 @@ def review_queue(status: str = "queued", search: str = "", limit: int = 20) -> l
 
 
 def review_item(item_id: int) -> dict:
+    """Load one review item together with its staged extraction."""
     query = (
         "query($itemId: Int!) { reviewItem(itemId: $itemId) {"
         + ITEM_FIELDS
@@ -101,8 +117,9 @@ def review_item(item_id: int) -> dict:
 
 
 def review_action(action: str, item_id: int) -> dict:
+    """Apply a heartbeat, release, or ignore action to a review item."""
     if action not in {"heartbeat", "release", "ignore"}:
-        raise ValueError("Ação de revisão desconhecida.")
+        raise ValueError(UNKNOWN_REVIEW_ACTION)
     field = f"{action}ScrapedItem"
     query = (
         "mutation($data: ScrapedItemActionInput!) { "
@@ -122,7 +139,8 @@ def catalog_candidates(search: str = "", ean: str = "", limit: int = 20) -> list
     query = """
     query($search: String!, $ean: String!, $limit: Int!) {
       catalogCandidates(search: $search, ean: $ean, limit: $limit) {
-        id name brandId brandName categoryId categoryName ean netMass massUnit packaging isPublished
+        id name brandId brandName categoryId categoryName ean netMass massUnit
+        packaging isPublished
       }
     }
     """
@@ -139,7 +157,7 @@ def catalog_choices(kind: str, search: str = "", limit: int = 50) -> list:
         "tags": "catalogTags",
     }
     if kind not in fields:
-        raise ValueError("Referência de catálogo desconhecida.")
+        raise ValueError(UNKNOWN_CATALOG_REFERENCE)
     field = fields[kind]
     query = (
         "query($search: String!, $limit: Int!) { "
@@ -150,10 +168,14 @@ def catalog_choices(kind: str, search: str = "", limit: int = 50) -> list:
 
 
 def approve_scraped_item(payload: dict) -> dict:
+    """Create or link a catalog product from an approved review payload."""
     query = """
     mutation($data: ScrapedItemApprovalInput!) {
       approveScrapedItem(data: $data) {
-        product { id name brandId brandName categoryId categoryName ean netMass massUnit packaging isPublished }
+        product {
+          id name brandId brandName categoryId categoryName ean netMass massUnit
+          packaging isPublished
+        }
         errors { field message }
       }
     }
@@ -162,7 +184,7 @@ def approve_scraped_item(payload: dict) -> dict:
     if result.get("errors"):
         raise APIError(str(result["errors"]))
     if not result.get("product"):
-        raise APIError("Aprovação não retornou produto.")
+        raise APIError(MISSING_APPROVAL_PRODUCT)
     return result["product"]
 
 
@@ -180,11 +202,12 @@ def apply_scraped_item_extraction(payload: dict) -> dict:
     if result.get("errors"):
         raise APIError(str(result["errors"]))
     if not result.get("product"):
-        raise APIError("Aplicação da extração não retornou produto.")
+        raise APIError(MISSING_EXTRACTION_PRODUCT)
     return result["product"]
 
 
 def submit_agent_extraction(data: dict[str, Any]) -> dict[str, Any]:
+    """Submit an extraction payload to the backend review staging area."""
     query = """
     mutation SubmitAgentExtraction($data: AgentExtractionInput!) {
       submitAgentExtraction(data: $data) {
@@ -204,8 +227,12 @@ def submit_agent_extraction(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def report_scraped_item_error(
-    item_id: int, message: str, is_fatal: bool = False
+    item_id: int,
+    message: str,
+    *,
+    is_fatal: bool = False,
 ) -> dict[str, Any]:
+    """Report a processing error for a checked-out item."""
     query = """
     mutation ReportScrapedItemError($data: ScrapedItemErrorInput!) {
       reportScrapedItemError(data: $data)

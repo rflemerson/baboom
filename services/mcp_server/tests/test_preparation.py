@@ -1,3 +1,5 @@
+"""Tests for source-data preparation and image URL extraction."""
+
 from mcp_server.tools.preparation import (
     build_prepared_context,
     extract_image_urls_from_html_text,
@@ -7,7 +9,8 @@ from mcp_server.tools.preparation import (
 )
 
 
-def test_looks_like_image_url():
+def test_looks_like_image_url() -> None:
+    """Recognize supported absolute, protocol-relative, and root URLs."""
     assert looks_like_image_url("https://cdn.example.com/a.jpg")
     assert looks_like_image_url("//cdn.example.com/a.webp?w=300")
     assert looks_like_image_url("/media/a.png")
@@ -15,7 +18,8 @@ def test_looks_like_image_url():
     assert not looks_like_image_url("relative/a.jpg")
 
 
-def test_normalize_url():
+def test_normalize_url() -> None:
+    """Resolve relative image URLs against their source page."""
     assert normalize_url("//cdn.example.com/a.jpg") == "https://cdn.example.com/a.jpg"
     assert (
         normalize_url("/media/a.jpg", base_url="https://example.com/produto")
@@ -28,7 +32,8 @@ def test_normalize_url():
     assert normalize_url("https://x.com/a.jpg") == "https://x.com/a.jpg"
 
 
-def test_extract_image_urls_from_payload_dedupes():
+def test_extract_image_urls_from_payload_dedupes() -> None:
+    """Extract nested image URLs once each."""
     payload = {
         "images": ["https://x.com/a.jpg", "https://x.com/a.jpg"],
         "nested": {"img": "//x.com/b.png", "other": 42},
@@ -40,14 +45,16 @@ def test_extract_image_urls_from_payload_dedupes():
     ]
 
 
-def test_extract_image_urls_from_html_text():
+def test_extract_image_urls_from_html_text() -> None:
+    """Extract supported image URLs from arbitrary HTML text."""
     html = '<img src="https://x.com/a.jpg?v=2"><img src="https://x.com/b.css">'
 
     assert extract_image_urls_from_html_text(html) == ["https://x.com/a.jpg?v=2"]
     assert extract_image_urls_from_html_text(None) == []
 
 
-def test_build_prepared_context():
+def test_build_prepared_context() -> None:
+    """Combine item metadata and discovered image URLs."""
     item = {
         "id": "7",
         "storeSlug": "growth",

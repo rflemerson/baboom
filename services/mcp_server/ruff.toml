@@ -12,7 +12,7 @@ select = [
     "ASYNC", # async/await issues
     "BLE", # blind exception catches
     "C4",  # flake8-comprehensions
-    "COM", # trailing commas
+    # Trailing commas are enforced by ruff-format.
     "EM",  # exception message style
     "EXE", # shebang / executable files
     "FBT", # boolean trap
@@ -47,17 +47,8 @@ select = [
     "TC",  # type-checking imports
     "D",   # pydocstyle
 ]
-ignore = [
-    "D",     # missing docstrings
-    "ANN",   # type annotations
-    "FBT",   # boolean trap
-    "EM",    # exception message style
-    "TRY",   # exception handling style
-    "S",     # security
-    "E501",  # line too long
-    "PLR",   # complexity
-    "COM812", # formatting conflict
-    "TC",    # type-checking imports
-    "BLE",   # blind exceptions
-    "PERF",  # performance suggestions
-]
+
+[lint.per-file-ignores]
+# ``assert`` is the idiomatic assertion API in pytest; production code remains
+# covered by the security rules above.
+"**/tests/**/*.py" = ["S101"]

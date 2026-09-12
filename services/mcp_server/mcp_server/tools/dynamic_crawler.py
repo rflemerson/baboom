@@ -30,7 +30,10 @@ IMG_SRC_ATTRS = ("src", "data-src", "data-lazy-src", "data-original")
 
 
 async def fetch_rendered_html_async(
-    url: str, timeout_ms: int = 60000, settle_ms: int = 3000, scroll_steps: int = 10
+    url: str,
+    timeout_ms: int = 60000,
+    settle_ms: int = 3000,
+    scroll_steps: int = 10,
 ) -> str:
     """Open the URL in headless Chromium and return the rendered HTML."""
     async with async_playwright() as p:
@@ -56,10 +59,14 @@ async def fetch_rendered_html_async(
 
 
 def fetch_rendered_html(
-    url: str, timeout_ms: int = 60000, settle_ms: int = 3000, scroll_steps: int = 10
+    url: str,
+    timeout_ms: int = 60000,
+    settle_ms: int = 3000,
+    scroll_steps: int = 10,
 ) -> str:
+    """Fetch a JavaScript-rendered page as HTML synchronously."""
     return asyncio.run(
-        fetch_rendered_html_async(url, timeout_ms, settle_ms, scroll_steps)
+        fetch_rendered_html_async(url, timeout_ms, settle_ms, scroll_steps),
     )
 
 
@@ -127,7 +134,8 @@ def _add_image(
 ) -> None:
     normalized = normalize_url(url, base_url=base_url)
     entry = images.setdefault(
-        normalized, {"url": normalized, "alt": None, "sources": []}
+        normalized,
+        {"url": normalized, "alt": None, "sources": []},
     )
     if source not in entry["sources"]:
         entry["sources"].append(source)
@@ -141,8 +149,7 @@ def _extract_images(
     json_ld: list[Any],
     base_url: str | None,
 ) -> list[dict[str, Any]]:
-    """Collect every image the page references, in document order, annotated
-    with where it came from so the agent can judge relevance."""
+    """Collect page images in document order with their source metadata."""
     images: dict[str, dict[str, Any]] = {}
 
     for key, value in meta.items():
@@ -165,7 +172,7 @@ def _extract_images(
 
 
 def extract_page_data(html: str, base_url: str | None = None) -> dict[str, Any]:
-    """Parse rendered HTML into structured JSON: title, meta, JSON-LD, tables, text, images."""
+    """Parse rendered HTML into title, metadata, tables, text, and images."""
     soup = BeautifulSoup(html, "html.parser")
     json_ld = _extract_json_ld(soup)
     meta = _extract_meta(soup)

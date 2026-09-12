@@ -2,6 +2,7 @@
 
 import json as json_module
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -20,13 +21,14 @@ pytestmark = [
 
 
 @pytest.fixture
-def backend(monkeypatch):
+def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Any]:
+    """Provision a minimal Django GraphQL backend for contract checks."""
     schema = pytest.importorskip("baboom.schema").schema
     core = pytest.importorskip("core.models")
     offers = pytest.importorskip("offers.models")
     scrapers = pytest.importorskip("scrapers.models")
     view = pytest.importorskip("strawberry.django.views").GraphQLView.as_view(
-        schema=schema
+        schema=schema,
     )
     factory = pytest.importorskip("django.test").RequestFactory()
 
@@ -39,13 +41,24 @@ def backend(monkeypatch):
         api_context={"image": "https://cdn.example/label"},
     )
     offer = offers.Offer.objects.create(
-        store_slug="growth", external_id="contract", name="Whey"
+        store_slug="growth",
+        external_id="contract",
+        name="Whey",
     )
     item = scrapers.ScrapedItem.objects.create(
-        offer=offer, source_page=page, status="queued"
+        offer=offer,
+        source_page=page,
+        status="queued",
     )
 
-    def post(_url, *, json, headers, timeout):
+    def post(
+        _url: str,
+        *,
+        json: dict[str, Any],
+        headers: dict[str, str],
+        timeout: int,
+    ) -> SimpleNamespace:
+        """Adapt requests-style calls to Django's in-process test client."""
         assert timeout > 0
         request = factory.post(
             "/graphql/",
@@ -66,7 +79,8 @@ def backend(monkeypatch):
     return item, brand
 
 
-def test_full_review_contract(backend):
+def test_full_review_contract(backend: tuple[Any, Any]) -> None:
+    """Exercise the complete review, approval, and extraction contract."""
     item, brand = backend
     assert int(api.review_queue()[0]["id"]) == item.id
     assert api.catalog_choices("brands")[0]["id"] == brand.id
@@ -78,7 +92,7 @@ def test_full_review_contract(backend):
     assert review.act_on_current_item("release")["status"] == "queued"
     review.checkout_item(item.id)
     update_draft(
-        {"name": "Whey", "nutritionFacts": {"servingSizeGrams": 30, "proteins": 24}}
+        {"name": "Whey", "nutritionFacts": {"servingSizeGrams": 30, "proteins": 24}},
     )
     assert submission.submit_draft(confirm=True)["ok"]
     assert review.resume_item(item.id)["reviewItem"]["status"] == "review"
@@ -90,16 +104,20 @@ def test_full_review_contract(backend):
     assert not result["product"]["isPublished"]
     assert api.catalog_candidates(search="Whey")[0]["id"] == result["product"]["id"]
     assert review.approve_current_item(
-        product_id=result["product"]["id"], confirm=True
+        product_id=result["product"]["id"],
+        confirm=True,
     )["ok"]
     assert review.apply_current_item_extraction(
-        product_id=result["product"]["id"], confirm=True
+        product_id=result["product"]["id"],
+        confirm=True,
     )["ok"]
     core = pytest.importorskip("core.models")
-    assert core.NutritionFacts.objects.get().proteins == 24000
+    expected_protein_milligrams = 24000
+    assert core.NutritionFacts.objects.get().proteins == expected_protein_milligrams
 
 
-def test_error_and_ignore_contract(backend):
+def test_error_and_ignore_contract(backend: tuple[Any, Any]) -> None:
+    """Verify error reporting and ignoring a checked-out item."""
     item, _ = backend
     review.checkout_item(item.id)
     assert review.report_current_item_error("Unreadable", is_fatal=True)["ok"]

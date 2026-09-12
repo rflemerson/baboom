@@ -1,6 +1,8 @@
+"""Pydantic validation for local product drafts."""
+
 from pydantic import ValidationError
 
-from ..schemas import ProductDraft
+from mcp_server.schemas import ProductDraft
 
 ALLOWED_PRODUCT_FIELDS = {
     field.alias or name for name, field in ProductDraft.model_fields.items()

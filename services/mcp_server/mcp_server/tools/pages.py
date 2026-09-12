@@ -16,7 +16,7 @@ def fetch_source_page(url: str | None = None) -> dict:
     item = get_current_item()
     target = url or item.get("sourcePageUrl") or item.get("productLink")
     if not target:
-        return {"ok": False, "error": "Item não tem URL de origem."}
+        return {"ok": False, "error": "Item has no source URL."}
 
     fetched = fetch_page_data(target)
     item_path = item_dir(int(item["id"]))

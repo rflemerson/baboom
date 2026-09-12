@@ -1,13 +1,20 @@
+"""Helpers that prepare captured source data for extraction."""
+
+from __future__ import annotations
+
 import json
 import re
-from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg")
 
 
-def parse_json_maybe(value: Any) -> Any:
+def parse_json_maybe(value: object) -> object | None:
+    """Parse a JSON string or return already structured data unchanged."""
     if not value:
         return None
 
@@ -23,7 +30,8 @@ def parse_json_maybe(value: Any) -> Any:
     return None
 
 
-def iter_values(payload: Any) -> Iterable[Any]:
+def iter_values(payload: object) -> Iterable[object]:
+    """Yield every nested value in a mapping or sequence."""
     if isinstance(payload, dict):
         for value in payload.values():
             yield value
@@ -35,6 +43,7 @@ def iter_values(payload: Any) -> Iterable[Any]:
 
 
 def looks_like_image_url(value: str) -> bool:
+    """Return whether a string has a supported image URL shape."""
     lower = value.lower().split("?")[0]
 
     if not lower.startswith(("http://", "https://", "//", "/")):
@@ -44,6 +53,7 @@ def looks_like_image_url(value: str) -> bool:
 
 
 def normalize_url(url: str, base_url: str | None = None) -> str:
+    """Resolve protocol-relative and relative URLs against a base URL."""
     if url.startswith("//"):
         return "https:" + url
 
@@ -54,27 +64,23 @@ def normalize_url(url: str, base_url: str | None = None) -> str:
 
 
 def extract_image_urls_from_payload(
-    payload: Any, base_url: str | None = None
+    payload: object,
+    base_url: str | None = None,
 ) -> list[str]:
-    urls: list[str] = []
-
-    for value in iter_values(payload):
-        if isinstance(value, str) and looks_like_image_url(value):
-            urls.append(normalize_url(value, base_url=base_url))
-
-    seen = set()
-    result = []
-    for url in urls:
-        if url not in seen:
-            seen.add(url)
-            result.append(url)
-
-    return result
+    """Extract unique image URLs from recursively nested payload data."""
+    urls = [
+        normalize_url(value, base_url=base_url)
+        for value in iter_values(payload)
+        if isinstance(value, str) and looks_like_image_url(value)
+    ]
+    return list(dict.fromkeys(urls))
 
 
 def extract_image_urls_from_html_text(
-    value: str | None, base_url: str | None = None
+    value: str | None,
+    base_url: str | None = None,
 ) -> list[str]:
+    """Extract unique image URLs from arbitrary HTML or text content."""
     if not value:
         return []
 
@@ -87,7 +93,8 @@ def extract_image_urls_from_html_text(
     return list(dict.fromkeys(normalize_url(url, base_url=base_url) for url in matches))
 
 
-def build_prepared_context(item: dict[str, Any]) -> dict[str, Any]:
+def build_prepared_context(item: dict[str, object]) -> dict[str, object]:
+    """Combine captured fields and discovered image URLs for one item."""
     base_url = item.get("sourcePageUrl") or item.get("productLink")
 
     api_context = parse_json_maybe(item.get("sourcePageContext"))
@@ -97,7 +104,7 @@ def build_prepared_context(item: dict[str, Any]) -> dict[str, Any]:
 
     image_urls.extend(extract_image_urls_from_payload(api_context, base_url=base_url))
     image_urls.extend(
-        extract_image_urls_from_payload(structured_data, base_url=base_url)
+        extract_image_urls_from_payload(structured_data, base_url=base_url),
     )
 
     image_urls = list(dict.fromkeys(image_urls))

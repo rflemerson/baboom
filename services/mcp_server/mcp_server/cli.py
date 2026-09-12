@@ -14,6 +14,7 @@ from .tools.validation import validate_product_draft
 
 
 def parser() -> argparse.ArgumentParser:
+    """Build the review workflow command-line parser."""
     result = argparse.ArgumentParser(prog="baboom-review")
     result.add_argument("--env-file", type=Path)
     commands = result.add_subparsers(dest="command", required=True)
@@ -24,7 +25,8 @@ def parser() -> argparse.ArgumentParser:
     checkout = commands.add_parser("checkout", help="Reserve queued work")
     checkout.add_argument("--item-id", type=int)
     resume = commands.add_parser(
-        "resume", help="Reload a review and preserve local edits"
+        "resume",
+        help="Reload a review and preserve local edits",
     )
     resume.add_argument("item_id", type=int)
     for name in (
@@ -40,15 +42,18 @@ def parser() -> argparse.ArgumentParser:
     update = commands.add_parser("update-draft", help="Apply a local JSON patch file")
     update.add_argument("file", type=Path)
     fetch = commands.add_parser(
-        "fetch-page", help="Render the source page and store its structured data"
+        "fetch-page",
+        help="Render the source page and store its structured data",
     )
     fetch.add_argument("--url", default=None)
     images = commands.add_parser(
-        "download-images", help="Download chosen image URLs into the workspace"
+        "download-images",
+        help="Download chosen image URLs into the workspace",
     )
     images.add_argument("urls", nargs="+")
     commands.add_parser(
-        "image-report", help="Analyse the downloaded images with the vision model"
+        "image-report",
+        help="Analyse the downloaded images with the vision model",
     )
     candidates = commands.add_parser("candidates", help="Search for existing products")
     candidates.add_argument("--search", default="")
@@ -61,16 +66,20 @@ def parser() -> argparse.ArgumentParser:
     submit = commands.add_parser("submit", help="Preview staging; --confirm sends it")
     submit.add_argument("--confirm", action="store_true")
     approve = commands.add_parser(
-        "approve", help="Preview approval; --confirm applies it"
+        "approve",
+        help="Preview approval; --confirm applies it",
     )
     target = approve.add_mutually_exclusive_group(required=True)
     target.add_argument("--product-id", type=int)
     target.add_argument(
-        "--create-product", type=Path, help="Approved catalog fields in JSON"
+        "--create-product",
+        type=Path,
+        help="Approved catalog fields in JSON",
     )
     approve.add_argument("--confirm", action="store_true")
     apply = commands.add_parser(
-        "apply-extraction", help="Complete an already linked product from staging"
+        "apply-extraction",
+        help="Complete an already linked product from staging",
     )
     apply.add_argument("--product-id", type=int, required=True)
     apply.add_argument("--confirm", action="store_true")
@@ -83,17 +92,19 @@ def parser() -> argparse.ArgumentParser:
 def _read_object(path: Path) -> dict:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
-        raise ValueError("O arquivo deve conter um objeto JSON.")
+        message = "The file must contain a JSON object."
+        raise TypeError(message)
     return value
 
 
 def execute(args: argparse.Namespace) -> object:
+    """Dispatch parsed arguments to local workspace or remote operations."""
     local = {
         "show": workspace.get_current_item,
         "draft": drafts.load_draft,
         "validate": lambda: validate_product_draft(drafts.load_draft()),
         "prepare": lambda: preparation.build_prepared_context(
-            workspace.get_current_item()
+            workspace.get_current_item(),
         ),
     }
     if args.command in local:
@@ -126,26 +137,28 @@ def _execute_workspace(args: argparse.Namespace) -> object:
 
 def _execute_remote(args: argparse.Namespace) -> object:
     """Run the commands that talk to the review API."""
-    match args.command:
-        case "queue":
-            return api.review_queue(args.status, args.search, args.limit)
-        case "checkout":
-            return review.checkout_item(args.item_id)
-        case "resume":
-            return review.resume_item(args.item_id)
-        case "candidates":
-            return api.catalog_candidates(args.search, args.ean, args.limit)
-        case "choices":
-            return api.catalog_choices(args.kind, args.search, args.limit)
-        case "submit":
-            return _submit(args)
-        case "approve":
-            return _approve(args)
-        case "apply-extraction":
-            return review.apply_current_item_extraction(args.product_id, args.confirm)
-        case "report-error":
-            return review.report_current_item_error(args.message, args.fatal)
-    raise ValueError("Comando desconhecido.")
+    handlers = {
+        "queue": lambda: api.review_queue(args.status, args.search, args.limit),
+        "checkout": lambda: review.checkout_item(args.item_id),
+        "resume": lambda: review.resume_item(args.item_id),
+        "candidates": lambda: api.catalog_candidates(args.search, args.ean, args.limit),
+        "choices": lambda: api.catalog_choices(args.kind, args.search, args.limit),
+        "submit": lambda: _submit(args),
+        "approve": lambda: _approve(args),
+        "apply-extraction": lambda: review.apply_current_item_extraction(
+            product_id=args.product_id,
+            confirm=args.confirm,
+        ),
+        "report-error": lambda: review.report_current_item_error(
+            args.message,
+            is_fatal=args.fatal,
+        ),
+    }
+    handler = handlers.get(args.command)
+    if handler is not None:
+        return handler()
+    message = "Comando desconhecido."
+    raise ValueError(message)
 
 
 def _submit(args: argparse.Namespace) -> dict:
@@ -168,13 +181,14 @@ def _approve(args: argparse.Namespace) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line client and return its process status."""
     args = parser().parse_args(argv)
     load_dotenv(args.env_file or Path(__file__).resolve().parents[1] / ".env")
     try:
         result = execute(args)
-    except (OSError, ValueError, RuntimeError, RequestException) as exc:
+    except (OSError, TypeError, ValueError, RuntimeError, RequestException) as exc:
         sys.stderr.write(
-            json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False) + "\n"
+            json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False) + "\n",
         )
         return 1
     sys.stdout.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")

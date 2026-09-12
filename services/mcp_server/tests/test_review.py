@@ -1,3 +1,5 @@
+"""Tests for local review state and remote review actions."""
+
 from unittest.mock import Mock
 
 import pytest
@@ -9,13 +11,17 @@ from mcp_server.tools.workspace import get_current_item, set_current_item
 
 
 @pytest.fixture
-def current():
+def current() -> dict[str, object]:
+    """Set and return a current item for review tests."""
     item = {"id": 7, "status": "processing", "sourcePageId": 3}
     set_current_item(item)
     return item
 
 
-def test_resume_restores_staged_evidence_and_preserves_local_edits(monkeypatch):
+def test_resume_restores_staged_evidence_and_preserves_local_edits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Restore staged data without overwriting local edits."""
     snapshot = {
         "reviewItem": {"id": 7, "status": "review"},
         "reviewExtraction": {
@@ -35,7 +41,10 @@ def test_resume_restores_staged_evidence_and_preserves_local_edits(monkeypatch):
 
 
 @pytest.mark.usefixtures("current")
-def test_approval_preview_never_writes_and_confirmation_updates_state(monkeypatch):
+def test_approval_preview_never_writes_and_confirmation_updates_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep previews read-only and mutate only after confirmation."""
     approve = Mock(return_value={"id": 42})
     monkeypatch.setattr(api, "approve_scraped_item", approve)
     preview = review.approve_current_item(product_id=42)
@@ -44,14 +53,19 @@ def test_approval_preview_never_writes_and_confirmation_updates_state(monkeypatc
     assert review.approve_current_item(product_id=42, confirm=True)["ok"]
     assert get_current_item()["status"] == "linked"
     approve.assert_called_once_with(
-        {"itemId": 7, "productId": 42, "createProduct": None}
+        {"itemId": 7, "productId": 42, "createProduct": None},
     )
 
 
 @pytest.mark.usefixtures("current")
-def test_failed_approval_preserves_local_state(monkeypatch):
+def test_failed_approval_preserves_local_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve the checkout when approval reports a backend failure."""
     monkeypatch.setattr(
-        api, "approve_scraped_item", Mock(side_effect=api.APIError("Conflict"))
+        api,
+        "approve_scraped_item",
+        Mock(side_effect=api.APIError("Conflict")),
     )
     with pytest.raises(api.APIError, match="Conflict"):
         review.approve_current_item(product_id=42, confirm=True)
@@ -59,12 +73,15 @@ def test_failed_approval_preserves_local_state(monkeypatch):
 
 
 @pytest.mark.usefixtures("current")
-def test_staging_requires_confirmation_and_reports_backend_errors(monkeypatch):
+def test_staging_requires_confirmation_and_reports_backend_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Require confirmation and expose backend staging errors."""
     send = Mock(
         return_value={
             "extraction": None,
             "errors": [{"field": "itemId", "message": "Invalid state"}],
-        }
+        },
     )
     monkeypatch.setattr(submission, "submit_agent_extraction", send)
     assert not submission.submit_draft()["ok"]
@@ -77,7 +94,10 @@ def test_staging_requires_confirmation_and_reports_backend_errors(monkeypatch):
 
 
 @pytest.mark.usefixtures("current")
-def test_invalid_nested_draft_is_not_submitted(monkeypatch):
+def test_invalid_nested_draft_is_not_submitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject invalid nested data before attempting submission."""
     send = Mock()
     monkeypatch.setattr(submission, "submit_agent_extraction", send)
     update_draft({"children": [{"quantity": True}]})
@@ -86,7 +106,11 @@ def test_invalid_nested_draft_is_not_submitted(monkeypatch):
 
 
 @pytest.mark.usefixtures("current")
-def test_failed_checkout_does_not_replace_current_item(monkeypatch, current):
+def test_failed_checkout_does_not_replace_current_item(
+    monkeypatch: pytest.MonkeyPatch,
+    current: dict[str, object],
+) -> None:
+    """Keep the existing checkout when another item cannot be loaded."""
     monkeypatch.setattr(api, "checkout_scraped_item", lambda _: None)
     assert review.checkout_item(99) is None
     assert get_current_item() == current
