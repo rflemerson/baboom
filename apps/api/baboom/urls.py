@@ -14,5 +14,6 @@ urlpatterns = [
     path("healthz/", healthz),
     path("admin/", admin.site.urls),
     path("admin-api/", include("django_admin_rest_api.urls")),
+    path("mcp/", include("django_admin_mcp_api.urls")),
     path("api/", include("core.rest.urls")),
 ]

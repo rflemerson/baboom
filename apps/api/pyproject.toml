@@ -27,6 +27,7 @@ dependencies = [
   "django-components",
   # Fork until the inline-name and multiselect fixes land upstream.
   "django-admin-rest-api @ git+https://github.com/rflemerson/django-admin-rest-api@fix-inline-names-and-multiselect",
+  "django-admin-mcp-api",
 ]
 
 [project.urls]

@@ -21,6 +21,9 @@ INSTALLED_APPS += ["web"]
 # JSON REST surface over the registered ModelAdmin classes
 INSTALLED_APPS += ["django_admin_rest_api"]
 
+# MCP endpoint over that same surface
+INSTALLED_APPS += ["django_admin_mcp_api"]
+
 # Media Files (User uploads)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
