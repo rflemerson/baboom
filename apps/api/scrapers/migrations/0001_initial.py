@@ -16,19 +16,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='ScrapedItem',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('status', models.CharField(choices=[('new', 'New'), ('queued', 'Queued for Agents'), ('processing', 'Processing'), ('linked', 'Linked'), ('error', 'Error (Retry)'), ('review', 'Needs Review'), ('ignored', 'Ignored')], db_index=True, default='new', max_length=20)),
-                ('error_count', models.PositiveIntegerField(default=0)),
-                ('last_attempt_at', models.DateTimeField(blank=True, null=True)),
-                ('last_error_log', models.TextField(blank=True)),
-                ('offer', models.OneToOneField(help_text='Offer this pipeline record tracks', on_delete=django.db.models.deletion.CASCADE, related_name='scraped_item', to='offers.offer', verbose_name='Merchant Offer')),
-            ],
-        ),
-        migrations.CreateModel(
             name='ScrapedPage',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -43,28 +30,20 @@ class Migration(migrations.Migration):
             ],
             options={
                 'ordering': ('-scraped_at',),
-                'indexes': [models.Index(fields=['store_slug', 'url'], name='scrapers_sc_store_s_d918a4_idx')],
             },
         ),
         migrations.CreateModel(
-            name='ScrapedItemExtraction',
+            name='ScrapedItem',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('image_report', models.TextField(blank=True, help_text='Ordered text report extracted from product images')),
-                ('extracted_product', models.JSONField(blank=True, default=dict, help_text='Recursive product tree returned by the agent')),
-                ('scraped_item', models.OneToOneField(help_text='Scraped item that produced this extraction', on_delete=django.db.models.deletion.CASCADE, related_name='agent_extraction', to='scrapers.scrapeditem')),
-                ('source_page', models.ForeignKey(help_text='Source page used by the agent pipeline', on_delete=django.db.models.deletion.CASCADE, related_name='agent_extractions', to='scrapers.scrapedpage')),
+                ('offer', models.OneToOneField(help_text='Offer observed by the scraper', on_delete=django.db.models.deletion.CASCADE, related_name='scraped_item', to='offers.offer', verbose_name='Merchant Offer')),
+                ('source_page', models.ForeignKey(blank=True, help_text='Source page where this item was found', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='items', to='scrapers.scrapedpage')),
             ],
             options={
-                'ordering': ('-updated_at',),
+                'abstract': False,
             },
-        ),
-        migrations.AddField(
-            model_name='scrapeditem',
-            name='source_page',
-            field=models.ForeignKey(blank=True, help_text='Source page where this item was found', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='items', to='scrapers.scrapedpage'),
         ),
         migrations.CreateModel(
             name='ScraperRun',
@@ -84,9 +63,5 @@ class Migration(migrations.Migration):
                 'ordering': ('-started_at',),
                 'indexes': [models.Index(fields=['label', '-started_at'], name='scrapers_sc_label_45cc2a_idx'), models.Index(fields=['status', '-started_at'], name='scrapers_sc_status_2c6a0a_idx')],
             },
-        ),
-        migrations.AddIndex(
-            model_name='scrapeditem',
-            index=models.Index(fields=['status'], name='scrapers_sc_status_99bac4_idx'),
         ),
     ]

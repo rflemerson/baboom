@@ -35,6 +35,7 @@ def drop_label_actives(apps, schema_editor):
     ).delete()
 
 
+
 class Migration(migrations.Migration):
     """Initial catalog schema, with the actives the label columns map onto."""
 
@@ -75,21 +76,6 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'Alert Subscriber',
                 'verbose_name_plural': 'Alert Subscribers',
-            },
-        ),
-        migrations.CreateModel(
-            name='APIKey',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('name', models.CharField(help_text='Who is this key for?', max_length=100, verbose_name='Client Name')),
-                ('key', models.CharField(db_index=True, editable=False, max_length=64, unique=True, verbose_name='API Key')),
-                ('is_active', models.BooleanField(default=True, verbose_name='Active')),
-            ],
-            options={
-                'verbose_name': 'API Key',
-                'verbose_name_plural': 'API Keys',
             },
         ),
         migrations.CreateModel(
@@ -180,7 +166,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('description', models.CharField(blank=True, help_text="E.g. 'Saborizada' or 'Natural' to identify this table in the admin.", max_length=200, verbose_name='Internal Label')),
+                ('description', models.CharField(blank=True, help_text="E.g. 'Flavored' or 'Natural' to identify this table in the admin.", max_length=200, verbose_name='Internal Label')),
                 ('serving_size', models.DecimalField(blank=True, decimal_places=3, max_digits=16, null=True, verbose_name='Serving Size')),
                 ('energy', models.DecimalField(blank=True, decimal_places=3, max_digits=10, null=True, verbose_name='Energy')),
                 ('proteins', models.DecimalField(blank=True, decimal_places=3, max_digits=16, null=True, verbose_name='Proteins')),
@@ -220,6 +206,37 @@ class Migration(migrations.Migration):
                 'verbose_name': 'Product',
                 'verbose_name_plural': 'Products',
                 'ordering': ('brand__name', 'name'),
+            },
+        ),
+        migrations.CreateModel(
+            name='ProductNutrition',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
+                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
+                ('flavors', models.ManyToManyField(blank=True, to='core.flavor', verbose_name='Flavors')),
+                ('nutrition_facts', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='product_profiles', to='core.nutritionfacts', verbose_name='Nutrition Facts')),
+                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='nutrition_profiles', to='core.product', verbose_name='Base Product')),
+            ],
+            options={
+                'verbose_name': 'Product Nutrition Profile',
+                'verbose_name_plural': 'Product Nutrition Profiles',
+            },
+        ),
+        migrations.CreateModel(
+            name='ProductActive',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
+                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
+                ('fraction', models.DecimalField(decimal_places=8, help_text='Mass of the active per unit of product mass.', max_digits=12, verbose_name='Mass Fraction')),
+                ('active', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='product_amounts', to='core.active', verbose_name='Active')),
+                ('nutrition_profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='actives', to='core.productnutrition', verbose_name='Nutrition Profile')),
+            ],
+            options={
+                'verbose_name': 'Product Active',
+                'verbose_name_plural': 'Product Actives',
+                'ordering': ('nutrition_profile__product__name', 'nutrition_profile_id', 'active__name'),
             },
         ),
         migrations.CreateModel(
@@ -267,24 +284,6 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='ProductActive',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('fraction', models.DecimalField(decimal_places=8, help_text='Mass of the active per unit of product mass.', max_digits=12, verbose_name='Mass Fraction')),
-                ('active', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='product_amounts', to='core.active', verbose_name='Active')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='actives', to='core.product', verbose_name='Product')),
-            ],
-            options={
-                'verbose_name': 'Product Active',
-                'verbose_name_plural': 'Product Actives',
-                'ordering': ('product__name', 'active__name'),
-                'indexes': [models.Index(fields=['active', 'fraction'], name='core_produc_active__d94223_idx')],
-                'constraints': [models.UniqueConstraint(fields=('product', 'active'), name='unique_product_active')],
-            },
-        ),
-        migrations.CreateModel(
             name='ProductComponent',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -300,21 +299,17 @@ class Migration(migrations.Migration):
                 'constraints': [models.UniqueConstraint(fields=('parent', 'component'), name='unique_product_component'), models.CheckConstraint(condition=models.Q(('parent', models.F('component')), _negated=True), name='product_component_not_self')],
             },
         ),
-        migrations.CreateModel(
-            name='ProductNutrition',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('flavors', models.ManyToManyField(blank=True, to='core.flavor', verbose_name='Flavors')),
-                ('nutrition_facts', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='product_profiles', to='core.nutritionfacts', verbose_name='Nutrition Facts')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='nutrition_profiles', to='core.product', verbose_name='Base Product')),
-            ],
-            options={
-                'verbose_name': 'Product Nutrition Profile',
-                'verbose_name_plural': 'Product Nutrition Profiles',
-                'constraints': [models.UniqueConstraint(fields=('product', 'nutrition_facts'), name='unique_product_nutrition_facts')],
-            },
+        migrations.AddConstraint(
+            model_name='productnutrition',
+            constraint=models.UniqueConstraint(fields=('product', 'nutrition_facts'), name='unique_product_nutrition_facts'),
+        ),
+        migrations.AddIndex(
+            model_name='productactive',
+            index=models.Index(fields=['active', 'fraction'], name='core_produc_active__d94223_idx'),
+        ),
+        migrations.AddConstraint(
+            model_name='productactive',
+            constraint=models.UniqueConstraint(fields=('nutrition_profile', 'active'), name='unique_profile_active'),
         ),
         migrations.AddIndex(
             model_name='productstore',
