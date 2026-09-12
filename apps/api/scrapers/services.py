@@ -76,7 +76,7 @@ class ScraperService:
         *,
         api_context: str | dict | None = None,
     ) -> ScrapedItem:
-        """Record the merchant offer and ensure its pipeline record exists.
+        """Record the merchant offer and its captured source-page link.
 
         This is the light path: the offer (identity, price, stock) is upserted
         on every run and the page's ``api_context`` keeps the latest raw catalog

@@ -311,7 +311,7 @@ class ShopifyApiSpider(CatalogApiSpider):
         return self._process_and_save(data, category_name)
 
     def _build_product_context(self, item: dict) -> str:
-        """Build structured context for downstream agents."""
+        """Build structured context for the captured source page."""
         payload = {
             "platform": "shopify",
             "product": {

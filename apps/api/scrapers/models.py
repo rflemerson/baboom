@@ -47,7 +47,6 @@ class ScrapedPage(models.Model):
         """Meta options."""
 
         ordering = ("-scraped_at",)
-        indexes = (models.Index(fields=["store_slug", "url"]),)
 
     def __str__(self) -> str:
         """Return string representation."""

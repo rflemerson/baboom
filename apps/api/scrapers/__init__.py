@@ -1,1 +1,1 @@
-"""Scraping app for external product ingestion pipelines."""
+"""Scraping app for merchant offers and source pages."""

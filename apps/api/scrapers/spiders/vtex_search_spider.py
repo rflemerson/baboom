@@ -251,7 +251,7 @@ class VtexSearchSpider(CatalogApiSpider):
         return self._parse_price(raw_price)
 
     def _build_product_context(self, item: dict) -> str:
-        """Build structured VTEX context for downstream agents."""
+        """Build structured VTEX context for the captured source page."""
         payload = {
             "platform": "vtex_legacy",
             "product": {

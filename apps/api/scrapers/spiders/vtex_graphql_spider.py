@@ -309,7 +309,7 @@ class VtexGraphqlSpider(CatalogApiSpider):
         return parse_positive_price(raw_price)
 
     def _build_product_context(self, item: dict) -> str:
-        """Build structured VTEX GraphQL context for downstream agents."""
+        """Build structured VTEX GraphQL context for the captured source page."""
         payload = {
             "platform": "vtex_graphql",
             "product": {

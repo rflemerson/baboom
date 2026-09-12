@@ -319,7 +319,7 @@ class WapStoreApiSpider(CatalogApiSpider):
         return parse_optional_int(quantity)
 
     def _build_product_context(self, item: dict) -> str:
-        """Build structured context for downstream agents."""
+        """Build structured context for the captured source page."""
         payload = {
             "platform": "uappi_wapstore",
             "product": {

@@ -13,7 +13,7 @@ from django.utils.html import format_html
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
-from offers.models import StockStatus
+from offers.models import Offer, StockStatus
 
 from .dtos import ProductCreateInput, ProductMetadataUpdateInput, StoreListingPayload
 from .forms import ProductAdminForm, ProductStoreInlineForm, ProductStoreInlineFormSet
@@ -64,6 +64,22 @@ class ProductStoreInline(admin.TabularInline):
     formset = ProductStoreInlineFormSet
     extra = 0
     autocomplete_fields: ClassVar[list[str]] = ["store"]
+
+    def get_extra(
+        self,
+        request: HttpRequest,
+        obj: Product | None = None,
+        **kwargs: object,
+    ) -> int:
+        """Show one listing row when adding a product from a captured offer."""
+        if (
+            (obj is None or obj.pk is None)
+            and request.method == "GET"
+            and request.GET.get("source_offer")
+        ):
+            return 1
+        return super().get_extra(request, obj, **kwargs)
+
     fields = (
         "store",
         "external_id",
@@ -98,12 +114,6 @@ class ProductNutritionInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     """Admin for products."""
-
-    INITIAL_FIELDS: ClassVar[tuple[str, ...]] = (
-        "name",
-        "ean",
-        "description",
-    )
 
     form = ProductAdminForm
     show_facets = admin.ShowFacets.ALWAYS
@@ -171,19 +181,53 @@ class ProductAdmin(admin.ModelAdmin):
         """Return category name."""
         return obj.category.name if obj.category else "-"
 
-    def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, str]:
-        """Populate initial form data.
+    def _source_offer(self, request: HttpRequest) -> Offer | None:
+        """Resolve the selected scraped offer for the product add form."""
+        if request.method != "GET":
+            return None
+        offer_id = request.GET.get("source_offer", "")
+        if not offer_id.isdecimal():
+            return None
+        return Offer.objects.filter(
+            pk=int(offer_id),
+            product_store__isnull=True,
+        ).first()
 
-        Populate initial form data from GET parameters.
-        Example: /admin/core/product/add/?initial_name=Whey&initial_ean=123
-        """
+    def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, object]:
+        """Prefill catalog fields from the selected merchant offer."""
         initial = super().get_changeform_initial_data(request)
-        for key, value in request.GET.items():
-            if key.startswith("initial_"):
-                field_name = key.replace("initial_", "")
-                if field_name in self.INITIAL_FIELDS:
-                    initial[field_name] = value
+        offer = self._source_offer(request)
+        if offer is not None:
+            initial.update(name=offer.name, ean=offer.ean)
         return initial
+
+    def get_formset_kwargs(
+        self,
+        request: HttpRequest,
+        obj: Product | None,
+        inline: admin.InlineModelAdmin,
+        prefix: str,
+    ) -> dict[str, object]:
+        """Prefill the store listing with the captured offer and current price."""
+        kwargs = super().get_formset_kwargs(request, obj, inline, prefix)
+        if (obj is not None and obj.pk is not None) or inline.model is not ProductStore:
+            return kwargs
+        offer = self._source_offer(request)
+        if offer is None:
+            return kwargs
+        store = Store.objects.filter(name=offer.store_slug).first()
+        if store is None:
+            return kwargs
+        kwargs["initial"] = [
+            {
+                "store": store.pk,
+                "external_id": offer.external_id,
+                "product_link": offer.url,
+                "price": offer.current_price,
+                "stock_status": offer.current_stock_status,
+            },
+        ]
+        return kwargs
 
     def changeform_view(
         self,

@@ -3,7 +3,7 @@
 The store migrated off VTEX; the customer-facing domain is now a headless
 storefront whose product routes do not resolve, so the canonical Shopify
 domain is the one that serves both the catalog API and fetchable product
-pages for the review pipeline.
+pages for source-page capture.
 """
 
 import logging

@@ -56,6 +56,9 @@
 - Scraper monitors store merchant offers and `ScrapedItem` source links.
 - Page enrichment stores `ScrapedPage.api_context`, `html_structured_data`,
   `raw_html` and response metadata. Humans can inspect pages in Django admin.
+- The scraped-item admin action opens product creation with offer identity and
+  the matching store listing prefilled from the captured offer. Saving the
+  product links that offer without creating a duplicate price observation.
 - Product creation, offer linking, nutrition profiles, flavors, components and
   publication are human catalog actions in Django admin.
 

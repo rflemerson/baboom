@@ -45,21 +45,13 @@ def create_product_from_scraped_item(
         return None
 
     offer = item.offer
-    params = {
-        "initial_name": offer.name,
-        "initial_ean": offer.ean,
-    }
+    linked_product = getattr(offer, "product_store", None)
+    if linked_product is not None:
+        return redirect(
+            reverse("admin:core_product_change", args=[linked_product.product_id]),
+        )
 
-    desc_parts = []
-    if offer.store_slug:
-        desc_parts.append(f"Imported from {offer.store_slug}")
-    if item.source_page:
-        desc_parts.append(f"Link: {item.source_page.url}")
-
-    if desc_parts:
-        params["initial_description"] = "\n".join(desc_parts)
-
-    query_string = urlencode(params)
+    query_string = urlencode({"source_offer": offer.pk})
     url = reverse("admin:core_product_add") + f"?{query_string}"
     return redirect(url)
 

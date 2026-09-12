@@ -199,7 +199,7 @@ class NuvemshopSpider(CatalogApiSpider):
         return self._process_and_save(data, category_name)
 
     def _build_product_context(self, item: dict[str, Any]) -> str:
-        """Build structured context for downstream extraction."""
+        """Build structured context for the captured source page."""
         return json.dumps(
             {"platform": "nuvemshop", "product": item},
             ensure_ascii=False,
