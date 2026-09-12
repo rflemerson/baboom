@@ -27,7 +27,7 @@ def enrich_selected_pages(
     request: HttpRequest,
     queryset: QuerySet[ScrapedPage],
 ) -> None:
-    """Queue a background render for the selected source pages."""
+    """Queue a background capture for the selected source pages."""
     page_ids = list(queryset.values_list("pk", flat=True))
     if not page_ids:
         modeladmin.message_user(
@@ -149,6 +149,29 @@ class ScrapedPageAdmin(admin.ModelAdmin):
     def has_add_permission(self, _request: HttpRequest) -> bool:
         """Disallow manual creation of scraper-captured pages."""
         return False
+
+    def has_change_permission(
+        self,
+        request: HttpRequest,
+        obj: ScrapedPage | None = None,
+    ) -> bool:
+        """Allow the capture action to run with view permission only."""
+        resolver_match = getattr(request, "resolver_match", None)
+        kwargs = getattr(resolver_match, "kwargs", {})
+        if kwargs.get("action_name") == enrich_selected_pages.__name__:
+            return self.has_view_permission(request, obj)
+        return super().has_change_permission(request, obj)
+
+    def get_actions(self, request: HttpRequest) -> dict[str, tuple[object, ...]]:
+        """Expose page enrichment to read-only operators in the action registry."""
+        actions = super().get_actions(request)
+        if not actions and self.has_view_permission(request):
+            actions[enrich_selected_pages.__name__] = (
+                enrich_selected_pages,
+                enrich_selected_pages.__name__,
+                enrich_selected_pages.short_description,
+            )
+        return actions
 
 
 @admin.register(ScraperRun)

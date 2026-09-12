@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from decimal import Decimal, InvalidOperation
@@ -10,6 +9,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import extruct
 from bs4 import BeautifulSoup
+from curl_cffi import requests
 from django.db import transaction
 
 from offers.services import OfferObservationResult, OfferObservationService
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class RenderResult(NamedTuple):
-    """Outcome of a headless render: HTTP status, response headers and HTML."""
+    """Outcome of an HTTP capture: status, response headers and HTML."""
 
     status: int | None
     headers: dict[str, str]
@@ -98,18 +98,8 @@ def extract_page_evidence(html: str, url: str) -> dict:
 class ScraperService:
     """Service for handling scraped data."""
 
-    # Product pages are always captured with a headless browser: it is the only
-    # method robust to every store (server-rendered, SPA, or anti-bot challenge).
     HTML_MISSING_STATUSES = (404, 410)
-
-    RENDER_USER_AGENT = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    )
-    RENDER_NAV_TIMEOUT_MS = 60000
-    RENDER_SETTLE_MS = 3000
-    RENDER_SCROLL_STEPS = 10
-    RENDER_SCROLL_PAUSE_MS = 300
+    CAPTURE_TIMEOUT_SECONDS = 60
 
     @staticmethod
     @transaction.atomic
@@ -216,50 +206,22 @@ class ScraperService:
         return parsed if isinstance(parsed, dict) else {}
 
     @staticmethod
-    async def _render_page_async(url: str) -> RenderResult:
-        """Render ``url`` in headless Chromium; capture status, headers and HTML."""
-        # Imported lazily so the heavy browser dependency only loads where it is
-        # used (the enrichment job), not in every process that imports this module.
-        from playwright.async_api import async_playwright  # noqa: PLC0415
-
-        async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
-            try:
-                context = await browser.new_context(
-                    viewport={"width": 1280, "height": 800},
-                    user_agent=ScraperService.RENDER_USER_AGENT,
-                )
-                page = await context.new_page()
-                response = await page.goto(
-                    url,
-                    timeout=ScraperService.RENDER_NAV_TIMEOUT_MS,
-                    wait_until="load",
-                )
-                # Let client-side rendering and anti-bot challenges settle, then
-                # scroll so sections that mount lazily (e.g. nutrition tables
-                # below the fold) are present in the captured HTML.
-                await page.wait_for_timeout(ScraperService.RENDER_SETTLE_MS)
-                for _ in range(ScraperService.RENDER_SCROLL_STEPS):
-                    await page.mouse.wheel(0, 2000)
-                    await page.wait_for_timeout(ScraperService.RENDER_SCROLL_PAUSE_MS)
-                await page.wait_for_timeout(1000)
-                if response is None:
-                    return RenderResult(None, {}, await page.content())
-                return RenderResult(
-                    response.status,
-                    await response.all_headers(),
-                    await page.content(),
-                )
-            finally:
-                await browser.close()
-
-    @staticmethod
     def _render_page(url: str) -> RenderResult | None:
-        """Render a page in a headless browser; ``None`` if rendering fails."""
+        """Capture a page over HTTP; ``None`` if the request fails."""
         try:
-            return asyncio.run(ScraperService._render_page_async(url))
+            response = requests.get(
+                url,
+                allow_redirects=True,
+                impersonate="chrome",
+                timeout=ScraperService.CAPTURE_TIMEOUT_SECONDS,
+            )
+            return RenderResult(
+                response.status_code,
+                dict(response.headers),
+                response.text,
+            )
         except Exception:
-            logger.exception("Failed to render %s in a headless browser", url)
+            logger.exception("Failed to capture %s over HTTP", url)
             return None
 
     @staticmethod
@@ -271,11 +233,10 @@ class ScraperService:
     ) -> dict[str, int]:
         """Heavy, on-demand pass: refresh the captured HTML for scraped pages.
 
-        Each page is rendered in a headless browser. Rendering is the only
-        capture method robust to every store (server-rendered, SPA, or anti-bot
-        challenge), so it is always used. The full HTML, the parsed schema.org
-        metadata and the HTTP response metadata are all stored. Runs
-        independently of the light catalog crawl.
+        Each page is captured over HTTP. The full HTML, parsed schema.org
+        metadata, visible evidence and HTTP response metadata are stored.
+        Interactive browser investigation is handled by the local browser client.
+        This pass runs independently of the light catalog crawl.
         """
         if limit is not None and limit < 1:
             msg = "limit must be a positive integer."
@@ -298,7 +259,7 @@ class ScraperService:
 
     @staticmethod
     def _enrich_page(page: ScrapedPage) -> str:
-        """Render and store one page's HTML, metadata and response info."""
+        """Capture and store one page's HTML, metadata and response info."""
         result = ScraperService._render_page(page.url)
         if result is None:
             # Transient failure: keep whatever was captured before.

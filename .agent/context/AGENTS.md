@@ -71,3 +71,6 @@ You can embed hints for specific AI tools if needed (e.g., strict non-searchable
   components, offer links and publication through Django admin.
 - The public REST endpoints serve catalog browsing and alert subscriptions.
 - No agent-specific queue, staging, approval or GraphQL endpoint belongs in Django.
+  A management command may provision a restricted catalog-operator group, but
+  it exposes no special API or workflow: clients use the same admin permissions
+  as a human operator.

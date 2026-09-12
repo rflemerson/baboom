@@ -76,7 +76,7 @@ def _finish_run(
 def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
     """Run a light catalog spider (price/stock/basic) and return a status message.
 
-    Product-page HTML enrichment is a separate, on-demand job
+    Product-page HTML capture is a separate, on-demand job
     (:func:`enrich_store_pages`); the monitors never touch it.
     """
     current_task = get_current_task()
@@ -176,7 +176,7 @@ def enrich_store_pages(
     limit: int | None = None,
     page_ids: list[int] | None = None,
 ) -> str:
-    """On-demand heavy pass: refresh product-page HTML for scraped pages.
+    """On-demand pass: refresh product-page HTML for scraped pages.
 
     Run this when you want fresh structured data (e.g.
     ``enrich_store_pages.delay("dark_lab")``). Each page is re-fetched with a

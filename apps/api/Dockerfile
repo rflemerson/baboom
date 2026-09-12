@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     gettext \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r appuser \
     && useradd -r -g appuser -m -d /home/appuser appuser

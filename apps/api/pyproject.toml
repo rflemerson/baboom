@@ -20,13 +20,13 @@ dependencies = [
   "curl_cffi",
   "extruct",
   "beautifulsoup4",
-  "playwright",
   "django-celery-results",
   "django-celery-beat",
   "pydantic",
   "sentry-sdk",
   "django-components",
-  "django-admin-rest-api",
+  # Fork until the inline-name and multiselect fixes land upstream.
+  "django-admin-rest-api @ git+https://github.com/rflemerson/django-admin-rest-api@fix-inline-names-and-multiselect",
 ]
 
 [project.urls]

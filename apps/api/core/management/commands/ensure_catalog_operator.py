@@ -31,10 +31,7 @@ PERMISSIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "offers": {"offer": ("view",)},
     "scrapers": {
         "scrapeditem": ("view",),
-        # Every field of ScrapedPageAdmin is read-only and it forbids adding,
-        # so change grants nothing but the right to run the enrichment action,
-        # which the REST action runner gates on change permission.
-        "scrapedpage": ("view", "change"),
+        "scrapedpage": ("view",),
     },
 }
 

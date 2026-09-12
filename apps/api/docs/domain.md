@@ -60,9 +60,9 @@
   for what the page author declared, `tables` for what it tabulated, and `text`
   for the visible text with one node per line. Stores keep nutrition in all
   three, and a label collapsed onto one line stops being parseable.
-- `ScrapedPageAdmin` exposes an action that queues the render on Celery instead
-  of rendering in the web process. Every field there is read-only and adding is
-  forbidden, so `change_scrapedpage` grants only the right to run that action.
+- `ScrapedPageAdmin` exposes an action that enqueues page capture on Celery
+  instead of running it in the web process. Every field there is read-only and
+  adding is forbidden; the action is available to users with view permission.
 - `ensure_catalog_operator --username=<name>` keeps a staff user in the
   `catalog-operator` group with an explicit, delete-free permission set. It is a
   command rather than a migration because access is configuration, not schema.

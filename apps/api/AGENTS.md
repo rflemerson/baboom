@@ -9,7 +9,6 @@
 
 ```bash
 pip install -e .[dev]
-playwright install chromium  # headless render fallback for enrich_pages
 prek run --all-files
 .venv/bin/python manage.py check
 .venv/bin/python manage.py test
@@ -21,8 +20,10 @@ prek run --all-files
 - Business workflows: `core/services/` and `scrapers/services.py`.
 - DTOs: `core/dtos.py` and `scrapers/dtos.py`.
 - Public catalog and alerts: REST.
-- Scrapers retain `ScrapedPage` metadata, structured data and rendered HTML;
+- Scrapers retain `ScrapedPage` metadata, structured data and captured HTML;
   humans inspect captured pages and curate the catalog through Django admin.
+- The Django enrichment task uses an HTTP capture. Interactive browser
+  investigation belongs to the local browser client, not this application.
 - Query composition belongs in `selectors.py`.
 - Product, nutrition, component, flavor, brand, store, tag, category and alert
   subscriber management is manager-facing through Django admin.

@@ -560,7 +560,9 @@ class ScraperEnrichmentTests(TestCase):
             "/admin-api/api/v1/scrapers/scrapedpage/actions/",
         )
         request.user = MagicMock()
-        request.user.has_perm.return_value = True
+        request.user.has_perm.side_effect = lambda permission: (
+            permission == "scrapers.view_scrapedpage"
+        )
         request.resolver_match = SimpleNamespace(
             kwargs={"action_name": enrich_selected_pages.__name__},
         )
