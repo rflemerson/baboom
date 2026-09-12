@@ -28,6 +28,10 @@ dependencies = [
   "django-admin-mcp-api",
 ]
 
+[tool.hatch.metadata]
+# The admin-api dependency is a git reference while two fixes are upstream.
+allow-direct-references = true
+
 [project.urls]
 Repository = "https://github.com/rflemerson/baboom"
 
