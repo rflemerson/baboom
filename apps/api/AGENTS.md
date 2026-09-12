@@ -27,8 +27,10 @@ prek run --all-files
 - Product, nutrition, component, flavor, brand, store, tag, category and alert
   subscriber management is manager-facing through Django admin.
 - `ProductStore` is managed through the `ProductAdmin` inline, not as direct CRUD.
-- The public REST API only serves catalog browsing and alerts. There is no
-  agent-specific mutation or authentication layer in the Django app.
+- The public REST API serves catalog browsing and alerts.
+- `django_admin_rest_api` exposes the registered `ModelAdmin` classes as JSON at
+  `/admin-api/`, under the same session auth and model permissions as the HTML
+  admin. Authorization belongs to those permissions, not to the endpoint.
 - See `docs/domain.md` for catalog and human curation boundaries.
 
 ## Patterns

@@ -13,5 +13,6 @@ def healthz(_request: HttpRequest) -> JsonResponse:
 urlpatterns = [
     path("healthz/", healthz),
     path("admin/", admin.site.urls),
+    path("admin-api/", include("django_admin_rest_api.urls")),
     path("api/", include("core.rest.urls")),
 ]

@@ -18,6 +18,9 @@ INSTALLED_APPS += ["django_components"]
 # UI Web Components
 INSTALLED_APPS += ["web"]
 
+# JSON REST surface over the registered ModelAdmin classes
+INSTALLED_APPS += ["django_admin_rest_api"]
+
 # Media Files (User uploads)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

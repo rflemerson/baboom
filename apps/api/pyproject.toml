@@ -25,6 +25,7 @@ dependencies = [
   "pydantic",
   "sentry-sdk",
   "django-components",
+  "django-admin-rest-api",
 ]
 
 [project.urls]
