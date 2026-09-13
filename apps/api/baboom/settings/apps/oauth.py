@@ -5,6 +5,17 @@ from baboom.settings.env import env
 
 INSTALLED_APPS += ["oauth2_provider"]
 
+# The default stays first, so user passwords keep Django's work factor; the
+# client-secret hasher is only reachable by the name below.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+    "mcp_server.hashers.ClientSecretHasher",
+]
+
 MCP_RESOURCE_IDENTIFIER = env(
     "MCP_RESOURCE_IDENTIFIER",
     default="http://localhost:8000/mcp/",
@@ -35,6 +46,7 @@ OAUTH2_PROVIDER = {
     "DCR_REGISTRATION_PERMISSION_CLASSES": (
         "mcp_server.registration.RedirectHostAllowlistDCRPermission",
     ),
+    "CLIENT_SECRET_HASHER": "oauth_pbkdf2_sha256",
     "OIDC_ENABLED": True,
     "OIDC_RSA_PRIVATE_KEY": env.str(
         "OIDC_RSA_PRIVATE_KEY",
