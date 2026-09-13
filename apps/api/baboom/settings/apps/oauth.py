@@ -19,6 +19,10 @@ LOGIN_URL = "/admin/login/"
 # permissions decide what happens there.
 MCP_SCOPE = "mcp:access"
 
+# Tried in order; the first to recognise a request wins. The app that serves
+# MCP knows these names and nothing about who issues tokens.
+MCP_AUTHENTICATORS = ["baboom.oauth.auth.TokenAuthenticator"]
+
 # Hosts a client may belong to: where its metadata document is served, and
 # where an authorization code may be sent. Empty denies every client.
 MCP_CLIENT_HOSTS = env.list("MCP_CLIENT_HOSTS", default=[])
@@ -37,7 +41,7 @@ OAUTH2_PROVIDER = {
     "CIMD_ALLOWED_HOSTS": MCP_CLIENT_HOSTS,
     "DCR_ENABLED": True,
     "DCR_REGISTRATION_PERMISSION_CLASSES": (
-        "mcp_server.registration.RedirectHostAllowlistDCRPermission",
+        "baboom.oauth.registration.RedirectHostAllowlistDCRPermission",
     ),
     "OIDC_ENABLED": True,
     "OIDC_RSA_PRIVATE_KEY": env.str(

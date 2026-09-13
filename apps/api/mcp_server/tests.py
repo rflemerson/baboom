@@ -1,21 +1,22 @@
-"""The MCP route is reachable by access token and by nothing else."""
+"""What the MCP endpoint serves, and to whom.
+
+These run behind a stand-in authenticator: which OAuth server issues the
+tokens is configuration, and its own behaviour is covered where it lives.
+"""
 
 from __future__ import annotations
 
 import json
-from datetime import timedelta
 from http import HTTPStatus
-from urllib.parse import urlparse
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
-from django.urls import resolve
-from django.utils import timezone
-from oauth2_provider.models import get_access_token_model, get_application_model
+
+from mcp_server.auth import AuthenticationFailed
 
 MCP_URL = "/mcp/"
+OPERATOR_HEADER = "HTTP_X_TEST_OPERATOR"
 INITIALIZE = {
     "jsonrpc": "2.0",
     "id": 1,
@@ -24,32 +25,46 @@ INITIALIZE = {
 }
 
 
+class HeaderAuthenticator:
+    """Stand-in that honours the same contract as the real one.
+
+    The endpoint is written against a list of authenticators, so its own
+    tests need no OAuth server -- and needing none is the proof that the
+    endpoint does not depend on one.
+    """
+
+    def authenticate(self, request: object) -> tuple[object, object] | None:
+        """Resolve the user named in the test header."""
+        username = request.META.get(OPERATOR_HEADER)
+        if not username:
+            return None
+        user = get_user_model().objects.filter(username=username).first()
+        if user is None:
+            raise AuthenticationFailed
+        return user, None
+
+    def authenticate_header(self, request: object) -> str:
+        """Offer the same shape of challenge a real scheme would."""
+        metadata = request.build_absolute_uri(
+            "/.well-known/oauth-protected-resource",
+        )
+        return f'Bearer realm="baboom-mcp",resource_metadata="{metadata}"'
+
+
 class _OperatorTokenMixin:
-    """An operator, a registered client, and tokens issued for them."""
+    """The catalog operator, recognised by the stand-in authenticator."""
 
     def setUp(self) -> None:
-        """Provision the operator and one registered client."""
+        """Provision the operator these requests run as."""
         call_command("ensure_catalog_operator", username="catalog-operator")
         self.user = get_user_model().objects.get(username="catalog-operator")
-        self.application = get_application_model().objects.create(
-            name="test-client",
-            user=self.user,
-            client_type="public",
-            authorization_grant_type="authorization-code",
-            redirect_uris="https://example.com/callback",
-        )
 
-    def _token(self, *, scope: str = "", expires_in: int = 300) -> str:
-        token = get_access_token_model().objects.create(
-            user=self.user,
-            application=self.application,
-            token=f"token-{scope or 'none'}-{expires_in}",
-            scope=scope or settings.MCP_SCOPE,
-            expires=timezone.now() + timedelta(seconds=expires_in),
-        )
-        return str(token.token)
+    @property
+    def _credentials(self) -> dict[str, str]:
+        return {OPERATOR_HEADER: self.user.username}
 
 
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
 class BearerMcpEndpointTests(_OperatorTokenMixin, TestCase):
     """Cover the ways in and the ways refused."""
 
@@ -61,15 +76,15 @@ class BearerMcpEndpointTests(_OperatorTokenMixin, TestCase):
             **headers,
         )
 
-    def test_valid_token_reaches_the_endpoint(self) -> None:
-        """A token carrying the scope runs as the user it was issued for."""
-        response = self._post(HTTP_AUTHORIZATION=f"Bearer {self._token()}")
+    def test_an_authenticated_request_reaches_the_endpoint(self) -> None:
+        """A verified request runs as the identity it was verified as."""
+        response = self._post(**self._credentials)
 
         assert response.status_code == HTTPStatus.OK
         body = json.loads(response.content)
         assert body["result"]["serverInfo"]["name"]
 
-    def test_missing_token_is_refused_with_a_challenge(self) -> None:
+    def test_an_unverified_request_is_refused_with_a_challenge(self) -> None:
         """The refusal names where the client can learn how to authenticate."""
         response = self._post()
 
@@ -90,39 +105,22 @@ class BearerMcpEndpointTests(_OperatorTokenMixin, TestCase):
 
         assert response.status_code == HTTPStatus.UNAUTHORIZED
 
-    def test_token_without_the_scope_is_refused(self) -> None:
-        """A token minted for something else does not open this door."""
-        response = self._post(
-            HTTP_AUTHORIZATION=f"Bearer {self._token(scope='read')}",
-        )
-
-        assert response.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}
-
     def test_manifest_lists_the_tools_behind_the_same_gate(self) -> None:
         """The catalogue is readable by hand, with the same token."""
-        response = self.client.get(
-            "/mcp/manifest/", headers={"authorization": f"Bearer {self._token()}"}
-        )
+        response = self.client.get("/mcp/manifest/", **self._credentials)
 
         assert response.status_code == HTTPStatus.OK
         names = [tool["name"] for tool in json.loads(response.content)["tools"]]
         assert "admin.registry" in names
 
-    def test_manifest_without_a_token_is_refused(self) -> None:
+    def test_manifest_without_authentication_is_refused(self) -> None:
         """The catalogue is not a public description of the server."""
         response = self.client.get("/mcp/manifest/")
 
         assert response.status_code == HTTPStatus.UNAUTHORIZED
 
-    def test_expired_token_is_refused(self) -> None:
-        """Expiry is enforced, not merely recorded."""
-        response = self._post(
-            HTTP_AUTHORIZATION=f"Bearer {self._token(expires_in=-60)}",
-        )
 
-        assert response.status_code == HTTPStatus.UNAUTHORIZED
-
-
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
 class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
     """The curation skill travels with the tools, for whatever a client speaks."""
 
@@ -133,7 +131,7 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
                 {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}},
             ),
             content_type="application/json",
-            headers={"authorization": f"Bearer {self._token()}"},
+            **self._credentials,
         )
         return json.loads(response.content)
 
@@ -184,8 +182,8 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
 
         assert "error" in body
 
-    def test_skill_methods_still_require_a_token(self) -> None:
-        """The instructions are behind the same gate as the tools."""
+    def test_skill_methods_are_behind_the_same_gate(self) -> None:
+        """The instructions are no more public than the tools."""
         response = self.client.post(
             MCP_URL,
             data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "skills/list"}),
@@ -195,98 +193,9 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
         assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
-class SigningKeyTests(TestCase):
-    """The configured key has to be usable, not merely present."""
-
-    def test_jwks_publishes_a_signing_key(self) -> None:
-        """An escaped PEM in the environment still has to parse.
-
-        A PEM kept on one line needs its newlines restored before use, and
-        nothing but this endpoint exercises the key.
-        """
-        response = self.client.get("/o/.well-known/jwks.json")
-
-        assert response.status_code == HTTPStatus.OK
-        keys = json.loads(response.content)["keys"]
-        assert [key["kty"] for key in keys] == ["RSA"]
-        assert keys[0]["alg"] == "RS256"
-
-
-@override_settings(MCP_CLIENT_HOSTS=["chatgpt.com"])
-class DynamicRegistrationTests(TestCase):
-    """A connector registers itself; a stranger does not."""
-
-    URL = "/o/register/"
-    ALLOWED_REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect"
-
-    def _register(self, *redirect_uris: str) -> int:
-        response = self.client.post(
-            self.URL,
-            data=json.dumps(
-                {
-                    "client_name": "connector",
-                    "redirect_uris": list(redirect_uris),
-                    "grant_types": ["authorization_code"],
-                    "response_types": ["code"],
-                    "token_endpoint_auth_method": "none",
-                },
-            ),
-            content_type="application/json",
-        )
-        return response.status_code
-
-    def test_allowlisted_redirect_registers(self) -> None:
-        """The connector has nobody signed in and still must get through."""
-        assert self._register(self.ALLOWED_REDIRECT) == HTTPStatus.CREATED
-
-    def test_other_host_is_refused(self) -> None:
-        """A code must not be deliverable to a host we did not name."""
-        assert self._register("https://evil.example/callback") != HTTPStatus.CREATED
-
-    def test_one_bad_redirect_spoils_the_registration(self) -> None:
-        """Every address is checked, not just the first."""
-        status = self._register(self.ALLOWED_REDIRECT, "https://evil.example/cb")
-
-        assert status != HTTPStatus.CREATED
-
-    def test_plain_http_is_refused(self) -> None:
-        """An authorization code may not travel in clear text."""
-        assert self._register("http://chatgpt.com/cb") != HTTPStatus.CREATED
-
-    @override_settings(MCP_CLIENT_HOSTS=[])
-    def test_empty_allowlist_denies(self) -> None:
-        """Naming no host denies every client, rather than allowing all."""
-        assert self._register(self.ALLOWED_REDIRECT) != HTTPStatus.CREATED
-
-
-class AuthorizationLoginTests(TestCase):
-    """Approving an authorization has to reach a page this project serves."""
-
-    def test_signing_in_lands_on_a_served_route(self) -> None:
-        """The default login URL is not routed here, so it reaches the site."""
-        response = self.client.get(
-            "/o/authorize/",
-            {
-                "response_type": "code",
-                "client_id": "whatever",
-                "redirect_uri": "https://chatgpt.com/cb",
-                "scope": settings.MCP_SCOPE,
-            },
-        )
-
-        assert response.status_code == HTTPStatus.FOUND
-        destination = urlparse(response["Location"]).path
-        assert destination == settings.LOGIN_URL
-        assert resolve(destination)
-
-
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
 class ProtocolHandshakeTests(_OperatorTokenMixin, TestCase):
     """Every call a client makes on connecting has to be answered."""
-
-    def setUp(self) -> None:
-        """Issue one token for the whole handshake."""
-        super().setUp()
-        self.bearer = self._token()
 
     def _rpc(self, method: str, *, notification: bool = False) -> object:
         payload: dict[str, object] = {"jsonrpc": "2.0", "method": method}
@@ -297,7 +206,7 @@ class ProtocolHandshakeTests(_OperatorTokenMixin, TestCase):
             MCP_URL,
             data=json.dumps(payload),
             content_type="application/json",
-            headers={"authorization": f"Bearer {self.bearer}"},
+            **self._credentials,
         )
 
     def test_a_notification_is_not_answered_with_an_error(self) -> None:
