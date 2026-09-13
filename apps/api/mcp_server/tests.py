@@ -11,6 +11,7 @@ from http import HTTPStatus
 from pathlib import Path
 
 import jsonschema
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -251,9 +252,9 @@ class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
     shaped in a way no client can read.
     """
 
-    SCHEMA_PATH = Path(__file__).resolve().parent / "spec" / "schema-2024-11-05.json"
+    SCHEMA_DIR = Path(__file__).resolve().parent / "spec"
     CASES = (
-        ("initialize", {"protocolVersion": "2024-11-05"}, "InitializeResult"),
+        ("initialize", {}, "InitializeResult"),
         ("tools/list", {}, "ListToolsResult"),
         ("resources/list", {}, "ListResourcesResult"),
         (
@@ -264,6 +265,12 @@ class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
         ("prompts/list", {}, "ListPromptsResult"),
         ("prompts/get", {"name": "product-curation"}, "GetPromptResult"),
         (
+            "resources/templates/list",
+            {},
+            "ListResourceTemplatesResult",
+        ),
+        ("ping", {}, "EmptyResult"),
+        (
             "tools/call",
             {"name": "admin.registry", "arguments": {}},
             "CallToolResult",
@@ -272,9 +279,11 @@ class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        """Load the schema once for every case."""
+        """Load the schema for the version this server announces."""
         super().setUpClass()
-        cls.schema = json.loads(cls.SCHEMA_PATH.read_text())
+        path = cls.SCHEMA_DIR / f"schema-{settings.MCP_PROTOCOL_VERSION}.json"
+        assert path.is_file(), f"No vendored schema for {settings.MCP_PROTOCOL_VERSION}"
+        cls.schema = json.loads(path.read_text())
 
     def _result(self, method: str, params: dict) -> dict:
         response = self.client.post(
@@ -288,6 +297,12 @@ class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
         body = json.loads(response.content)
         assert "result" in body, f"{method}: {body}"
         return body["result"]
+
+    def test_the_announced_version_is_the_one_served(self) -> None:
+        """Announcing a version is a claim, so check the server makes it."""
+        result = self._result("initialize", {})
+
+        assert result["protocolVersion"] == settings.MCP_PROTOCOL_VERSION
 
     def test_every_response_matches_the_published_schema(self) -> None:
         """A result no client can read is a result the server should not send."""
