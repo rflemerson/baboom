@@ -26,6 +26,15 @@ image_tag="sha-${commit_sha}"
 
 export API_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-api:${image_tag}"
 export WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/baboom-web:${image_tag}"
+# Written by the deploy workflow over stdin, so the signing key never
+# appears in a command line.
+if [ -f .env.oauth ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env.oauth
+  set +a
+fi
+
 export SENTRY_DSN="${SENTRY_DSN:-}"
 export SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-0.0}"
 export SENTRY_SEND_DEFAULT_PII="${SENTRY_SEND_DEFAULT_PII:-false}"
@@ -46,6 +55,15 @@ docker compose pull api web celery celery-beat redis
 echo "== Starting web and API =="
 docker compose up -d --no-build web api
 ./infra/deploy/wait-health.sh baboom-api-1 "${API_HEALTH_ATTEMPTS:-30}" "${API_HEALTH_INTERVAL:-10}"
+
+if [ -n "${CATALOG_OPERATOR_USERNAME:-}" ]; then
+  echo "== Ensuring the catalog operator =="
+  docker compose exec -T \
+    -e CATALOG_OPERATOR_PASSWORD="${CATALOG_OPERATOR_PASSWORD:-}" \
+    api python manage.py ensure_catalog_operator \
+      --username "${CATALOG_OPERATOR_USERNAME}" \
+      --email "${CATALOG_OPERATOR_EMAIL:-}"
+fi
 
 echo "== Starting workers =="
 docker compose up -d --no-build celery celery-beat

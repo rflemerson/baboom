@@ -24,6 +24,31 @@ jobs:
           chmod 600 ~/.ssh/production_key
           ssh-keyscan -H "${{ vars.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Ship deployment secrets
+        env:
+          PRODUCTION_HOST: ${{ vars.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ vars.PRODUCTION_USER }}
+          OIDC_RSA_PRIVATE_KEY: ${{ secrets.OIDC_RSA_PRIVATE_KEY }}
+          CATALOG_OPERATOR_PASSWORD: ${{ secrets.CATALOG_OPERATOR_PASSWORD }}
+          MCP_RESOURCE_IDENTIFIER: ${{ vars.MCP_RESOURCE_IDENTIFIER }}
+          OAUTH_ISSUER: ${{ vars.OAUTH_ISSUER }}
+          MCP_CLIENT_HOSTS: ${{ vars.MCP_CLIENT_HOSTS }}
+          CATALOG_OPERATOR_USERNAME: ${{ vars.CATALOG_OPERATOR_USERNAME }}
+          CATALOG_OPERATOR_EMAIL: ${{ vars.CATALOG_OPERATOR_EMAIL }}
+        run: |
+          # Over stdin, never as arguments: a command line is visible in the
+          # remote process listing, and one of these is a signing key.
+          {
+            printf 'OIDC_RSA_PRIVATE_KEY=%s\n' "$OIDC_RSA_PRIVATE_KEY"
+            printf 'CATALOG_OPERATOR_PASSWORD=%s\n' "$CATALOG_OPERATOR_PASSWORD"
+            printf 'MCP_RESOURCE_IDENTIFIER=%s\n' "$MCP_RESOURCE_IDENTIFIER"
+            printf 'OAUTH_ISSUER=%s\n' "$OAUTH_ISSUER"
+            printf 'MCP_CLIENT_HOSTS=%s\n' "$MCP_CLIENT_HOSTS"
+            printf 'CATALOG_OPERATOR_USERNAME=%s\n' "$CATALOG_OPERATOR_USERNAME"
+            printf 'CATALOG_OPERATOR_EMAIL=%s\n' "$CATALOG_OPERATOR_EMAIL"
+          } | ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
+            "umask 077 && cat > /home/ubuntu/app/baboom/.env.oauth"
+
       - name: Deploy over SSH
         env:
           PRODUCTION_HOST: ${{ vars.PRODUCTION_HOST }}
