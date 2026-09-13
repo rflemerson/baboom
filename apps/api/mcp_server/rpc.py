@@ -13,13 +13,13 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django_admin_mcp_api.server import errors, jsonrpc
 
 from mcp_server import loader
 
 if TYPE_CHECKING:
-    from django.http import HttpRequest, HttpResponse
+    from django.http import HttpRequest
 
 SKILLS_EXTENSION = "io.modelcontextprotocol/skills"
 URI_SCHEME = "skill"
@@ -125,6 +125,16 @@ def _prompts_list(_params: dict[str, Any]) -> dict[str, Any]:
     return {"prompts": prompts}
 
 
+def _resources_templates_list(_params: dict[str, Any]) -> dict[str, Any]:
+    """No template: every file this server offers has a fixed URI."""
+    return {"resourceTemplates": []}
+
+
+def _ping(_params: dict[str, Any]) -> dict[str, Any]:
+    """Answer the protocol's liveness check."""
+    return {}
+
+
 def _prompts_get(params: dict[str, Any]) -> dict[str, Any]:
     name = params.get("name")
     if not name:
@@ -140,6 +150,8 @@ def _prompts_get(params: dict[str, Any]) -> dict[str, Any]:
 
 
 HANDLERS = {
+    "ping": _ping,
+    "resources/templates/list": _resources_templates_list,
     "skills/list": _skills_list,
     "skills/get": _skills_get,
     "resources/list": _resources_list,
@@ -173,6 +185,11 @@ class SkillMethodsMixin:
         except UnicodeDecodeError, json.JSONDecodeError, AttributeError:
             payload = None
         method = payload.get("method") if isinstance(payload, dict) else None
+
+        # A notification carries no id and takes no reply; answering one with
+        # an error envelope is what a client reads as a broken server.
+        if isinstance(method, str) and method.startswith("notifications/"):
+            return HttpResponse(status=HTTPStatus.ACCEPTED)
 
         if method in HANDLERS:
             rpc_id = payload.get("id")

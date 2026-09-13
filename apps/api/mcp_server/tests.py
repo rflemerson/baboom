@@ -278,3 +278,54 @@ class AuthorizationLoginTests(TestCase):
         destination = urlparse(response["Location"]).path
         assert destination == settings.LOGIN_URL
         assert resolve(destination)
+
+
+class ProtocolHandshakeTests(_OperatorTokenMixin, TestCase):
+    """Every call a client makes on connecting has to be answered."""
+
+    def setUp(self) -> None:
+        """Issue one token for the whole handshake."""
+        super().setUp()
+        self.bearer = self._token()
+
+    def _rpc(self, method: str, *, notification: bool = False) -> object:
+        payload: dict[str, object] = {"jsonrpc": "2.0", "method": method}
+        if not notification:
+            payload["id"] = 1
+            payload["params"] = {}
+        return self.client.post(
+            MCP_URL,
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers={"authorization": f"Bearer {self.bearer}"},
+        )
+
+    def test_a_notification_is_not_answered_with_an_error(self) -> None:
+        """A notification carries no id, so an error envelope has nowhere to go.
+
+        A client that sent one and got back a failure reads the server as
+        broken and abandons the connection.
+        """
+        response = self._rpc("notifications/initialized", notification=True)
+
+        assert response.status_code == HTTPStatus.ACCEPTED
+        assert not response.content
+
+    def test_every_declared_capability_answers_its_methods(self) -> None:
+        """Announcing a capability is a promise to serve all of it.
+
+        ``resources`` was advertised while ``resources/templates/list`` was
+        not implemented, so a client following the handshake hit an error.
+        """
+        for method in (
+            "ping",
+            "tools/list",
+            "resources/list",
+            "resources/templates/list",
+            "prompts/list",
+            "skills/list",
+        ):
+            response = self._rpc(method)
+
+            assert response.status_code == HTTPStatus.OK, method
+            assert "error" not in json.loads(response.content), method
