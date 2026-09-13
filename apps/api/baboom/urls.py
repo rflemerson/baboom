@@ -5,8 +5,6 @@ from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
 from oauth2_provider.urls import metadata_urlpatterns
 
-from baboom.mcp_bearer import bearer_mcp_endpoint, bearer_mcp_manifest
-
 
 def healthz(_request: HttpRequest) -> JsonResponse:
     """Return a lightweight liveness response for container healthchecks."""
@@ -24,7 +22,6 @@ urlpatterns = [
     path("healthz/", healthz),
     path("admin/", admin.site.urls),
     path("admin-api/", include("django_admin_rest_api.urls")),
-    path("mcp/", bearer_mcp_endpoint),
-    path("mcp/manifest/", bearer_mcp_manifest),
+    path("mcp/", include("mcp_server.urls")),
     path("api/", include("core.rest.urls")),
 ]

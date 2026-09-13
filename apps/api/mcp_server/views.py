@@ -19,6 +19,8 @@ from oauth2_provider.views.mixins import (
     ProtectedResourceMixin,
 )
 
+from mcp_server.rpc import SkillMethodsMixin
+
 if TYPE_CHECKING:
     from django.http import HttpRequest, HttpResponseBase
 
@@ -67,7 +69,7 @@ class _BearerOnly(
         return super().dispatch(request, *args, **kwargs)
 
 
-class BearerMcpEndpointView(_BearerOnly, McpEndpointView):
+class BearerMcpEndpointView(_BearerOnly, SkillMethodsMixin, McpEndpointView):
     """MCP over JSON-RPC, authenticated by access token."""
 
 

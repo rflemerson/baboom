@@ -18,6 +18,7 @@
 - API backend: `apps/api/AGENTS.md`
 - Infra and deploy: `infra/AGENTS.md`
 - Web frontend: `apps/web/AGENTS.md`
+- MCP endpoint: `apps/api/mcp_server/AGENTS.md`
 
 ## 1. When in Doubt, Research
 If you are stuck, unsure about a syntax, or encountering a complex error:

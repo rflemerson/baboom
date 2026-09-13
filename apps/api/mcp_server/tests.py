@@ -22,8 +22,8 @@ INITIALIZE = {
 }
 
 
-class BearerMcpEndpointTests(TestCase):
-    """Cover the ways in and the ways refused."""
+class _OperatorTokenMixin:
+    """An operator, a registered client, and tokens issued for them."""
 
     def setUp(self) -> None:
         """Provision the operator and one registered client."""
@@ -46,6 +46,10 @@ class BearerMcpEndpointTests(TestCase):
             expires=timezone.now() + timedelta(seconds=expires_in),
         )
         return str(token.token)
+
+
+class BearerMcpEndpointTests(_OperatorTokenMixin, TestCase):
+    """Cover the ways in and the ways refused."""
 
     def _post(self, **headers: str) -> object:
         return self.client.post(
@@ -95,8 +99,7 @@ class BearerMcpEndpointTests(TestCase):
     def test_manifest_lists_the_tools_behind_the_same_gate(self) -> None:
         """The catalogue is readable by hand, with the same token."""
         response = self.client.get(
-            "/mcp/manifest/",
-            HTTP_AUTHORIZATION=f"Bearer {self._token()}",
+            "/mcp/manifest/", headers={"authorization": f"Bearer {self._token()}"}
         )
 
         assert response.status_code == HTTPStatus.OK
@@ -113,6 +116,78 @@ class BearerMcpEndpointTests(TestCase):
         """Expiry is enforced, not merely recorded."""
         response = self._post(
             HTTP_AUTHORIZATION=f"Bearer {self._token(expires_in=-60)}",
+        )
+
+        assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
+    """The curation skill travels with the tools, for whatever a client speaks."""
+
+    def _rpc(self, method: str, params: dict | None = None) -> dict:
+        response = self.client.post(
+            MCP_URL,
+            data=json.dumps(
+                {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}},
+            ),
+            content_type="application/json",
+            headers={"authorization": f"Bearer {self._token()}"},
+        )
+        return json.loads(response.content)
+
+    def test_initialize_advertises_what_it_serves(self) -> None:
+        """A client learns from the handshake that skills are available."""
+        capabilities = self._rpc(
+            "initialize",
+            {"protocolVersion": "2024-11-05"},
+        )["result"]["capabilities"]
+
+        assert "io.modelcontextprotocol/skills" in capabilities["extensions"]
+        assert "prompts" in capabilities
+        assert "resources" in capabilities
+        assert "tools" in capabilities
+
+    def test_skills_list_names_the_curation_skill(self) -> None:
+        """The listing carries the frontmatter a client indexes on."""
+        skills = self._rpc("skills/list")["result"]["skills"]
+
+        assert [skill["name"] for skill in skills] == ["product-curation"]
+        assert skills[0]["frontmatter"]["description"]
+        assert skills[0]["uri"].endswith("/SKILL.md")
+
+    def test_resources_read_returns_a_referenced_file(self) -> None:
+        """A reference named by the skill can be fetched by its URI."""
+        body = self._rpc(
+            "resources/read",
+            {"uri": "skill://product-curation/references/catalog-rules.md"},
+        )
+
+        text = body["result"]["contents"][0]["text"]
+        assert "One product, many offers" in text
+
+    def test_prompt_carries_the_references_inline(self) -> None:
+        """A prompt cannot follow a URI, so the references travel with it."""
+        body = self._rpc("prompts/get", {"name": "product-curation"})
+
+        text = body["result"]["messages"][0]["content"]["text"]
+        assert "price per gram" in text
+        assert "One product, many offers" in text
+
+    def test_reading_outside_the_skill_is_refused(self) -> None:
+        """A URI may not walk out of the skill directory."""
+        body = self._rpc(
+            "resources/read",
+            {"uri": "skill://product-curation/../../settings/base.py"},
+        )
+
+        assert "error" in body
+
+    def test_skill_methods_still_require_a_token(self) -> None:
+        """The instructions are behind the same gate as the tools."""
+        response = self.client.post(
+            MCP_URL,
+            data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "skills/list"}),
+            content_type="application/json",
         )
 
         assert response.status_code == HTTPStatus.UNAUTHORIZED
