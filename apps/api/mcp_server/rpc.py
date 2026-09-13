@@ -130,11 +130,6 @@ def _resources_templates_list(_params: dict[str, Any]) -> dict[str, Any]:
     return {"resourceTemplates": []}
 
 
-def _ping(_params: dict[str, Any]) -> dict[str, Any]:
-    """Answer the protocol's liveness check."""
-    return {}
-
-
 def _prompts_get(params: dict[str, Any]) -> dict[str, Any]:
     name = params.get("name")
     if not name:
@@ -150,7 +145,6 @@ def _prompts_get(params: dict[str, Any]) -> dict[str, Any]:
 
 
 HANDLERS = {
-    "ping": _ping,
     "resources/templates/list": _resources_templates_list,
     "skills/list": _skills_list,
     "skills/get": _skills_get,
@@ -164,25 +158,6 @@ HANDLERS = {
 def handle(method: str, params: dict[str, Any]) -> dict[str, Any]:
     """Answer one of the methods this module adds."""
     return HANDLERS[method](params)
-
-
-def as_content_blocks(result: dict[str, Any]) -> dict[str, Any]:
-    """Rewrite a tool result into content blocks the protocol defines.
-
-    The library returns its JSON body as ``{"type": "json"}``, which is not a
-    content block in any published version of the protocol: a client finds no
-    ``text`` where the answer should be and discards the call it just made.
-    """
-    blocks = result.get("content")
-    if not isinstance(blocks, list):
-        return result
-    rewritten = [
-        {"type": "text", "text": json.dumps(block["json"], ensure_ascii=False)}
-        if isinstance(block, dict) and block.get("type") == "json"
-        else block
-        for block in blocks
-    ]
-    return {**result, "content": rewritten}
 
 
 def declare_capabilities(payload: dict[str, Any]) -> dict[str, Any]:
@@ -204,11 +179,6 @@ class SkillMethodsMixin:
         except UnicodeDecodeError, json.JSONDecodeError, AttributeError:
             payload = None
         method = payload.get("method") if isinstance(payload, dict) else None
-
-        # A notification carries no id and takes no reply; answering one with
-        # an error envelope is what a client reads as a broken server.
-        if isinstance(method, str) and method.startswith("notifications/"):
-            return HttpResponse(status=HTTPStatus.ACCEPTED)
 
         if method in HANDLERS:
             rpc_id = payload.get("id")
@@ -232,7 +202,4 @@ class SkillMethodsMixin:
         body = json.loads(response.content)
         if method == "initialize":
             return JsonResponse(declare_capabilities(body))
-        if method == "tools/call" and "result" in body:
-            body["result"] = as_content_blocks(body["result"])
-            return JsonResponse(body)
         return response
