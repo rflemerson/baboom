@@ -15,6 +15,10 @@ OAUTH_ISSUER = env("OAUTH_ISSUER", default="http://localhost:8000/o")
 # permissions decide what happens there.
 MCP_SCOPE = "mcp:access"
 
+# Hosts a client may belong to: where its metadata document is served, and
+# where an authorization code may be sent. Empty denies every client.
+MCP_CLIENT_HOSTS = env.list("MCP_CLIENT_HOSTS", default=[])
+
 OAUTH2_PROVIDER = {
     "SCOPES": {MCP_SCOPE: "Use the Baboom MCP endpoint"},
     "DEFAULT_SCOPES": [MCP_SCOPE],
@@ -26,8 +30,11 @@ OAUTH2_PROVIDER = {
     "CIMD_REGISTRATION_PERMISSION_CLASSES": (
         "oauth2_provider.cimd.HostAllowlistCIMDPermission",
     ),
-    "CIMD_ALLOWED_HOSTS": env.list("MCP_CLIENT_HOSTS", default=[]),
+    "CIMD_ALLOWED_HOSTS": MCP_CLIENT_HOSTS,
     "DCR_ENABLED": True,
+    "DCR_REGISTRATION_PERMISSION_CLASSES": (
+        "mcp_server.registration.RedirectHostAllowlistDCRPermission",
+    ),
     "OIDC_ENABLED": True,
     "OIDC_RSA_PRIVATE_KEY": env.str(
         "OIDC_RSA_PRIVATE_KEY",
