@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.core.checks import run_checks
 from django.test import TestCase
@@ -26,13 +25,13 @@ class ScraperRunHistoryTests(TestCase):
     def test_monitor_success_creates_scraper_run(self) -> None:
         """Successful monitor runs should be visible in admin history."""
 
-        def run(command: list[str], **kwargs: object) -> object:
+        def fake_run(_command: list[str], **kwargs: object) -> object:
             Path(kwargs["env"]["SCRAPER_STATS_FILE"]).write_text(
                 json.dumps({"item_scraped_count": 2, "downloader/request_count": 3}),
             )
             return MagicMock(returncode=0, stdout="", stderr="")
 
-        with patch("scrapers.tasks.subprocess.run", side_effect=run):
+        with patch("scrapers.tasks.subprocess.run", side_effect=fake_run):
             result = _run_spider_monitor("test_store", "Test Store")
         run = ScraperRun.objects.get()
 
@@ -50,11 +49,11 @@ class ScraperRunHistoryTests(TestCase):
     def test_monitor_error_creates_failed_scraper_run(self) -> None:
         """Failed monitor runs should record the error before re-raising."""
 
-        def run(command: list[str], **kwargs: object) -> object:
+        def fake_run(_command: list[str], **_kwargs: object) -> object:
             return MagicMock(returncode=1, stdout="", stderr="blocked by upstream")
 
         error = _raised(
-            lambda: self._run_subprocess(run, "Blocked Store"),
+            lambda: self._run_subprocess(fake_run, "Blocked Store"),
             RuntimeError,
         )
 
@@ -82,13 +81,16 @@ class EmptyMonitorRunTests(TestCase):
 
     def _run(self, items: list[object]) -> str:
         """Run the monitor helper with a spider returning the given items."""
-        def run(command: list[str], **kwargs: object) -> object:
+
+        def fake_run(_command: list[str], **kwargs: object) -> object:
             Path(kwargs["env"]["SCRAPER_STATS_FILE"]).write_text(
-                json.dumps({"item_scraped_count": len(items), "downloader/request_count": 1}),
+                json.dumps(
+                    {"item_scraped_count": len(items), "downloader/request_count": 1}
+                ),
             )
             return MagicMock(returncode=0, stdout="", stderr="")
 
-        with patch("scrapers.tasks.subprocess.run", side_effect=run):
+        with patch("scrapers.tasks.subprocess.run", side_effect=fake_run):
             return _run_spider_monitor("dux", self.LABEL)
 
     def test_empty_run_is_success_for_a_monitor_without_history(self) -> None:

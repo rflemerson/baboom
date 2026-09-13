@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import TYPE_CHECKING
 
-from scrapy import Request
-from scrapy.http import Response
-
-from ..base import CatalogSpider
 from ...normalizers.wapstore import WapStoreNormalizer
+from ..base import CatalogSpider
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from scrapy import Request
+    from scrapy.http import Response
+
+    from ...contracts import ScrapedProductInput
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +49,9 @@ class WapStoreApiSpider(CatalogSpider):
             "Content-Type": "application/json",
             "Origin": self.BASE_URL,
             "Referer": f"{self.BASE_URL}/",
-            "Sec-Ch-Ua": '"Chromium";v="120", "Google Chrome";v="120", "Not_A Brand";v="8"',
+            "Sec-Ch-Ua": (
+                '"Chromium";v="120", "Google Chrome";v="120", "Not_A Brand";v="8"'
+            ),
             "Sec-Ch-Ua-Mobile": "?0",
             "Sec-Ch-Ua-Platform": '"Linux"',
             "Sec-Fetch-Dest": "empty",
@@ -73,7 +82,10 @@ class WapStoreApiSpider(CatalogSpider):
             meta={**self._api_meta(), "category": category, "offset": 0},
         )
 
-    def _parse_menu(self, response: Response):
+    def _parse_menu(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Flatten a menu response and schedule category requests."""
         if response.status != WAPSTORE_SUCCESS_CODE:
             logger.warning("Menu API failed: %s", response.status)
@@ -119,16 +131,23 @@ class WapStoreApiSpider(CatalogSpider):
         if len(path) > 1 and self._is_valid_category_path(path):
             paths.add(path)
 
-    def _parse_category(self, response: Response):
+    def _parse_category(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Normalize one Wap.Store page and continue offset pagination."""
         category = str(response.meta["category"])
         offset = int(response.meta["offset"])
         if response.status != WAPSTORE_SUCCESS_CODE:
-            logger.warning("Failed category %s at offset %s: %s", category, offset, response.status)
+            logger.warning(
+                "Failed category %s at offset %s: %s", category, offset, response.status
+            )
             return
         try:
             data = response.json()
-            products = self._extract_products_list(data if isinstance(data, dict) else {})
+            products = self._extract_products_list(
+                data if isinstance(data, dict) else {}
+            )
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
             logger.debug("Wap.Store item page parse error for %s: %s", category, exc)
             products = []
@@ -144,7 +163,9 @@ class WapStoreApiSpider(CatalogSpider):
                 dont_filter=True,
             )
 
-    def _extract_products_list(self, data: dict[str, object]) -> list[dict[str, object]]:
+    def _extract_products_list(
+        self, data: dict[str, object]
+    ) -> list[dict[str, object]]:
         """Support both Wap.Store response envelopes."""
         content = data.get("conteudo")
         if isinstance(content, dict) and isinstance(content.get("produtos"), list):

@@ -2,8 +2,8 @@
 
 import logging
 
-from ..normalizers.shopify import ShopifyNormalizer
 from ..crawler.spiders.shopify import ShopifyApiSpider
+from ..normalizers.shopify import ShopifyNormalizer
 
 logger = logging.getLogger(__name__)
 

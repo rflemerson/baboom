@@ -30,8 +30,11 @@ class VariantSelection(BaseModel):
 
 
 class VariantContext(BaseModel):
-    """Where to look, never what was found; curation reads mass, flavor, and
-    composition from the label so guesses here do not compete with it."""
+    """Where to look, never what was found.
+
+    Curation reads mass, flavor, and composition from the label, so a guess
+    recorded here would compete with it.
+    """
 
     schema_version: Literal[1] = 1
     provider: str = ""

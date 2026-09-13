@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,7 @@ from django.utils import timezone
 from .models import ScraperRun
 
 API_ROOT = Path(__file__).resolve().parents[1]
+SPIDER_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 logger = get_task_logger(__name__)
 
@@ -93,6 +95,9 @@ def _cleanup_stats_file(path: Path | None) -> None:
 
 def _run_spider_monitor(spider_name: str, label: str) -> str:
     """Run one Scrapy spider in a child process and record its outcome."""
+    if not SPIDER_NAME_PATTERN.fullmatch(spider_name):
+        message = f"Refusing to run spider with unexpected name: {spider_name!r}"
+        raise ValueError(message)
     current_task = get_current_task()
     run = ScraperRun.objects.create(
         label=label,
@@ -110,6 +115,8 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
             stats_path = Path(stats_file.name)
         environment = os.environ.copy()
         environment.setdefault("DJANGO_SETTINGS_MODULE", "baboom.settings")
+        # S603: the command is this interpreter plus a name checked above,
+        # never anything a request or a store could influence.
         completed = subprocess.run(  # noqa: S603
             [sys.executable, "-m", "scrapy", "crawl", spider_name],
             cwd=API_ROOT,

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Awaitable
 from typing import TYPE_CHECKING
 
 from ..services import ScraperService
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from ..contracts import ScrapedProductInput
 
 
@@ -32,7 +33,9 @@ class CatalogPipeline:
             return item
         return self._process_item_async(item)
 
-    async def _process_item_async(self, item: ScrapedProductInput) -> ScrapedProductInput:
+    async def _process_item_async(
+        self, item: ScrapedProductInput
+    ) -> ScrapedProductInput:
         """Move synchronous Django writes off Scrapy's asyncio event loop."""
         await asyncio.to_thread(self._save, item)
         return item

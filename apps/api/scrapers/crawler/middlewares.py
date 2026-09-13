@@ -5,14 +5,25 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from typing import TYPE_CHECKING
 
-from scrapy import Request
-from scrapy.http import Response
 from scrapy.downloadermiddlewares.retry import get_retry_request
+
+# Scrapy itself imports the reactor at module scope, including in
+# scrapy.utils.defer, which is loaded long before this middleware. The reactor
+# chosen by TWISTED_REACTOR is already installed by the time a middleware runs.
+from twisted.internet import reactor
+from twisted.internet.task import deferLater
+
+if TYPE_CHECKING:
+    from scrapy import Request, Spider
+    from scrapy.http import Response
+    from twisted.internet.defer import Deferred
 
 logger = logging.getLogger(__name__)
 
 # scrapy_impersonate delegates the browser TLS fingerprint to curl_cffi.
+HTTP_OK = 200
 MAX_RETRY_AFTER_SECONDS = 120.0
 RETRYABLE_STATUS_CODES = frozenset({403, 429, 500, 502, 503, 504})
 IMPERSONATIONS = ("chrome120", "chrome119", "chrome116", "safari17_0")
@@ -40,12 +51,15 @@ def parse_retry_after(
     raw = response.headers.get("Retry-After")
     if not raw:
         return None
-    value = str(raw, encoding="latin-1").strip() if isinstance(raw, bytes) else str(raw).strip()
+    if isinstance(raw, bytes):
+        value = str(raw, encoding="latin-1").strip()
+    else:
+        value = str(raw).strip()
     if value.isdigit():
         return min(float(value), max_seconds)
     try:
         retry_at = parsedate_to_datetime(value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return None
     if retry_at is None:
         return None
@@ -65,14 +79,23 @@ class ImpersonationMiddleware:
 
     impersonations = IMPERSONATIONS
 
-    def process_request(self, request: Request, spider: object) -> None:
+    def __init__(self) -> None:
+        """Keep the rotation index per spider name, out of the spider itself."""
+        self._indexes: dict[str, int] = {}
+
+    def process_request(self, request: Request, spider: Spider) -> None:
         """Assign one stable browser identity to a new request."""
         if "impersonate" not in request.meta:
             request.meta["impersonate"] = self._current_identity(spider)
 
-    def process_response(self, request: Request, response: Response, spider: object):
+    def process_response(
+        self,
+        request: Request,
+        response: Response,
+        spider: Spider,
+    ) -> Response | Request | Deferred[Request]:
         """Retry forbidden, transient, and nominally successful WAF responses."""
-        blocked_body = response.status == 200 and is_blocked(response.text)
+        blocked_body = response.status == HTTP_OK and is_blocked(response.text)
         if response.status not in RETRYABLE_STATUS_CODES and not blocked_body:
             return response
 
@@ -82,23 +105,18 @@ class ImpersonationMiddleware:
             return response
         retry.meta["impersonate"] = self._next_identity(spider)
         wait = parse_retry_after(response)
-        if wait is not None:
-            logger.info("Honoring Retry-After=%.1fs for %s", wait, request.url)
-            return self._delayed(wait, retry)
-        return retry
-
-    def _delayed(self, wait: float, retry: Request):
-        """Import the reactor lazily: importing it early installs the wrong one."""
-        from twisted.internet import reactor
-        from twisted.internet.task import deferLater
-
+        if wait is None:
+            return retry
+        logger.info("Honoring Retry-After=%.1fs for %s", wait, request.url)
         return deferLater(reactor, wait, lambda: retry)
 
-    def _current_identity(self, spider: object) -> str:
-        index = int(getattr(spider, "_impersonation_index", 0))
+    def _current_identity(self, spider: Spider) -> str:
+        """Return the identity currently assigned to this spider."""
+        index = self._indexes.get(spider.name, 0)
         return self.impersonations[index % len(self.impersonations)]
 
-    def _next_identity(self, spider: object) -> str:
-        index = int(getattr(spider, "_impersonation_index", 0)) + 1
-        spider._impersonation_index = index
+    def _next_identity(self, spider: Spider) -> str:
+        """Advance to the next identity after a block or refusal."""
+        index = self._indexes.get(spider.name, 0) + 1
+        self._indexes[spider.name] = index
         return self.impersonations[index % len(self.impersonations)]

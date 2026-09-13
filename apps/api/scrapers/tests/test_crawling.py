@@ -8,6 +8,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
+from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -23,12 +24,16 @@ from scrapers.crawler.middlewares import (
 )
 from scrapers.crawler.pipelines import CatalogPipeline
 from scrapers.models import ScrapedItem
+from scrapers.normalizers.shopify import ShopifyNormalizer
 from scrapers.stores.blackskull import BlackSkullSpider
 from scrapers.stores.dark_lab import DarkLabSpider
 from scrapers.stores.dux import DuxSpider
 from scrapers.stores.growth import GrowthSpider
-from scrapers.stores.integral_medica import IntegralMedicaSpider
 from scrapers.tests import EXPECTED_FALLBACK_CATEGORY_COUNT
+
+RETRY_AFTER_SECONDS = 20
+SOLDIERS_PRICE_IN_REAIS = 129.90
+DARK_LAB_PRICE_IN_REAIS = 12990.0
 
 
 @skipUnless(
@@ -40,8 +45,6 @@ class ScraperIntegrationTests(TestCase):
 
     def _run(self, spider_name: str) -> None:
         """Run one real spider through the same command used by Celery."""
-        from pathlib import Path
-
         result = subprocess.run(
             [sys.executable, "-m", "scrapy", "crawl", spider_name],
             cwd=Path(__file__).resolve().parents[2],
@@ -146,35 +149,68 @@ class ProcessRawProductIntegrationTests(TestCase):
             pipeline.process_item(product, spider)
         return products
 
-    def test_shopify_passes_store_page_and_category_and_rejects_bad_payload(self) -> None:
+    def test_shopify_passes_store_page_and_category_and_rejects_bad_payload(
+        self,
+    ) -> None:
         """Shopify wiring persists its configured store and source page."""
         spider = DarkLabSpider()
-        assert self._persist(spider, {"id": "bad", "handle": "", "variants": []}, "whey") == []
+        assert (
+            self._persist(spider, {"id": "bad", "handle": "", "variants": []}, "whey")
+            == []
+        )
         assert ScrapedItem.objects.count() == 0
         raw = {
             "id": "shopify-product-1",
             "title": "Whey Test",
             "handle": "whey-test",
-            "variants": [{"id": "shopify-variant-1", "title": "Default Title", "price": "10.00", "available": True}],
+            "variants": [
+                {
+                    "id": "shopify-variant-1",
+                    "title": "Default Title",
+                    "price": "10.00",
+                    "available": True,
+                }
+            ],
         }
         items = self._persist(spider, raw, "whey-protein")
         assert len(items) == 1
         item = ScrapedItem.objects.get()
         assert item.offer.store_slug == "dark_lab"
         assert item.source_page is not None
-        assert item.source_page.url == "https://www.darklabsuplementos.com.br/products/whey-test"
+        assert (
+            item.source_page.url
+            == "https://www.darklabsuplementos.com.br/products/whey-test"
+        )
         assert item.offer.category == "whey-protein"
 
     def test_vtex_passes_store_page_and_category_and_rejects_bad_payload(self) -> None:
         """VTEX wiring persists its configured store and source page."""
         spider = BlackSkullSpider()
-        assert self._persist(spider, {"productId": "bad", "linkText": "", "items": []}, "proteina") == []
+        assert (
+            self._persist(
+                spider, {"productId": "bad", "linkText": "", "items": []}, "proteina"
+            )
+            == []
+        )
         assert ScrapedItem.objects.count() == 0
         raw = {
             "productId": "vtex-product-1",
             "productName": "Whey Test",
             "linkText": "whey-test",
-            "items": [{"itemId": "vtex-item-1", "sellers": [{"sellerDefault": True, "commertialOffer": {"Price": "10.00", "AvailableQuantity": 2}}]}],
+            "items": [
+                {
+                    "itemId": "vtex-item-1",
+                    "sellers": [
+                        {
+                            "sellerDefault": True,
+                            "commertialOffer": {
+                                "Price": "10.00",
+                                "AvailableQuantity": 2,
+                            },
+                        }
+                    ],
+                }
+            ],
         }
         items = self._persist(spider, raw, "proteina")
         assert len(items) == 1
@@ -184,16 +220,29 @@ class ProcessRawProductIntegrationTests(TestCase):
         assert item.source_page.url == "https://www.blackskullusa.com.br/whey-test/p"
         assert item.offer.category == "proteina"
 
-    def test_nuvemshop_passes_store_page_and_category_and_rejects_bad_payload(self) -> None:
+    def test_nuvemshop_passes_store_page_and_category_and_rejects_bad_payload(
+        self,
+    ) -> None:
         """Nuvemshop wiring persists its configured store and source page."""
         spider = DuxSpider()
-        assert self._persist(spider, {"sku": "bad", "offers": {"url": "", "price": "N/A"}}, "produtos") == []
+        assert (
+            self._persist(
+                spider,
+                {"sku": "bad", "offers": {"url": "", "price": "N/A"}},
+                "produtos",
+            )
+            == []
+        )
         assert ScrapedItem.objects.count() == 0
         raw = {
             "@type": "Product",
             "name": "Whey Test",
             "sku": "nuvem-sku-1",
-            "offers": {"url": "https://duxhumanhealth.com/produtos/whey-test/?ref=listing", "price": "10.00", "availability": "InStock"},
+            "offers": {
+                "url": "https://duxhumanhealth.com/produtos/whey-test/?ref=listing",
+                "price": "10.00",
+                "availability": "InStock",
+            },
         }
         items = self._persist(spider, raw, "produtos")
         assert len(items) == 1
@@ -203,12 +252,26 @@ class ProcessRawProductIntegrationTests(TestCase):
         assert item.source_page.url == "https://duxhumanhealth.com/produtos/whey-test/"
         assert item.offer.category == "produtos"
 
-    def test_wapstore_passes_store_page_and_category_and_rejects_bad_payload(self) -> None:
+    def test_wapstore_passes_store_page_and_category_and_rejects_bad_payload(
+        self,
+    ) -> None:
         """Wap.Store wiring persists its configured store and source page."""
         spider = GrowthSpider()
-        assert self._persist(spider, {"id": "bad", "nome": "Bad", "link": "", "precos": {"por": "N/A"}}, "/proteina/") == []
+        assert (
+            self._persist(
+                spider,
+                {"id": "bad", "nome": "Bad", "link": "", "precos": {"por": "N/A"}},
+                "/proteina/",
+            )
+            == []
+        )
         assert ScrapedItem.objects.count() == 0
-        raw = {"id": "wap-item-1", "nome": "Whey Test", "link": "/whey-test", "precos": {"por": "10.00"}}
+        raw = {
+            "id": "wap-item-1",
+            "nome": "Whey Test",
+            "link": "/whey-test",
+            "precos": {"por": "10.00"},
+        }
         items = self._persist(spider, raw, "/proteina/")
         assert len(items) == 1
         item = ScrapedItem.objects.get()
@@ -228,7 +291,9 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
         request = Request("https://example.com")
         response = TextResponse(request.url, status=403, request=request)
         retry = request.replace()
-        with patch("scrapers.crawler.middlewares.get_retry_request", return_value=retry):
+        with patch(
+            "scrapers.crawler.middlewares.get_retry_request", return_value=retry
+        ):
             result = middleware.process_response(request, response, spider)
         assert result is retry
         assert result.meta["impersonate"] == "chrome119"
@@ -238,9 +303,13 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
         middleware = ImpersonationMiddleware()
         spider = MagicMock(_impersonation_index=0)
         request = Request("https://example.com")
-        response = TextResponse(request.url, body=b"Attention Required! | Cloudflare", request=request)
+        response = TextResponse(
+            request.url, body=b"Attention Required! | Cloudflare", request=request
+        )
         retry = request.replace()
-        with patch("scrapers.crawler.middlewares.get_retry_request", return_value=retry):
+        with patch(
+            "scrapers.crawler.middlewares.get_retry_request", return_value=retry
+        ):
             result = middleware.process_response(request, response, spider)
         assert result is retry
         assert result.meta["impersonate"] == "chrome119"
@@ -251,12 +320,17 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
         response = TextResponse(
             request.url,
             status=429,
-            headers={"Retry-After": format_datetime(datetime.now(UTC) + timedelta(seconds=20), usegmt=True)},
+            headers={
+                "Retry-After": format_datetime(
+                    datetime.now(UTC) + timedelta(seconds=RETRY_AFTER_SECONDS),
+                    usegmt=True,
+                )
+            },
             request=request,
         )
         wait = parse_retry_after(response)
         assert wait is not None
-        assert 0 < wait <= 20
+        assert 0 < wait <= RETRY_AFTER_SECONDS
 
     def test_startup_jitter_is_applied_before_full_run(self) -> None:
         """A full run awaits its randomized startup delay."""
@@ -267,7 +341,9 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
 
         with (
             patch("scrapers.crawler.base.random.uniform", return_value=2.0),
-            patch("scrapers.crawler.base.asyncio.sleep", new_callable=AsyncMock) as sleep,
+            patch(
+                "scrapers.crawler.base.asyncio.sleep", new_callable=AsyncMock
+            ) as sleep,
         ):
             requests = asyncio.run(collect())
         sleep.assert_awaited_once_with(2.0)
@@ -277,12 +353,20 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
         """The shared scheduler emits configured categories after an empty result."""
         spider = _DummyCatalogSpider()
         requests = list(spider.requests_for_categories([]))
-        assert [request.url.rsplit("/", maxsplit=1)[-1] for request in requests] == ["fallback-a", "fallback-b"]
+        assert [request.url.rsplit("/", maxsplit=1)[-1] for request in requests] == [
+            "fallback-a",
+            "fallback-b",
+        ]
 
     def test_product_id_deduplication_spans_categories(self) -> None:
         """The same product id in two categories yields one page item."""
         spider = DarkLabSpider()
-        raw = {"id": "product-1", "handle": "whey", "title": "Whey", "variants": [{"id": "variant-1", "price": "10", "available": True}]}
+        raw = {
+            "id": "product-1",
+            "handle": "whey",
+            "title": "Whey",
+            "variants": [{"id": "variant-1", "price": "10", "available": True}],
+        }
         first = list(spider.emit_products([raw], "whey"))
         second = list(spider.emit_products([raw], "kits"))
         assert len(first) == 1
@@ -290,8 +374,8 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
 
     def test_price_units_keep_soldiers_cents_and_dark_lab_reais(self) -> None:
         """Only the Soldiers Shopify endpoint interprets integer cents."""
-        from scrapers.normalizers.shopify import ShopifyNormalizer
-
-        cents = ShopifyNormalizer(price_int_is_cents=True, price_digit_str_is_cents=True)
-        assert cents.parse_price(12990) == 129.90
-        assert DarkLabSpider.normalizer.parse_price(12990) == 12990.0
+        cents = ShopifyNormalizer(
+            price_int_is_cents=True, price_digit_str_is_cents=True
+        )
+        assert cents.parse_price(12990) == SOLDIERS_PRICE_IN_REAIS
+        assert DarkLabSpider.normalizer.parse_price(12990) == DARK_LAB_PRICE_IN_REAIS

@@ -53,5 +53,7 @@ select = [
 ]
 
 [lint.per-file-ignores]
+# Tests assert, and the scraper integration tests spawn the same command
+# Celery spawns; neither is the untrusted input these rules look for.
 "**/tests.py" = ["S101"]
-"**/tests/**/*.py" = ["S101"]
+"**/tests/**/*.py" = ["S101", "S603"]

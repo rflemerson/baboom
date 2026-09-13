@@ -17,6 +17,7 @@ class StatsDumpExtension:
     """Write Scrapy statistics to the path supplied by the task runner."""
 
     def __init__(self, crawler: Crawler, output_path: str) -> None:
+        """Hold the crawler and the path its statistics are written to."""
         self.crawler = crawler
         self.output_path = output_path
 

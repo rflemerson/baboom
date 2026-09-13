@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import logging
+import re
 
 PRICE_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 logger = logging.getLogger(__name__)

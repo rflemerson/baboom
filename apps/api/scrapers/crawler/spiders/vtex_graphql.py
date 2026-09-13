@@ -5,12 +5,19 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from typing import TYPE_CHECKING
 
-from scrapy import Request
-from scrapy.http import Response
-
-from ..base import CatalogSpider
 from ...normalizers.vtex import VtexNormalizer
+from ..base import CatalogSpider
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from scrapy import Request
+    from scrapy.http import Response
+
+    from ...contracts import ScrapedProductInput
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +59,10 @@ class VtexGraphqlSpider(CatalogSpider):
         """Return headers accepted by the VTEX GraphQL endpoint."""
         return {"Accept": "application/json"}
 
-    def _parse_categories(self, response: Response):
+    def _parse_categories(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Extract category slugs and schedule category requests."""
         try:
             payload = response.json()
@@ -67,7 +77,10 @@ class VtexGraphqlSpider(CatalogSpider):
             slugs = set()
         yield from self.requests_for_categories(self.categories_or_fallback(slugs))
 
-    def _parse_category(self, response: Response):
+    def _parse_category(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Normalize one GraphQL range and continue while it is full."""
         category = str(response.meta["category"])
         start = int(response.meta["start"])
@@ -83,12 +96,16 @@ class VtexGraphqlSpider(CatalogSpider):
             yield self.request(
                 response.url.split("?", maxsplit=1)[0],
                 callback=self._parse_category,
-                params=self._build_graphql_params(category, next_start, next_start + PAGE_SIZE - 1),
+                params=self._build_graphql_params(
+                    category, next_start, next_start + PAGE_SIZE - 1
+                ),
                 headers=self.get_headers(),
                 meta={"category": category, "start": next_start},
             )
 
-    def _build_variables_payload(self, category: str, start: int, end: int) -> dict[str, object]:
+    def _build_variables_payload(
+        self, category: str, start: int, end: int
+    ) -> dict[str, object]:
         """Build the variables object used by VTEX's persisted query."""
         return {
             "hideUnavailableItems": False,
@@ -107,7 +124,9 @@ class VtexGraphqlSpider(CatalogSpider):
             },
         }
 
-    def _build_graphql_params(self, category: str, start: int, end: int) -> dict[str, str]:
+    def _build_graphql_params(
+        self, category: str, start: int, end: int
+    ) -> dict[str, str]:
         """Build the persisted-query URL parameters."""
         variables = json.dumps(
             self._build_variables_payload(category, start, end),
@@ -133,7 +152,9 @@ class VtexGraphqlSpider(CatalogSpider):
             "extensions": json.dumps(extensions, separators=(",", ":")),
         }
 
-    def _parse_graphql_response(self, data: dict[str, object]) -> list[dict[str, object]]:
+    def _parse_graphql_response(
+        self, data: dict[str, object]
+    ) -> list[dict[str, object]]:
         """Extract products from either supported GraphQL response shape."""
         data_node = data.get("data")
         if not isinstance(data_node, dict):

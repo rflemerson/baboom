@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
-from scrapy import Request
-from scrapy.http import Response
-
-from ..base import CatalogSpider
 from ...normalizers.vtex import VtexNormalizer
+from ..base import CatalogSpider
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from scrapy import Request
+    from scrapy.http import Response
+
+    from ...contracts import ScrapedProductInput
+
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +57,10 @@ class VtexSearchSpider(CatalogSpider):
         """Return headers for VTEX's JSON endpoints."""
         return {"Accept": "application/json"}
 
-    def _parse_categories(self, response: Response):
+    def _parse_categories(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Flatten the VTEX tree and schedule its category requests."""
         if response.status != VTEX_CATEGORY_TREE_SUCCESS_CODE:
             logger.warning("Failed to fetch category tree: %s", response.status)
@@ -86,7 +95,10 @@ class VtexSearchSpider(CatalogSpider):
         """Build VTEX inclusive range parameters."""
         return {"_from": start, "_to": start + step - 1}
 
-    def _parse_category(self, response: Response):
+    def _parse_category(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Normalize one VTEX search range and continue while it is full."""
         category = str(response.meta["category"])
         start = int(response.meta["start"])
@@ -101,7 +113,9 @@ class VtexSearchSpider(CatalogSpider):
             yield self.request(
                 response.url.split("?", maxsplit=1)[0],
                 callback=self._parse_category,
-                params=self._build_pagination_params(start + VTEX_PAGE_SIZE, VTEX_PAGE_SIZE),
+                params=self._build_pagination_params(
+                    start + VTEX_PAGE_SIZE, VTEX_PAGE_SIZE
+                ),
                 headers=self.get_headers(),
                 meta={"category": category, "start": start + VTEX_PAGE_SIZE},
                 handle_httpstatus_list=list(VTEX_SUCCESS_CODES),

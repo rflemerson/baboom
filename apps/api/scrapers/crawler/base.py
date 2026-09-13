@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from collections.abc import Iterable
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 from scrapy import Request, Spider
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Iterable
+
     from ..contracts import ScrapedProductInput
     from ..normalizers.base import ProductNormalizer
 
@@ -28,7 +29,9 @@ class CatalogSpider(Spider):
     FALLBACK_CATEGORIES: tuple[str, ...] = ()
     STARTUP_JITTER_SECONDS = (0.0, 5.0)
 
-    def __init__(self, categories: list[str] | str | None = None, **kwargs: object) -> None:
+    def __init__(
+        self, categories: list[str] | str | None = None, **kwargs: object
+    ) -> None:
         """Initialize a spider with an optional comma-separated category filter."""
         super().__init__(**kwargs)
         if isinstance(categories, str):
@@ -39,7 +42,7 @@ class CatalogSpider(Spider):
             self.categories_to_crawl = categories
         self.processed_ids: set[str] = set()
 
-    async def start(self):
+    async def start(self) -> AsyncIterator[Request]:
         """Spread full runs before scheduling the first request."""
         if not self.categories_to_crawl:
             await asyncio.sleep(random.uniform(*self.STARTUP_JITTER_SECONDS))  # noqa: S311
@@ -110,29 +113,17 @@ class CatalogSpider(Spider):
         *,
         callback: object,
         params: dict[str, object] | None = None,
-        headers: dict[str, str] | None = None,
-        meta: dict[str, object] | None = None,
-        method: str = "GET",
-        body: bytes | None = None,
-        dont_filter: bool = False,
         handle_httpstatus_list: list[int] | None = None,
+        **kwargs: object,
     ) -> Request:
-        """Construct a Request while keeping platform callbacks concise."""
+        """Fold params into the query string and forward the rest to Request."""
         if params:
             separator = "&" if "?" in url else "?"
             url = f"{url}{separator}{urlencode(params)}"
-        request_meta = dict(meta or {})
+        request_meta = dict(kwargs.pop("meta", None) or {})
         if handle_httpstatus_list:
             request_meta["handle_httpstatus_list"] = handle_httpstatus_list
-        return Request(
-            url,
-            callback=callback,
-            headers=headers or {},
-            meta=request_meta,
-            method=method,
-            body=body,
-            dont_filter=dont_filter,
-        )
+        return Request(url, callback=callback, meta=request_meta, **kwargs)
 
     def process_raw_product(
         self,

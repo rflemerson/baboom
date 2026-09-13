@@ -5,12 +5,19 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import TYPE_CHECKING
 
-from scrapy import Request
-from scrapy.http import Response
-
-from ..base import CatalogSpider
 from ...normalizers.nuvemshop import NuvemshopNormalizer
+from ..base import CatalogSpider
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from scrapy import Request
+    from scrapy.http import Response
+
+    from ...contracts import ScrapedProductInput
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +59,17 @@ class NuvemshopSpider(CatalogSpider):
             meta={"category": category, "page": 1},
         )
 
-    def _parse_category(self, response: Response):
+    def _parse_category(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Extract JSON-LD products and continue until the listing ends."""
         category = str(response.meta["category"])
         page = int(response.meta["page"])
         if response.status != NUVEMSHOP_SUCCESS_CODE:
-            logger.warning("Failed category %s page %s: %s", category, page, response.status)
+            logger.warning(
+                "Failed category %s page %s: %s", category, page, response.status
+            )
             return
         products = self.extract_products(response.text)
         yield from self.emit_products(products, category)

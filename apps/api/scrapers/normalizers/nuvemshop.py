@@ -42,7 +42,13 @@ class NuvemshopNormalizer:
                 base_url=base_url,
                 category=category,
             )
-        except Exception as exc:
+        except (
+            AttributeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            OverflowError,
+        ) as exc:
             # Warning, not error: the run must survive one malformed item.
             logger.warning("Skipping malformed Nuvemshop item %s: %s", identifier, exc)
             return None

@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
-from scrapy import Request
-from scrapy.http import Response
-
-from ..base import CatalogSpider
 from ...normalizers.shopify import ShopifyNormalizer
+from ..base import CatalogSpider
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from scrapy import Request
+    from scrapy.http import Response
+
+    from ...contracts import ScrapedProductInput
+
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +60,10 @@ class ShopifyApiSpider(CatalogSpider):
         """Return the collection discovery endpoint."""
         return f"{self.BASE_URL}/collections.json"
 
-    def _parse_collections(self, response: Response):
+    def _parse_collections(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Collect handles, paginate discovery, then schedule collections."""
         try:
             payload = response.json()
@@ -84,7 +92,10 @@ class ShopifyApiSpider(CatalogSpider):
             return
         yield from self.requests_for_categories(self.categories_or_fallback(handles))
 
-    def _parse_category(self, response: Response):
+    def _parse_category(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Normalize one Shopify collection page and continue pagination."""
         category = str(response.meta["category"])
         page = int(response.meta["page"])
@@ -92,7 +103,9 @@ class ShopifyApiSpider(CatalogSpider):
             payload = response.json()
             products = payload.get("products") or []
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("Shopify category payload parse error for %s: %s", category, exc)
+            logger.debug(
+                "Shopify category payload parse error for %s: %s", category, exc
+            )
             products = []
 
         yield from self._emit_category_products(products, category)
@@ -132,14 +145,21 @@ class ShopifyApiSpider(CatalogSpider):
             else:
                 yield from self.process_raw_product(product, category, claim_id=False)
 
-    def _parse_detail(self, response: Response):
+    def _parse_detail(
+        self,
+        response: Response,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Normalize a Shopify detail response, falling back to its listing."""
         listing = response.meta["listing_product"]
         category = str(response.meta["category"])
         try:
             detail = response.json()
         except (TypeError, ValueError) as exc:
-            logger.debug("Shopify detail payload parse error for %s: %s", self.product_id(listing), exc)
+            logger.debug(
+                "Shopify detail payload parse error for %s: %s",
+                self.product_id(listing),
+                exc,
+            )
             detail = None
         yield from self.process_raw_product(
             detail if isinstance(detail, dict) else listing,
@@ -147,7 +167,10 @@ class ShopifyApiSpider(CatalogSpider):
             claim_id=False,
         )
 
-    def _detail_failed(self, failure: object):
+    def _detail_failed(
+        self,
+        failure: object,
+    ) -> Iterator[Request | ScrapedProductInput]:
         """Keep a listing product when its optional detail request fails."""
         request = getattr(failure, "request", None)
         if request is None:
