@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 from http import HTTPStatus
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from django.urls import resolve
 from django.utils import timezone
 from oauth2_provider.models import get_access_token_model, get_application_model
 
@@ -255,3 +257,24 @@ class DynamicRegistrationTests(TestCase):
     def test_empty_allowlist_denies(self) -> None:
         """Naming no host denies every client, rather than allowing all."""
         assert self._register(self.ALLOWED_REDIRECT) != HTTPStatus.CREATED
+
+
+class AuthorizationLoginTests(TestCase):
+    """Approving an authorization has to reach a page this project serves."""
+
+    def test_signing_in_lands_on_a_served_route(self) -> None:
+        """The default login URL is not routed here, so it reaches the site."""
+        response = self.client.get(
+            "/o/authorize/",
+            {
+                "response_type": "code",
+                "client_id": "whatever",
+                "redirect_uri": "https://chatgpt.com/cb",
+                "scope": settings.MCP_SCOPE,
+            },
+        )
+
+        assert response.status_code == HTTPStatus.FOUND
+        destination = urlparse(response["Location"]).path
+        assert destination == settings.LOGIN_URL
+        assert resolve(destination)

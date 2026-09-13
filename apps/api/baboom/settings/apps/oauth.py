@@ -11,6 +11,10 @@ MCP_RESOURCE_IDENTIFIER = env(
 )
 OAUTH_ISSUER = env("OAUTH_ISSUER", default="http://localhost:8000/o")
 
+# Approving an authorization means signing in first. Django's default points
+# at a route this project does not serve, so it lands on the public site.
+LOGIN_URL = "/admin/login/"
+
 # One coarse scope: the token says the holder may reach the endpoint, model
 # permissions decide what happens there.
 MCP_SCOPE = "mcp:access"
