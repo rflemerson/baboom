@@ -8,13 +8,17 @@ from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django.utils import timezone
 
+from offers.models import Offer, StockStatus
 from offers.services import OfferObservationResult, OfferObservationService
 
 from .contracts import ScrapedItemIngestionInput
 from .models import ScrapedItem, ScrapedPage
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from .contracts import ScrapedProductInput, VariantContext
 
 logger = logging.getLogger(__name__)
@@ -99,6 +103,8 @@ class ScraperService:
             page.save(update_fields=page_updates)
 
         saved: list[ScrapedItem] = []
+        seen_at = timezone.now()
+        seen_ids: set[str] = set()
         for offer in product.offers:
             data = ScrapedItemIngestionInput(
                 store_slug=product.store_slug,
@@ -116,14 +122,49 @@ class ScraperService:
                 category=product.category,
             )
             observation = ScraperService.record_offer_observation(data)
+            Offer.objects.filter(pk=observation.offer.pk).update(
+                last_seen_at=seen_at,
+                delisted_at=None,
+            )
             item, _created = ScraperService._upsert_scraped_item(
                 observation,
                 page,
                 offer.variant_context,
             )
             saved.append(item)
+            seen_ids.add(offer.external_id)
+
+        if product.complete_unit_list and seen_ids:
+            ScraperService._reconcile_absent_units(product, page, seen_ids, seen_at)
 
         return saved
+
+    @staticmethod
+    def _reconcile_absent_units(
+        product: ScrapedProductInput,
+        page: ScrapedPage,
+        seen_ids: set[str],
+        seen_at: datetime,
+    ) -> None:
+        """Delist only confirmed sibling units on an exhaustive product page."""
+        siblings = ScrapedItem.objects.filter(
+            source_page=page,
+            offer__store_slug=product.store_slug,
+            offer__pid=product.provider_product_id,
+        ).exclude(offer__external_id__in=seen_ids)
+        for item in siblings.select_related("offer"):
+            context = item.variant_context
+            if not isinstance(context, dict) or (
+                context.get("provider") != product.provider
+                or context.get("provider_product_id") != product.provider_product_id
+            ):
+                continue
+            Offer.objects.filter(pk=item.offer_id, delisted_at__isnull=True).update(
+                delisted_at=seen_at,
+                current_price=None,
+                current_stock_status=StockStatus.OUT_OF_STOCK,
+                current_stock_quantity=0,
+            )
 
     @staticmethod
     def _upsert_scraped_item(
@@ -165,7 +206,7 @@ class ScraperService:
             store_slug=data.store_slug,
             external_id=data.external_id,
             price=ScraperService._normalize_price(data.price),
-            stock_status=data.stock_status,
+            stock_status=str(data.stock_status),
             snapshot={
                 "name": data.name,
                 "category": data.category,

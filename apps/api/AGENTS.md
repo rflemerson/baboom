@@ -26,7 +26,13 @@ prek run --all-files
   to `ScraperService.save_product_snapshot`.
 - Celery launches one `scrapy crawl <spider>` subprocess per monitor and uses
   the dumped Scrapy statistics to close `ScraperRun`; the task preserves the
-  empty-after-history failure rule.
+  empty-after-history failure rule and terminates crawls over 30 minutes.
+- Complete Shopify/VTEX unit lists reconcile absent variants; partial lists
+  never delist. A price-less unit remains present but unavailable. Delisting
+  and missing prices clear the current price without deleting price history.
+- `scrapers/management/commands/cutover_offer_identities.py` is an explicit,
+  preview-first legacy-identity transition. It never runs on deployment;
+  operators must review ambiguous mappings before opting into archival.
 - Public catalog and alerts: REST.
 - Scrapers retain `ScrapedPage` metadata and the store's own product context;
   humans curate the catalog through Django admin.

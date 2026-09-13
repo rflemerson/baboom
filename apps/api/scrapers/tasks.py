@@ -16,10 +16,18 @@ from .crawler.run import crawl
 from .models import ScraperRun
 
 logger = get_task_logger(__name__)
+CRAWL_TIMEOUT_SECONDS = 1800
+TERMINATION_GRACE_SECONDS = 5
 
 
 class EmptyMonitorRunError(RuntimeError):
     """A monitor that used to return products returned none."""
+
+
+def _raise_crawl_timeout(label: str) -> None:
+    """Report the hard wall-clock limit after the child has been stopped."""
+    message = f"{label} crawl exceeded {CRAWL_TIMEOUT_SECONDS} seconds."
+    raise TimeoutError(message)
 
 
 def _monitor_has_produced_items(label: str) -> bool:
@@ -114,7 +122,14 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
             args=(spider_name, str(stats_path)),
         )
         child.start()
-        child.join()
+        child.join(timeout=CRAWL_TIMEOUT_SECONDS)
+        if child.is_alive():
+            child.terminate()
+            child.join(timeout=TERMINATION_GRACE_SECONDS)
+            if child.is_alive():
+                child.kill()
+                child.join(timeout=TERMINATION_GRACE_SECONDS)
+            _raise_crawl_timeout(label)
         exit_code = child.exitcode
     except Exception as exc:
         _cleanup_stats_file(stats_path)
@@ -132,17 +147,17 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
     items_count = _stat_int(stats, "scraper/offers_collected") or item_pages
     requests_count = _stat_int(stats, "downloader/request_count")
     responses_count = _stat_int(stats, "downloader/response_count")
-    error_count = _stat_int(stats, "log_count/ERROR")
+    finish_reason = str(stats.get("finish_reason") or "finished")
     stats_summary = (
         f" Scrapy: {requests_count} requests, {responses_count} responses, "
         f"{item_pages} pages."
     )
 
-    if exit_code != 0 or error_count:
+    if exit_code != 0 or finish_reason != "finished":
         error_message = str(stats.get("last_error") or "").strip() or (
-            f"Scrapy reported {error_count} errors."
-            if error_count
-            else f"The crawl process exited with status {exit_code}."
+            f"The crawl process exited with status {exit_code}."
+            if exit_code != 0
+            else f"Scrapy closed with reason {finish_reason}."
         )
         _finish_run(
             run,

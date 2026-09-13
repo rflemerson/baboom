@@ -110,6 +110,21 @@ class CatalogSpiderTests(SimpleTestCase):
             "fallback-b",
         ]
 
+    def test_invalid_first_category_does_not_claim_product_id(self) -> None:
+        """A later complete copy of a malformed product remains eligible."""
+        spider = _DummyCatalogSpider()
+        raw = {
+            "id": "same-product",
+            "title": "Whey",
+            "handle": "whey",
+            "variants": [{"id": "unit-1", "price": "10", "available": True}],
+        }
+
+        assert spider.process_raw_product({**raw, "handle": ""}, "first") == []
+        assert "same-product" not in spider.processed_ids
+        assert len(spider.process_raw_product(raw, "second")) == 1
+        assert spider.process_raw_product(raw, "third") == []
+
 
 class WafDetectionTests(SimpleTestCase):
     """The WAF detector separates challenge pages from ordinary content."""

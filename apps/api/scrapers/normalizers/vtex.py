@@ -9,7 +9,7 @@ from decimal import Decimal
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
-    StockStatus,
+    StockReading,
     VariantContext,
     VariantOption,
     VariantSelection,
@@ -92,6 +92,7 @@ class VtexNormalizer:
             category=category,
             api_context=self._build_product_context(raw),
             offers=offers,
+            complete_unit_list=len(offers) == len(items),
         )
 
     def _normalize_sku(
@@ -118,20 +119,21 @@ class VtexNormalizer:
             return None
         price = parse_positive_price(commercial.get("Price"))
         if price is None:
-            logger.warning("Skipping VTEX item %s without valid price", item_id)
-            return None
+            # An unavailable VTEX SKU commonly reports price zero. Dropping it
+            # would leave the previous price standing as if still on sale.
+            logger.warning("VTEX item %s has no usable price", item_id)
         stock_quantity = parse_optional_int(commercial.get("AvailableQuantity"))
         sku_name = str(sku.get("nameComplete") or sku.get("name") or "")
         return ScrapedOfferInput(
             external_id=item_id,
             offer_url=f"{page_url}?skuId={item_id}",
             name=sku_name or product_name,
-            price=Decimal(str(price)),
-            stock_quantity=stock_quantity,
+            price=None if price is None else Decimal(str(price)),
+            stock_quantity=stock_quantity if price is not None else 0,
             stock_status=(
-                StockStatus.AVAILABLE
-                if stock_quantity is None or stock_quantity > 0
-                else StockStatus.OUT_OF_STOCK
+                StockReading.AVAILABLE
+                if price is not None and (stock_quantity is None or stock_quantity > 0)
+                else StockReading.OUT_OF_STOCK
             ),
             sku=item_id,
             ean=str(sku.get("ean") or ""),

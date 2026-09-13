@@ -140,8 +140,6 @@ class CatalogSpider(Spider):
         product_id = self.product_id(raw)
         if claim_id and (not product_id or product_id in self.processed_ids):
             return []
-        if claim_id:
-            self.processed_ids.add(product_id)
         product = self.normalizer.normalize(
             raw,
             store_slug=self.STORE_SLUG,
@@ -149,6 +147,8 @@ class CatalogSpider(Spider):
             category=category,
         )
         if product is not None:
+            if claim_id:
+                self.processed_ids.add(product_id)
             self._set_stat("offers_collected", len(product.offers))
         return [product] if product is not None else []
 

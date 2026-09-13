@@ -10,7 +10,7 @@ from typing import Any
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
-    StockStatus,
+    StockReading,
     VariantContext,
 )
 from .parsing import is_http_url, parse_positive_price
@@ -71,8 +71,8 @@ class NuvemshopNormalizer:
         offer = self._offer(raw)
         price = parse_positive_price(offer.get("price"))
         if price is None:
-            logger.warning("Skipping Nuvemshop item without valid price: %s", sku)
-            return None
+            # Kept: dropping the unit leaves its previous price standing.
+            logger.warning("Nuvemshop item %s has no usable price", sku)
 
         offer_url = str(offer.get("url") or raw.get("url") or "")
         page_url = offer_url.split("?", maxsplit=1)[0]
@@ -107,12 +107,12 @@ class NuvemshopNormalizer:
                     external_id=sku,
                     offer_url=offer_url,
                     name=title,
-                    price=Decimal(str(price)),
-                    stock_quantity=stock_quantity,
+                    price=None if price is None else Decimal(str(price)),
+                    stock_quantity=stock_quantity if price is not None else 0,
                     stock_status=(
-                        StockStatus.AVAILABLE
-                        if is_available
-                        else StockStatus.OUT_OF_STOCK
+                        StockReading.AVAILABLE
+                        if is_available and price is not None
+                        else StockReading.OUT_OF_STOCK
                     ),
                     ean=str(raw.get("gtin13") or ""),
                     sku=sku,

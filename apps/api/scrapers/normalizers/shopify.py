@@ -9,7 +9,7 @@ from decimal import Decimal
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
-    StockStatus,
+    StockReading,
     VariantContext,
     VariantOption,
     VariantSelection,
@@ -113,6 +113,7 @@ class ShopifyNormalizer:
             category=category,
             api_context=self._build_product_context(raw),
             offers=offers,
+            complete_unit_list=len(offers) == len(variants),
         )
 
     def _normalize_variant(
@@ -134,14 +135,15 @@ class ShopifyNormalizer:
             )
             return None
         if price is None:
+            # Kept, not dropped: dropping leaves yesterday's price standing as
+            # if it were still on sale. A unit without a price is not for sale.
             logger.warning(
-                "Skipping Shopify variant %s for product %s without valid price",
+                "Shopify variant %s of product %s has no usable price",
                 variant_id,
                 product_id,
             )
-            return None
 
-        is_available = bool(variant.get("available"))
+        is_available = bool(variant.get("available")) and price is not None
         try:
             quantity = variant.get("inventory_quantity")
             stock_quantity = int(quantity) if quantity is not None else None
@@ -160,10 +162,10 @@ class ShopifyNormalizer:
             external_id=variant_id,
             offer_url=f"{page_url}?variant={variant_id}",
             name=name,
-            price=Decimal(str(price)),
+            price=None if price is None else Decimal(str(price)),
             stock_quantity=stock_quantity,
             stock_status=(
-                StockStatus.AVAILABLE if is_available else StockStatus.OUT_OF_STOCK
+                StockReading.AVAILABLE if is_available else StockReading.OUT_OF_STOCK
             ),
             sku=str(variant.get("sku") or ""),
             ean=str(variant.get("barcode") or ""),

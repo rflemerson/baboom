@@ -112,6 +112,28 @@ class Offer(BaseModel):
         help_text=_("Latest observed quantity in stock"),
     )
 
+    # "The store stopped listing this unit" and "the store says it is out of
+    # stock" are different facts. Stock is a reading; delisting is an absence,
+    # and only a complete reading of the unit's own page can establish it.
+    last_seen_at = models.DateTimeField(
+        _("Last Seen At"),
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("When the store last published this unit"),
+    )
+    delisted_at = models.DateTimeField(
+        _("Delisted At"),
+        null=True,
+        blank=True,
+        help_text=_("When the unit stopped appearing on a page that did list it"),
+    )
+
+    @property
+    def is_listed(self) -> bool:
+        """Whether the store still publishes this unit."""
+        return self.delisted_at is None
+
     class Meta:
         """Meta options."""
 

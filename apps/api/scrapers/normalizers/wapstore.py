@@ -9,7 +9,7 @@ from decimal import Decimal
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
-    StockStatus,
+    StockReading,
     VariantContext,
 )
 from .parsing import is_http_url, parse_optional_int, parse_positive_price
@@ -51,11 +51,8 @@ class WapStoreNormalizer:
 
         price = parse_positive_price(self._extract_raw_price(raw))
         if price is None:
-            logger.warning(
-                "Skipping Wap.Store item without valid price: %s",
-                external_id,
-            )
-            return None
+            # Kept: dropping the unit leaves its previous price standing.
+            logger.warning("Wap.Store item %s has no usable price", external_id)
         stock_quantity = parse_optional_int(
             raw.get("estoque") or raw.get("balance"),
         )
@@ -72,15 +69,15 @@ class WapStoreNormalizer:
                     external_id=external_id,
                     offer_url=page_url,
                     name=name,
-                    price=Decimal(str(price)),
-                    stock_quantity=stock_quantity,
-                    stock_status=self._resolve_stock_status(stock_quantity),
+                    price=None if price is None else Decimal(str(price)),
+                    stock_quantity=stock_quantity if price is not None else 0,
+                    stock_status=self._resolve_stock_status(stock_quantity, price),
                     ean=str(ean),
                     sku=sku,
                     variant_context=VariantContext(
                         provider=self.provider,
                         provider_product_id=external_id,
-                        provider_variant_id=sku,
+                        provider_variant_id=sku or external_id,
                         title=name,
                         options=[],
                         selection=None,
@@ -106,16 +103,20 @@ class WapStoreNormalizer:
             return prices.get("por") or prices.get("vista")
         return item.get("price")
 
-    def _resolve_stock_status(self, stock_quantity: int | None) -> str:
-        """Treat absent/positive stock as available, as the spider does today."""
-        if stock_quantity is None or stock_quantity > 0:
-            return StockStatus.AVAILABLE
-        return StockStatus.OUT_OF_STOCK
+    def _resolve_stock_status(
+        self,
+        stock_quantity: int | None,
+        price: float | None,
+    ) -> StockReading:
+        """Treat absent/positive stock as available, but never a unit with no price."""
+        if price is not None and (stock_quantity is None or stock_quantity > 0):
+            return StockReading.AVAILABLE
+        return StockReading.OUT_OF_STOCK
 
     def _build_product_context(self, item: dict) -> str:
         """Build the structured source context used by the current spider."""
         payload = {
-            "platform": "uappi_wapstore",
+            "platform": self.provider,
             "product": {
                 "id": item.get("id"),
                 "name": item.get("nome") or item.get("name"),

@@ -34,6 +34,8 @@ def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
     """
     return PriceObservation.objects.filter(
         offer__product_store__product=OuterRef("pk"),
+        offer__current_price__isnull=False,
+        offer__delisted_at__isnull=True,
     ).order_by("-observed_at", "-pk")
 
 

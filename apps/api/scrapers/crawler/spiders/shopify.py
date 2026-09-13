@@ -132,8 +132,10 @@ class ShopifyApiSpider(CatalogSpider):
             product_id = self.product_id(product)
             if not product_id or product_id in self.processed_ids:
                 continue
-            self.processed_ids.add(product_id)
             if self.USE_PRODUCT_DETAIL and product.get("handle"):
+                # Claim before scheduling the optional detail request so two
+                # categories cannot queue the same detail concurrently.
+                self.processed_ids.add(product_id)
                 yield self.request(
                     f"{self.BASE_URL}/products/{product['handle']}.js",
                     callback=self._parse_detail,
@@ -143,7 +145,7 @@ class ShopifyApiSpider(CatalogSpider):
                     dont_filter=True,
                 )
             else:
-                yield from self.process_raw_product(product, category, claim_id=False)
+                yield from self.process_raw_product(product, category)
 
     def _parse_detail(
         self,

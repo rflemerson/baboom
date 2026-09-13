@@ -26,6 +26,8 @@ from scrapers.tests import (
     _raised,
 )
 
+EXPECTED_TIMEOUT_JOIN_CALLS = 2
+
 
 @contextmanager
 def _fake_crawl(stats: dict[str, object], exitcode: int = 0) -> Iterator[None]:
@@ -34,7 +36,7 @@ def _fake_crawl(stats: dict[str, object], exitcode: int = 0) -> Iterator[None]:
     def build(target: object, args: tuple[str, str]) -> MagicMock:
         _ = target
         Path(args[1]).write_text(json.dumps(stats))
-        return MagicMock(exitcode=exitcode)
+        return MagicMock(exitcode=exitcode, **{"is_alive.return_value": False})
 
     with patch("scrapers.tasks.multiprocessing.Process", side_effect=build):
         yield
@@ -101,6 +103,51 @@ class ScraperRunHistoryTests(TestCase):
         stats = {"last_error": "blocked by upstream"}
         with _fake_crawl(stats, exitcode=1):
             return _run_spider_monitor("test_store", label)
+
+    def test_unrelated_error_log_does_not_fail_successful_crawl(self) -> None:
+        """A library error line is not itself a failed spider."""
+        with _fake_crawl({"item_scraped_count": 1, "log_count/ERROR": 1}):
+            _run_spider_monitor("test_store", "Test Store")
+
+        assert ScraperRun.objects.get().status == ScraperRun.Status.SUCCESS
+
+    def test_non_finished_spider_reason_fails_the_run(self) -> None:
+        """A premature Scrapy close is a failure even with exit status zero."""
+        with _fake_crawl({"finish_reason": "closespider_timeout"}):
+            _raised(
+                lambda: _run_spider_monitor("test_store", "Test Store"),
+                RuntimeError,
+            )
+
+        assert ScraperRun.objects.get().status == ScraperRun.Status.ERROR
+
+    def test_stuck_child_is_terminated_and_run_is_closed(self) -> None:
+        """A hung crawler cannot occupy the only worker indefinitely."""
+        child = MagicMock(**{"is_alive.side_effect": [True, False]})
+        with patch("scrapers.tasks.multiprocessing.Process", return_value=child):
+            error = _raised(
+                lambda: _run_spider_monitor("test_store", "Test Store"),
+                TimeoutError,
+            )
+
+        assert "exceeded" in str(error)
+        child.terminate.assert_called_once()
+        assert child.join.call_count == EXPECTED_TIMEOUT_JOIN_CALLS
+        run = ScraperRun.objects.get()
+        assert run.status == ScraperRun.Status.ERROR
+        assert "exceeded" in run.error_message
+
+    def test_killed_child_never_gets_an_unbounded_join(self) -> None:
+        """Even termination-resistant children cannot stall the worker forever."""
+        child = MagicMock(**{"is_alive.side_effect": [True, True]})
+        with patch("scrapers.tasks.multiprocessing.Process", return_value=child):
+            _raised(
+                lambda: _run_spider_monitor("test_store", "Test Store"),
+                TimeoutError,
+            )
+
+        child.kill.assert_called_once()
+        assert all(call.kwargs.get("timeout") for call in child.join.call_args_list)
 
 
 class EmptyMonitorRunTests(TestCase):

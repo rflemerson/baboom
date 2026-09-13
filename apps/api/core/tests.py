@@ -806,6 +806,28 @@ class CatalogActiveRankingTests(TestCase):
 
         assert [product.name for product in results] == ["Whey", "Blend"]
 
+    def test_missing_current_price_hides_old_observation_from_catalog(self) -> None:
+        """A price-less or delisted offer must not surface yesterday's price."""
+        link = self.whey.store_links.get()
+        assert link.offer is not None
+        link.offer.current_price = None
+        link.offer.save(update_fields=["current_price"])
+
+        row = public_catalog_products().get(pk=self.whey.pk)
+
+        assert row.last_price is None
+        assert row.external_link is None
+
+    def test_delisted_offer_hides_old_observation_from_catalog(self) -> None:
+        """An archived offer's historical price remains stored, not ranked."""
+        link = self.whey.store_links.get()
+        assert link.offer is not None
+        link.offer.delisted_at = timezone.now()
+        link.offer.save(update_fields=["delisted_at"])
+
+        assert public_catalog_products().get(pk=self.whey.pk).last_price is None
+        assert link.offer.price_observations.count() == 1
+
     def test_requesting_another_active_changes_the_ranking(self) -> None:
         """The same expressions rank creatine without a per-active branch."""
         results = list(

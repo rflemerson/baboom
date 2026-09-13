@@ -65,15 +65,17 @@ class DarkLabSpiderUnitTests(SimpleTestCase):
 
         assert result is None
 
-    def test_normalizer_skips_invalid_price(self) -> None:
-        """Should skip item when selected variant has invalid price."""
+    def test_normalizer_keeps_variant_without_price_as_unavailable(self) -> None:
+        """A missing price must clear the previous sellable snapshot."""
         item = dict(self.base_item)
         base_variants = cast("list[ScrapedJsonObject]", self.base_item["variants"])
         item["variants"] = [dict(base_variants[0], price="N/A")]
 
         result = _normalize_spider_item(self.spider, item, "whey-protein")
 
-        assert result is None
+        assert result is not None
+        assert result.offers[0].price is None
+        assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
     def test_every_variant_becomes_its_own_offer(self) -> None:
         """A page selling two sizes sells two things, at two prices."""
@@ -270,15 +272,17 @@ class SoldiersSpiderUnitTests(SimpleTestCase):
 
         assert result is None
 
-    def test_normalizer_skips_invalid_price(self) -> None:
-        """Skips item when selected variant has invalid price."""
+    def test_normalizer_keeps_variant_without_price_as_unavailable(self) -> None:
+        """The Soldiers price format does not make a missing price sellable."""
         item = dict(self.base_item)
         base_variants = cast("list[ScrapedJsonObject]", self.base_item["variants"])
         item["variants"] = [dict(base_variants[0], price="N/A")]
 
         result = _normalize_spider_item(self.spider, item, "barra")
 
-        assert result is None
+        assert result is not None
+        assert result.offers[0].price is None
+        assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
     def test_normalizer_keeps_available_on_unknown_shopify_stock(self) -> None:
         """Available Shopify items without quantity should keep stock unknown."""
@@ -333,14 +337,16 @@ class GrowthSpiderUnitTests(SimpleTestCase):
 
         assert result is None
 
-    def test_normalizer_skips_invalid_price(self) -> None:
-        """Skips item when price is not parseable."""
+    def test_normalizer_keeps_unit_without_price_as_unavailable(self) -> None:
+        """Keep the unit so yesterday's price does not remain current."""
         item = dict(self.base_item)
         item["precos"] = {"por": "N/A"}
 
         result = _normalize_spider_item(self.spider, item, "/proteina/")
 
-        assert result is None
+        assert result is not None
+        assert result.offers[0].price is None
+        assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
     def test_normalizer_keeps_available_on_unknown_stock(self) -> None:
         """Unknown stock should not be forced to out-of-stock."""
@@ -364,7 +370,9 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         assert product is not None
         assert product.offers[0].price == Decimal("89.50")
         item = dict(self.base_item, precos={"por": "N/A"})
-        assert _normalize_spider_item(self.spider, item, "/proteina/") is None
+        product = _normalize_spider_item(self.spider, item, "/proteina/")
+        assert product is not None
+        assert product.offers[0].price is None
 
     def test_category_path_filter_rejects_non_product_routes(self) -> None:
         """Rejects account/checkout-like paths from dynamic menu."""
@@ -377,7 +385,7 @@ class GrowthSpiderUnitTests(SimpleTestCase):
         product = _normalize_spider_item(self.spider, self.base_item, "/proteina/")
         assert product is not None
         context = json.loads(product.api_context)
-        assert context["platform"] == "uappi_wapstore"
+        assert context["platform"] == "wapstore"
         assert "prices" in context["product"]
 
     def test_normalizer_keeps_wapstore_unit_literal(self) -> None:
@@ -443,14 +451,16 @@ class VtexSpiderUnitTests(SimpleTestCase):
 
         assert result is None
 
-    def test_normalizer_skips_invalid_price(self) -> None:
-        """Skips item when price is not parseable."""
+    def test_normalizer_keeps_sku_without_price_as_unavailable(self) -> None:
+        """Keep the SKU to clear a stale price and stock status."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["Price"] = "N/A"
 
         result = _normalize_spider_item(self.spider, item, "proteina")
 
-        assert result is None
+        assert result is not None
+        assert result.offers[0].price is None
+        assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
     def test_normalizer_keeps_available_on_unknown_stock(self) -> None:
         """Unknown stock should keep item available by default."""
@@ -506,7 +516,9 @@ class VtexSpiderUnitTests(SimpleTestCase):
                 ],
             ),
         ]
-        assert _normalize_spider_item(self.spider, item, "proteina") is None
+        product = _normalize_spider_item(self.spider, item, "proteina")
+        assert product is not None
+        assert product.offers[0].price is None
 
     def test_normalizer_builds_api_context(self) -> None:
         """The full source context travels with the normalized page."""
@@ -604,14 +616,16 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
 
         assert result is None
 
-    def test_normalizer_skips_invalid_price(self) -> None:
-        """Skips item when price is not parseable."""
+    def test_normalizer_keeps_sku_without_price_as_unavailable(self) -> None:
+        """Keep the SKU to clear a stale price and stock status."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["Price"] = "N/A"
 
         result = _normalize_spider_item(self.spider, item, "proteina")
 
-        assert result is None
+        assert result is not None
+        assert result.offers[0].price is None
+        assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
     def test_normalizer_keeps_available_on_unknown_stock(self) -> None:
         """Unknown stock should keep item available by default."""
@@ -715,8 +729,8 @@ class DuxNuvemshopSpiderUnitTests(SimpleTestCase):
 
         assert result is None
 
-    def test_normalizer_skips_invalid_price(self) -> None:
-        """An offer without a usable price is not persisted."""
+    def test_normalizer_keeps_unit_without_price_as_unavailable(self) -> None:
+        """Missing listing price must not leave an old offer available."""
         item = dict(self.base_item)
         item["offers"] = dict(
             cast("ScrapedJsonObject", self.base_item["offers"]),
@@ -725,7 +739,9 @@ class DuxNuvemshopSpiderUnitTests(SimpleTestCase):
 
         result = _normalize_spider_item(self.spider, item, "produtos")
 
-        assert result is None
+        assert result is not None
+        assert result.offers[0].price is None
+        assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
     def test_normalizer_builds_api_context(self) -> None:
         """The full JSON-LD entry is handed downstream as the api context."""
