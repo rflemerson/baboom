@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,6 +13,7 @@ from django.core.checks import run_checks
 from django.test import TestCase
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
+from baboom.celery import app as celery_app
 from scrapers.models import ScraperRun
 from scrapers.tasks import EmptyMonitorRunError, _run_spider_monitor
 
@@ -36,6 +38,23 @@ def _fake_crawl(stats: dict[str, object], exitcode: int = 0) -> Iterator[None]:
 
     with patch("scrapers.tasks.multiprocessing.Process", side_effect=build):
         yield
+
+
+@contextmanager
+def _registry_without_scraper_tasks() -> Iterator[None]:
+    """Put the process back in the state a non-worker starts in."""
+    saved_tasks = dict(celery_app.tasks)
+    saved_module = sys.modules.get("scrapers.tasks")
+    for name in list(celery_app.tasks):
+        if name.startswith("scrapers."):
+            celery_app.tasks.pop(name)
+    sys.modules.pop("scrapers.tasks", None)
+    try:
+        yield
+    finally:
+        if saved_module is not None:
+            sys.modules["scrapers.tasks"] = saved_module
+        celery_app.tasks.update(saved_tasks)
 
 
 class ScraperRunHistoryTests(TestCase):
@@ -170,11 +189,12 @@ class PeriodicTaskCheckTests(TestCase):
         assert "Release Stuck Items" in orphaned[0].msg
         assert "scrapers.tasks.release_stuck_items" in orphaned[0].msg
 
-    def test_check_stays_quiet_for_a_task_that_exists(self) -> None:
-        """A real monitor must not be reported.
+    def test_check_stays_quiet_for_a_task_whose_module_is_not_imported(self) -> None:
+        """The production condition: an empty registry and an importable module.
 
-        The Celery registry is empty outside a worker, which once made every
-        entry look orphaned.
+        Outside a Celery worker nothing has imported the task modules, so the
+        registry starts without them. The test process imports them itself,
+        which is why the condition has to be staged here.
         """
         interval, _created = IntervalSchedule.objects.get_or_create(
             every=1,
@@ -187,7 +207,8 @@ class PeriodicTaskCheckTests(TestCase):
             interval=interval,
         )
 
-        messages = run_checks()
+        with _registry_without_scraper_tasks():
+            messages = run_checks()
 
         orphaned = [message for message in messages if message.id == "scrapers.W001"]
         assert orphaned == []
