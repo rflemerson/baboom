@@ -122,6 +122,33 @@ class BearerMcpEndpointTests(_OperatorTokenMixin, TestCase):
 
         assert response.status_code == HTTPStatus.UNAUTHORIZED
 
+    def test_operator_can_execute_registry_and_product_list(self) -> None:
+        """Discovery is not enough: both read tools must finish end to end."""
+        for name, arguments in (
+            ("admin.registry", {}),
+            (
+                "admin.list",
+                {"app_label": "core", "model_name": "product", "page_size": 1},
+            ),
+        ):
+            response = self.client.post(
+                MCP_URL,
+                data=json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "tools/call",
+                        "params": {"name": name, "arguments": arguments},
+                    },
+                ),
+                content_type="application/json",
+                **self._credentials,
+            )
+            body = json.loads(response.content)
+            assert response.status_code == HTTPStatus.OK, (name, body)
+            assert "error" not in body, (name, body)
+            assert body["result"]["isError"] is False, (name, body)
+
 
 @override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
 class SkillOverMcpTests(_OperatorTokenMixin, TestCase):

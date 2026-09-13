@@ -25,4 +25,4 @@ RUN pip install --no-cache-dir . \
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "mkdir -p /app/media /app/staticfiles && chown -R appuser:appuser /app/media /app/staticfiles && su appuser -s /bin/sh -c 'python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2} --timeout ${GUNICORN_TIMEOUT:-120} --access-logfile - baboom.wsgi:application'"]
+CMD ["sh", "-c", "mkdir -p /app/media /app/staticfiles && chown -R appuser:appuser /app/media /app/staticfiles && su appuser -s /bin/sh -c 'python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2} --timeout ${GUNICORN_TIMEOUT:-120} --preload --max-requests ${GUNICORN_MAX_REQUESTS:-300} --max-requests-jitter 50 --access-logfile - baboom.wsgi:application'"]
