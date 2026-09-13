@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 from decimal import Decimal
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Protocol, cast
+from unittest import mock
 from unittest.mock import Mock
 
 from django.contrib import admin as django_admin
@@ -859,6 +861,24 @@ class CatalogOperatorCommandTests(TestCase):
         assert "view_scrapedpage" in codenames
         assert len(codenames) == self.EXPECTED_PERMISSION_COUNT
         assert not any(codename.startswith("delete_") for codename in codenames)
+
+    def test_password_comes_from_the_environment(self) -> None:
+        """A credential passed as an argument would land in shell history."""
+        with mock.patch.dict(
+            os.environ,
+            {"CATALOG_OPERATOR_PASSWORD": "chosen-by-the-operator"},
+        ):
+            call_command(
+                "ensure_catalog_operator",
+                username="catalog-operator",
+                email="curator@local.test",
+            )
+
+        user = get_user_model().objects.get(username="catalog-operator")
+        assert user.check_password("chosen-by-the-operator")
+        assert user.email == "curator@local.test"
+        assert user.is_staff
+        assert not user.is_superuser
 
 
 class AdminApiInlineWriteTests(TestCase):

@@ -191,3 +191,20 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
         )
 
         assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+class SigningKeyTests(TestCase):
+    """The configured key has to be usable, not merely present."""
+
+    def test_jwks_publishes_a_signing_key(self) -> None:
+        """An escaped PEM in the environment still has to parse.
+
+        A PEM kept on one line needs its newlines restored before use, and
+        nothing but this endpoint exercises the key.
+        """
+        response = self.client.get("/o/.well-known/jwks.json")
+
+        assert response.status_code == HTTPStatus.OK
+        keys = json.loads(response.content)["keys"]
+        assert [key["kty"] for key in keys] == ["RSA"]
+        assert keys[0]["alg"] == "RS256"

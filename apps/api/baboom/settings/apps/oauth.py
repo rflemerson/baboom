@@ -29,7 +29,11 @@ OAUTH2_PROVIDER = {
     "CIMD_ALLOWED_HOSTS": env.list("MCP_CLIENT_HOSTS", default=[]),
     "DCR_ENABLED": True,
     "OIDC_ENABLED": True,
-    "OIDC_RSA_PRIVATE_KEY": env("OIDC_RSA_PRIVATE_KEY", default=""),
+    "OIDC_RSA_PRIVATE_KEY": env.str(
+        "OIDC_RSA_PRIVATE_KEY",
+        default="",
+        multiline=True,
+    ),
     "OIDC_ISS_ENDPOINT": OAUTH_ISSUER,
     "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,
     "REFRESH_TOKEN_REUSE_PROTECTION": True,

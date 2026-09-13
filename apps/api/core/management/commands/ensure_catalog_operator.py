@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
 
 
 GROUP_NAME = "catalog-operator"
+CREDENTIAL_ENV = "CATALOG_OPERATOR_PASSWORD"
 
 PERMISSIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "core": {
@@ -42,8 +44,9 @@ class Command(BaseCommand):
     help = "Create or update a restricted catalog operator user."
 
     def add_arguments(self, parser: ArgumentParser) -> None:
-        """Register the required username argument."""
+        """Register the username and the optional address."""
         parser.add_argument("--username", required=True)
+        parser.add_argument("--email", default="")
 
     def handle(self, *_args: object, **options: object) -> None:
         """Create the group and synchronize its explicit permission set."""
@@ -53,11 +56,22 @@ class Command(BaseCommand):
             raise CommandError(message)
 
         user_model = get_user_model()
+        email = str(options["email"]).strip()
         user, created = user_model.objects.get_or_create(username=username)
         user.is_staff = True
         user.is_active = True
         user.is_superuser = False
-        user.save(update_fields=["is_staff", "is_active", "is_superuser"])
+        fields = ["is_staff", "is_active", "is_superuser"]
+        if email:
+            user.email = email
+            fields.append("email")
+        # Read the password from the environment, never from an argument: the
+        # command line is visible in process listings and shell history.
+        password = os.environ.get(CREDENTIAL_ENV, "")
+        if password:
+            user.set_password(password)
+            fields.append("password")
+        user.save(update_fields=fields)
 
         group, _group_created = Group.objects.get_or_create(name=GROUP_NAME)
         permissions = []
@@ -81,9 +95,10 @@ class Command(BaseCommand):
         user.groups.add(group)
 
         state = "created" if created else "updated"
+        credential = "password set" if password else f"no {CREDENTIAL_ENV} given"
         self.stdout.write(
             self.style.SUCCESS(
                 f"Operator {username!r} {state}; synchronized "
-                f"{len(permissions)} permissions.",
+                f"{len(permissions)} permissions; {credential}.",
             ),
         )
