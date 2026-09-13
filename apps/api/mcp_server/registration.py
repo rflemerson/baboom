@@ -33,7 +33,7 @@ class RedirectHostAllowlistDCRPermission:
             return False
         try:
             payload = json.loads(request.body.decode() or "{}")
-        except UnicodeDecodeError, json.JSONDecodeError:
+        except (UnicodeDecodeError, json.JSONDecodeError):
             return False
         redirect_uris = payload.get("redirect_uris")
         if not isinstance(redirect_uris, list) or not redirect_uris:

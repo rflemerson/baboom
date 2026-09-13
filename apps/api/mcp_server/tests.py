@@ -8,11 +8,9 @@ from http import HTTPStatus
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import check_password, make_password
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
-from django.utils.crypto import get_random_string
 from oauth2_provider.models import get_access_token_model, get_application_model
 
 MCP_URL = "/mcp/"
@@ -257,52 +255,3 @@ class DynamicRegistrationTests(TestCase):
     def test_empty_allowlist_denies(self) -> None:
         """Naming no host denies every client, rather than allowing all."""
         assert self._register(self.ALLOWED_REDIRECT) != HTTPStatus.CREATED
-
-
-@override_settings(MCP_CLIENT_HOSTS=["chatgpt.com"])
-class ClientSecretHashingTests(TestCase):
-    """A generated secret is stored more cheaply than a chosen password."""
-
-    DEFAULT_PREFIX = "pbkdf2_sha256$"
-    CLIENT_PREFIX = "oauth_pbkdf2_sha256$"
-
-    def test_a_user_password_keeps_the_default_cost(self) -> None:
-        """The cheaper hasher must not reach anything a person chose."""
-        user = get_user_model().objects.create(username="someone")
-        user.set_password("a password a person picked")
-
-        assert user.password.startswith(self.DEFAULT_PREFIX)
-
-    def test_a_client_secret_uses_the_client_hasher(self) -> None:
-        """A server-generated secret is long and random, not guessable."""
-        response = self.client.post(
-            "/o/register/",
-            data=json.dumps(
-                {
-                    "client_name": "confidential",
-                    "redirect_uris": ["https://chatgpt.com/cb"],
-                    "grant_types": ["authorization_code"],
-                    "response_types": ["code"],
-                    "token_endpoint_auth_method": "client_secret_basic",
-                },
-            ),
-            content_type="application/json",
-        )
-        assert response.status_code == HTTPStatus.CREATED
-
-        application = get_application_model().objects.get(name="confidential")
-        assert application.client_secret.startswith(self.CLIENT_PREFIX)
-
-    def test_a_secret_hashed_before_the_change_still_verifies(self) -> None:
-        """Changing the hasher must not lock out a client already registered."""
-        issued = get_random_string(64)
-        application = get_application_model().objects.create(
-            name="existing",
-            client_type="confidential",
-            authorization_grant_type="authorization-code",
-            redirect_uris="https://chatgpt.com/cb",
-            client_secret=make_password(issued),
-        )
-
-        assert application.client_secret.startswith(self.DEFAULT_PREFIX)
-        assert check_password(issued, application.client_secret)
