@@ -11,10 +11,11 @@ from django.db import transaction
 
 from offers.services import OfferObservationResult, OfferObservationService
 
+from .contracts import ScrapedItemIngestionInput
 from .models import ScrapedItem, ScrapedPage
 
 if TYPE_CHECKING:
-    from .dtos import ScrapedItemIngestionInput
+    from .contracts import ScrapedProductInput, VariantContext
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class ScraperService:
             else None
         )
         page, _created = ScrapedPage.objects.get_or_create(
-            url=data.url,
+            url=data.page_url,
             defaults={
                 "store_slug": data.store_slug,
                 "api_context": normalized_context or {},
@@ -55,13 +56,11 @@ class ScraperService:
 
         observation = ScraperService.record_offer_observation(data)
 
-        item, item_created = ScrapedItem.objects.get_or_create(
-            offer=observation.offer,
-            defaults={"source_page": page},
+        item, item_created = ScraperService._upsert_scraped_item(
+            observation,
+            page,
+            data.variant_context,
         )
-        if not item_created and item.source_page_id != page.id:
-            item.source_page = page
-            item.save(update_fields=["source_page", "updated_at"])
 
         if normalized_context is not None and page.api_context != normalized_context:
             page.api_context = normalized_context
@@ -73,6 +72,84 @@ class ScraperService:
         logger.debug("%s item %s for %s", action, data.external_id, data.store_slug)
 
         return item
+
+    @staticmethod
+    @transaction.atomic
+    def save_product_snapshot(product: ScrapedProductInput) -> list[ScrapedItem]:
+        """Persist one normalized page and all of its independently priced units."""
+        normalized_context = ScraperService._normalize_api_context_payload(
+            product.api_context,
+        )
+        page, _created = ScrapedPage.objects.get_or_create(
+            url=product.page_url,
+            defaults={
+                "store_slug": product.store_slug,
+                "api_context": normalized_context,
+            },
+        )
+
+        page_updates: list[str] = []
+        if page.store_slug != product.store_slug:
+            page.store_slug = product.store_slug
+            page_updates.append("store_slug")
+        if page.api_context != normalized_context:
+            page.api_context = normalized_context
+            page_updates.append("api_context")
+        if page_updates:
+            page.save(update_fields=page_updates)
+
+        saved: list[ScrapedItem] = []
+        for offer in product.offers:
+            data = ScrapedItemIngestionInput(
+                store_slug=product.store_slug,
+                external_id=offer.external_id,
+                page_url=product.page_url,
+                offer_url=offer.offer_url,
+                variant_context=offer.variant_context,
+                name=offer.name,
+                price=offer.price,
+                stock_quantity=offer.stock_quantity,
+                stock_status=offer.stock_status,
+                ean=offer.ean,
+                sku=offer.sku,
+                pid=product.provider_product_id,
+                category=product.category,
+            )
+            observation = ScraperService.record_offer_observation(data)
+            item, _created = ScraperService._upsert_scraped_item(
+                observation,
+                page,
+                offer.variant_context,
+            )
+            saved.append(item)
+
+        return saved
+
+    @staticmethod
+    def _upsert_scraped_item(
+        observation: OfferObservationResult,
+        page: ScrapedPage,
+        variant_context: VariantContext,
+    ) -> tuple[ScrapedItem, bool]:
+        """Bind an observed offer to its source page and variant context."""
+        serialized_context = variant_context.model_dump(mode="json")
+        item, item_created = ScrapedItem.objects.get_or_create(
+            offer=observation.offer,
+            defaults={
+                "source_page": page,
+                "variant_context": serialized_context,
+            },
+        )
+        item_updates: list[str] = []
+        if item.source_page_id != page.id:
+            item.source_page = page
+            item_updates.append("source_page")
+        if item.variant_context != serialized_context:
+            item.variant_context = serialized_context
+            item_updates.append("variant_context")
+        if not item_created and item_updates:
+            item.save(update_fields=[*item_updates, "updated_at"])
+        return item, item_created
 
     @staticmethod
     def record_offer_observation(
@@ -92,7 +169,7 @@ class ScraperService:
             snapshot={
                 "name": data.name,
                 "category": data.category,
-                "url": data.url,
+                "url": data.offer_url,
                 "ean": data.ean,
                 "sku": data.sku,
                 "pid": data.pid,

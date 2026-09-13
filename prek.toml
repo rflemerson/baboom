@@ -9,7 +9,8 @@ hooks = [
     { id = "check-added-large-files" },
     { id = "detect-private-key" },
     { id = "check-merge-conflict" },
-    { id = "end-of-file-fixer" },
-    { id = "trailing-whitespace" },
+    # The vendored MCP spec must stay byte-identical to upstream to be diffable.
+    { id = "end-of-file-fixer", exclude = "^apps/api/mcp_server/spec/" },
+    { id = "trailing-whitespace", exclude = "^apps/api/mcp_server/spec/" },
     { id = "mixed-line-ending" },
 ]

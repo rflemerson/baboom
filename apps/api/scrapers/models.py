@@ -88,6 +88,13 @@ class ScrapedItem(BaseModel):
         help_text=_("Offer observed by the scraper"),
     )
 
+    variant_context = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_(
+            "Which unit of the source page this offer is, in the store's words",
+        ),
+    )
     source_page = models.ForeignKey(
         ScrapedPage,
         on_delete=models.CASCADE,

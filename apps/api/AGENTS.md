@@ -18,7 +18,15 @@ prek run --all-files
 ## Architecture
 
 - Business workflows: `core/services/` and `scrapers/services.py`.
-- DTOs: `core/dtos.py` and `scrapers/dtos.py`.
+- DTOs: `core/dtos.py`; scraper handoff contracts live in `scrapers/contracts.py`.
+- Scraper normalizers live in `scrapers/normalizers/`. They are pure payload
+  transformations and must not import Django database models or persistence
+  services. Scrapy platform spiders live in `scrapers/crawler/spiders/`, emit
+  `ScrapedProductInput`, and `scrapers/crawler/pipelines.py` hands those items
+  to `ScraperService.save_product_snapshot`.
+- Celery launches one `scrapy crawl <spider>` subprocess per monitor and uses
+  the dumped Scrapy statistics to close `ScraperRun`; the task preserves the
+  empty-after-history failure rule.
 - Public catalog and alerts: REST.
 - Scrapers retain `ScrapedPage` metadata and the store's own product context;
   humans curate the catalog through Django admin.

@@ -1,6 +1,13 @@
 # Scrapers
 
-Scrapers are API-first. Each spider stores `ScrapedPage.api_context` from the store's own catalog API; no spider fetches or stores the product page. `CatalogApiSpider` owns crawl orchestration, retry/backoff, and metrics.
+Scrapers are API-first and run as Scrapy subprocesses. Scrapy owns request
+scheduling, concurrency, retries, throttling, duplicate URLs, and statistics;
+the custom downloader middleware retains TLS impersonation rotation, WAF
+detection, and `Retry-After`. The platform spiders only discover and paginate
+their endpoints, while pure normalizers under `scrapers/normalizers/` map
+payloads to one source page and its independently buyable, priced offers.
+`CatalogPipeline` is the only handoff to `ScraperService.save_product_snapshot`;
+no spider fetches or stores product-page HTML.
 
 ## Growth
 
@@ -14,14 +21,22 @@ Scrapers are API-first. Each spider stores `ScrapedPage.api_context` from the st
 
 ## Shopify
 
-- Used by Dark Lab and Soldiers.
+- Used by Dark Lab, Soldiers, and Integralmedica.
 - Endpoints: `/collections.json`, `/collections/{handle}/products.json`, `/products/{handle}.js`
 - Paginate with `page` and `limit=250`.
 - Use detail JSON for variants, options, images, price, and availability.
 
+## Nuvemshop
+
+- Used by Dux Nutrition.
+- No public catalog JSON API is used; product JSON-LD blocks embedded in
+  listing pages provide SKU, canonical URL, price, stock, and inventory.
+- The listing does not expose addressable variants, so the normalized
+  `variant_context.selection` is absent.
+
 ## VTEX GraphQL
 
-- Used by Black Skull.
+- Used by stores configured with `VtexGraphqlSpider`.
 - Endpoint: `/_v/segment/graphql/v1`
 - Uses persisted queries through `extensions`.
 - Variables are JSON-encoded, Base64-encoded, then embedded in `extensions`.
@@ -30,7 +45,7 @@ Scrapers are API-first. Each spider stores `ScrapedPage.api_context` from the st
 
 ## VTEX Legacy
 
-- Used by Integral Medica, Max Titanium, Probiotica, and Dux.
+- Used by Black Skull, Max Titanium, and Probiotica.
 - Endpoint: `/api/catalog_system/pub/products/search`
 - Pagination: `_from` and `_to`.
 - HTTP 206 is a normal successful response.

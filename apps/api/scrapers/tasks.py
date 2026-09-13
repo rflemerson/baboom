@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 
 from celery import shared_task
 from celery._state import get_current_task
@@ -10,17 +15,8 @@ from celery.utils.log import get_task_logger
 from django.utils import timezone
 
 from .models import ScraperRun
-from .spiders.blackskull import BlackSkullSpider
-from .spiders.dark_lab import DarkLabSpider
-from .spiders.dux import DuxSpider
-from .spiders.growth import GrowthSpider
-from .spiders.integral_medica import IntegralMedicaSpider
-from .spiders.max_titanium import MaxTitaniumSpider
-from .spiders.probiotica import ProbioticaSpider
-from .spiders.soldiers import SoldiersSpider
 
-if TYPE_CHECKING:
-    from .spiders.base_spider import BaseSpider
+API_ROOT = Path(__file__).resolve().parents[1]
 
 logger = get_task_logger(__name__)
 
@@ -72,17 +68,58 @@ def _finish_run(
     )
 
 
-def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
-    """Run a light catalog spider (price/stock/basic) and return a status message."""
+def _read_scrapy_stats(path: Path) -> dict[str, object]:
+    """Read the stats written by the Scrapy subprocess, if available."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, TypeError, ValueError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _stat_int(stats: dict[str, object], key: str) -> int:
+    """Read an integer Scrapy stat without trusting subprocess output."""
+    try:
+        return int(stats.get(key, 0) or 0)
+    except TypeError, ValueError, OverflowError:
+        return 0
+
+
+def _cleanup_stats_file(path: Path | None) -> None:
+    """Remove the temporary stats file after the run has been recorded."""
+    if path is not None:
+        path.unlink(missing_ok=True)
+
+
+def _run_spider_monitor(spider_name: str, label: str) -> str:
+    """Run one Scrapy spider in a child process and record its outcome."""
     current_task = get_current_task()
     run = ScraperRun.objects.create(
         label=label,
         task_name=current_task.name if current_task else "",
     )
     logger.info("Starting %s monitor task", label)
+    stats_path: Path | None = None
     try:
-        items = spider_class().crawl()
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            prefix=f"{spider_name}-stats-",
+            suffix=".json",
+            delete=False,
+        ) as stats_file:
+            stats_path = Path(stats_file.name)
+        environment = os.environ.copy()
+        environment.setdefault("DJANGO_SETTINGS_MODULE", "baboom.settings")
+        completed = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "scrapy", "crawl", spider_name],
+            cwd=API_ROOT,
+            env={**environment, "SCRAPER_STATS_FILE": str(stats_path)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     except Exception as exc:
+        _cleanup_stats_file(stats_path)
         _finish_run(
             run,
             status=ScraperRun.Status.ERROR,
@@ -92,7 +129,39 @@ def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
         logger.exception("%s monitor task failed", label)
         raise
 
-    if not items and _monitor_has_produced_items(label):
+    stats = _read_scrapy_stats(stats_path) if stats_path else {}
+    item_pages = _stat_int(stats, "item_scraped_count")
+    items_count = _stat_int(stats, "scraper/offers_collected") or item_pages
+    requests_count = _stat_int(stats, "downloader/request_count")
+    responses_count = _stat_int(stats, "downloader/response_count")
+    error_count = _stat_int(stats, "log_count/ERROR")
+    stats_summary = (
+        f" Scrapy: {requests_count} requests, {responses_count} responses, "
+        f"{item_pages} pages."
+    )
+
+    if completed.returncode != 0 or error_count:
+        error_message = (
+            completed.stderr.strip()
+            or completed.stdout.strip()
+            or (
+                f"Scrapy reported {error_count} errors."
+                if error_count
+                else f"Scrapy exited with status {completed.returncode}."
+            )
+        )
+        _finish_run(
+            run,
+            status=ScraperRun.Status.ERROR,
+            message=f"{label} Monitor failed.",
+            items_count=items_count,
+            error_message=error_message,
+        )
+        _cleanup_stats_file(stats_path)
+        logger.error("%s monitor task failed: %s", label, error_message)
+        raise RuntimeError(error_message)
+
+    if not items_count and _monitor_has_produced_items(label):
         message = (
             f"{label} Monitor returned no products, but previous runs did. "
             f"The store layout or endpoint has most likely changed."
@@ -103,16 +172,18 @@ def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
             message=f"{label} Monitor returned no products.",
             error_message=message,
         )
+        _cleanup_stats_file(stats_path)
         logger.error(message)
         raise EmptyMonitorRunError(message)
 
-    message = f"{label} Monitor: Saved/Updated {len(items)} items."
+    message = f"{label} Monitor: Saved/Updated {items_count} items.{stats_summary}"
     _finish_run(
         run,
         status=ScraperRun.Status.SUCCESS,
         message=message,
-        items_count=len(items),
+        items_count=items_count,
     )
+    _cleanup_stats_file(stats_path)
     logger.info(message)
     return message
 
@@ -120,46 +191,46 @@ def _run_spider_monitor(spider_class: type[BaseSpider], label: str) -> str:
 @shared_task
 def scrape_growth_monitor() -> str:
     """Scrape Growth Supplements via API."""
-    return _run_spider_monitor(GrowthSpider, "Growth")
+    return _run_spider_monitor("growth", "Growth")
 
 
 @shared_task
 def scrape_blackskull_monitor() -> str:
     """Scrape Black Skull via API."""
-    return _run_spider_monitor(BlackSkullSpider, "Black Skull")
+    return _run_spider_monitor("blackskull", "Black Skull")
 
 
 @shared_task
 def scrape_integral_monitor() -> str:
     """Scrape Integral Medica."""
-    return _run_spider_monitor(IntegralMedicaSpider, "Integral Medica")
+    return _run_spider_monitor("integral_medica", "Integral Medica")
 
 
 @shared_task
 def scrape_maxtitanium_monitor() -> str:
     """Scrape Max Titanium."""
-    return _run_spider_monitor(MaxTitaniumSpider, "Max Titanium")
+    return _run_spider_monitor("max_titanium", "Max Titanium")
 
 
 @shared_task
 def scrape_probiotica_monitor() -> str:
     """Scrape Probiotica."""
-    return _run_spider_monitor(ProbioticaSpider, "Probiotica")
+    return _run_spider_monitor("probiotica", "Probiotica")
 
 
 @shared_task
 def scrape_darklab_monitor() -> str:
     """Scrape Dark Lab."""
-    return _run_spider_monitor(DarkLabSpider, "Dark Lab")
+    return _run_spider_monitor("dark_lab", "Dark Lab")
 
 
 @shared_task
 def scrape_dux_monitor() -> str:
     """Scrape Dux Nutrition."""
-    return _run_spider_monitor(DuxSpider, "Dux")
+    return _run_spider_monitor("dux", "Dux")
 
 
 @shared_task
 def scrape_soldiers_monitor() -> str:
     """Scrape Soldiers Nutrition."""
-    return _run_spider_monitor(SoldiersSpider, "Soldiers")
+    return _run_spider_monitor("soldiers", "Soldiers")

@@ -1,0 +1,1 @@
+The Scrapy project owns request scheduling and transport policy, not payload extraction or store configuration; robots.txt remains disabled because the previous crawler did not obey it and enabling it is a product decision.
