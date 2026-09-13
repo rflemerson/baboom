@@ -38,14 +38,15 @@ jobs:
         run: |
           # Over stdin, never as arguments: a command line is visible in the
           # remote process listing, and one of these is a signing key.
+          # %q so the deploy can source the file: these values carry spaces.
           {
-            printf 'OIDC_RSA_PRIVATE_KEY=%s\n' "$OIDC_RSA_PRIVATE_KEY"
-            printf 'CATALOG_OPERATOR_PASSWORD=%s\n' "$CATALOG_OPERATOR_PASSWORD"
-            printf 'MCP_RESOURCE_IDENTIFIER=%s\n' "$MCP_RESOURCE_IDENTIFIER"
-            printf 'OAUTH_ISSUER=%s\n' "$OAUTH_ISSUER"
-            printf 'MCP_CLIENT_HOSTS=%s\n' "$MCP_CLIENT_HOSTS"
-            printf 'CATALOG_OPERATOR_USERNAME=%s\n' "$CATALOG_OPERATOR_USERNAME"
-            printf 'CATALOG_OPERATOR_EMAIL=%s\n' "$CATALOG_OPERATOR_EMAIL"
+            printf 'OIDC_RSA_PRIVATE_KEY=%q\n' "$OIDC_RSA_PRIVATE_KEY"
+            printf 'CATALOG_OPERATOR_PASSWORD=%q\n' "$CATALOG_OPERATOR_PASSWORD"
+            printf 'MCP_RESOURCE_IDENTIFIER=%q\n' "$MCP_RESOURCE_IDENTIFIER"
+            printf 'OAUTH_ISSUER=%q\n' "$OAUTH_ISSUER"
+            printf 'MCP_CLIENT_HOSTS=%q\n' "$MCP_CLIENT_HOSTS"
+            printf 'CATALOG_OPERATOR_USERNAME=%q\n' "$CATALOG_OPERATOR_USERNAME"
+            printf 'CATALOG_OPERATOR_EMAIL=%q\n' "$CATALOG_OPERATOR_EMAIL"
           } | ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
             "umask 077 && cat > /home/ubuntu/app/baboom/.env.oauth"
 
