@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
-import re
-import subprocess
-import sys
+import multiprocessing
 import tempfile
 from pathlib import Path
 
@@ -15,10 +12,8 @@ from celery._state import get_current_task
 from celery.utils.log import get_task_logger
 from django.utils import timezone
 
+from .crawler.run import crawl
 from .models import ScraperRun
-
-API_ROOT = Path(__file__).resolve().parents[1]
-SPIDER_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 logger = get_task_logger(__name__)
 
@@ -94,10 +89,11 @@ def _cleanup_stats_file(path: Path | None) -> None:
 
 
 def _run_spider_monitor(spider_name: str, label: str) -> str:
-    """Run one Scrapy spider in a child process and record its outcome."""
-    if not SPIDER_NAME_PATTERN.fullmatch(spider_name):
-        message = f"Refusing to run spider with unexpected name: {spider_name!r}"
-        raise ValueError(message)
+    """Run one Scrapy spider in a child process and record its outcome.
+
+    The crawl needs its own process because the Twisted reactor cannot be
+    restarted, and the worker runs several crawls a day.
+    """
     current_task = get_current_task()
     run = ScraperRun.objects.create(
         label=label,
@@ -113,18 +109,13 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
             delete=False,
         ) as stats_file:
             stats_path = Path(stats_file.name)
-        environment = os.environ.copy()
-        environment.setdefault("DJANGO_SETTINGS_MODULE", "baboom.settings")
-        # S603: the command is this interpreter plus a name checked above,
-        # never anything a request or a store could influence.
-        completed = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "scrapy", "crawl", spider_name],
-            cwd=API_ROOT,
-            env={**environment, "SCRAPER_STATS_FILE": str(stats_path)},
-            capture_output=True,
-            text=True,
-            check=False,
+        child = multiprocessing.Process(
+            target=crawl,
+            args=(spider_name, str(stats_path)),
         )
+        child.start()
+        child.join()
+        exit_code = child.exitcode
     except Exception as exc:
         _cleanup_stats_file(stats_path)
         _finish_run(
@@ -147,15 +138,11 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
         f"{item_pages} pages."
     )
 
-    if completed.returncode != 0 or error_count:
-        error_message = (
-            completed.stderr.strip()
-            or completed.stdout.strip()
-            or (
-                f"Scrapy reported {error_count} errors."
-                if error_count
-                else f"Scrapy exited with status {completed.returncode}."
-            )
+    if exit_code != 0 or error_count:
+        error_message = str(stats.get("last_error") or "").strip() or (
+            f"Scrapy reported {error_count} errors."
+            if error_count
+            else f"The crawl process exited with status {exit_code}."
         )
         _finish_run(
             run,

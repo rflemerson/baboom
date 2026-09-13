@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
+import secrets
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
@@ -17,6 +17,10 @@ if TYPE_CHECKING:
     from ..normalizers.base import ProductNormalizer
 
 logger = logging.getLogger(__name__)
+
+# SystemRandom so the jitter is not a pseudo-random sequence a store could
+# predict across runs.
+_jitter = secrets.SystemRandom()
 
 
 class CatalogSpider(Spider):
@@ -45,7 +49,7 @@ class CatalogSpider(Spider):
     async def start(self) -> AsyncIterator[Request]:
         """Spread full runs before scheduling the first request."""
         if not self.categories_to_crawl:
-            await asyncio.sleep(random.uniform(*self.STARTUP_JITTER_SECONDS))  # noqa: S311
+            await asyncio.sleep(_jitter.uniform(*self.STARTUP_JITTER_SECONDS))
         for request in self.start_category_requests():
             yield request
 

@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-import subprocess
-import sys
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
-from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,6 +26,7 @@ from scrapers.stores.blackskull import BlackSkullSpider
 from scrapers.stores.dark_lab import DarkLabSpider
 from scrapers.stores.dux import DuxSpider
 from scrapers.stores.growth import GrowthSpider
+from scrapers.tasks import _run_spider_monitor
 from scrapers.tests import EXPECTED_FALLBACK_CATEGORY_COUNT
 
 RETRY_AFTER_SECONDS = 20
@@ -41,19 +39,11 @@ DARK_LAB_PRICE_IN_REAIS = 12990.0
     "External scraper integration tests are opt-in. Set RUN_EXTERNAL_SCRAPER_TESTS=1.",
 )
 class ScraperIntegrationTests(TestCase):
-    """Opt-in tests that execute real Scrapy subprocesses."""
+    """Opt-in tests that run real crawls through the Celery entry point."""
 
     def _run(self, spider_name: str) -> None:
-        """Run one real spider through the same command used by Celery."""
-        result = subprocess.run(
-            [sys.executable, "-m", "scrapy", "crawl", spider_name],
-            cwd=Path(__file__).resolve().parents[2],
-            env={**os.environ, "DJANGO_SECRET_KEY": "dev-only"},
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0, result.stderr
+        """Run one real spider exactly the way the monitor task runs it."""
+        _run_spider_monitor(spider_name, f"Integration {spider_name}")
 
     def test_blackskull_spider(self) -> None:
         """Test Black Skull spider execution."""
@@ -340,7 +330,7 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
             return [request async for request in spider.start()]
 
         with (
-            patch("scrapers.crawler.base.random.uniform", return_value=2.0),
+            patch("scrapers.crawler.base._jitter.uniform", return_value=2.0),
             patch(
                 "scrapers.crawler.base.asyncio.sleep", new_callable=AsyncMock
             ) as sleep,

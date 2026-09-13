@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from django.core.checks import run_checks
@@ -12,6 +14,10 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 from scrapers.models import ScraperRun
 from scrapers.tasks import EmptyMonitorRunError, _run_spider_monitor
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 from scrapers.tests import (
     EXPECTED_MONITOR_ITEMS,
     EXPECTED_SCRAPER_RUN_ITEMS,
@@ -19,19 +25,26 @@ from scrapers.tests import (
 )
 
 
+@contextmanager
+def _fake_crawl(stats: dict[str, object], exitcode: int = 0) -> Iterator[None]:
+    """Stand in for the crawl child, writing the stats it would have written."""
+
+    def build(target: object, args: tuple[str, str]) -> MagicMock:
+        _ = target
+        Path(args[1]).write_text(json.dumps(stats))
+        return MagicMock(exitcode=exitcode)
+
+    with patch("scrapers.tasks.multiprocessing.Process", side_effect=build):
+        yield
+
+
 class ScraperRunHistoryTests(TestCase):
     """Tests for scraper monitor execution history."""
 
     def test_monitor_success_creates_scraper_run(self) -> None:
         """Successful monitor runs should be visible in admin history."""
-
-        def fake_run(_command: list[str], **kwargs: object) -> object:
-            Path(kwargs["env"]["SCRAPER_STATS_FILE"]).write_text(
-                json.dumps({"item_scraped_count": 2, "downloader/request_count": 3}),
-            )
-            return MagicMock(returncode=0, stdout="", stderr="")
-
-        with patch("scrapers.tasks.subprocess.run", side_effect=fake_run):
+        stats = {"item_scraped_count": 2, "downloader/request_count": 3}
+        with _fake_crawl(stats):
             result = _run_spider_monitor("test_store", "Test Store")
         run = ScraperRun.objects.get()
 
@@ -48,12 +61,8 @@ class ScraperRunHistoryTests(TestCase):
 
     def test_monitor_error_creates_failed_scraper_run(self) -> None:
         """Failed monitor runs should record the error before re-raising."""
-
-        def fake_run(_command: list[str], **_kwargs: object) -> object:
-            return MagicMock(returncode=1, stdout="", stderr="blocked by upstream")
-
         error = _raised(
-            lambda: self._run_subprocess(fake_run, "Blocked Store"),
+            lambda: self._run_failing_crawl("Blocked Store"),
             RuntimeError,
         )
 
@@ -68,9 +77,10 @@ class ScraperRunHistoryTests(TestCase):
         assert run.message == "Blocked Store Monitor failed."
         assert run.error_message == "blocked by upstream"
 
-    def _run_subprocess(self, runner: object, label: str) -> str:
-        """Run the task helper with a fake subprocess."""
-        with patch("scrapers.tasks.subprocess.run", side_effect=runner):
+    def _run_failing_crawl(self, label: str) -> str:
+        """Run the task helper against a child that exits with an error."""
+        stats = {"last_error": "blocked by upstream"}
+        with _fake_crawl(stats, exitcode=1):
             return _run_spider_monitor("test_store", label)
 
 
@@ -81,16 +91,8 @@ class EmptyMonitorRunTests(TestCase):
 
     def _run(self, items: list[object]) -> str:
         """Run the monitor helper with a spider returning the given items."""
-
-        def fake_run(_command: list[str], **kwargs: object) -> object:
-            Path(kwargs["env"]["SCRAPER_STATS_FILE"]).write_text(
-                json.dumps(
-                    {"item_scraped_count": len(items), "downloader/request_count": 1}
-                ),
-            )
-            return MagicMock(returncode=0, stdout="", stderr="")
-
-        with patch("scrapers.tasks.subprocess.run", side_effect=fake_run):
+        stats = {"item_scraped_count": len(items), "downloader/request_count": 1}
+        with _fake_crawl(stats):
             return _run_spider_monitor("dux", self.LABEL)
 
     def test_empty_run_is_success_for_a_monitor_without_history(self) -> None:
