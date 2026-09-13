@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from django.http import HttpRequest, HttpResponseBase
 
 
-class AuthenticationFailed(Exception):
+class AuthenticationError(Exception):
     """The request carried this scheme's credentials and they did not hold."""
 
 
@@ -38,7 +38,7 @@ class Authenticator(Protocol):
     ) -> tuple[AbstractBaseUser, object] | None:
         """Return the identity and its credential, or ``None`` if not ours.
 
-        Raise :class:`AuthenticationFailed` when the credential is this
+        Raise :class:`AuthenticationError` when the credential is this
         scheme's and is invalid, so a later authenticator cannot paper over
         a rejection.
         """
@@ -82,7 +82,7 @@ class AuthenticatedEndpointMixin:
         for authenticator in authenticators:
             try:
                 identity = authenticator.authenticate(request)
-            except AuthenticationFailed:
+            except AuthenticationError:
                 identity = None
                 break
             if identity is not None:

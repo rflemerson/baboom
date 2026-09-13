@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-from http import HTTPStatus
-from urllib.parse import urlparse
-
 from datetime import timedelta
+from http import HTTPStatus
+from typing import ClassVar
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -15,6 +15,7 @@ from django.test import TestCase, override_settings
 from django.urls import resolve
 from django.utils import timezone
 from oauth2_provider.models import get_access_token_model, get_application_model
+
 
 class SigningKeyTests(TestCase):
     """The configured key has to be usable, not merely present."""
@@ -31,6 +32,7 @@ class SigningKeyTests(TestCase):
         keys = json.loads(response.content)["keys"]
         assert [key["kty"] for key in keys] == ["RSA"]
         assert keys[0]["alg"] == "RS256"
+
 
 @override_settings(MCP_CLIENT_HOSTS=["chatgpt.com"])
 class DynamicRegistrationTests(TestCase):
@@ -78,6 +80,7 @@ class DynamicRegistrationTests(TestCase):
         """Naming no host denies every client, rather than allowing all."""
         assert self._register(self.ALLOWED_REDIRECT) != HTTPStatus.CREATED
 
+
 class AuthorizationLoginTests(TestCase):
     """Approving an authorization has to reach a page this project serves."""
 
@@ -103,7 +106,7 @@ class TokenAuthenticatorTests(TestCase):
     """What the deployment's own authenticator accepts on the MCP route."""
 
     URL = "/mcp/"
-    INITIALIZE = {
+    INITIALIZE: ClassVar[dict[str, object]] = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "initialize",
@@ -111,7 +114,7 @@ class TokenAuthenticatorTests(TestCase):
     }
 
     def setUp(self) -> None:
-        """An operator and a client to mint tokens against."""
+        """Create an operator and a client to mint tokens against."""
         call_command("ensure_catalog_operator", username="catalog-operator")
         self.user = get_user_model().objects.get(username="catalog-operator")
         self.application = get_application_model().objects.create(

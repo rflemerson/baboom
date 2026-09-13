@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import json
 from http import HTTPStatus
+from pathlib import Path
 
+import jsonschema
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-from mcp_server.auth import AuthenticationFailed
+from mcp_server.auth import AuthenticationError
 
 MCP_URL = "/mcp/"
 OPERATOR_HEADER = "HTTP_X_TEST_OPERATOR"
@@ -40,7 +42,7 @@ class HeaderAuthenticator:
             return None
         user = get_user_model().objects.filter(username=username).first()
         if user is None:
-            raise AuthenticationFailed
+            raise AuthenticationError
         return user, None
 
     def authenticate_header(self, request: object) -> str:
@@ -238,3 +240,67 @@ class ProtocolHandshakeTests(_OperatorTokenMixin, TestCase):
 
             assert response.status_code == HTTPStatus.OK, method
             assert "error" not in json.loads(response.content), method
+
+
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
+class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
+    """Every response is held against the protocol's own schema.
+
+    The library that supplies the tools validates the arguments it receives
+    and never what it returns, so nothing else here would notice a response
+    shaped in a way no client can read.
+    """
+
+    SCHEMA_PATH = Path(__file__).resolve().parent / "spec" / "schema-2024-11-05.json"
+    CASES = (
+        ("initialize", {"protocolVersion": "2024-11-05"}, "InitializeResult"),
+        ("tools/list", {}, "ListToolsResult"),
+        ("resources/list", {}, "ListResourcesResult"),
+        (
+            "resources/read",
+            {"uri": "skill://product-curation/SKILL.md"},
+            "ReadResourceResult",
+        ),
+        ("prompts/list", {}, "ListPromptsResult"),
+        ("prompts/get", {"name": "product-curation"}, "GetPromptResult"),
+        (
+            "tools/call",
+            {"name": "admin.registry", "arguments": {}},
+            "CallToolResult",
+        ),
+    )
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Load the schema once for every case."""
+        super().setUpClass()
+        cls.schema = json.loads(cls.SCHEMA_PATH.read_text())
+
+    def _result(self, method: str, params: dict) -> dict:
+        response = self.client.post(
+            MCP_URL,
+            data=json.dumps(
+                {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            ),
+            content_type="application/json",
+            **self._credentials,
+        )
+        body = json.loads(response.content)
+        assert "result" in body, f"{method}: {body}"
+        return body["result"]
+
+    def test_every_response_matches_the_published_schema(self) -> None:
+        """A result no client can read is a result the server should not send."""
+        for method, params, result_type in self.CASES:
+            validator = jsonschema.Draft202012Validator(
+                {
+                    "$ref": f"#/definitions/{result_type}",
+                    "definitions": self.schema["definitions"],
+                },
+            )
+            errors = list(validator.iter_errors(self._result(method, params)))
+
+            assert not errors, f"{method} does not match {result_type}: " + "; ".join(
+                f"{'/'.join(str(p) for p in e.absolute_path) or '(root)'}: {e.message}"
+                for e in errors[:3]
+            )

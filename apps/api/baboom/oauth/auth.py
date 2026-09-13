@@ -9,7 +9,7 @@ from django.urls import reverse
 from oauth2_provider.oauth2_backends import get_oauthlib_core
 from oauth2_provider.www_authenticate import build_bearer_challenge
 
-from mcp_server.auth import AuthenticationFailed
+from mcp_server.auth import AuthenticationError
 
 if TYPE_CHECKING:
     from django.contrib.auth.base_user import AbstractBaseUser
@@ -28,7 +28,7 @@ class TokenAuthenticator:
         request: HttpRequest,
     ) -> tuple[AbstractBaseUser, object] | None:
         """Resolve the token's owner, or decline when there is no token."""
-        header = request.META.get("HTTP_AUTHORIZATION", "")
+        header = request.headers.get("authorization", "")
         if not header.startswith(BEARER):
             return None
 
@@ -38,7 +38,7 @@ class TokenAuthenticator:
         )
         if not valid:
             request.oauth2_error = getattr(verified, "oauth2_error", {})
-            raise AuthenticationFailed
+            raise AuthenticationError
         return verified.user, verified.access_token
 
     def authenticate_header(self, request: HttpRequest) -> str:

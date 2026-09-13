@@ -166,6 +166,25 @@ def handle(method: str, params: dict[str, Any]) -> dict[str, Any]:
     return HANDLERS[method](params)
 
 
+def as_content_blocks(result: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite a tool result into content blocks the protocol defines.
+
+    The library returns its JSON body as ``{"type": "json"}``, which is not a
+    content block in any published version of the protocol: a client finds no
+    ``text`` where the answer should be and discards the call it just made.
+    """
+    blocks = result.get("content")
+    if not isinstance(blocks, list):
+        return result
+    rewritten = [
+        {"type": "text", "text": json.dumps(block["json"], ensure_ascii=False)}
+        if isinstance(block, dict) and block.get("type") == "json"
+        else block
+        for block in blocks
+    ]
+    return {**result, "content": rewritten}
+
+
 def declare_capabilities(payload: dict[str, Any]) -> dict[str, Any]:
     """Add what this module serves to an ``initialize`` result."""
     capabilities = payload.setdefault("result", {}).setdefault("capabilities", {})
@@ -203,8 +222,17 @@ class SkillMethodsMixin:
                 )
             return JsonResponse(jsonrpc.success(rpc_id, result))
 
-        response = super().post(request)
-        if method == "initialize" and response.status_code == HTTPStatus.OK:
-            body = declare_capabilities(json.loads(response.content))
+        return self._adapt(method, super().post(request))
+
+    @staticmethod
+    def _adapt(method: str | None, response: HttpResponse) -> HttpResponse:
+        """Add what this module serves to what the library answered."""
+        if response.status_code != HTTPStatus.OK:
+            return response
+        body = json.loads(response.content)
+        if method == "initialize":
+            return JsonResponse(declare_capabilities(body))
+        if method == "tools/call" and "result" in body:
+            body["result"] = as_content_blocks(body["result"])
             return JsonResponse(body)
         return response
