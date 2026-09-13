@@ -169,3 +169,25 @@ class PeriodicTaskCheckTests(TestCase):
         assert len(orphaned) == 1
         assert "Release Stuck Items" in orphaned[0].msg
         assert "scrapers.tasks.release_stuck_items" in orphaned[0].msg
+
+    def test_check_stays_quiet_for_a_task_that_exists(self) -> None:
+        """A real monitor must not be reported.
+
+        The Celery registry is empty outside a worker, which once made every
+        entry look orphaned.
+        """
+        interval, _created = IntervalSchedule.objects.get_or_create(
+            every=1,
+            period=IntervalSchedule.MINUTES,
+        )
+        PeriodicTask.objects.create(
+            name="Scrape Dark Lab Monitor",
+            task="scrapers.tasks.scrape_darklab_monitor",
+            enabled=True,
+            interval=interval,
+        )
+
+        messages = run_checks()
+
+        orphaned = [message for message in messages if message.id == "scrapers.W001"]
+        assert orphaned == []
