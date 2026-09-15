@@ -13,6 +13,20 @@ from core.models import ProductStore
 from offers.models import Offer, StockStatus
 from scrapers.models import ScrapedItem
 
+# These platforms publish one buyable unit per page, and the normalizers key
+# that unit by the same product identifier the legacy rows already carry. There
+# is nothing to move. Reading them as ambiguous would archive rows that are
+# already right, which is worse than leaving them alone.
+IDENTITY_STABLE_PLATFORMS = frozenset({"nuvemshop", "wapstore", "uappi_wapstore"})
+
+
+def _page_platform(item: ScrapedItem) -> str:
+    """Read the platform the page was captured from, or an empty string."""
+    page = item.source_page
+    if page is None or not isinstance(page.api_context, dict):
+        return ""
+    return str(page.api_context.get("platform") or "")
+
 
 @dataclass(frozen=True)
 class CutoverDecision:
@@ -167,6 +181,8 @@ class Command(BaseCommand):
             if isinstance(item.variant_context, dict) and item.variant_context.get(
                 "provider_variant_id"
             ):
+                continue
+            if _page_platform(item) in IDENTITY_STABLE_PLATFORMS:
                 continue
             decision = _decide(item)
             if decision.target_id != decision.old_id:

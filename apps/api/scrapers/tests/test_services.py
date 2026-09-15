@@ -339,6 +339,33 @@ class OfferIdentityCutoverTests(TestCase):
         store = Store.objects.create(name="test_store", display_name="Test Store")
         return ProductStore.objects.create(product=product, store=store, offer=offer)
 
+    def test_a_platform_that_keeps_its_identity_is_left_alone(self) -> None:
+        """WapStore and Nuvemshop key a unit by the same id the legacy rows use.
+
+        Nothing moves for them, so they must not be reported as ambiguous: that
+        reading would archive rows that are already correct.
+        """
+        offer = Offer.objects.create(
+            store_slug="growth",
+            external_id="4518",
+            pid="4518",
+            sku="",
+            current_price=Decimal("99.90"),
+        )
+        page = ScrapedPage.objects.create(
+            store_slug="growth",
+            url="https://example.com/produto/whey",
+            api_context={"platform": "uappi_wapstore", "product": {"id": "4518"}},
+        )
+        ScrapedItem.objects.create(offer=offer, source_page=page)
+
+        output = StringIO()
+        call_command("cutover_offer_identities", stdout=output)
+
+        report = output.getvalue()
+        assert "growth/4518" not in report
+        assert "0 legacy offers" in report
+
     def test_cutover_preview_does_not_write(self) -> None:
         """Operators can inspect the mapping before changing any row."""
         offer = self._legacy_offer([{"id": "variant-111", "sku": "SKU-111"}])
