@@ -34,11 +34,21 @@ class NoNetworkTestRunner(DiscoverRunner):
         with ExitStack() as stack:
             connect = socket.socket.connect
             connect_ex = socket.socket.connect_ex
+            # Curl.perform is the synchronous path. AsyncSession, which
+            # scrapy-impersonate downloads through, never calls it: it hands the
+            # handle to the multi interface through AsyncCurl.add_handle.
             stack.enter_context(
                 patch.object(
                     curl.Curl,
                     "perform",
                     new=self._guard_curl(curl.CurlInfo),
+                ),
+            )
+            stack.enter_context(
+                patch.object(
+                    import_module("curl_cffi.aio").AsyncCurl,
+                    "add_handle",
+                    new=self._guard_async_curl(curl.CurlInfo),
                 ),
             )
             stack.enter_context(
@@ -69,6 +79,16 @@ class NoNetworkTestRunner(DiscoverRunner):
                 f"External curl_cffi request blocked: {destination or '<unknown>'}"
             )
             raise ExternalNetworkAccessError(message)
+
+        return guarded
+
+    @staticmethod
+    def _guard_async_curl(curl_info: object) -> Callable[..., object]:
+        """Reject a libcurl handle before the multi interface starts it."""
+        reject = NoNetworkTestRunner._guard_curl(curl_info)
+
+        def guarded(_multi: object, curl: object, *_args: object) -> None:
+            reject(curl)
 
         return guarded
 

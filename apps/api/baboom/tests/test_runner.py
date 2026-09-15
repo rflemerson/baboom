@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import socket
 from importlib import import_module
 
@@ -42,6 +43,26 @@ class NoNetworkTestRunnerTests(SimpleTestCase):
         """A curl_cffi request fails before native code can reach the network."""
         try:
             curl_requests.get(EXTERNAL_URL, timeout=CURL_TIMEOUT_SECONDS)
+        except ExternalNetworkAccessError as error:
+            blocked_message = str(error)
+        except (OSError, curl_requests.exceptions.RequestException) as error:
+            raise AssertionError from error
+        else:
+            raise AssertionError
+
+        assert EXTERNAL_URL in blocked_message
+
+    def test_external_async_curl_request_is_rejected_with_its_destination(
+        self,
+    ) -> None:
+        """The async session scrapy-impersonate downloads with is blocked too."""
+
+        async def fetch() -> None:
+            async with curl_requests.AsyncSession(max_clients=1) as session:
+                await session.get(EXTERNAL_URL, timeout=CURL_TIMEOUT_SECONDS)
+
+        try:
+            asyncio.run(fetch())
         except ExternalNetworkAccessError as error:
             blocked_message = str(error)
         except (OSError, curl_requests.exceptions.RequestException) as error:
