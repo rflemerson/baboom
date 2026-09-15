@@ -1,65 +1,26 @@
-"""Tests for scraper task workflows and system checks."""
+"""Tests for scraper task workflows."""
 
 from __future__ import annotations
 
 import json
-import sys
-from contextlib import contextmanager
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
-from django.core.checks import run_checks
 from django.test import TestCase
 from django.utils import timezone
-from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
-from baboom.celery import app as celery_app
 from offers.models import Offer, StockStatus
 from scrapers.models import ScraperRun
-from scrapers.tasks import EmptyMonitorRunError, _run_spider_monitor
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-from scrapers.tests import (
+from scrapers.tasks import EmptyMonitorRunError, run_spider_monitor
+from scrapers.tests.helpers import (
     EXPECTED_MONITOR_ITEMS,
     EXPECTED_SCRAPER_RUN_ITEMS,
     _raised,
 )
+from scrapers.tests.task_helpers import _fake_crawl
 
 EXPECTED_TIMEOUT_JOIN_CALLS = 2
-
-
-@contextmanager
-def _fake_crawl(stats: dict[str, object], exitcode: int = 0) -> Iterator[None]:
-    """Stand in for the crawl child, writing the stats it would have written."""
-
-    def build(target: object, args: tuple[str, str]) -> MagicMock:
-        _ = target
-        Path(args[1]).write_text(json.dumps(stats))
-        return MagicMock(exitcode=exitcode, **{"is_alive.return_value": False})
-
-    with patch("scrapers.tasks.multiprocessing.Process", side_effect=build):
-        yield
-
-
-@contextmanager
-def _registry_without_scraper_tasks() -> Iterator[None]:
-    """Put the process back in the state a non-worker starts in."""
-    saved_tasks = dict(celery_app.tasks)
-    saved_module = sys.modules.get("scrapers.tasks")
-    for name in list(celery_app.tasks):
-        if name.startswith("scrapers."):
-            celery_app.tasks.pop(name)
-    sys.modules.pop("scrapers.tasks", None)
-    try:
-        yield
-    finally:
-        if saved_module is not None:
-            sys.modules["scrapers.tasks"] = saved_module
-        celery_app.tasks.update(saved_tasks)
 
 
 class ScraperRunHistoryTests(TestCase):
@@ -69,7 +30,7 @@ class ScraperRunHistoryTests(TestCase):
         """Successful monitor runs should be visible in admin history."""
         stats = {"item_scraped_count": 2, "downloader/request_count": 3}
         with _fake_crawl(stats):
-            result = _run_spider_monitor("test_store", "Test Store")
+            result = run_spider_monitor("test_store", "Test Store")
         run = ScraperRun.objects.get()
 
         assert result == (
@@ -105,12 +66,12 @@ class ScraperRunHistoryTests(TestCase):
         """Run the task helper against a child that exits with an error."""
         stats = {"last_error": "blocked by upstream"}
         with _fake_crawl(stats, exitcode=1):
-            return _run_spider_monitor("test_store", label)
+            return run_spider_monitor("test_store", label)
 
     def test_unrelated_error_log_does_not_fail_successful_crawl(self) -> None:
         """A library error line is not itself a failed spider."""
         with _fake_crawl({"item_scraped_count": 1, "log_count/ERROR": 1}):
-            _run_spider_monitor("test_store", "Test Store")
+            run_spider_monitor("test_store", "Test Store")
 
         assert ScraperRun.objects.get().status == ScraperRun.Status.SUCCESS
 
@@ -118,7 +79,7 @@ class ScraperRunHistoryTests(TestCase):
         """A premature Scrapy close is a failure even with exit status zero."""
         with _fake_crawl({"finish_reason": "closespider_timeout"}):
             _raised(
-                lambda: _run_spider_monitor("test_store", "Test Store"),
+                lambda: run_spider_monitor("test_store", "Test Store"),
                 RuntimeError,
             )
 
@@ -129,7 +90,7 @@ class ScraperRunHistoryTests(TestCase):
         child = MagicMock(**{"is_alive.side_effect": [True, False]})
         with patch("scrapers.tasks.multiprocessing.Process", return_value=child):
             error = _raised(
-                lambda: _run_spider_monitor("test_store", "Test Store"),
+                lambda: run_spider_monitor("test_store", "Test Store"),
                 TimeoutError,
             )
 
@@ -145,7 +106,7 @@ class ScraperRunHistoryTests(TestCase):
         child = MagicMock(**{"is_alive.side_effect": [True, True]})
         with patch("scrapers.tasks.multiprocessing.Process", return_value=child):
             _raised(
-                lambda: _run_spider_monitor("test_store", "Test Store"),
+                lambda: run_spider_monitor("test_store", "Test Store"),
                 TimeoutError,
             )
 
@@ -162,7 +123,7 @@ class EmptyMonitorRunTests(TestCase):
         """Run the monitor helper with a spider returning the given items."""
         stats = {"item_scraped_count": len(items), "downloader/request_count": 1}
         with _fake_crawl(stats):
-            return _run_spider_monitor("dux", self.LABEL)
+            return run_spider_monitor("dux", self.LABEL)
 
     def test_empty_run_is_success_for_a_monitor_without_history(self) -> None:
         """A store that never produced items may legitimately return none."""
@@ -216,54 +177,6 @@ class EmptyMonitorRunTests(TestCase):
         assert "Scrapy: 1 requests, 0 responses, 0 pages." in message
 
 
-class PeriodicTaskCheckTests(TestCase):
-    """Beat entries must point at tasks registered by the Celery app."""
-
-    def test_check_reports_enabled_orphaned_periodic_task(self) -> None:
-        """The system check finds an enabled task missing from the registry."""
-        interval, _created = IntervalSchedule.objects.get_or_create(
-            every=1,
-            period=IntervalSchedule.MINUTES,
-        )
-        PeriodicTask.objects.create(
-            name="Release Stuck Items",
-            task="scrapers.tasks.release_stuck_items",
-            enabled=True,
-            interval=interval,
-        )
-
-        messages = run_checks()
-
-        orphaned = [message for message in messages if message.id == "scrapers.W001"]
-        assert len(orphaned) == 1
-        assert "Release Stuck Items" in orphaned[0].msg
-        assert "scrapers.tasks.release_stuck_items" in orphaned[0].msg
-
-    def test_check_stays_quiet_for_a_task_whose_module_is_not_imported(self) -> None:
-        """The production condition: an empty registry and an importable module.
-
-        Outside a Celery worker nothing has imported the task modules, so the
-        registry starts without them. The test process imports them itself,
-        which is why the condition has to be staged here.
-        """
-        interval, _created = IntervalSchedule.objects.get_or_create(
-            every=1,
-            period=IntervalSchedule.MINUTES,
-        )
-        PeriodicTask.objects.create(
-            name="Scrape Dark Lab Monitor",
-            task="scrapers.tasks.scrape_darklab_monitor",
-            enabled=True,
-            interval=interval,
-        )
-
-        with _registry_without_scraper_tasks():
-            messages = run_checks()
-
-        orphaned = [message for message in messages if message.id == "scrapers.W001"]
-        assert orphaned == []
-
-
 class UnseenOfferDelistingTests(TestCase):
     """A unit the store stopped publishing leaves the catalog after repeated absence.
 
@@ -305,7 +218,7 @@ class UnseenOfferDelistingTests(TestCase):
 
         with patch("scrapers.tasks.multiprocessing.Process", side_effect=build):
             try:
-                _run_spider_monitor("dark_lab", self.LABEL)
+                run_spider_monitor("dark_lab", self.LABEL)
             except RuntimeError:
                 if exitcode == 0:
                     raise

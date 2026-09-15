@@ -12,11 +12,9 @@ from pathlib import Path
 
 import jsonschema
 from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-from mcp_server.auth import AuthenticationError
+from mcp_server.tests.helpers import _OperatorTokenMixin
 
 MCP_URL = "/mcp/"
 OPERATOR_HEADER = "HTTP_X_TEST_OPERATOR"
@@ -28,129 +26,7 @@ INITIALIZE = {
 }
 
 
-class HeaderAuthenticator:
-    """Stand-in that honours the same contract as the real one.
-
-    The endpoint is written against a list of authenticators, so its own
-    tests need no OAuth server -- and needing none is the proof that the
-    endpoint does not depend on one.
-    """
-
-    def authenticate(self, request: object) -> tuple[object, object] | None:
-        """Resolve the user named in the test header."""
-        username = request.META.get(OPERATOR_HEADER)
-        if not username:
-            return None
-        user = get_user_model().objects.filter(username=username).first()
-        if user is None:
-            raise AuthenticationError
-        return user, None
-
-    def authenticate_header(self, request: object) -> str:
-        """Offer the same shape of challenge a real scheme would."""
-        metadata = request.build_absolute_uri(
-            "/.well-known/oauth-protected-resource",
-        )
-        return f'Bearer realm="baboom-mcp",resource_metadata="{metadata}"'
-
-
-class _OperatorTokenMixin:
-    """The catalog operator, recognised by the stand-in authenticator."""
-
-    def setUp(self) -> None:
-        """Provision the operator these requests run as."""
-        call_command("ensure_catalog_operator", username="catalog-operator")
-        self.user = get_user_model().objects.get(username="catalog-operator")
-
-    @property
-    def _credentials(self) -> dict[str, str]:
-        return {OPERATOR_HEADER: self.user.username}
-
-
-@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
-class BearerMcpEndpointTests(_OperatorTokenMixin, TestCase):
-    """Cover the ways in and the ways refused."""
-
-    def _post(self, **headers: str) -> object:
-        return self.client.post(
-            MCP_URL,
-            data=json.dumps(INITIALIZE),
-            content_type="application/json",
-            **headers,
-        )
-
-    def test_an_authenticated_request_reaches_the_endpoint(self) -> None:
-        """A verified request runs as the identity it was verified as."""
-        response = self._post(**self._credentials)
-
-        assert response.status_code == HTTPStatus.OK
-        body = json.loads(response.content)
-        assert body["result"]["serverInfo"]["name"]
-
-    def test_an_unverified_request_is_refused_with_a_challenge(self) -> None:
-        """The refusal names where the client can learn how to authenticate."""
-        response = self._post()
-
-        assert response.status_code == HTTPStatus.UNAUTHORIZED
-        challenge = response.headers["WWW-Authenticate"]
-        assert challenge.startswith("Bearer ")
-        assert 'resource_metadata="http://testserver/.well-known' in challenge
-
-    def test_session_cookie_does_not_authenticate(self) -> None:
-        """A browser session must not carry authority onto this route.
-
-        Cookies ride along on every request to the domain, and this one
-        writes to the catalog.
-        """
-        self.client.force_login(self.user)
-
-        response = self._post()
-
-        assert response.status_code == HTTPStatus.UNAUTHORIZED
-
-    def test_manifest_lists_the_tools_behind_the_same_gate(self) -> None:
-        """The catalogue is readable by hand, with the same token."""
-        response = self.client.get("/mcp/manifest/", **self._credentials)
-
-        assert response.status_code == HTTPStatus.OK
-        names = [tool["name"] for tool in json.loads(response.content)["tools"]]
-        assert "admin.registry" in names
-
-    def test_manifest_without_authentication_is_refused(self) -> None:
-        """The catalogue is not a public description of the server."""
-        response = self.client.get("/mcp/manifest/")
-
-        assert response.status_code == HTTPStatus.UNAUTHORIZED
-
-    def test_operator_can_execute_registry_and_product_list(self) -> None:
-        """Discovery is not enough: both read tools must finish end to end."""
-        for name, arguments in (
-            ("admin.registry", {}),
-            (
-                "admin.list",
-                {"app_label": "core", "model_name": "product", "page_size": 1},
-            ),
-        ):
-            response = self.client.post(
-                MCP_URL,
-                data=json.dumps(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "tools/call",
-                        "params": {"name": name, "arguments": arguments},
-                    },
-                ),
-                content_type="application/json",
-                **self._credentials,
-            )
-            body = json.loads(response.content)
-            assert response.status_code == HTTPStatus.OK, (name, body)
-            assert "error" not in body, (name, body)
-            assert body["result"]["isError"] is False, (name, body)
-
-
-@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.helpers.HeaderAuthenticator"])
 class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
     """The curation skill travels with the tools, for whatever a client speaks."""
 
@@ -223,7 +99,7 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
         assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
-@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.helpers.HeaderAuthenticator"])
 class ProtocolHandshakeTests(_OperatorTokenMixin, TestCase):
     """Every call a client makes on connecting has to be answered."""
 
@@ -270,7 +146,7 @@ class ProtocolHandshakeTests(_OperatorTokenMixin, TestCase):
             assert "error" not in json.loads(response.content), method
 
 
-@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.HeaderAuthenticator"])
+@override_settings(MCP_AUTHENTICATORS=["mcp_server.tests.helpers.HeaderAuthenticator"])
 class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
     """Every response is held against the protocol's own schema.
 
@@ -279,7 +155,7 @@ class ProtocolSchemaTests(_OperatorTokenMixin, TestCase):
     shaped in a way no client can read.
     """
 
-    SCHEMA_DIR = Path(__file__).resolve().parent / "spec"
+    SCHEMA_DIR = Path(__file__).resolve().parent.parent / "spec"
     CASES = (
         ("initialize", {}, "InitializeResult"),
         ("tools/list", {}, "ListToolsResult"),

@@ -50,6 +50,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "baboom.wsgi.application"
 
+TEST_RUNNER = "baboom.test_runner.NoNetworkTestRunner"
+
 
 DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),

@@ -65,7 +65,6 @@ source = ["."]
 omit = [
   ".venv/*",
   "*/migrations/*",
-  "*/tests.py",
   "*/tests/*",
   "manage.py",
   "baboom/settings/*",

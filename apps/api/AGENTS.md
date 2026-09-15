@@ -16,6 +16,47 @@ prek run --all-files
 .venv/bin/python manage.py runserver
 ```
 
+## Testing
+
+Tests mirror the production modules under each app's `tests/` package:
+
+- model invariants live in `core/tests/models/`;
+- selectors and business services live in `core/tests/selectors/` and
+  `core/tests/services/`;
+- admin, API, and management-command tests live in `core/tests/admin/`,
+  `core/tests/apis/`, and `core/tests/commands/`;
+- scraper normalizers, crawler infrastructure, platform spiders, scraper
+  services, tasks, and commands live in the corresponding directories under
+  `scrapers/tests/`;
+- MCP loader, RPC, and endpoint tests live in `mcp_server/tests/`;
+- OAuth tests live beside the OAuth modules in `baboom/oauth/tests/`.
+
+Run the Django test runner from this directory with the local-only key:
+
+```bash
+DJANGO_SECRET_KEY=test-only-local .venv/bin/python manage.py test
+DJANGO_SECRET_KEY=test-only-local .venv/bin/python manage.py test --shuffle
+DJANGO_SECRET_KEY=test-only-local .venv/bin/python manage.py test --reverse
+# Real store verification is manual and may access the network:
+.venv/bin/python manage.py verify_scraper_stores [SPIDER ...]
+```
+
+Coverage uses the configured branch measurement:
+
+```bash
+DJANGO_SECRET_KEY=test-only-local .venv/bin/coverage run manage.py test
+.venv/bin/coverage report -m
+```
+
+The configured `baboom.test_runner.NoNetworkTestRunner` blocks Python socket
+connections outside loopback and the test-database hosts, and blocks native
+`curl_cffi` transfers. All crawler tests use in-memory Scrapy responses and
+never collect from the network. Real store verification was moved out of the
+suite; run `verify_scraper_stores` manually when network access is intentional.
+That command uses the same public `run_spider_monitor` workflow as Celery: it
+persists scraped items and offers, creates a `ScraperRun`, and reconciles
+offers that a successful crawl no longer sees.
+
 ## Architecture
 
 - Business workflows: `core/services/` and `scrapers/services.py`.

@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from core.models import Brand, Product, ProductStore, Store
 from offers.models import PriceObservation, StockStatus
-from scrapers.tests import _scraped_item
+from scrapers.tests.helpers import _scraped_item
 
 
 class ScrapedItemAdminWorkflowTests(TestCase):

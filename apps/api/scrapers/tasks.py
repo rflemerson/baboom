@@ -105,11 +105,13 @@ def _delist_unseen_offers(stats: dict[str, object], run: ScraperRun) -> int:
     return ScraperService.delist_unseen_offers(store_slug, run.started_at)
 
 
-def _run_spider_monitor(spider_name: str, label: str) -> str:
-    """Run one Scrapy spider in a child process and record its outcome.
+def run_spider_monitor(spider_name: str, label: str) -> str:
+    """Run a monitor, persist its run, and reconcile unseen store offers.
 
     The crawl needs its own process because the Twisted reactor cannot be
-    restarted, and the worker runs several crawls a day.
+    restarted, and the worker runs several crawls a day. The crawl pipeline
+    persists offers and scraped items; a successful run also archives offers
+    the store no longer publishes.
     """
     current_task = get_current_task()
     run = ScraperRun.objects.create(
@@ -213,46 +215,46 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
 @shared_task
 def scrape_growth_monitor() -> str:
     """Scrape Growth Supplements via API."""
-    return _run_spider_monitor("growth", "Growth")
+    return run_spider_monitor("growth", "Growth")
 
 
 @shared_task
 def scrape_blackskull_monitor() -> str:
     """Scrape Black Skull via API."""
-    return _run_spider_monitor("blackskull", "Black Skull")
+    return run_spider_monitor("blackskull", "Black Skull")
 
 
 @shared_task
 def scrape_integral_monitor() -> str:
     """Scrape Integral Medica."""
-    return _run_spider_monitor("integral_medica", "Integral Medica")
+    return run_spider_monitor("integral_medica", "Integral Medica")
 
 
 @shared_task
 def scrape_maxtitanium_monitor() -> str:
     """Scrape Max Titanium."""
-    return _run_spider_monitor("max_titanium", "Max Titanium")
+    return run_spider_monitor("max_titanium", "Max Titanium")
 
 
 @shared_task
 def scrape_probiotica_monitor() -> str:
     """Scrape Probiotica."""
-    return _run_spider_monitor("probiotica", "Probiotica")
+    return run_spider_monitor("probiotica", "Probiotica")
 
 
 @shared_task
 def scrape_darklab_monitor() -> str:
     """Scrape Dark Lab."""
-    return _run_spider_monitor("dark_lab", "Dark Lab")
+    return run_spider_monitor("dark_lab", "Dark Lab")
 
 
 @shared_task
 def scrape_dux_monitor() -> str:
     """Scrape Dux Nutrition."""
-    return _run_spider_monitor("dux", "Dux")
+    return run_spider_monitor("dux", "Dux")
 
 
 @shared_task
 def scrape_soldiers_monitor() -> str:
     """Scrape Soldiers Nutrition."""
-    return _run_spider_monitor("soldiers", "Soldiers")
+    return run_spider_monitor("soldiers", "Soldiers")
