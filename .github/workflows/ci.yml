@@ -137,3 +137,12 @@ jobs:
             echo "No coverage data: the test step did not run." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  images:
+    name: Publish images
+    needs: [prek, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/container-images.yml
+    secrets: inherit

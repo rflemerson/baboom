@@ -1,9 +1,8 @@
 name: Container Images
 
+# Called by CI after prek and the tests pass on main; never on its own push.
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
   workflow_dispatch:
 
 permissions:
