@@ -16,6 +16,12 @@
   Components are always simple products, so an assembly is one level deep and
   cannot contain itself or form a cycle. `kind` is structural and orthogonal
   to `Category`, which describes what a product is.
+- A combo ranks through `ComboActive`: the mass of an active summed over its
+  components (quantity x net mass x the component's smallest fraction across
+  labels). A row exists only when every component contains the active, because
+  the combo's price buys all of them and the store does not split it. A mixed
+  combo is therefore listed without a metric for an active one component lacks,
+  like a simple product without that active.
 - Nutrition macros are nullable: a partially extracted label is stored as-is,
   because an unknown value is not a measured zero.
 - Actives: `Active` names a substance the catalog ranks by. Protein is one row,

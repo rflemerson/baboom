@@ -16,13 +16,13 @@ from django.db.models import (
     URLField,
     Value,
 )
-from django.db.models.functions import Cast, NullIf
+from django.db.models.functions import Cast, Coalesce, NullIf
 
 from offers.models import PriceObservation
 
 from . import units
 from .dtos import CatalogProductsFilters
-from .models import Active, Product, ProductActive, ProductNutrition
+from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
 
 def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
@@ -64,6 +64,18 @@ def _annotate_catalog_base_fields(
         )
     )
 
+    combo_total_active = (
+        Value(None, output_field=DecimalField(max_digits=16, decimal_places=3))
+        if active is None
+        else Subquery(
+            ComboActive.objects.filter(
+                combo=OuterRef("pk"),
+                active=active.pk,
+            ).values("total_mass")[:1],
+            output_field=DecimalField(max_digits=16, decimal_places=3),
+        )
+    )
+
     return queryset.annotate(
         last_price=Subquery(
             latest_prices.values("price")[:1],
@@ -74,6 +86,7 @@ def _annotate_catalog_base_fields(
             output_field=URLField(),
         ),
         fraction=fraction,
+        combo_total_active=combo_total_active,
     )
 
 
@@ -86,10 +99,16 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
     """
     total_active_safe = NullIf(F("total_active"), Value(0))
 
+    # A simple product's total comes from its label; a combo has no label and
+    # carries the total summed from its components instead.
     return queryset.annotate(
         total_active=ExpressionWrapper(
-            Cast(F("net_mass"), output_field=FloatField())
-            * Cast(F("fraction"), output_field=FloatField()),
+            Coalesce(
+                Cast(F("net_mass"), output_field=FloatField())
+                * Cast(F("fraction"), output_field=FloatField()),
+                Cast(F("combo_total_active"), output_field=FloatField()),
+                output_field=FloatField(),
+            ),
             output_field=DecimalField(max_digits=16, decimal_places=3),
         ),
         concentration=ExpressionWrapper(

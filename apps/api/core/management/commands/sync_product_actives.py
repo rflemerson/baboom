@@ -2,7 +2,7 @@
 
 from django.core.management.base import BaseCommand
 
-from core.models import Product, ProductActive
+from core.models import ComboActive, Product, ProductActive
 
 
 class Command(BaseCommand):
@@ -17,6 +17,8 @@ class Command(BaseCommand):
         )
         for product in products.iterator(chunk_size=100):
             ProductActive.objects.sync_for(product)
+        for combo in Product.objects.filter(kind=Product.Kind.COMBO).iterator():
+            ComboActive.objects.sync_for(combo)
 
         self.stdout.write(
             self.style.SUCCESS(

@@ -358,9 +358,11 @@ class Product(BaseModel):
         return f"{self.brand.display_name} - {self.name} ({mass_display})"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Validate rules on save."""
+        """Validate rules on save, and refresh the combos this product is part of."""
         self.full_clean()
         super().save(*args, **kwargs)
+        if not self.is_combo and self.parent_links.exists():
+            ComboActive.objects.sync_parents_of(self)
 
     def clean(self) -> None:
         """Validate business rules."""
@@ -427,9 +429,17 @@ class ProductComponent(BaseModel):
         return f"{self.quantity}x {self.component.name}"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Validate rules on save."""
+        """Validate rules on save and refresh the combo's active totals."""
         self.full_clean()
         super().save(*args, **kwargs)
+        ComboActive.objects.sync_for(self.parent)
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Remove the component and refresh the combo's active totals."""
+        parent = self.parent
+        result = super().delete(*args, **kwargs)
+        ComboActive.objects.sync_for(parent)
+        return result
 
     def clean(self) -> None:
         """Reject self-references, combo nesting, and simple-product parents."""
@@ -784,6 +794,7 @@ class ProductActiveManager(models.Manager):
                     active_id=active_id,
                     defaults={"fraction": fraction},
                 )
+        ComboActive.objects.sync_parents_of(product)
 
     def _label_fractions(
         self,
@@ -869,6 +880,126 @@ class ProductActive(BaseModel):
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.nutrition_profile} - {self.active.name}: {self.fraction}"
+
+
+class ComboActiveManager(models.Manager):
+    """Manager that keeps combo active totals derived from their components."""
+
+    @transaction.atomic
+    def sync_for(self, combo: Product) -> None:
+        """Rebuild one combo's active totals from its current components."""
+        totals = (
+            self._totals(list(combo.component_links.select_related("component")))
+            if combo.is_combo
+            else {}
+        )
+        self.filter(combo=combo).exclude(active_id__in=totals).delete()
+        for active_id, total_mass in totals.items():
+            self.update_or_create(
+                combo=combo,
+                active_id=active_id,
+                defaults={"total_mass": total_mass},
+            )
+
+    def sync_parents_of(self, component: Product) -> None:
+        """Rebuild every combo the given product is a component of."""
+        combos = Product.objects.filter(component_links__component=component)
+        for combo in combos.distinct():
+            self.sync_for(combo)
+
+    def _totals(self, links: list[ProductComponent]) -> dict[int, Decimal]:
+        """Sum each active over the components, if every component has it.
+
+        A component's mass of an active is its quantity times its net mass
+        times its smallest fraction across nutrition labels: flavors differ and
+        a combo does not say which one it ships, so the figure never overstates
+        what the buyer gets. A component that lacks the active on any label, or
+        has no net mass, leaves the combo without that active.
+        """
+        if not links:
+            return {}
+        per_component: list[dict[int, Decimal]] = []
+        for link in links:
+            masses = self._component_masses(link)
+            if not masses:
+                return {}
+            per_component.append(masses)
+        shared = set.intersection(*(set(masses) for masses in per_component))
+        return {
+            active_id: sum(
+                (masses[active_id] for masses in per_component),
+                Decimal(0),
+            ).quantize(Decimal("0.001"))
+            for active_id in shared
+        }
+
+    def _component_masses(self, link: ProductComponent) -> dict[int, Decimal]:
+        """Return the mass of each active one component line contributes."""
+        component = link.component
+        profile_count = component.nutrition_profiles.count()
+        if component.net_mass is None or not profile_count:
+            return {}
+        fractions: dict[int, list[Decimal]] = {}
+        rows = ProductActive.objects.filter(
+            nutrition_profile__product=component,
+        ).values_list("active_id", "fraction")
+        for active_id, fraction in rows:
+            fractions.setdefault(active_id, []).append(fraction)
+        return {
+            active_id: link.quantity * component.net_mass * min(values)
+            for active_id, values in fractions.items()
+            if len(values) == profile_count
+        }
+
+
+class ComboActive(BaseModel):
+    """Mass of one active in a whole combo, summed from its components.
+
+    A combo has no nutrition label of its own, so it cannot have a
+    :class:`ProductActive` fraction. Its price buys every component and the
+    store does not split it, so a row exists only when every component contains
+    the active: a price per gram charged against part of what was paid for would
+    mislead the ranking.
+    """
+
+    combo = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="combo_actives",
+        verbose_name=_("Combo"),
+    )
+    active = models.ForeignKey(
+        Active,
+        on_delete=models.CASCADE,
+        related_name="combo_amounts",
+        verbose_name=_("Active"),
+    )
+    total_mass = models.DecimalField(
+        _("Total Mass"),
+        max_digits=16,
+        decimal_places=3,
+        help_text=_(
+            "Mass of the active across every component, in the canonical unit."
+        ),
+    )
+
+    objects = ComboActiveManager()
+
+    class Meta:
+        """Meta options."""
+
+        verbose_name = _("Combo Active")
+        verbose_name_plural = _("Combo Actives")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["combo", "active"],
+                name="unique_combo_active",
+            ),
+        )
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return f"{self.combo.name} - {self.active.name}: {self.total_mass}"
 
 
 class AlertSubscriber(BaseModel):

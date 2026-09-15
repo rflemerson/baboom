@@ -849,6 +849,138 @@ class CatalogActiveRankingTests(TestCase):
         assert all(product.price_per_active is None for product in results)
 
 
+class ComboRankingTests(TestCase):
+    """A combo ranks by the active its components sum up to.
+
+    Its price buys every component, and the store does not say how much of it
+    each one costs, so a combo only has a price per active when every component
+    contains that active. Otherwise it behaves like a simple product without the
+    active: listed, with no metric, sorted last.
+    """
+
+    def setUp(self) -> None:
+        """Create the actives and a brand shared by every product."""
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+        self.creatine = Active.objects.create(
+            name="Creatine",
+            slug="creatine",
+            display_unit="g",
+        )
+
+    def _simple(
+        self,
+        name: str,
+        *,
+        proteins: Decimal,
+        creatine: Decimal | None = None,
+    ) -> Product:
+        """Create an unpublished 1kg component with a 30g serving label."""
+        product = Product.objects.create(
+            name=name,
+            brand=self.brand,
+            net_mass=_grams(1000),
+        )
+        self._label(product, proteins=proteins, creatine=creatine)
+        return product
+
+    def _label(
+        self,
+        product: Product,
+        *,
+        proteins: Decimal,
+        creatine: Decimal | None = None,
+    ) -> ProductNutrition:
+        """Attach one more nutrition profile to a product."""
+        facts = NutritionFacts.objects.create(
+            serving_size=_grams(30),
+            proteins=proteins,
+        )
+        if creatine is not None:
+            NutritionActive.objects.create(
+                nutrition_facts=facts,
+                active=self.creatine,
+                amount=creatine,
+                declared_unit="g",
+            )
+        return ProductNutrition.objects.create(product=product, nutrition_facts=facts)
+
+    def _combo(self, name: str, components: list[tuple[Product, int]]) -> Product:
+        """Create a published combo priced at 100."""
+        combo = Product.objects.create(
+            name=name,
+            brand=self.brand,
+            kind=Product.Kind.COMBO,
+            is_published=True,
+        )
+        for component, quantity in components:
+            ProductComponent.objects.create(
+                parent=combo,
+                component=component,
+                quantity=quantity,
+            )
+        _link_offer(
+            product=combo,
+            store=Store.objects.create(name=name, display_name=name),
+            price=100.00,
+        )
+        return combo
+
+    def _price_per_gram(
+        self, combo: Product, active: str = "protein"
+    ) -> Decimal | None:
+        row = public_catalog_products(CatalogProductsFilters(active=active)).get(
+            pk=combo.pk,
+        )
+        if row.price_per_active is None:
+            return None
+        return _per_gram(Decimal(str(row.price_per_active))).quantize(Decimal("0.0001"))
+
+    def test_combo_ranks_by_the_protein_its_components_sum_to(self) -> None:
+        """Two 1kg tubs at 80% protein hold 1600g, so 100 buys 0.0625 per gram."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        combo = self._combo("Two Wheys", [(whey, 2)])
+
+        assert self._price_per_gram(combo) == Decimal("0.0625")
+
+    def test_a_combo_has_no_metric_for_an_active_one_component_lacks(self) -> None:
+        """Protein is in both components; creatine only in one."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        blend = self._simple("Blend", proteins=_grams(12), creatine=_grams(5))
+        combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
+
+        assert self._price_per_gram(combo, "creatine") is None
+        assert self._price_per_gram(combo, "protein") == Decimal("0.0833")
+
+    def test_a_component_with_several_labels_counts_its_smallest(self) -> None:
+        """Flavors differ and the combo does not say which it ships."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        combo = self._combo("Two Wheys", [(whey, 2)])
+
+        self._label(whey, proteins=_grams(15))
+
+        assert self._price_per_gram(combo) == Decimal("0.1000")
+
+    def test_removing_a_component_updates_the_combo(self) -> None:
+        """The derived total follows the component list."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        blend = self._simple("Blend", proteins=_grams(12))
+        combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
+
+        combo.component_links.get(component=blend).delete()
+
+        assert self._price_per_gram(combo) == Decimal("0.1250")
+
+    def test_changing_a_component_mass_updates_the_combo(self) -> None:
+        """Net mass is half of the arithmetic, so it must trigger a resync."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        combo = self._combo("Two Wheys", [(whey, 2)])
+
+        whey.net_mass = _grams(1500)
+        whey.save()
+
+        assert self._price_per_gram(combo) == Decimal("0.0417")
+
+
 class NutritionFactsAdminTests(TestCase):
     """Coverage for manager-facing nutrition admin behavior."""
 
