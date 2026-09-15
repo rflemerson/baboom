@@ -4,6 +4,8 @@ set -Eeuo pipefail
 ROOT_DIR="${ROOT_DIR:-/home/ubuntu/app/baboom}"
 REGISTRY="${REGISTRY:?REGISTRY is required}"
 IMAGE_OWNER="${IMAGE_OWNER:?IMAGE_OWNER is required}"
+# web: nginx, web, API and postgres. worker: celery, beat and redis.
+DEPLOY_ROLE="${DEPLOY_ROLE:?DEPLOY_ROLE must be web or worker}"
 
 cd "$ROOT_DIR"
 
@@ -49,30 +51,53 @@ if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
   printf "%s\n" "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
 fi
 
-echo "== Pulling immutable images =="
-docker compose pull api web celery celery-beat redis
+case "$DEPLOY_ROLE" in
+  web)
+    DB_PRIVATE_BIND="${DB_PRIVATE_BIND:?DB_PRIVATE_BIND is required on the web machine}"
+    export DB_PRIVATE_BIND
+    compose() { docker compose -f docker-compose.yml -f docker-compose.web.yml "$@"; }
 
-echo "== Starting web and API =="
-docker compose up -d --no-build web api
-./infra/deploy/wait-health.sh baboom-api-1 "${API_HEALTH_ATTEMPTS:-30}" "${API_HEALTH_INTERVAL:-10}"
+    echo "== Pulling immutable images =="
+    compose pull api web
 
-if [ -n "${CATALOG_OPERATOR_USERNAME:-}" ]; then
-  echo "== Ensuring the catalog operator =="
-  docker compose exec -T \
-    -e CATALOG_OPERATOR_PASSWORD="${CATALOG_OPERATOR_PASSWORD:-}" \
-    api python manage.py ensure_catalog_operator \
-      --username "${CATALOG_OPERATOR_USERNAME}" \
-      --email "${CATALOG_OPERATOR_EMAIL:-}"
-fi
+    echo "== Starting database, web and API =="
+    compose up -d --no-build db web api
+    ./infra/deploy/wait-health.sh baboom-api-1 "${API_HEALTH_ATTEMPTS:-30}" "${API_HEALTH_INTERVAL:-10}"
 
-echo "== Starting workers =="
-docker compose up -d --no-build celery celery-beat
+    if [ -n "${CATALOG_OPERATOR_USERNAME:-}" ]; then
+      echo "== Ensuring the catalog operator =="
+      compose exec -T \
+        -e CATALOG_OPERATOR_PASSWORD="${CATALOG_OPERATOR_PASSWORD:-}" \
+        api python manage.py ensure_catalog_operator \
+          --username "${CATALOG_OPERATOR_USERNAME}" \
+          --email "${CATALOG_OPERATOR_EMAIL:-}"
+    fi
 
-echo "== Reloading edge proxy =="
-docker compose up -d --no-build --force-recreate --no-deps nginx
+    # Background work lives on the worker machine. A beat left running here
+    # would schedule every crawl twice.
+    echo "== Removing background services from this machine =="
+    compose rm -sf celery celery-beat redis
+
+    echo "== Reloading edge proxy =="
+    compose up -d --no-build --force-recreate --no-deps nginx
+    ;;
+  worker)
+    compose() { docker compose -f docker-compose.worker.yml "$@"; }
+
+    echo "== Pulling immutable images =="
+    compose pull celery celery-beat redis
+
+    echo "== Starting background services =="
+    compose up -d --no-build redis celery celery-beat
+    ;;
+  *)
+    echo "::error::Unknown DEPLOY_ROLE: ${DEPLOY_ROLE}"
+    exit 1
+    ;;
+esac
 
 echo "== Pruning unused images =="
 docker image prune -f
 
 echo "== Final compose state =="
-docker compose ps
+compose ps

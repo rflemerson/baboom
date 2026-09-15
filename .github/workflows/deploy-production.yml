@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Pull images and restart stack
+    name: Deploy the web and worker machines
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 40
@@ -23,6 +23,7 @@ jobs:
           printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/production_key
           chmod 600 ~/.ssh/production_key
           ssh-keyscan -H "${{ vars.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ vars.PRODUCTION_WORKER_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Ship deployment secrets
         env:
@@ -50,10 +51,15 @@ jobs:
           } | ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
             "umask 077 && cat > /home/ubuntu/app/baboom/.env.oauth"
 
+      # The web machine goes first: its API container applies migrations, and
+      # the worker must not start against a schema it does not match yet. A
+      # failure there stops the job before the worker is touched.
       - name: Deploy over SSH
         env:
           PRODUCTION_HOST: ${{ vars.PRODUCTION_HOST }}
+          PRODUCTION_WORKER_HOST: ${{ vars.PRODUCTION_WORKER_HOST }}
           PRODUCTION_USER: ${{ vars.PRODUCTION_USER }}
+          DB_PRIVATE_BIND: ${{ vars.PRODUCTION_DB_PRIVATE_BIND }}
           REGISTRY: ${{ vars.REGISTRY }}
           IMAGE_OWNER: ${{ vars.IMAGE_OWNER }}
           GHCR_USER: ${{ secrets.GHCR_USER }}
@@ -63,16 +69,27 @@ jobs:
           SENTRY_SEND_DEFAULT_PII: ${{ vars.SENTRY_SEND_DEFAULT_PII }}
           SENTRY_MONITOR_CELERY_BEAT: ${{ vars.SENTRY_MONITOR_CELERY_BEAT }}
         run: |
-          ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
-            "cd /home/ubuntu/app/baboom \
-              && git pull --ff-only origin main \
-              && DEPLOY_SKIP_GIT_UPDATE=1 \
-                REGISTRY=$(printf '%q' "$REGISTRY") \
-                IMAGE_OWNER=$(printf '%q' "$IMAGE_OWNER") \
-                GHCR_USER=$(printf '%q' "$GHCR_USER") \
-                GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") \
-                SENTRY_DSN=$(printf '%q' "$SENTRY_DSN") \
-                SENTRY_TRACES_SAMPLE_RATE=$(printf '%q' "$SENTRY_TRACES_SAMPLE_RATE") \
-                SENTRY_SEND_DEFAULT_PII=$(printf '%q' "$SENTRY_SEND_DEFAULT_PII") \
-                SENTRY_MONITOR_CELERY_BEAT=$(printf '%q' "$SENTRY_MONITOR_CELERY_BEAT") \
-                ./infra/deploy/production.sh"
+          deploy() {
+            host="$1"
+            role="$2"
+            echo "::group::Deploying ${role} on ${host}"
+            ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${host}" \
+              "cd /home/ubuntu/app/baboom \
+                && git pull --ff-only origin main \
+                && DEPLOY_SKIP_GIT_UPDATE=1 \
+                  DEPLOY_ROLE=$(printf '%q' "$role") \
+                  DB_PRIVATE_BIND=$(printf '%q' "$DB_PRIVATE_BIND") \
+                  REGISTRY=$(printf '%q' "$REGISTRY") \
+                  IMAGE_OWNER=$(printf '%q' "$IMAGE_OWNER") \
+                  GHCR_USER=$(printf '%q' "$GHCR_USER") \
+                  GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") \
+                  SENTRY_DSN=$(printf '%q' "$SENTRY_DSN") \
+                  SENTRY_TRACES_SAMPLE_RATE=$(printf '%q' "$SENTRY_TRACES_SAMPLE_RATE") \
+                  SENTRY_SEND_DEFAULT_PII=$(printf '%q' "$SENTRY_SEND_DEFAULT_PII") \
+                  SENTRY_MONITOR_CELERY_BEAT=$(printf '%q' "$SENTRY_MONITOR_CELERY_BEAT") \
+                  ./infra/deploy/production.sh"
+            echo "::endgroup::"
+          }
+
+          deploy "$PRODUCTION_HOST" web
+          deploy "$PRODUCTION_WORKER_HOST" worker

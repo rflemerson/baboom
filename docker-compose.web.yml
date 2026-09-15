@@ -1,0 +1,7 @@
+# The API machine in production. Postgres answers the worker machine on the
+# private address only: binding to it keeps the port off the public interface,
+# and the subnet's security list admits nothing but the worker's address.
+services:
+  db:
+    ports:
+      - "${DB_PRIVATE_BIND:?DB_PRIVATE_BIND is the private address postgres listens on}:5432:5432"

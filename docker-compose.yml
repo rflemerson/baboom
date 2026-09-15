@@ -48,8 +48,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
   web:
     image: ${WEB_IMAGE:-ghcr.io/rflemerson/baboom-web:latest}

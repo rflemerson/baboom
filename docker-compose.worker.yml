@@ -1,0 +1,28 @@
+# Background work, on a machine of its own so a crawl's memory never pushes
+# the API into swap. The API does not use redis, so the only thing crossing
+# machines is the celery connection to postgres, over the private network.
+services:
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  celery:
+    extends:
+      file: docker-compose.yml
+      service: celery
+    depends_on: !override
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    extends:
+      file: docker-compose.yml
+      service: celery-beat
+    depends_on: !override
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  media_data:
