@@ -52,6 +52,7 @@ dev = [
   "factory-boy",
   "pytest",
   "coverage",
+  "cryptography",
   "pytest-cov",
   "pytest-django",
   "pytest-asyncio",

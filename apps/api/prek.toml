@@ -34,7 +34,7 @@ args = [
     "--package-module-name-map",
     "factory-boy=factory,django-components=django_components",
     "--per-rule-ignores",
-    "DEP002=gunicorn|psycopg|django-celery-results|django-celery-beat|django-admin-rest-api|django-admin-mcp-api|scrapy-impersonate,DEP004=factory|jsonschema",
+    "DEP002=gunicorn|psycopg|django-celery-results|django-celery-beat|django-admin-rest-api|django-admin-mcp-api|scrapy-impersonate,DEP004=factory|jsonschema|cryptography",
 ]
 
 [[repos]]
