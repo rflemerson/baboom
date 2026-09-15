@@ -337,6 +337,18 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
         assert wait is not None
         assert 0 < wait <= RETRY_AFTER_SECONDS
 
+    def test_a_run_reports_which_store_it_crawled(self) -> None:
+        """Without the store slug the task cannot delist units the store dropped."""
+        spider = _DummyCatalogSpider(categories="fallback-a")
+        spider.crawler = MagicMock()
+
+        async def collect() -> list[Request]:
+            return [request async for request in spider.start()]
+
+        asyncio.run(collect())
+
+        spider.crawler.stats.set_value.assert_any_call("scraper/store_slug", "dummy")
+
     def test_startup_jitter_is_applied_before_full_run(self) -> None:
         """A full run awaits its randomized startup delay."""
         spider = _DummyCatalogSpider()

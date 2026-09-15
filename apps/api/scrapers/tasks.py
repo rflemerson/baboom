@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from .crawler.run import crawl
 from .models import ScraperRun
+from .services import ScraperService
 
 logger = get_task_logger(__name__)
 CRAWL_TIMEOUT_SECONDS = 1800
@@ -94,6 +95,14 @@ def _cleanup_stats_file(path: Path | None) -> None:
     """Remove the temporary stats file after the run has been recorded."""
     if path is not None:
         path.unlink(missing_ok=True)
+
+
+def _delist_unseen_offers(stats: dict[str, object], run: ScraperRun) -> int:
+    """Let a successful run count the units its store no longer publishes."""
+    store_slug = str(stats.get("scraper/store_slug") or "")
+    if not store_slug:
+        return 0
+    return ScraperService.delist_unseen_offers(store_slug, run.started_at)
 
 
 def _run_spider_monitor(spider_name: str, label: str) -> str:
@@ -185,7 +194,11 @@ def _run_spider_monitor(spider_name: str, label: str) -> str:
         logger.error(message)
         raise EmptyMonitorRunError(message)
 
-    message = f"{label} Monitor: Saved/Updated {items_count} items.{stats_summary}"
+    delisted = _delist_unseen_offers(stats, run)
+    message = (
+        f"{label} Monitor: Saved/Updated {items_count} items, "
+        f"delisted {delisted}.{stats_summary}"
+    )
     _finish_run(
         run,
         status=ScraperRun.Status.SUCCESS,

@@ -5,15 +5,18 @@ from __future__ import annotations
 import json
 import sys
 from contextlib import contextmanager
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from django.core.checks import run_checks
 from django.test import TestCase
+from django.utils import timezone
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 from baboom.celery import app as celery_app
+from offers.models import Offer, StockStatus
 from scrapers.models import ScraperRun
 from scrapers.tasks import EmptyMonitorRunError, _run_spider_monitor
 
@@ -70,7 +73,7 @@ class ScraperRunHistoryTests(TestCase):
         run = ScraperRun.objects.get()
 
         assert result == (
-            "Test Store Monitor: Saved/Updated 2 items. "
+            "Test Store Monitor: Saved/Updated 2 items, delisted 0. "
             "Scrapy: 3 requests, 0 responses, 2 pages."
         )
         assert run.label == "Test Store"
@@ -259,3 +262,99 @@ class PeriodicTaskCheckTests(TestCase):
 
         orphaned = [message for message in messages if message.id == "scrapers.W001"]
         assert orphaned == []
+
+
+class UnseenOfferDelistingTests(TestCase):
+    """A unit the store stopped publishing leaves the catalog after repeated absence.
+
+    This covers what per-page reconciliation cannot: a whole page that is gone,
+    which is the only way a unit disappears on single-unit platforms.
+    """
+
+    LABEL = "Dark Lab"
+    STORE = "dark_lab"
+
+    def _offer(self, external_id: str, store: str = STORE) -> Offer:
+        return Offer.objects.create(
+            store_slug=store,
+            external_id=external_id,
+            pid=external_id,
+            current_price=Decimal("99.90"),
+        )
+
+    def _run(self, *, seen: tuple[str, ...] = (), exitcode: int = 0) -> None:
+        """Run the monitor, marking the given units as published by the store."""
+
+        def build(target: object, args: tuple[str, str]) -> MagicMock:
+            _ = target
+            Offer.objects.filter(store_slug=self.STORE, external_id__in=seen).update(
+                last_seen_at=timezone.now(),
+                missed_runs=0,
+                delisted_at=None,
+            )
+            Path(args[1]).write_text(
+                json.dumps(
+                    {
+                        "item_scraped_count": 1,
+                        "scraper/offers_collected": 1,
+                        "scraper/store_slug": self.STORE,
+                    },
+                ),
+            )
+            return MagicMock(exitcode=exitcode, **{"is_alive.return_value": False})
+
+        with patch("scrapers.tasks.multiprocessing.Process", side_effect=build):
+            try:
+                _run_spider_monitor("dark_lab", self.LABEL)
+            except RuntimeError:
+                if exitcode == 0:
+                    raise
+
+    def test_one_absence_does_not_delist(self) -> None:
+        """A single run that misses a unit may just have been incomplete."""
+        self._offer("kept")
+        self._offer("missing")
+
+        self._run(seen=("kept",))
+
+        missing = Offer.objects.get(external_id="missing")
+        assert missing.delisted_at is None
+        assert missing.missed_runs == 1
+
+    def test_second_consecutive_absence_delists(self) -> None:
+        """Two successful runs without the unit take it out of the catalog."""
+        self._offer("kept")
+        self._offer("missing")
+
+        self._run(seen=("kept",))
+        self._run(seen=("kept",))
+
+        missing = Offer.objects.get(external_id="missing")
+        assert missing.delisted_at is not None
+        assert missing.current_price is None
+        assert missing.current_stock_status == StockStatus.OUT_OF_STOCK
+        assert Offer.objects.get(external_id="kept").delisted_at is None
+
+    def test_a_failed_run_is_not_evidence_of_absence(self) -> None:
+        """Only successful runs count; a failure between them changes nothing."""
+        self._offer("kept")
+        self._offer("missing")
+
+        self._run(seen=("kept",))
+        self._run(exitcode=1)
+
+        missing = Offer.objects.get(external_id="missing")
+        assert missing.delisted_at is None
+        assert missing.missed_runs == 1
+
+    def test_another_stores_offers_are_untouched(self) -> None:
+        """A run speaks only for the store it crawled."""
+        self._offer("kept")
+        other = self._offer("elsewhere", store="growth")
+
+        self._run(seen=("kept",))
+        self._run(seen=("kept",))
+
+        other.refresh_from_db()
+        assert other.delisted_at is None
+        assert other.missed_runs == 0

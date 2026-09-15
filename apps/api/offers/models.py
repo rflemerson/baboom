@@ -129,6 +129,12 @@ class Offer(BaseModel):
         help_text=_("When the unit stopped appearing on a page that did list it"),
     )
 
+    missed_runs = models.PositiveIntegerField(
+        _("Missed Runs"),
+        default=0,
+        help_text=_("Consecutive successful store runs that did not publish this unit"),
+    )
+
     @property
     def is_listed(self) -> bool:
         """Whether the store still publishes this unit."""

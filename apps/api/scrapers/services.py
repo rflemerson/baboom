@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django.db.models import F, Q
 from django.utils import timezone
 
 from offers.models import Offer, StockStatus
@@ -22,6 +23,10 @@ if TYPE_CHECKING:
     from .contracts import ScrapedProductInput, VariantContext
 
 logger = logging.getLogger(__name__)
+
+# Two daily runs: one incomplete crawl cannot delist, and a unit that is really
+# gone leaves the ranking within two days.
+MISSED_RUNS_BEFORE_DELISTING = 2
 
 
 class ScraperService:
@@ -125,6 +130,7 @@ class ScraperService:
             Offer.objects.filter(pk=observation.offer.pk).update(
                 last_seen_at=seen_at,
                 delisted_at=None,
+                missed_runs=0,
             )
             item, _created = ScraperService._upsert_scraped_item(
                 observation,
@@ -138,6 +144,32 @@ class ScraperService:
             ScraperService._reconcile_absent_units(product, page, seen_ids, seen_at)
 
         return saved
+
+    @staticmethod
+    @transaction.atomic
+    def delist_unseen_offers(store_slug: str, run_started_at: datetime) -> int:
+        """Count a successful run's absences and delist units missing too often.
+
+        Per-page reconciliation only sees a unit vanish from a page that still
+        exists. A page that is gone takes all of its units with it, and on
+        single-unit platforms that is the only way a unit disappears. One run
+        that misses a unit may have been incomplete, so a unit leaves the
+        catalog only after MISSED_RUNS_BEFORE_DELISTING successful runs in a
+        row; the next run that publishes it lists it again.
+        """
+        unseen = Offer.objects.filter(
+            store_slug=store_slug,
+            delisted_at__isnull=True,
+        ).filter(Q(last_seen_at__isnull=True) | Q(last_seen_at__lt=run_started_at))
+        unseen.update(missed_runs=F("missed_runs") + 1)
+        return unseen.filter(
+            missed_runs__gte=MISSED_RUNS_BEFORE_DELISTING,
+        ).update(
+            delisted_at=timezone.now(),
+            current_price=None,
+            current_stock_status=StockStatus.OUT_OF_STOCK,
+            current_stock_quantity=0,
+        )
 
     @staticmethod
     def _reconcile_absent_units(

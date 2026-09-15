@@ -48,6 +48,11 @@ class CatalogSpider(Spider):
 
     async def start(self) -> AsyncIterator[Request]:
         """Spread full runs before scheduling the first request."""
+        # The task reads this to know whose unseen offers a successful run
+        # speaks for.
+        crawler = getattr(self, "crawler", None)
+        if crawler is not None:
+            crawler.stats.set_value("scraper/store_slug", self.STORE_SLUG)
         if not self.categories_to_crawl:
             await asyncio.sleep(_jitter.uniform(*self.STARTUP_JITTER_SECONDS))
         for request in self.start_category_requests():
