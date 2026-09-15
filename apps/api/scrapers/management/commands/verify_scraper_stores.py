@@ -32,8 +32,10 @@ class Command(BaseCommand):
     help = (
         "Run real scraper monitors for selected stores. This intentionally accesses "
         "the network and executes the same workflow as Celery: it persists "
-        "ScrapedItems and Offers, creates a ScraperRun, and on success archives "
-        "offers not seen in the crawl. It is never part of the test suite."
+        "ScrapedItems and Offers and creates a ScraperRun. A successful run also "
+        "counts one miss for every active offer of the store it did not see; an "
+        "offer is delisted after two successful runs in a row without it. It is "
+        "never part of the test suite."
     )
 
     def add_arguments(self, parser: ArgumentParser) -> None:
