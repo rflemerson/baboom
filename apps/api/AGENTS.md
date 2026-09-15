@@ -12,6 +12,7 @@ pip install -e .[dev]
 prek run --all-files
 .venv/bin/python manage.py check
 .venv/bin/python manage.py test
+.venv/bin/coverage run manage.py test && .venv/bin/coverage report
 .venv/bin/python manage.py runserver
 ```
 

@@ -51,8 +51,33 @@ dev = [
   "safety",
   "factory-boy",
   "pytest",
+  "coverage",
   "pytest-cov",
   "pytest-django",
   "pytest-asyncio",
   "pytest-sugar",
+]
+
+[tool.coverage.run]
+# Run with: coverage run manage.py test && coverage report
+branch = true
+source = ["."]
+omit = [
+  ".venv/*",
+  "*/migrations/*",
+  "*/tests.py",
+  "*/tests/*",
+  "manage.py",
+  "baboom/settings/*",
+  "baboom/asgi.py",
+  "baboom/wsgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+skip_empty = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
 ]
