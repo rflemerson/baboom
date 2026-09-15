@@ -120,7 +120,10 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: always
-    command: sh -c "mkdir -p /app/media && chown -R appuser:appuser /app/media && su appuser -s /bin/sh -c 'celery -A baboom worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --prefetch-multiplier=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}'"
+    # Solo pool: prefork runs each task in a daemonic process, and a daemonic
+    # process may not start children, which is exactly what a crawl does. One
+    # task at a time is also all this machine can afford.
+    command: sh -c "mkdir -p /app/media && chown -R appuser:appuser /app/media && su appuser -s /bin/sh -c 'celery -A baboom worker -l info --pool=solo --prefetch-multiplier=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}'"
     volumes:
       - media_data:/app/media
     extra_hosts:
