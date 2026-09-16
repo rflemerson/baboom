@@ -88,7 +88,7 @@ class WapStoreApiSpider(CatalogSpider):
     ) -> Iterator[Request | ScrapedProductInput]:
         """Flatten a menu response and schedule category requests."""
         if response.status != WAPSTORE_SUCCESS_CODE:
-            logger.warning("Menu API failed: %s", response.status)
+            self.mark_incomplete(f"menu answered {response.status}")
             yield from self.requests_for_categories(self.FALLBACK_CATEGORIES)
             return
         try:
@@ -100,7 +100,7 @@ class WapStoreApiSpider(CatalogSpider):
                 paths,
             )
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("Wap.Store menu payload parse error: %s", exc)
+            self.mark_incomplete(f"menu payload unreadable: {exc}")
             paths = set()
         yield from self.requests_for_categories(self.categories_or_fallback(paths))
 
@@ -139,8 +139,8 @@ class WapStoreApiSpider(CatalogSpider):
         category = str(response.meta["category"])
         offset = int(response.meta["offset"])
         if response.status != WAPSTORE_SUCCESS_CODE:
-            logger.warning(
-                "Failed category %s at offset %s: %s", category, offset, response.status
+            self.mark_incomplete(
+                f"category {category} at offset {offset} answered {response.status}",
             )
             return
         try:
@@ -149,7 +149,7 @@ class WapStoreApiSpider(CatalogSpider):
                 data if isinstance(data, dict) else {}
             )
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("Wap.Store item page parse error for %s: %s", category, exc)
+            self.mark_incomplete(f"category {category} payload unreadable: {exc}")
             products = []
         yield from self.emit_products(products, category)
         if len(products) >= PAGE_SIZE:

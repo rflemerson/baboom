@@ -73,7 +73,7 @@ class VtexGraphqlSpider(CatalogSpider):
                 if isinstance(item, dict) and item.get("url")
             }
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("VTEX GraphQL category payload parse error: %s", exc)
+            self.mark_incomplete(f"category payload unreadable: {exc}")
             slugs = set()
         yield from self.requests_for_categories(self.categories_or_fallback(slugs))
 
@@ -88,7 +88,7 @@ class VtexGraphqlSpider(CatalogSpider):
             data = response.json()
             items = self._parse_graphql_response(data if isinstance(data, dict) else {})
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("VTEX GraphQL item page parse error for %s: %s", category, exc)
+            self.mark_incomplete(f"category {category} payload unreadable: {exc}")
             items = []
         yield from self.emit_products(items, category)
         if len(items) >= PAGE_SIZE:

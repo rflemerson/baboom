@@ -54,6 +54,24 @@ class StatsDumpExtension:
         _ = spider
         logging.getLogger().addHandler(self.handler)
 
+    @staticmethod
+    def _catalog_is_complete(stats: dict[str, object], reason: str) -> bool:
+        """Whether this crawl read the whole catalog, not merely ended.
+
+        Only a complete reading can turn an absence into evidence. A crawl that
+        stopped early, skipped a page, raised in a callback, or collected
+        nothing says where products are, never where they no longer are.
+        """
+        if reason != "finished" or stats.get("scraper/pages_failed"):
+            return False
+        if any(str(key).startswith("spider_exceptions") for key in stats):
+            return False
+        try:
+            collected = int(stats.get("item_scraped_count", 0) or 0)
+        except TypeError, ValueError:
+            return False
+        return collected > 0
+
     def spider_closed(self, spider: Spider, reason: str) -> None:
         """Persist stats, the close reason, and the last error seen."""
         _ = spider
@@ -63,6 +81,7 @@ class StatsDumpExtension:
         payload = dict(self.crawler.stats.get_stats())
         payload["finish_reason"] = reason
         payload["last_error"] = self.handler.last_error
+        payload["scraper/catalog_complete"] = self._catalog_is_complete(payload, reason)
         Path(self.output_path).write_text(
             json.dumps(payload, default=str),
             encoding="utf-8",

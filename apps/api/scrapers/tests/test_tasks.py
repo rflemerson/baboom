@@ -195,7 +195,13 @@ class UnseenOfferDelistingTests(TestCase):
             current_price=Decimal("99.90"),
         )
 
-    def _run(self, *, seen: tuple[str, ...] = (), exitcode: int = 0) -> None:
+    def _run(
+        self,
+        *,
+        seen: tuple[str, ...] = (),
+        exitcode: int = 0,
+        complete: bool = True,
+    ) -> None:
         """Run the monitor, marking the given units as published by the store."""
 
         def build(target: object, args: tuple[str, str]) -> MagicMock:
@@ -211,6 +217,7 @@ class UnseenOfferDelistingTests(TestCase):
                         "item_scraped_count": 1,
                         "scraper/offers_collected": 1,
                         "scraper/store_slug": self.STORE,
+                        "scraper/catalog_complete": complete,
                     },
                 ),
             )
@@ -271,3 +278,15 @@ class UnseenOfferDelistingTests(TestCase):
         other.refresh_from_db()
         assert other.delisted_at is None
         assert other.missed_runs == 0
+
+    def test_an_incomplete_crawl_never_delists(self) -> None:
+        """A crawl that could not read the whole catalog proves no absence."""
+        self._offer("kept")
+        self._offer("missing")
+
+        self._run(seen=("kept",), complete=False)
+        self._run(seen=("kept",), complete=False)
+
+        missing = Offer.objects.get(external_id="missing")
+        assert missing.delisted_at is None
+        assert missing.missed_runs == 0

@@ -98,9 +98,13 @@ def _cleanup_stats_file(path: Path | None) -> None:
 
 
 def _delist_unseen_offers(stats: dict[str, object], run: ScraperRun) -> int:
-    """Let a successful run count the units its store no longer publishes."""
+    """Let a complete run count the units its store no longer publishes.
+
+    A run that ended without reading the whole catalog is not evidence: the
+    units it did not see may simply be on the pages it could not read.
+    """
     store_slug = str(stats.get("scraper/store_slug") or "")
-    if not store_slug:
+    if not store_slug or stats.get("scraper/catalog_complete") is not True:
         return 0
     return ScraperService.delist_unseen_offers(store_slug, run.started_at)
 

@@ -177,6 +177,21 @@ class CatalogSpider(Spider):
         self._set_stat("products_collected", emitted)
         self._set_stat("categories_crawled")
 
+    def mark_incomplete(self, reason: str) -> None:
+        """Record that part of the catalog could not be read.
+
+        Every caller is a place where the spider carries on after losing a
+        page. Carrying on is right; letting that page's offers count as absent
+        is not.
+        """
+        logger.warning("Incomplete crawl for %s: %s", self.STORE_SLUG, reason)
+        self._set_stat("pages_failed")
+        crawler = getattr(self, "crawler", None)
+        if crawler is not None and not crawler.stats.get_value(
+            "scraper/incomplete_reason",
+        ):
+            crawler.stats.set_value("scraper/incomplete_reason", reason)
+
     def _set_stat(self, key: str, increment: int = 1) -> None:
         """Increment a Scrapy statistic when the engine is available."""
         crawler = getattr(self, "crawler", None)

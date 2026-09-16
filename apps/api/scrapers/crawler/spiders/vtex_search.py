@@ -63,7 +63,7 @@ class VtexSearchSpider(CatalogSpider):
     ) -> Iterator[Request | ScrapedProductInput]:
         """Flatten the VTEX tree and schedule its category requests."""
         if response.status != VTEX_CATEGORY_TREE_SUCCESS_CODE:
-            logger.warning("Failed to fetch category tree: %s", response.status)
+            self.mark_incomplete(f"category tree answered {response.status}")
             yield from self.requests_for_categories(self.FALLBACK_CATEGORIES)
             return
         try:
@@ -106,7 +106,7 @@ class VtexSearchSpider(CatalogSpider):
             data = response.json()
             items = data if isinstance(data, list) else []
         except (AttributeError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("VTEX item page parse error for %s: %s", category, exc)
+            self.mark_incomplete(f"category {category} payload unreadable: {exc}")
             items = []
         yield from self.emit_products(items, category)
         if len(items) >= VTEX_PAGE_SIZE:

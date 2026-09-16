@@ -69,7 +69,7 @@ class ShopifyApiSpider(CatalogSpider):
             payload = response.json()
             collections = payload.get("collections") or []
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug("Shopify collection payload parse error: %s", exc)
+            self.mark_incomplete(f"collection payload unreadable: {exc}")
             collections = []
 
         handles = set(response.meta.get("collection_handles", []))
@@ -99,13 +99,16 @@ class ShopifyApiSpider(CatalogSpider):
         """Normalize one Shopify collection page and continue pagination."""
         category = str(response.meta["category"])
         page = int(response.meta["page"])
+        if response.status != SHOPIFY_SUCCESS_CODE:
+            self.mark_incomplete(
+                f"category {category} page {page} answered {response.status}",
+            )
+            return
         try:
             payload = response.json()
             products = payload.get("products") or []
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
-            logger.debug(
-                "Shopify category payload parse error for %s: %s", category, exc
-            )
+            self.mark_incomplete(f"category {category} payload unreadable: {exc}")
             products = []
 
         yield from self._emit_category_products(products, category)

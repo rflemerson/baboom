@@ -67,8 +67,8 @@ class NuvemshopSpider(CatalogSpider):
         category = str(response.meta["category"])
         page = int(response.meta["page"])
         if response.status != NUVEMSHOP_SUCCESS_CODE:
-            logger.warning(
-                "Failed category %s page %s: %s", category, page, response.status
+            self.mark_incomplete(
+                f"category {category} page {page} answered {response.status}",
             )
             return
         products = self.extract_products(response.text)
