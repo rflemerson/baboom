@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import ClassVar
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
@@ -406,7 +407,13 @@ class ProductComponent(BaseModel):
         related_name="parent_links",
         verbose_name=_("Component"),
     )
-    quantity = models.PositiveIntegerField(_("Quantity"), default=1)
+    # PositiveIntegerField allows zero, and zero of a product is not part of a
+    # combo: it would divide the combo's price by a mass nobody buys.
+    quantity = models.PositiveIntegerField(
+        _("Quantity"),
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
 
     class Meta:
         """Meta options."""
@@ -422,6 +429,10 @@ class ProductComponent(BaseModel):
                 condition=~models.Q(parent=models.F("component")),
                 name="product_component_not_self",
             ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),
+                name="product_component_quantity_positive",
+            ),
         )
 
     def __str__(self) -> str:
@@ -433,13 +444,6 @@ class ProductComponent(BaseModel):
         self.full_clean()
         super().save(*args, **kwargs)
         ComboActive.objects.sync_for(self.parent)
-
-    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
-        """Remove the component and refresh the combo's active totals."""
-        parent = self.parent
-        result = super().delete(*args, **kwargs)
-        ComboActive.objects.sync_for(parent)
-        return result
 
     def clean(self) -> None:
         """Reject self-references, combo nesting, and simple-product parents."""
@@ -763,13 +767,6 @@ class ProductNutrition(BaseModel):
         """Persist the link and refresh the product's derived concentrations."""
         super().save(*args, **kwargs)
         ProductActive.objects.sync_for(self.product)
-
-    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
-        """Remove the link and refresh the product's derived concentrations."""
-        product = self.product
-        result = super().delete(*args, **kwargs)
-        ProductActive.objects.sync_for(product)
-        return result
 
 
 class ProductActiveManager(models.Manager):

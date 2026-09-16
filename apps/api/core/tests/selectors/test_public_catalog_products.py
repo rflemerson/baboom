@@ -244,6 +244,39 @@ class ComboRankingTests(TestCase):
 
         assert self._price_per_gram(combo) == Decimal("0.1000")
 
+    def test_deleting_a_component_product_updates_the_combo(self) -> None:
+        """Cascade removes the link without calling its delete() method."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        blend = self._simple("Blend", proteins=_grams(12))
+        combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
+
+        blend.delete()
+
+        assert self._price_per_gram(combo) == Decimal("0.1250")
+
+    def test_removing_a_component_by_queryset_updates_the_combo(self) -> None:
+        """A queryset delete never calls the model's delete() method."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        blend = self._simple("Blend", proteins=_grams(12))
+        combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
+
+        combo.component_links.filter(component=blend).delete()
+
+        assert self._price_per_gram(combo) == Decimal("0.1250")
+
+    def test_removing_a_label_by_queryset_updates_the_combo(self) -> None:
+        """Dropping a profile by queryset still refreshes the combo total."""
+        whey = self._simple("Whey", proteins=_grams(24))
+        combo = self._combo("Two Wheys", [(whey, 2)])
+        self._label(whey, proteins=_grams(15))
+        assert self._price_per_gram(combo) == Decimal("0.1000")
+
+        whey.nutrition_profiles.filter(
+            nutrition_facts__proteins=_grams(15),
+        ).delete()
+
+        assert self._price_per_gram(combo) == Decimal("0.0625")
+
     def test_removing_a_component_updates_the_combo(self) -> None:
         """The derived total follows the component list."""
         whey = self._simple("Whey", proteins=_grams(24))
