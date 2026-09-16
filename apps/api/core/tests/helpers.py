@@ -77,3 +77,13 @@ class CatalogAnnotatedProduct(Protocol):
     price_per_active: Decimal | None
     external_link: str | None
     last_price: Decimal | None
+
+
+def _raised(operation: Callable[[], object], expected: type[Exception]) -> Exception:
+    """Return the exception an operation is expected to raise."""
+    try:
+        operation()
+    except expected as error:
+        return error
+    message = f"Expected the operation to raise {expected.__name__}."
+    raise AssertionError(message)

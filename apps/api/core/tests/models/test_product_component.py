@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from core.models import (
@@ -10,6 +11,7 @@ from core.models import (
     ProductComponent,
 )
 from core.tests.helpers import (
+    _raised,
     _validation_error,
 )
 
@@ -27,6 +29,44 @@ class ProductComponentTests(TestCase):
         )
         self.whey = Product.objects.create(name="Whey", brand=self.brand)
         self.creatine = Product.objects.create(name="Creatine", brand=self.brand)
+
+    def test_a_component_line_of_zero_units_is_rejected(self) -> None:
+        """Zero of a product is not part of a combo."""
+        combo = Product.objects.create(
+            name="Kit",
+            brand=self.brand,
+            kind=Product.Kind.COMBO,
+        )
+        component = Product.objects.create(name="Whey", brand=self.brand)
+
+        error = _validation_error(
+            lambda: ProductComponent.objects.create(
+                parent=combo,
+                component=component,
+                quantity=0,
+            ),
+        )
+
+        assert "quantity" in error.message_dict
+
+    def test_the_database_refuses_zero_units_too(self) -> None:
+        """A write that skips validation still cannot store zero units."""
+        combo = Product.objects.create(
+            name="Kit DB",
+            brand=self.brand,
+            kind=Product.Kind.COMBO,
+        )
+        component = Product.objects.create(name="Creatine", brand=self.brand)
+
+        def write_without_validation() -> None:
+            # atomic() keeps the failed statement from breaking the test
+            # transaction.
+            with transaction.atomic():
+                ProductComponent.objects.bulk_create(
+                    [ProductComponent(parent=combo, component=component, quantity=0)],
+                )
+
+        _raised(write_without_validation, IntegrityError)
 
     def test_combo_accepts_simple_components(self) -> None:
         """A combo assembles simple products with quantities."""
