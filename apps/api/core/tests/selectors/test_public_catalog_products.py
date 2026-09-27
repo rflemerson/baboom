@@ -103,7 +103,7 @@ class CatalogActiveRankingTests(TestCase):
 
         row = public_catalog_products().get(pk=self.whey.pk)
 
-        assert row.last_price is None
+        assert row.price is None
         assert row.external_link is None
 
     def test_delisted_offer_hides_old_observation_from_catalog(self) -> None:
@@ -113,7 +113,7 @@ class CatalogActiveRankingTests(TestCase):
         link.offer.delisted_at = timezone.now()
         link.offer.save(update_fields=["delisted_at"])
 
-        assert public_catalog_products().get(pk=self.whey.pk).last_price is None
+        assert public_catalog_products().get(pk=self.whey.pk).price is None
         assert link.offer.price_observations.count() == 1
 
     def test_requesting_another_active_changes_the_ranking(self) -> None:
@@ -375,7 +375,7 @@ class ProductStatsTests(TestCase):
         )
 
         assert result is not None
-        assert result.last_price is None
+        assert result.price is None
         assert result.price_per_active is None
         assert result.external_link is None
 
@@ -401,7 +401,7 @@ class ProductStatsTests(TestCase):
         )
 
         assert product is not None
-        assert product.last_price == Decimal("100.00")
+        assert product.price == Decimal("100.00")
         assert product.external_link == self.link.offer.url
 
     def test_catalog_preserves_distinct_nutrition_profiles(self) -> None:
@@ -433,7 +433,7 @@ class ProductStatsTests(TestCase):
             Decimal(900),
         ]
         assert round(products[0].price_per_active, 3) == Decimal("0.125")
-        assert products[1].last_price is None
+        assert products[1].price is None
         assert products[1].price_per_active is None
 
     def test_rest_ranks_and_filters_flavors_with_their_own_table(self) -> None:
@@ -570,7 +570,7 @@ class ProductStatsTests(TestCase):
 
         items = list(
             public_catalog_products(
-                CatalogProductsFilters(sort_by="last_price", sort_dir="asc"),
+                CatalogProductsFilters(sort_by="price", sort_dir="asc"),
             ).values_list("brand__name", "name"),
         )
 
@@ -634,8 +634,8 @@ class CatalogRowPriceTests(TestCase):
         self._sell(self.natural, "Natural", "150.00")
         self._sell(self.flavored, "Chocolate", "190.00")
 
-        assert self._row(self.natural).last_price == Decimal("150.00")
-        assert self._row(self.flavored).last_price == Decimal("190.00")
+        assert self._row(self.natural).price == Decimal("150.00")
+        assert self._row(self.flavored).price == Decimal("190.00")
         assert self._row(self.natural).external_link == "https://growth.example/Natural"
 
     def test_a_label_sold_in_several_flavors_shows_the_cheapest(self) -> None:
@@ -645,5 +645,5 @@ class CatalogRowPriceTests(TestCase):
 
         row = self._row(self.flavored)
 
-        assert row.last_price == Decimal("170.00")
+        assert row.price == Decimal("170.00")
         assert row.external_link == "https://growth.example/Morango"

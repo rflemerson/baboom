@@ -92,7 +92,7 @@ def _annotate_catalog_base_fields(
     )
 
     return queryset.annotate(
-        last_price=Subquery(
+        price=Subquery(
             cheapest.values("current_price")[:1],
             output_field=DecimalField(max_digits=10, decimal_places=2),
         ),
@@ -132,7 +132,7 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
         ),
     ).annotate(
         price_per_active=ExpressionWrapper(
-            F("last_price") / Cast(total_active_safe, output_field=FloatField()),
+            F("price") / Cast(total_active_safe, output_field=FloatField()),
             output_field=DecimalField(max_digits=20, decimal_places=10),
         ),
     )
@@ -163,7 +163,7 @@ def public_catalog_products_with_stats(
 SORTABLE_CATALOG_FIELDS = frozenset(
     {
         "price_per_active",
-        "last_price",
+        "price",
         "total_active",
         "concentration",
     },
@@ -214,8 +214,8 @@ def _apply_catalog_numeric_filters(
 ) -> QuerySet[Product]:
     """Apply numeric range filters to annotated catalog metrics."""
     numeric_filters = (
-        ("last_price__gte", filters.price_min),
-        ("last_price__lte", filters.price_max),
+        ("price__gte", filters.price_min),
+        ("price__lte", filters.price_max),
         (
             "price_per_active__gte",
             filters.price_per_active_min,

@@ -37,7 +37,7 @@ export interface CatalogProduct {
   name: string
   packagingDisplay: string
   netMass?: string | null
-  lastPrice?: string | null
+  price?: string | null
   pricePerActive?: string | null
   concentration?: string | null
   totalActive?: string | null

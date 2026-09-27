@@ -18,7 +18,7 @@ const products = [
     name: 'Creatina Monohidratada 300g',
     packagingDisplay: 'Container Package',
     netMass: '300',
-    lastPrice: '89.90',
+    price: '89.90',
     pricePerActive: null,
     concentration: '0',
     totalActive: '0',

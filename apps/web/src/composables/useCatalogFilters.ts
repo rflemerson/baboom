@@ -4,7 +4,7 @@ import type { CatalogProductsVariables } from '@/types/catalog'
 
 export const CATALOG_SORT_OPTIONS = [
   { label: 'Price per active', value: 'price_per_active' },
-  { label: 'Price', value: 'last_price' },
+  { label: 'Price', value: 'price' },
   { label: 'Total active', value: 'total_active' },
   { label: 'Concentration', value: 'concentration' },
 ] as const

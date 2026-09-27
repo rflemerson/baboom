@@ -53,7 +53,7 @@ defineProps<{
 
       <div class="grid gap-3 sm:min-w-[220px] lg:min-w-[220px]">
         <div class="grid grid-cols-2 gap-3">
-          <BaseMetricCard compact label="Total price" :value="formatDecimal(product.lastPrice)" />
+          <BaseMetricCard compact label="Total price" :value="formatDecimal(product.price)" />
           <BaseMetricCard
             compact
             :label="`Total ${activeName ?? 'active'}`"

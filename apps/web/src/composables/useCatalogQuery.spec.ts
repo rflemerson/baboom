@@ -25,7 +25,7 @@ describe('useCatalogQuery', () => {
               name: '100% Whey Concentrado 900g',
               packagingDisplay: 'Refill Package',
               netMass: '900',
-              lastPrice: '129.90',
+              price: '129.90',
               pricePerActive: '0.18',
               concentration: '80',
               totalActive: '720',

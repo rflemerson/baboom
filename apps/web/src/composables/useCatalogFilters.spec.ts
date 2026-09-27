@@ -42,7 +42,7 @@ describe('useCatalogFilters', () => {
     expect(page.value).toBe(1)
 
     setPage(4)
-    setSortBy('last_price')
+    setSortBy('price')
     expect(page.value).toBe(1)
 
     setPage(2)

@@ -74,7 +74,7 @@ class CatalogAnnotatedProduct(Protocol):
     total_active: Decimal | None
     price_per_active: Decimal | None
     external_link: str | None
-    last_price: Decimal | None
+    price: Decimal | None
 
 
 def _raised(operation: Callable[[], object], expected: type[Exception]) -> Exception:

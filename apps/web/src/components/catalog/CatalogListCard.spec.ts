@@ -12,7 +12,7 @@ describe('CatalogListCard', () => {
           name: 'Whey Isolado 1kg',
           packagingDisplay: 'Container Package',
           netMass: '1000',
-          lastPrice: '199.90',
+          price: '199.90',
           pricePerActive: '0.23',
           concentration: '86.6',
           totalActive: '866',

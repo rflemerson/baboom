@@ -19,7 +19,7 @@ describe('CatalogToolbar', () => {
     })
 
     await wrapper.get('input[type="search"]').setValue('whey')
-    await wrapper.findAll('select')[0]?.setValue('last_price')
+    await wrapper.findAll('select')[0]?.setValue('price')
     await wrapper.findAll('select')[1]?.setValue('24')
 
     await wrapper.get('[data-test="open-filters"]').trigger('click')
@@ -28,7 +28,7 @@ describe('CatalogToolbar', () => {
     await wrapper.get('[data-test="clear-filters"]').trigger('click')
 
     expect(wrapper.emitted('update:search')?.[0]).toEqual(['whey'])
-    expect(wrapper.emitted('update:sortBy')?.[0]).toEqual(['last_price'])
+    expect(wrapper.emitted('update:sortBy')?.[0]).toEqual(['price'])
     expect(wrapper.emitted('update:perPage')?.[0]).toEqual([24])
     expect(wrapper.emitted('openFilters')).toHaveLength(1)
     expect(wrapper.emitted('toggle:sortDir')).toHaveLength(1)
