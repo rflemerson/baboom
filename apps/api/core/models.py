@@ -309,18 +309,7 @@ class Product(BaseModel):
         help_text=_("Marketing description"),
     )
 
-    net_mass = models.DecimalField(
-        format_lazy("{} ({})", _("Net Mass"), units.MASS_UNIT),
-        max_digits=16,
-        decimal_places=3,
-        null=True,
-        blank=True,
-        help_text=format_lazy(
-            "{} {}.",
-            _("Net content as printed on the package, in"),
-            units.MASS_UNIT,
-        ),
-    )
+    net_mass = label_field(_("Net Mass"), units.MASS_UNIT)
 
     ean = models.CharField(
         _("EAN/GTIN"),
