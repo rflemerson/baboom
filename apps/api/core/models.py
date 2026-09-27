@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from decimal import Decimal
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
@@ -18,6 +18,9 @@ from common.models import BaseModel
 from offers.models import fold
 
 from . import units
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def label_field(
@@ -570,94 +573,86 @@ class ProductStore(BaseModel):
         """Resolve the store and reject a link that would misprice a row."""
         super().clean()
         errors: dict[str, list[str]] = {}
+
+        def refuse(field: str, message: str) -> None:
+            errors.setdefault(field, []).append(message)
+
         if self.offer_id is None:
-            errors.setdefault("offer", []).append(
-                str(_("Link a captured offer.")),
-            )
+            refuse("offer", _("Link a captured offer."))
         else:
-            self._resolve_store(errors)
+            self._resolve_store(refuse)
         if self.product_id is not None:
-            self._validate_profile(errors)
-        if not errors and self.offer_id is not None:
-            self._validate_flavor(errors)
+            self._validate_profile(refuse)
+        if not errors and self.offer_id is not None and not self.product.is_combo:
+            self._validate_flavor(refuse)
         if errors:
             raise ValidationError(errors)
 
-    def _resolve_store(self, errors: dict[str, list[str]]) -> None:
+    def _resolve_store(self, refuse: Callable[[str, str], None]) -> None:
         """Set the store that sells the offer, or report that none is mapped."""
         offer = self.offer
         if not offer.is_listed:
-            errors.setdefault("offer", []).append(
-                str(_("The store no longer publishes this offer.")),
-            )
+            refuse("offer", _("The store no longer publishes this offer."))
         store = Store.objects.filter(scraper_slug=offer.store_slug).first()
         if store is None:
-            errors.setdefault("offer", []).append(
-                format_lazy(
-                    "{} {}.",
-                    _("No store is mapped to the scraper slug"),
-                    offer.store_slug,
-                ),
+            refuse(
+                "offer",
+                _("No store is mapped to the scraper slug %(slug)s.")
+                % {"slug": offer.store_slug},
             )
             return
         self.store = store
 
-    def _validate_profile(self, errors: dict[str, list[str]]) -> None:
+    def _validate_profile(self, refuse: Callable[[str, str], None]) -> None:
         """Require the product's own label on a simple product, none on a combo."""
         profile = self.nutrition_profile
         if self.product.is_combo:
             if profile is not None:
-                errors.setdefault("nutrition_profile", []).append(
-                    str(_("A combo ranks through its components; leave it empty.")),
+                refuse(
+                    "nutrition_profile",
+                    _("A combo ranks through its components; leave it empty."),
                 )
-            return
-        if profile is None:
-            errors.setdefault("nutrition_profile", []).append(
-                str(_("Choose the product's label that this offer's flavor prints.")),
+        elif profile is None:
+            refuse(
+                "nutrition_profile",
+                _("Choose the product's label that this offer's flavor prints."),
             )
         elif profile.product_id != self.product_id:
-            errors.setdefault("nutrition_profile", []).append(
-                str(_("This label belongs to another product.")),
-            )
+            refuse("nutrition_profile", _("This label belongs to another product."))
 
-    def _validate_flavor(self, errors: dict[str, list[str]]) -> None:
+    def _validate_flavor(self, refuse: Callable[[str, str], None]) -> None:
         """Require the flavor the offer states to be one its label lists."""
-        if self.product.is_combo:
-            return
         sold = self.offer.flavors
         printed = [flavor.name for flavor in self.nutrition_profile.flavors.all()]
         sold_folded = {fold(flavor) for flavor in sold}
         printed_folded = {fold(flavor) for flavor in printed}
+        names = {"sold": ", ".join(sold), "printed": ", ".join(printed)}
         if len(sold_folded) > 1:
-            message = format_lazy(
-                "{} {}.",
-                _("This offer sells several flavors, so it is a kit:"),
-                ", ".join(sold),
+            refuse(
+                "offer",
+                _("This offer sells several flavors, so it is a kit: %(sold)s.")
+                % names,
             )
         elif printed_folded and not sold_folded:
-            message = format_lazy(
-                "{} {}.",
+            refuse(
+                "offer",
                 _(
                     "This offer states no flavor, so it cannot price the label "
-                    "printed by",
-                ),
-                ", ".join(printed),
+                    "printed by %(printed)s.",
+                )
+                % names,
             )
         elif sold_folded - printed_folded:
-            message = format_lazy(
-                "{} {}; {} {}. {}",
-                _("This offer sells"),
-                ", ".join(sold),
-                _("the chosen label lists"),
-                ", ".join(printed) or _("no flavor"),
+            refuse(
+                "offer",
                 _(
-                    "Link it to the label of that flavor, or add the flavor to "
-                    "this label if the package prints the same table for it.",
-                ),
+                    "This offer sells %(sold)s; the chosen label lists "
+                    "%(printed)s. Link it to the label of that flavor, or add the "
+                    "flavor to this label if the package prints the same table "
+                    "for it.",
+                )
+                % {**names, "printed": names["printed"] or _("no flavor")},
             )
-        else:
-            return
-        errors.setdefault("offer", []).append(str(message))
 
     @property
     def external_id(self) -> str:
