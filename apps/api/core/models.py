@@ -537,6 +537,7 @@ class ProductStore(BaseModel):
         blank=True,
         verbose_name=_("Merchant Offer"),
         related_name="product_store",
+        limit_choices_to={"delisted_at__isnull": True},
         help_text=_(
             "The captured offer that prices this row. Its price, stock, URL and "
             "flavor come from the scraper; nothing about it is typed here.",

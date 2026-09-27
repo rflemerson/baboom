@@ -441,3 +441,36 @@ class NutritionFactsUsageTests(TestCase):
         body = json.dumps(json.loads(response.content), ensure_ascii=False)
         assert "Whey 3W Chocolate — Chocolate" in body
         assert "Whey 3W Baunilha — Baunilha" in body
+
+
+class StoreLinkOfferChoiceTests(TestCase):
+    """Picking an offer for a link only offers what can still be linked."""
+
+    def test_the_offer_autocomplete_leaves_out_delisted_offers(self) -> None:
+        """A delisted offer would only be refused after being chosen."""
+        user = get_user_model().objects.create(
+            username="curator",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.force_login(user)
+        Offer.objects.create(store_slug="growth", external_id="185-4", name="Whey live")
+        gone = Offer.objects.create(
+            store_slug="growth", external_id="185", name="Whey gone"
+        )
+        gone.delisted_at = gone.created_at
+        gone.save(update_fields=["delisted_at"])
+
+        response = self.client.get(
+            "/admin/autocomplete/",
+            {
+                "app_label": "core",
+                "model_name": "productstore",
+                "field_name": "offer",
+                "term": "whey",
+            },
+        )
+
+        labels = [row["text"] for row in json.loads(response.content)["results"]]
+        assert any("Whey live" in label for label in labels), labels
+        assert not any("Whey gone" in label for label in labels), labels
