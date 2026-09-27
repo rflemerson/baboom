@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
-from offers.models import Offer, StockStatus
+from offers.models import DelistReason, Offer, StockStatus
 from offers.services import OfferObservationResult, OfferObservationService
 
 from .contracts import ScrapedItemIngestionInput
@@ -130,6 +130,7 @@ class ScraperService:
             Offer.objects.filter(pk=observation.offer.pk).update(
                 last_seen_at=seen_at,
                 delisted_at=None,
+                delisted_reason="",
                 missed_runs=0,
             )
             item, _created = ScraperService._upsert_scraped_item(
@@ -166,6 +167,7 @@ class ScraperService:
             missed_runs__gte=MISSED_RUNS_BEFORE_DELISTING,
         ).update(
             delisted_at=timezone.now(),
+            delisted_reason=DelistReason.GONE,
             current_price=None,
             current_stock_status=StockStatus.OUT_OF_STOCK,
             current_stock_quantity=0,
@@ -193,6 +195,7 @@ class ScraperService:
                 continue
             Offer.objects.filter(pk=item.offer_id, delisted_at__isnull=True).update(
                 delisted_at=seen_at,
+                delisted_reason=DelistReason.GONE,
                 current_price=None,
                 current_stock_status=StockStatus.OUT_OF_STOCK,
                 current_stock_quantity=0,
@@ -247,6 +250,9 @@ class ScraperService:
                 "sku": data.sku,
                 "pid": data.pid,
                 "current_stock_quantity": data.stock_quantity,
+                "options": [
+                    option.model_dump() for option in data.variant_context.options
+                ],
             },
         )
 

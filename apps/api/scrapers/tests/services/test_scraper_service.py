@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
-from offers.models import Offer, PriceObservation
+from offers.models import DelistReason, Offer, PriceObservation
 from scrapers.contracts import (
     ScrapedItemIngestionInput,
     ScrapedOfferInput,
@@ -16,7 +18,7 @@ from scrapers.contracts import (
     VariantSelection,
 )
 from scrapers.models import ScrapedItem, ScrapedPage
-from scrapers.services import ScraperService
+from scrapers.services import MISSED_RUNS_BEFORE_DELISTING, ScraperService
 from scrapers.tests.helpers import EXPECTED_PRICE_HISTORY_RECORDS_AFTER_UPDATE
 
 
@@ -302,3 +304,69 @@ class VariantIngestionTests(TestCase):
         restored = Offer.objects.get(external_id="222")
         assert restored.delisted_at is None
         assert restored.current_price == Decimal("229.90")
+
+
+class OfferVariantRecordTests(TestCase):
+    """An offer carries what its store published about the unit and its fate."""
+
+    URL = "https://example.com/products/whey"
+
+    def _page(self, *flavors: str, complete: bool = False) -> ScrapedProductInput:
+        """Build one page selling the given flavors, one unit each."""
+        return ScrapedProductInput(
+            store_slug="growth",
+            provider="wapstore",
+            provider_product_id="185",
+            page_url=self.URL,
+            complete_unit_list=complete,
+            offers=[
+                ScrapedOfferInput(
+                    external_id=f"185-{flavor}",
+                    offer_url=self.URL,
+                    name="Whey Protein Concentrado 1Kg",
+                    price=Decimal("194.33"),
+                    variant_context=VariantContext(
+                        provider="wapstore",
+                        provider_product_id="185",
+                        provider_variant_id=flavor,
+                        options=[VariantOption(name="Sabor", value=flavor)],
+                    ),
+                )
+                for flavor in flavors
+            ],
+        )
+
+    def test_each_offer_keeps_the_options_its_store_published(self) -> None:
+        """The flavor a unit sells is readable on the offer the catalog links."""
+        ScraperService.save_product_snapshot(self._page("Natural", "Chocolate"))
+
+        natural = Offer.objects.get(external_id="185-Natural")
+        assert natural.options == [{"name": "Sabor", "value": "Natural"}]
+        assert natural.flavors == ["Natural"]
+
+    def test_a_unit_gone_from_its_page_is_delisted_as_gone(self) -> None:
+        """Absence from a complete page is the store no longer selling it."""
+        ScraperService.save_product_snapshot(self._page("Natural", "Chocolate"))
+        ScraperService.save_product_snapshot(self._page("Natural", complete=True))
+
+        gone = Offer.objects.get(external_id="185-Chocolate")
+        assert gone.delisted_reason == DelistReason.GONE
+
+    def test_a_unit_missing_from_successful_runs_is_delisted_as_gone(self) -> None:
+        """Repeated absence from whole-store runs is the same fact."""
+        ScraperService.save_product_snapshot(self._page("Natural"))
+        later = timezone.now() + timedelta(seconds=1)
+
+        for _run in range(MISSED_RUNS_BEFORE_DELISTING):
+            ScraperService.delist_unseen_offers("growth", later)
+
+        assert Offer.objects.get().delisted_reason == DelistReason.GONE
+
+    def test_a_unit_published_again_loses_its_delist_reason(self) -> None:
+        """Relisting clears why it had been delisted, not only when."""
+        ScraperService.save_product_snapshot(self._page("Natural", "Chocolate"))
+        ScraperService.save_product_snapshot(self._page("Natural", complete=True))
+
+        ScraperService.save_product_snapshot(self._page("Natural", "Chocolate"))
+
+        assert Offer.objects.get(external_id="185-Chocolate").delisted_reason == ""
