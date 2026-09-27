@@ -32,8 +32,8 @@ them from evidence; it never types a price, a URL or a store.
 Call `admin.form_spec` for a model before writing to it; field names, units and
 choices come from its answer, not from memory or from these notes.
 
-1. **Pick the offer.** `admin.list` on `offers.offer`, searching with `q` (the
-   list ignores unknown parameters such as `search`) and filtering by
+1. **Pick the offer.** `admin.list` on `offers.offer`, searching with `search`
+   (the MCP adapter translates it to the REST API's `q`) and filtering by
    `store_slug`. Take a listed offer (no `delisted_at`) with a price, and read
    its `options`: the flavor it sells is there. An offer with no flavor option
    on a product sold in flavors cannot be linked to a flavored label.
@@ -46,7 +46,7 @@ choices come from its answer, not from memory or from these notes.
    name; a product already in the catalog gets a new link, not a twin. Resolve
    brand, category, flavor and table keys with `admin.autocomplete` or
    `admin.list`, never by guessing ids.
-   - Categories are a tree and render as their path ("Proteína › Whey ›
+   - Categories are a tree and render as their path ("Proteína > Whey >
      Concentrado"). Use the most specific node that fits what defines the line
      (3W, isolate, concentrate), and create nothing if a node already fits.
    - Flavors match the store's option value ignoring case and accents. Reuse an

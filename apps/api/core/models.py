@@ -268,7 +268,7 @@ class Category(MP_Node, BaseModel):
 
     def __str__(self) -> str:
         """Name the category by its whole path, as a curator places it."""
-        return " › ".join(node.name for node in [*self.get_ancestors(), self])
+        return " > ".join(node.name for node in [*self.get_ancestors(), self])
 
 
 class Product(BaseModel):

@@ -71,4 +71,4 @@ class ObjectLabelTests(TestCase):
         whey = protein.add_child(name="Whey")
         concentrate = whey.add_child(name="Concentrado")
 
-        assert str(concentrate) == "Proteína › Whey › Concentrado"
+        assert str(concentrate) == "Proteína > Whey > Concentrado"
