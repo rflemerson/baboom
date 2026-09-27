@@ -53,7 +53,11 @@ class AdminApiInlineWriteTests(TestCase):
         )
         self.client.force_login(self.user)
         self.brand = Brand.objects.create(name="growth", display_name="Growth")
-        self.store = Store.objects.create(name="growth", display_name="Growth")
+        self.store = Store.objects.create(
+            name="growth",
+            display_name="Growth",
+            scraper_slug="growth",
+        )
         self.facts = NutritionFacts.objects.create(
             description="Natural",
             serving_size=Decimal(30),
@@ -216,7 +220,11 @@ class ProductAdminActionTests(TestCase):
         self.admin = ProductAdmin(Product, django_admin.site)
         self.admin.message_user = Mock()
         self.brand = Brand.objects.create(name="dark-lab", display_name="Dark Lab")
-        self.store = Store.objects.create(name="dark-lab", display_name="Dark Lab")
+        self.store = Store.objects.create(
+            name="dark-lab",
+            display_name="Dark Lab",
+            scraper_slug="dark_lab",
+        )
         self.product = Product.objects.create(
             name="Whey One Refil 900g - Dark Lab",
             brand=self.brand,

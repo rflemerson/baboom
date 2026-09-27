@@ -46,9 +46,13 @@ class ProductStoreService:
                         {"store": _("A store can only appear once per product.")},
                     )
 
+                if not store.scraper_slug:
+                    raise ValidationError(
+                        {"store": _("This store has no scraped offers to link.")},
+                    )
                 desired_store_ids.add(store.id)
                 offer = OfferObservationService().resolve_for_listing(
-                    store_slug=store.name,
+                    store_slug=store.scraper_slug,
                     listing=store_payload,
                 )
                 existing_listing = existing_links.get(store.id)

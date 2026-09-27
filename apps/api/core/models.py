@@ -152,6 +152,17 @@ class Store(BaseModel):
 
     name = models.CharField(_("Name"), max_length=100, unique=True)
     display_name = models.CharField(_("Display Name"), max_length=100, unique=True)
+    scraper_slug = models.SlugField(
+        _("Scraper Slug"),
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text=_(
+            "The store_slug the scraper records on this store's offers. "
+            "Empty for a store nothing scrapes.",
+        ),
+    )
     description = models.TextField(
         _("Description"),
         blank=True,

@@ -34,7 +34,11 @@ class ProductCreateServiceTests(TestCase):
         """Create reusable fixtures and services."""
         self.service = ProductCreateService()
         self.brand = Brand.objects.create(name="growth", display_name="Growth")
-        self.store = Store.objects.create(name="growth", display_name="Growth")
+        self.store = Store.objects.create(
+            name="growth",
+            display_name="Growth",
+            scraper_slug="growth",
+        )
 
     def test_execute_creates_product_with_taxonomy_and_store(self) -> None:
         """Product creation should persist brand, category, tags and store listing."""

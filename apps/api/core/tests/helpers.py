@@ -39,11 +39,11 @@ def _link_offer(
     price = cast("float | Decimal | None", kwargs.get("price"))
     stock_status = cast("str", kwargs.get("stock_status", StockStatus.AVAILABLE))
     resolved_external_id = (
-        external_id if external_id is not None else f"{store.name}-{product.pk}"
+        external_id if external_id is not None else f"{store.scraper_slug}-{product.pk}"
     )
     resolved_price = Decimal(str(price)) if price is not None else None
     offer = Offer.objects.create(
-        store_slug=store.name,
+        store_slug=store.scraper_slug,
         external_id=resolved_external_id,
         url=product_link,
         current_price=resolved_price,

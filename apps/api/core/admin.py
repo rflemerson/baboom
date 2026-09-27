@@ -215,7 +215,7 @@ class ProductAdmin(admin.ModelAdmin):
         offer = self._source_offer(request)
         if offer is None:
             return kwargs
-        store = Store.objects.filter(name=offer.store_slug).first()
+        store = Store.objects.filter(scraper_slug=offer.store_slug).first()
         if store is None:
             return kwargs
         kwargs["initial"] = [
@@ -407,8 +407,8 @@ class BrandAdmin(admin.ModelAdmin):
 class StoreAdmin(admin.ModelAdmin):
     """Admin for stores."""
 
-    list_display = ("name", "display_name", "products_count")
-    search_fields = ("name", "display_name")
+    list_display = ("name", "display_name", "scraper_slug", "products_count")
+    search_fields = ("name", "display_name", "scraper_slug")
     list_per_page = 50
 
     def get_queryset(self, request: HttpRequest) -> QuerySet:

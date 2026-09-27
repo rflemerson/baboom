@@ -24,7 +24,7 @@ from core.services import (
 from core.tests.helpers import (
     _link_offer,
 )
-from offers.models import StockStatus
+from offers.models import Offer, StockStatus
 
 
 class ProductStoreServiceTests(TestCase):
@@ -42,8 +42,16 @@ class ProductStoreServiceTests(TestCase):
             net_mass=Decimal(900),
             packaging=Product.Packaging.CONTAINER,
         )
-        self.store = Store.objects.create(name="growth", display_name="Growth")
-        self.other_store = Store.objects.create(name="dux", display_name="Dux")
+        self.store = Store.objects.create(
+            name="growth",
+            display_name="Growth",
+            scraper_slug="growth",
+        )
+        self.other_store = Store.objects.create(
+            name="dux",
+            display_name="Dux",
+            scraper_slug="dux",
+        )
         self.service = ProductStoreService()
 
     def test_replace_listings_updates_existing_listing_without_recreating_it(
@@ -211,3 +219,50 @@ class ProductStoreServiceTests(TestCase):
             raised_validation_error = True
 
         assert raised_validation_error
+
+
+class StoreIdentityTests(TestCase):
+    """A listing reuses the offer the scraper captured for that store.
+
+    The scraper records ``Offer.store_slug`` (``black_skull``); the store's
+    ``name`` is for people (``Black Skull``). Resolving by name misses the
+    captured offer and forges a second one with an artificial price history.
+    """
+
+    def test_listing_reuses_the_captured_offer_of_a_store_named_for_people(
+        self,
+    ) -> None:
+        """Linking must not create an offer when the store already has it."""
+        brand = Brand.objects.create(name="black-skull", display_name="Black Skull")
+        product = Product.objects.create(
+            name="Whey 3W",
+            brand=brand,
+            net_mass=Decimal(900),
+        )
+        store = Store.objects.create(
+            name="Black Skull",
+            display_name="Black Skull USA",
+            scraper_slug="black_skull",
+        )
+        captured = Offer.objects.create(
+            store_slug="black_skull",
+            external_id="1014",
+            name="Whey 3W Chocolate",
+            url="https://blackskull.example/whey?skuId=1014",
+            current_price=Decimal("119.90"),
+        )
+
+        ProductStoreService().replace_listings(
+            product,
+            [
+                StoreListingPayload(
+                    store_id=store.id,
+                    external_id="1014",
+                    product_link=captured.url,
+                    price=119.90,
+                ),
+            ],
+        )
+
+        assert Offer.objects.count() == 1
+        assert ProductStore.objects.get(product=product).offer_id == captured.pk

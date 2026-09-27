@@ -32,6 +32,7 @@ class StoreFactory(DjangoModelFactory):
 
     name = factory.Sequence(lambda number: f"store-{number}")
     display_name = factory.Sequence(lambda number: f"Store {number}")
+    scraper_slug = factory.Sequence(lambda number: f"store_{number}")
 
 
 class ProductFactory(DjangoModelFactory):

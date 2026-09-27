@@ -7,6 +7,7 @@ from typing import cast
 
 from django.test import TestCase
 from django.utils import timezone
+from django.utils.text import slugify
 
 from core.dtos import (
     CatalogProductsFilters,
@@ -76,7 +77,11 @@ class CatalogActiveRankingTests(TestCase):
         ProductNutrition.objects.create(product=product, nutrition_facts=facts)
         _link_offer(
             product=product,
-            store=Store.objects.create(name=name, display_name=name),
+            store=Store.objects.create(
+                name=name,
+                display_name=name,
+                scraper_slug=slugify(name),
+            ),
             product_link=f"https://example.com/{name}",
             price=100.00,
         )
@@ -202,7 +207,11 @@ class ComboRankingTests(TestCase):
             )
         _link_offer(
             product=combo,
-            store=Store.objects.create(name=name, display_name=name),
+            store=Store.objects.create(
+                name=name,
+                display_name=name,
+                scraper_slug=slugify(name),
+            ),
             price=100.00,
         )
         return combo
@@ -302,7 +311,11 @@ class ProductStatsTests(TestCase):
     def setUp(self) -> None:
         """Set up test data."""
         self.brand = Brand.objects.create(name="Test Brand", display_name="Test Brand")
-        self.store = Store.objects.create(name="Test Store", display_name="Test Store")
+        self.store = Store.objects.create(
+            name="Test Store",
+            display_name="Test Store",
+            scraper_slug="test_store",
+        )
 
         self.product = Product.objects.create(
             name="Whey Protein",
@@ -372,6 +385,7 @@ class ProductStatsTests(TestCase):
         second_store = Store.objects.create(
             name="Second Store",
             display_name="Second Store",
+            scraper_slug="second_store",
         )
         second_link = _link_offer(
             product=self.product,

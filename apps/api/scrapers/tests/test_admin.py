@@ -26,7 +26,11 @@ class ScrapedItemAdminWorkflowTests(TestCase):
         )
         self.client.force_login(user)
         Brand.objects.create(name="growth", display_name="Growth")
-        store = Store.objects.create(name="growth", display_name="Growth")
+        store = Store.objects.create(
+            name="growth",
+            display_name="Growth",
+            scraper_slug="growth",
+        )
         item = _scraped_item(
             store_slug="growth",
             external_id="whey-450",
