@@ -27,9 +27,12 @@
 - Actives: `Active` names a substance the catalog ranks by. Protein is one row,
   not a privileged column; label columns point at their active through
   `nutrition_field`, and everything else is a `NutritionActive` row.
-- `ProductActive` stores the dimensionless mass fraction of each active in one
-  `ProductNutrition` profile, derived only from that profile's table. Concentrations
-  from different labels are never merged or maximized. Run
+- A product is one package with one nutrition table: `ProductNutrition` (the
+  table and the flavors that print it) is at most one per product. Natural and a
+  flavored whey sold on the same page print different tables, so they are two
+  products.
+- `ProductActive` stores the dimensionless mass fraction of each active in a
+  product's `ProductNutrition`, derived only from its table. Run
   `sync_product_actives` to rebuild it. `Category.default_active` names the
   active a category is ranked by.
 - Units: a stored value is the number printed on the package, in the unit the
@@ -40,12 +43,13 @@
   `core/units.py` converts only inside arithmetic, into grams. Values the
   catalog cannot convert -- international units, percentages of a daily value
   -- carry no concentration and simply do not rank.
-- Store links: a catalog row is one nutrition profile of a product, and a store
-  sells one flavor per offer, so `ProductStore` links a profile (none for a
-  combo) to a captured `Offer`. The rules live in `ProductStore.clean()`: the
-  store comes from the offer through `Store.scraper_slug`, the offer must still
-  be listed, and the flavor it states (`Offer.flavors`) must be one the profile
-  lists. A row shows its cheapest listed offer.
+- Store links: `ProductStore` links a product to a captured `Offer`, one link
+  per offer and as many offers per product as flavors and stores sell it. The
+  rules live in `ProductStore.clean()`: the store comes from the offer through
+  `Store.scraper_slug`, the offer must still be listed, and once the product's
+  table lists flavors, the flavor the offer states (`Offer.flavors`) must be one
+  of them. A product whose table is not in yet takes any single-flavor offer, so
+  a price never waits for the label. A product shows its cheapest listed offer.
 - Product create/update goes through `ProductCreateService` and `ProductMetadataUpdateService`.
 
 ## Public
@@ -55,14 +59,11 @@
 - Catalog metrics are relative to one active and one mass unit; the response
   names both in `active` and `massUnit` rather than implying them. Pass `active`
   to rank by another substance; an unknown slug yields empty metrics.
-- Each catalog row represents one product nutrition profile and includes
-  `nutritionProfile` with its ID, nutrition table ID, and associated flavor names.
-  Several flavors sharing the same profile stay together; distinct tables are
-  independently filtered, sorted, and paginated. Products without profiles keep
-  one row with `nutritionProfile: null` and unknown nutritional metrics.
-- A row's stable identity is `(product.id, nutritionProfile.id)`. Flavor search
-  matches only the corresponding profile. Offers remain linked at product level;
-  the displayed price is a product offer, not a verified price for a specific flavor.
+- Each catalog row is one product and includes `nutritionProfile` with its ID,
+  nutrition table ID and the flavors that print it. A product without a table
+  has `nutritionProfile: null` and no nutritional metrics.
+- `price` and `externalLink` come from the cheapest listed offer linked to the
+  product, which sells one of the flavors its table lists.
 
 ## Scraped evidence
 
@@ -76,16 +77,15 @@
 - `ensure_catalog_operator --username=<name>` keeps a staff user in the
   `catalog-operator` group with an explicit, delete-free permission set. It is a
   command rather than a migration because access is configuration, not schema.
-- The scraped-item admin action opens product creation with offer identity and
-  the matching store listing prefilled from the captured offer. Saving the
-  product links that offer without creating a duplicate price observation.
+- The scraped-item admin action opens the store link form with the item's offer
+  chosen, or the existing link if the offer is already linked.
 - Product creation, offer linking, nutrition profiles, flavors, components and
   publication are human catalog actions in Django admin.
 
 
 ## Services
 
-- `ProductCreateService`, `ProductMetadataUpdateService`, `ProductStoreService`
+- `ProductCreateService`, `ProductMetadataUpdateService`
 - `AlertSubscriptionService`
 - `ScraperService` for offer snapshots
 - `public_catalog_products(...)` in `core/selectors.py`

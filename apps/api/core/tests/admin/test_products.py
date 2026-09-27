@@ -231,11 +231,7 @@ class AdminApiStoreLinkTests(TestCase):
         response = self.client.post(
             self.URL,
             data=json.dumps(
-                {
-                    "product": self.product.pk,
-                    "nutrition_profile": self.natural.pk,
-                    "offer": self.offers[flavor].pk,
-                },
+                {"product": self.product.pk, "offer": self.offers[flavor].pk},
             ),
             content_type="application/json",
         )
@@ -251,8 +247,17 @@ class AdminApiStoreLinkTests(TestCase):
         assert link.store == self.store
         assert Offer.objects.count() == len(self.offers)
 
+    def test_an_unlabelled_product_takes_its_offer(self) -> None:
+        """An agent links the price before it has read the nutrition table."""
+        self.natural.delete()
+
+        status, body = self._post("Chocolate")
+
+        assert status < HTTPStatus.BAD_REQUEST, body
+        assert ProductStore.objects.get().offer == self.offers["Chocolate"]
+
     def test_a_link_to_the_wrong_label_is_refused_with_a_reason(self) -> None:
-        """Chocolate cannot price the Natural label, and the client is told why."""
+        """Chocolate cannot price the Natural product, and the client is told why."""
         status, body = self._post("Chocolate")
 
         assert status == HTTPStatus.BAD_REQUEST, body
@@ -260,11 +265,11 @@ class AdminApiStoreLinkTests(TestCase):
         assert not ProductStore.objects.exists()
 
     def test_the_store_is_not_something_the_client_can_type(self) -> None:
-        """The form spec offers the offer and the label, never the store."""
+        """The form spec offers the product and the offer, never the store."""
         response = self.client.get(f"{self.URL}add/form-spec/")
         fields = json.loads(response.content)["fields"]
 
-        assert {"product", "nutrition_profile", "offer"} <= set(fields)
+        assert {"product", "offer"} <= set(fields)
         assert "store" not in fields or fields["store"]["readonly"]
 
 
@@ -288,7 +293,7 @@ class ProductAdminActionTests(TestCase):
             net_mass=Decimal(900),
             packaging=Product.Packaging.REFILL,
         )
-        profile = ProductNutrition.objects.create(
+        ProductNutrition.objects.create(
             product=self.product,
             nutrition_facts=NutritionFacts.objects.create(
                 serving_size=Decimal(30),
@@ -297,7 +302,6 @@ class ProductAdminActionTests(TestCase):
         )
         self.store_link = _link_offer(
             product=self.product,
-            nutrition_profile=profile,
             store=self.store,
             external_id="568",
             product_link="https://example.com/whey",

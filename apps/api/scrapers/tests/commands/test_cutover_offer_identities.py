@@ -11,9 +11,7 @@ from django.test import TestCase
 
 from core.models import (
     Brand,
-    NutritionFacts,
     Product,
-    ProductNutrition,
     ProductStore,
     Store,
 )
@@ -55,13 +53,8 @@ class OfferIdentityCutoverTests(TestCase):
             display_name="Test Store",
             scraper_slug="test_store",
         )
-        profile = ProductNutrition.objects.create(
-            product=product,
-            nutrition_facts=NutritionFacts.objects.create(serving_size=Decimal(30)),
-        )
         return ProductStore.objects.create(
             product=product,
-            nutrition_profile=profile,
             offer=offer,
         )
 

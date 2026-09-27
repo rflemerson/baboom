@@ -490,12 +490,13 @@ class ProductComponent(BaseModel):
 
 
 class ProductStore(BaseModel):
-    """Curated link between a catalog row and the merchant offer that prices it.
+    """Curated link between a catalog product and a merchant offer that prices it.
 
-    A simple product is ranked once per nutrition profile, and a store sells one
-    flavor per offer, so the link names the profile whose label that flavor
-    prints: the flavor the store states must be one the label lists. A combo
-    ranks through its components and has no label, so it links without one.
+    A product is one package with one nutrition table, so Natural and the
+    flavored whey of one page are two products, each priced by the offers of
+    its own flavors. Once the table lists its flavors, an offer must sell one
+    of them; before that the link is accepted, so a price never waits for the
+    label to be read.
 
     The store is whichever one sells the offer. It is resolved from the offer's
     scraper slug on every save and cannot be chosen, so a link can never show
@@ -507,19 +508,6 @@ class ProductStore(BaseModel):
         on_delete=models.CASCADE,
         verbose_name=_("Related Product"),
         related_name="store_links",
-    )
-
-    nutrition_profile = models.ForeignKey(
-        "ProductNutrition",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        verbose_name=_("Nutrition Profile"),
-        related_name="store_links",
-        help_text=_(
-            "The product's label that this offer's flavor prints. Required for "
-            "a simple product, empty for a combo.",
-        ),
     )
 
     store = models.ForeignKey(
@@ -571,88 +559,77 @@ class ProductStore(BaseModel):
         super().save(*args, **kwargs)
 
     def clean(self) -> None:
-        """Resolve the store and reject a link that would misprice a row."""
+        """Resolve the store and reject a link that would misprice a product."""
         super().clean()
         errors: dict[str, list[str]] = {}
 
-        def refuse(field: str, message: str) -> None:
-            errors.setdefault(field, []).append(message)
+        def refuse(message: str) -> None:
+            errors.setdefault("offer", []).append(message)
 
         if self.offer_id is None:
-            refuse("offer", _("Link a captured offer."))
+            refuse(_("Link a captured offer."))
         else:
             self._resolve_store(refuse)
-        if self.product_id is not None:
-            self._validate_profile(refuse)
-        if not errors and self.offer_id is not None and not self.product.is_combo:
-            self._validate_flavor(refuse)
+            if not errors and self.product_id is not None and not self.product.is_combo:
+                self._validate_flavor(refuse)
         if errors:
             raise ValidationError(errors)
 
-    def _resolve_store(self, refuse: Callable[[str, str], None]) -> None:
+    def _resolve_store(self, refuse: Callable[[str], None]) -> None:
         """Set the store that sells the offer, or report that none is mapped."""
         offer = self.offer
         if not offer.is_listed:
-            refuse("offer", _("The store no longer publishes this offer."))
+            refuse(_("The store no longer publishes this offer."))
         store = Store.objects.filter(scraper_slug=offer.store_slug).first()
         if store is None:
             refuse(
-                "offer",
                 _("No store is mapped to the scraper slug %(slug)s.")
                 % {"slug": offer.store_slug},
             )
             return
         self.store = store
 
-    def _validate_profile(self, refuse: Callable[[str, str], None]) -> None:
-        """Require the product's own label on a simple product, none on a combo."""
-        profile = self.nutrition_profile
-        if self.product.is_combo:
-            if profile is not None:
-                refuse(
-                    "nutrition_profile",
-                    _("A combo ranks through its components; leave it empty."),
-                )
-        elif profile is None:
-            refuse(
-                "nutrition_profile",
-                _("Choose the product's label that this offer's flavor prints."),
-            )
-        elif profile.product_id != self.product_id:
-            refuse("nutrition_profile", _("This label belongs to another product."))
+    def _validate_flavor(self, refuse: Callable[[str], None]) -> None:
+        """Require the flavor the offer sells to be one the product's table lists.
 
-    def _validate_flavor(self, refuse: Callable[[str, str], None]) -> None:
-        """Require the flavor the offer states to be one its label lists."""
+        A product whose table is not in yet lists no flavor, and takes the offer.
+        """
         sold = self.offer.flavors
-        printed = [flavor.name for flavor in self.nutrition_profile.flavors.all()]
+        printed = [
+            flavor.name
+            for profile in self.product.nutrition_profiles.all()
+            for flavor in profile.flavors.all()
+        ]
         sold_folded = {fold(flavor) for flavor in sold}
         printed_folded = {fold(flavor) for flavor in printed}
         names = {"sold": ", ".join(sold), "printed": ", ".join(printed)}
         if len(sold_folded) > 1:
             refuse(
-                "offer",
-                _("This offer sells several flavors, so it is a kit: %(sold)s.")
+                _(
+                    "This offer sells several flavors, so it is a kit: %(sold)s. "
+                    "Link it to a combo.",
+                )
                 % names,
             )
-        elif printed_folded and not sold_folded:
+        elif not printed_folded:
+            return
+        elif not sold_folded:
             refuse(
-                "offer",
                 _(
-                    "This offer states no flavor, so it cannot price the label "
+                    "This offer states no flavor, so it cannot price a product "
                     "printed by %(printed)s.",
                 )
                 % names,
             )
         elif sold_folded - printed_folded:
             refuse(
-                "offer",
                 _(
-                    "This offer sells %(sold)s; the chosen label lists "
-                    "%(printed)s. Link it to the label of that flavor, or add the "
-                    "flavor to this label if the package prints the same table "
-                    "for it.",
+                    "This offer sells %(sold)s; this product's table lists "
+                    "%(printed)s. A flavor with another table is another "
+                    "product; add the flavor here only if the package prints "
+                    "the same table for it.",
                 )
-                % {**names, "printed": names["printed"] or _("no flavor")},
+                % names,
             )
 
     @property
@@ -867,7 +844,10 @@ class NutritionActive(BaseModel):
 
 
 class ProductNutrition(BaseModel):
-    """Links distinct nutrition profiles to a product."""
+    """The nutrition table a product prints, and the flavors that print it.
+
+    One per product: a flavor with a different table is a different product.
+    """
 
     product = models.ForeignKey(
         Product,
@@ -896,8 +876,8 @@ class ProductNutrition(BaseModel):
         verbose_name_plural = _("Product Nutrition Profiles")
         constraints = (
             models.UniqueConstraint(
-                fields=["product", "nutrition_facts"],
-                name="unique_product_nutrition_facts",
+                fields=["product"],
+                name="one_nutrition_table_per_product",
             ),
         )
 
@@ -1067,10 +1047,8 @@ class ComboActiveManager(models.Manager):
         """Sum each active over the components, if every component has it.
 
         A component's mass of an active is its quantity times its net mass
-        times its smallest fraction across nutrition labels: flavors differ and
-        a combo does not say which one it ships, so the figure never overstates
-        what the buyer gets. A component that lacks the active on any label, or
-        has no net mass, leaves the combo without that active.
+        times the fraction its one nutrition table gives. A component without
+        the active, or without a net mass, leaves the combo without it.
         """
         if not links:
             return {}
@@ -1092,19 +1070,14 @@ class ComboActiveManager(models.Manager):
     def _component_masses(self, link: ProductComponent) -> dict[int, Decimal]:
         """Return the mass of each active one component line contributes."""
         component = link.component
-        profile_count = component.nutrition_profiles.count()
-        if component.net_mass is None or not profile_count:
+        if component.net_mass is None:
             return {}
-        fractions: dict[int, list[Decimal]] = {}
         rows = ProductActive.objects.filter(
             nutrition_profile__product=component,
         ).values_list("active_id", "fraction")
-        for active_id, fraction in rows:
-            fractions.setdefault(active_id, []).append(fraction)
         return {
-            active_id: link.quantity * component.net_mass * min(values)
-            for active_id, values in fractions.items()
-            if len(values) == profile_count
+            active_id: link.quantity * component.net_mass * fraction
+            for active_id, fraction in rows
         }
 
 

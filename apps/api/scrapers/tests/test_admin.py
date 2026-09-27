@@ -11,9 +11,7 @@ from django.urls import reverse
 
 from core.models import (
     Brand,
-    NutritionFacts,
     Product,
-    ProductNutrition,
     ProductStore,
     Store,
 )
@@ -75,19 +73,11 @@ class ScrapedItemAdminWorkflowTests(TestCase):
             brand=Brand.objects.create(name="growth", display_name="Growth"),
             net_mass=Decimal(450),
         )
-        profile = ProductNutrition.objects.create(
-            product=product,
-            nutrition_facts=NutritionFacts.objects.create(
-                serving_size=Decimal(30),
-                proteins=Decimal(24),
-            ),
-        )
 
         response = self.client.post(
             self._act(),
             {
                 "product": product.pk,
-                "nutrition_profile": profile.pk,
                 "offer": self.item.offer_id,
                 "affiliate_link": "",
                 "_save": "Save",

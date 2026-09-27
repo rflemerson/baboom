@@ -7,7 +7,6 @@ from django.db.models import (
     ExpressionWrapper,
     F,
     FloatField,
-    IntegerField,
     OuterRef,
     Q,
     QuerySet,
@@ -22,36 +21,19 @@ from offers.models import Offer
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
-# A combo row has no nutrition profile; 0 stands for "no profile" on both
-# sides so the row and its links can be compared with one equality.
-NO_PROFILE = 0
-
-
-def _row_profile_key(field: str) -> Coalesce:
-    """Return a profile id that compares equal when both sides have none."""
-    return Coalesce(F(field), Value(NO_PROFILE), output_field=IntegerField())
-
 
 def _cheapest_offer_subquery() -> QuerySet[Offer]:
-    """Return the listed offers pricing the outer catalog row, cheapest first.
+    """Return the listed offers pricing the outer product, cheapest first.
 
-    A row is one nutrition profile of a product, and every offer linked to that
-    profile sells a flavor its label prints, so they compete: the row shows the
-    best current price. The ordering is stable so the price and the link always
-    come from the same offer.
+    Every offer linked to a product sells a flavor its one table prints, so
+    they compete: the product shows the best current price. The ordering is
+    stable so the price and the link always come from the same offer.
     """
-    return (
-        Offer.objects.annotate(
-            row_profile=_row_profile_key("product_store__nutrition_profile_id"),
-        )
-        .filter(
-            product_store__product=OuterRef("pk"),
-            row_profile=OuterRef("row_profile"),
-            current_price__isnull=False,
-            delisted_at__isnull=True,
-        )
-        .order_by("current_price", "pk")
-    )
+    return Offer.objects.filter(
+        product_store__product=OuterRef("pk"),
+        current_price__isnull=False,
+        delisted_at__isnull=True,
+    ).order_by("current_price", "pk")
 
 
 def catalog_active(slug: str | None = None) -> Active | None:
@@ -152,7 +134,6 @@ def public_catalog_products_with_stats(
         .annotate(
             nutrition_profile_id=F("nutrition_profiles__id"),
             nutrition_facts_id=F("nutrition_profiles__nutrition_facts_id"),
-            row_profile=_row_profile_key("nutrition_profiles__id"),
         )
     )
     return _annotate_catalog_metrics(

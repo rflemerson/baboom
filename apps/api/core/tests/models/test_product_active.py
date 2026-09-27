@@ -116,42 +116,6 @@ class ProductActiveTests(TestCase):
             nutrition_profile__product=self.product,
         ).exists()
 
-    def test_profiles_never_borrow_missing_actives_from_each_other(self) -> None:
-        """A missing measurement in one label stays missing after synchronization."""
-        NutritionActive.objects.create(
-            nutrition_facts=self.facts,
-            active=self.caffeine,
-            amount=Decimal(200),
-            declared_unit="mg",
-        )
-        first = ProductNutrition.objects.create(
-            product=self.product,
-            nutrition_facts=self.facts,
-        )
-        other_facts = NutritionFacts.objects.create(
-            serving_size=Decimal(10),
-            proteins=Decimal(5),
-        )
-        second = ProductNutrition.objects.create(
-            product=self.product,
-            nutrition_facts=other_facts,
-        )
-        fractions = dict(
-            ProductActive.objects.filter(
-                nutrition_profile__product=self.product,
-                active__slug="protein",
-            ).values_list("nutrition_profile_id", "fraction"),
-        )
-        assert fractions == {first.pk: Decimal("0.2"), second.pk: Decimal("0.5")}
-        assert not second.actives.filter(active=self.caffeine).exists()
-        self.facts.proteins = Decimal(1)
-        self.facts.save()
-        assert first.actives.get(active__slug="protein").fraction == Decimal("0.1")
-        assert second.actives.get(active__slug="protein").fraction == Decimal("0.5")
-        ProductNutrition.objects.filter(pk=second.pk).delete()
-        assert not ProductActive.objects.filter(nutrition_profile_id=second.pk).exists()
-        assert first.actives.filter(active=self.caffeine).exists()
-
 
 class LabelUnitTests(TestCase):
     """Values are written exactly as the label prints them.

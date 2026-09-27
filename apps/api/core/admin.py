@@ -422,14 +422,13 @@ class ProductStoreAdmin(admin.ModelAdmin):
     """Link a captured offer to the catalog row it prices.
 
     This is the one place an offer becomes a price on the site. The curator
-    picks the product, the label its flavor prints and the offer; the store,
-    price, stock, URL and flavor all come from the offer itself.
+    picks the product and the offer; the store, price, stock, URL and flavor
+    all come from the offer itself.
     """
 
     show_facets = admin.ShowFacets.ALWAYS
     list_display = (
         "product",
-        "nutrition_profile",
         "store",
         "get_flavors",
         "get_external_id",
@@ -437,21 +436,13 @@ class ProductStoreAdmin(admin.ModelAdmin):
     )
     list_filter = ("store",)
     search_fields = ("product__name", "store__name", "offer__external_id")
-    autocomplete_fields: ClassVar[list[str]] = [
-        "product",
-        "nutrition_profile",
-        "offer",
-    ]
-    fields = ("product", "nutrition_profile", "offer", "affiliate_link", "store")
+    autocomplete_fields: ClassVar[list[str]] = ["product", "offer"]
+    fields = ("product", "offer", "affiliate_link", "store")
     readonly_fields = ("store",)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet:
         """Optimize queryset."""
-        return (
-            super()
-            .get_queryset(request)
-            .select_related("product", "nutrition_profile", "store", "offer")
-        )
+        return super().get_queryset(request).select_related("product", "store", "offer")
 
     @admin.display(description="Flavors")
     def get_flavors(self, obj: ProductStore) -> str:

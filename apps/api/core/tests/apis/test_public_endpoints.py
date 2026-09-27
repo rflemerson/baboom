@@ -59,7 +59,7 @@ class PublicCatalogPayloadTests(TestCase):
             net_mass=Decimal(900),
             is_published=True,
         )
-        profile = ProductNutrition.objects.create(
+        ProductNutrition.objects.create(
             product=product,
             nutrition_facts=NutritionFacts.objects.create(
                 serving_size=Decimal(30),
@@ -68,7 +68,6 @@ class PublicCatalogPayloadTests(TestCase):
         )
         _link_offer(
             product=product,
-            nutrition_profile=profile,
             store=store,
             product_link="https://blackskull.example/whey?skuId=1014",
             price=119.90,

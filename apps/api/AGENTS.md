@@ -83,11 +83,13 @@ offers that a successful crawl no longer sees.
 - Query composition belongs in `selectors.py`.
 - Product, nutrition, component, flavor, brand, store, tag, category and alert
   subscriber management is manager-facing through Django admin.
-- `ProductStore` links one nutrition profile of a product (none for a combo) to
-  one captured `Offer`, through its own `ProductStoreAdmin`. The store is resolved
-  from the offer's `store_slug` via `Store.scraper_slug`, never chosen, and
-  `ProductStore.clean()` refuses an offer whose stated flavor (`Offer.flavors`)
-  the profile does not list. Curation never types a price, URL or offer id.
+- A product is one package with one nutrition table (at most one
+  `ProductNutrition`). `ProductStore` links a product to one captured `Offer`,
+  through its own `ProductStoreAdmin`. The store is resolved from the offer's
+  `store_slug` via `Store.scraper_slug`, never chosen, and `ProductStore.clean()`
+  refuses an offer whose stated flavor (`Offer.flavors`) the product's table does
+  not list; a product without a table yet takes the offer. Curation never types
+  a price, URL or offer id.
 - The public REST API serves catalog browsing and alerts.
 - `django_admin_rest_api` exposes the registered `ModelAdmin` classes as JSON at
   `/admin-api/`, under the same session auth and model permissions as the HTML

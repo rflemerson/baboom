@@ -30,7 +30,6 @@ class SyncProductActivesCommandTests(TestCase):
         call_command("sync_product_actives", stdout=output)
 
         active = ProductActive.objects.get(
-            nutrition_profile=profile,
             active__slug="protein",
         )
         assert active.fraction == Decimal("0.80000000")

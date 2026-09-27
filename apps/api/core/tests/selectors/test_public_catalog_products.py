@@ -75,12 +75,9 @@ class CatalogActiveRankingTests(TestCase):
                 amount=creatine,
                 declared_unit="g",
             )
-        profile = ProductNutrition.objects.create(
-            product=product, nutrition_facts=facts
-        )
+        ProductNutrition.objects.create(product=product, nutrition_facts=facts)
         _link_offer(
             product=product,
-            nutrition_profile=profile,
             store=Store.objects.create(
                 name=name,
                 display_name=name,
@@ -246,15 +243,6 @@ class ComboRankingTests(TestCase):
         assert self._price_per_gram(combo, "creatine") is None
         assert self._price_per_gram(combo, "protein") == Decimal("0.0833")
 
-    def test_a_component_with_several_labels_counts_its_smallest(self) -> None:
-        """Flavors differ and the combo does not say which it ships."""
-        whey = self._simple("Whey", proteins=Decimal(24))
-        combo = self._combo("Two Wheys", [(whey, 2)])
-
-        self._label(whey, proteins=Decimal(15))
-
-        assert self._price_per_gram(combo) == Decimal("0.1000")
-
     def test_deleting_a_component_product_updates_the_combo(self) -> None:
         """Cascade removes the link without calling its delete() method."""
         whey = self._simple("Whey", proteins=Decimal(24))
@@ -276,17 +264,14 @@ class ComboRankingTests(TestCase):
         assert self._price_per_gram(combo) == Decimal("0.1250")
 
     def test_removing_a_label_by_queryset_updates_the_combo(self) -> None:
-        """Dropping a profile by queryset still refreshes the combo total."""
+        """Dropping a table by queryset still refreshes the combo total."""
         whey = self._simple("Whey", proteins=Decimal(24))
         combo = self._combo("Two Wheys", [(whey, 2)])
-        self._label(whey, proteins=Decimal(15))
-        assert self._price_per_gram(combo) == Decimal("0.1000")
-
-        whey.nutrition_profiles.filter(
-            nutrition_facts__proteins=Decimal(15),
-        ).delete()
-
         assert self._price_per_gram(combo) == Decimal("0.0625")
+
+        whey.nutrition_profiles.all().delete()
+
+        assert self._price_per_gram(combo) is None
 
     def test_removing_a_component_updates_the_combo(self) -> None:
         """The derived total follows the component list."""
@@ -342,7 +327,6 @@ class ProductStatsTests(TestCase):
 
         self.link = _link_offer(
             product=self.product,
-            nutrition_profile=self.profile,
             store=self.store,
             product_link="https://example.com",
             price=100.00,
@@ -394,7 +378,6 @@ class ProductStatsTests(TestCase):
         )
         _link_offer(
             product=self.product,
-            nutrition_profile=self.profile,
             store=second_store,
             product_link="https://example.com/second",
             price=100.00,
@@ -409,62 +392,27 @@ class ProductStatsTests(TestCase):
         assert product.price == Decimal("100.00")
         assert product.external_link == self.link.offer.url
 
-    def test_catalog_preserves_distinct_nutrition_profiles(self) -> None:
-        """Each label keeps its own metrics and never borrows another's price."""
-        denser_profile = NutritionFacts.objects.create(
-            serving_size=Decimal(30),
-            proteins=Decimal("27.0"),
-            carbohydrates=Decimal(0),
-            total_fats=Decimal(0),
-            description="Isolate profile",
-            energy=120,
-        )
-        ProductNutrition.objects.create(
-            product=self.product,
-            nutrition_facts=denser_profile,
-        )
-
-        products = list(
-            public_catalog_products_with_stats()
-            .filter(pk=self.product.pk)
-            .order_by("concentration"),
-        )
-        assert [product.concentration for product in products] == [
-            Decimal("80.0"),
-            Decimal("90.0"),
-        ]
-        assert [product.total_active for product in products] == [
-            Decimal(800),
-            Decimal(900),
-        ]
-        assert round(products[0].price_per_active, 3) == Decimal("0.125")
-        assert products[1].price is None
-        assert products[1].price_per_active is None
-
     def test_rest_ranks_and_filters_flavors_with_their_own_table(self) -> None:
-        """Search and concentration filters must select the same profile row."""
+        """Search and filters select the product whose table a flavor prints."""
         self.product.is_published = True
         self.product.save()
-        original = self.product.nutrition_profiles.get()
-        chocolate = Flavor.objects.create(name="Chocolate")
-        original.flavors.add(chocolate)
-        vanilla_facts = NutritionFacts.objects.create(
-            serving_size=Decimal(30),
-            proteins=Decimal(21),
+        self.profile.flavors.add(Flavor.objects.create(name="Chocolate"))
+        vanilla = Product.objects.create(
+            name="Whey Protein Baunilha",
+            brand=self.brand,
+            net_mass=Decimal(1000),
+            is_published=True,
         )
-        vanilla = ProductNutrition.objects.create(
-            product=self.product,
-            nutrition_facts=vanilla_facts,
-        )
-        vanilla.flavors.add(Flavor.objects.create(name="Vanilla"))
+        ProductNutrition.objects.create(
+            product=vanilla,
+            nutrition_facts=NutritionFacts.objects.create(
+                serving_size=Decimal(30),
+                proteins=Decimal(21),
+            ),
+        ).flavors.add(Flavor.objects.create(name="Vanilla"))
 
-        response = self.client.get("/api/catalog/products/")
-        payload = response.json()
-        assert payload["pageInfo"]["totalCount"] == len([original, vanilla])
-        assert [row["nutritionProfile"]["id"] for row in payload["items"]] == [
-            original.pk,
-            vanilla.pk,
-        ]
+        payload = self.client.get("/api/catalog/products/").json()
+        assert [row["id"] for row in payload["items"]] == [self.product.pk, vanilla.pk]
         assert [row["nutritionProfile"]["flavors"] for row in payload["items"]] == [
             ["Chocolate"],
             ["Vanilla"],
@@ -473,13 +421,8 @@ class ProductStatsTests(TestCase):
             Decimal(80),
             Decimal(70),
         ]
-        searched = self.client.get(
-            "/api/catalog/products/",
-            {"search": "Vanilla"},
-        ).json()
-        assert [row["nutritionProfile"]["id"] for row in searched["items"]] == [
-            vanilla.pk,
-        ]
+        searched = self.client.get("/api/catalog/products/", {"search": "Vanilla"})
+        assert [row["id"] for row in searched.json()["items"]] == [vanilla.pk]
         filtered = self.client.get(
             "/api/catalog/products/",
             {"search": "Vanilla", "concentration_min": 75},
@@ -489,9 +432,7 @@ class ProductStatsTests(TestCase):
             "/api/catalog/products/",
             {"price_per_active_max": 0.13},
         ).json()
-        assert [row["nutritionProfile"]["id"] for row in price_filtered["items"]] == [
-            original.pk,
-        ]
+        assert [row["id"] for row in price_filtered["items"]] == [self.product.pk]
 
     def test_same_table_flavors_share_one_catalog_row(self) -> None:
         """Several flavors of one profile must not duplicate ranking entries."""
@@ -512,31 +453,6 @@ class ProductStatsTests(TestCase):
             "Chocolate Hazelnut",
         ]
 
-    def test_equal_concentrations_keep_separate_profiles_and_stable_pages(self) -> None:
-        """Ties and pagination must preserve identities rather than merge rows."""
-        self.product.is_published = True
-        self.product.save()
-        original = self.product.nutrition_profiles.get()
-        profile_ids = [original.pk]
-        for index in range(12):
-            facts = NutritionFacts.objects.create(
-                serving_size=Decimal(30),
-                proteins=Decimal(24),
-                description=str(index),
-            )
-            profile_ids.append(
-                ProductNutrition.objects.create(
-                    product=self.product,
-                    nutrition_facts=facts,
-                ).pk,
-            )
-        first = self.client.get("/api/catalog/products/", {"page": 1}).json()
-        second = self.client.get("/api/catalog/products/", {"page": 2}).json()
-        assert [
-            row["nutritionProfile"]["id"] for row in first["items"] + second["items"]
-        ] == profile_ids
-        assert first["pageInfo"]["totalCount"] == len(profile_ids)
-
     def test_catalog_sorting_is_stable_when_metric_values_tie(self) -> None:
         """Sorting should use a stable fallback under metric ties."""
         alpha_brand = Brand.objects.create(name="Alpha", display_name="Alpha")
@@ -554,24 +470,20 @@ class ProductStatsTests(TestCase):
             is_published=True,
         )
 
-        profiles = {
-            product: ProductNutrition.objects.create(
+        for product in (alpha, beta):
+            ProductNutrition.objects.create(
                 product=product,
                 nutrition_facts=self.nutrition,
             )
-            for product in (alpha, beta)
-        }
 
         _link_offer(
             product=alpha,
-            nutrition_profile=profiles[alpha],
             store=self.store,
             product_link="https://example.com/alpha",
             price=100.00,
         )
         _link_offer(
             product=beta,
-            nutrition_profile=profiles[beta],
             store=self.store,
             product_link="https://example.com/beta",
             price=100.00,
@@ -587,40 +499,39 @@ class ProductStatsTests(TestCase):
 
 
 class CatalogRowPriceTests(TestCase):
-    """Each catalog row is priced by the offers of its own nutrition label."""
+    """Natural and the flavored whey of one page are two priced products."""
 
     def setUp(self) -> None:
-        """Create a whey whose Natural and flavored labels sell separately."""
-        self.store = Store.objects.create(
-            name="Growth",
-            display_name="Growth",
-            scraper_slug="growth",
+        """Create both products of the Growth 1 kg page, each with its table."""
+        Store.objects.create(
+            name="Growth", display_name="Growth", scraper_slug="growth"
         )
-        self.product = Product.objects.create(
-            name="Whey",
-            brand=Brand.objects.create(name="growth", display_name="Growth"),
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+        self.natural = self._product("Whey 1 kg Natural", "Natural")
+        self.flavored = self._product("Whey 1 kg", "Chocolate", "Morango")
+
+    def _product(self, name: str, *flavors: str) -> Product:
+        """Create a published product whose one table the flavors print."""
+        product = Product.objects.create(
+            name=name,
+            brand=self.brand,
             net_mass=Decimal(1000),
             is_published=True,
         )
-        self.natural = self._profile("Natural")
-        self.flavored = self._profile("Chocolate", "Morango")
-
-    def _profile(self, *flavors: str) -> ProductNutrition:
-        """Create a label printed by the given flavors."""
         profile = ProductNutrition.objects.create(
-            product=self.product,
+            product=product,
             nutrition_facts=NutritionFacts.objects.create(
                 serving_size=Decimal(30),
                 proteins=Decimal(24),
             ),
         )
         profile.flavors.set(
-            [Flavor.objects.get_or_create(name=name)[0] for name in flavors],
+            [Flavor.objects.get_or_create(name=flavor)[0] for flavor in flavors],
         )
-        return profile
+        return product
 
-    def _sell(self, profile: ProductNutrition, flavor: str, price: str) -> None:
-        """Link a captured offer of one flavor to its label."""
+    def _sell(self, product: Product, flavor: str, price: str) -> None:
+        """Link the captured offer of one flavor to its product."""
         offer = Offer.objects.create(
             store_slug="growth",
             external_id=flavor,
@@ -628,18 +539,14 @@ class CatalogRowPriceTests(TestCase):
             current_price=Decimal(price),
             options=[{"name": "Sabor", "value": flavor}],
         )
-        ProductStore.objects.create(
-            product=self.product,
-            nutrition_profile=profile,
-            offer=offer,
-        )
+        ProductStore.objects.create(product=product, offer=offer)
 
-    def _row(self, profile: ProductNutrition) -> CatalogAnnotatedProduct:
-        """Return the catalog row of one label of the whey."""
-        return public_catalog_products().get(nutrition_profile_id=profile.pk)
+    def _row(self, product: Product) -> CatalogAnnotatedProduct:
+        """Return the catalog row of one product."""
+        return public_catalog_products().get(pk=product.pk)
 
-    def test_each_label_shows_the_price_of_its_own_flavors(self) -> None:
-        """The Natural row never borrows the flavored price, and vice versa."""
+    def test_each_product_shows_the_price_of_its_own_flavors(self) -> None:
+        """The Natural product never borrows the flavored price, nor the reverse."""
         self._sell(self.natural, "Natural", "150.00")
         self._sell(self.flavored, "Chocolate", "190.00")
 
@@ -647,8 +554,8 @@ class CatalogRowPriceTests(TestCase):
         assert self._row(self.flavored).price == Decimal("190.00")
         assert self._row(self.natural).external_link == "https://growth.example/Natural"
 
-    def test_a_label_sold_in_several_flavors_shows_the_cheapest(self) -> None:
-        """Two flavors printing one label compete; the row offers the best price."""
+    def test_a_product_sold_in_several_flavors_shows_the_cheapest(self) -> None:
+        """Flavors sharing one table compete; the product offers the best price."""
         self._sell(self.flavored, "Chocolate", "190.00")
         self._sell(self.flavored, "Morango", "170.00")
 
