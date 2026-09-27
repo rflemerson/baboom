@@ -126,7 +126,7 @@ def _serialize_catalog_product(
         ),
         "packagingDisplay": product.get_packaging_display(),
         "netMass": _decimal_to_str(product.net_mass),
-        "lastPrice": _decimal_to_str(product.price),
+        "price": _decimal_to_str(product.price),
         "pricePerActive": _decimal_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
         "totalActive": _decimal_to_str(product.total_active),

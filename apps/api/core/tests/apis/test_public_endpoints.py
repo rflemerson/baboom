@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from http import HTTPStatus
 
 from django.test import TestCase, override_settings
+
+from core.models import Brand, NutritionFacts, Product, ProductNutrition, Store
+from core.tests.helpers import _link_offer
 
 
 class PublicEndpointSecurityTests(TestCase):
@@ -37,3 +41,40 @@ class PublicEndpointSecurityTests(TestCase):
 
         assert response.status_code == HTTPStatus.OK
         assert payload == {"status": "ok"}
+
+
+class PublicCatalogPayloadTests(TestCase):
+    """The catalog item carries what the web app reads, under its names."""
+
+    def test_an_item_publishes_its_price_and_link(self) -> None:
+        """The card reads ``price``; a renamed key leaves the site priceless."""
+        store = Store.objects.create(
+            name="Black Skull",
+            display_name="Black Skull",
+            scraper_slug="black_skull",
+        )
+        product = Product.objects.create(
+            name="Whey 3W Chocolate",
+            brand=Brand.objects.create(name="black-skull", display_name="Black Skull"),
+            net_mass=Decimal(900),
+            is_published=True,
+        )
+        profile = ProductNutrition.objects.create(
+            product=product,
+            nutrition_facts=NutritionFacts.objects.create(
+                serving_size=Decimal(30),
+                proteins=Decimal(12),
+            ),
+        )
+        _link_offer(
+            product=product,
+            nutrition_profile=profile,
+            store=store,
+            product_link="https://blackskull.example/whey?skuId=1014",
+            price=119.90,
+        )
+
+        (item,) = json.loads(self.client.get("/api/catalog/products/").content)["items"]
+
+        assert item["price"] == "119.90"
+        assert item["externalLink"] == "https://blackskull.example/whey?skuId=1014"
