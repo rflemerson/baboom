@@ -14,7 +14,6 @@ from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
 from .dtos import ProductCreateInput, ProductMetadataUpdateInput
-from .forms import ProductAdminForm
 from .models import (
     Active,
     AlertSubscriber,
@@ -39,6 +38,7 @@ from .units import MASS_UNIT
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+    from django.forms import ModelForm
     from django.http import HttpRequest, HttpResponse
 
 
@@ -77,7 +77,6 @@ class ProductNutritionInline(admin.TabularInline):
 class ProductAdmin(admin.ModelAdmin):
     """Admin for products."""
 
-    form = ProductAdminForm
     show_facets = admin.ShowFacets.ALWAYS
     list_display = (
         "name",
@@ -157,7 +156,7 @@ class ProductAdmin(admin.ModelAdmin):
         self,
         _request: HttpRequest,
         obj: Product,
-        form: ProductAdminForm,
+        form: ModelForm,
         change: object,
     ) -> None:
         """Persist product changes through the official service layer."""
