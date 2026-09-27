@@ -4,21 +4,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from .models import Offer, PriceObservation, StockStatus
 
+if TYPE_CHECKING:
+    from decimal import Decimal
+
 logger = logging.getLogger(__name__)
-
-
-class OfferListingInput(Protocol):
-    """Minimal listing fields required to resolve an offer observation."""
-
-    external_id: str | None
-    product_link: str
-    price: float
-    stock_status: str
 
 
 @dataclass(frozen=True)
@@ -38,23 +31,8 @@ class OfferObservationService:
     """Resolve merchant offers and append price observations when needed.
 
     This is the single owner of "upsert an offer and record a price observation
-    if it changed". Both the scraper and the catalog listing flow go through it.
+    if it changed". Only the scraper writes offers; curation links to them.
     """
-
-    def resolve_for_listing(
-        self,
-        *,
-        store_slug: str,
-        listing: OfferListingInput,
-    ) -> Offer:
-        """Resolve or create the offer represented by a product listing payload."""
-        return self.record(
-            store_slug=store_slug,
-            external_id=listing.external_id or "",
-            price=Decimal(str(listing.price)),
-            stock_status=listing.stock_status,
-            snapshot={"url": listing.product_link},
-        ).offer
 
     def record(
         self,

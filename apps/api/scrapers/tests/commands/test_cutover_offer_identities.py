@@ -9,7 +9,14 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
-from core.models import Brand, Product, ProductStore, Store
+from core.models import (
+    Brand,
+    NutritionFacts,
+    Product,
+    ProductNutrition,
+    ProductStore,
+    Store,
+)
 from offers.models import Offer, PriceObservation
 from scrapers.models import ScrapedItem, ScrapedPage
 from scrapers.tests.helpers import _raised
@@ -43,8 +50,20 @@ class OfferIdentityCutoverTests(TestCase):
         """Attach a catalog link to the old identity for cutover coverage."""
         brand = Brand.objects.create(name="test", display_name="Test")
         product = Product.objects.create(name="Whey", brand=brand)
-        store = Store.objects.create(name="test_store", display_name="Test Store")
-        return ProductStore.objects.create(product=product, store=store, offer=offer)
+        Store.objects.create(
+            name="test_store",
+            display_name="Test Store",
+            scraper_slug="test_store",
+        )
+        profile = ProductNutrition.objects.create(
+            product=product,
+            nutrition_facts=NutritionFacts.objects.create(serving_size=Decimal(30)),
+        )
+        return ProductStore.objects.create(
+            product=product,
+            nutrition_profile=profile,
+            offer=offer,
+        )
 
     def test_a_platform_that_keeps_its_identity_is_left_alone(self) -> None:
         """WapStore and Nuvemshop key a unit by the same id the legacy rows use.

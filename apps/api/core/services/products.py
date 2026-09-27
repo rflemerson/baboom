@@ -12,8 +12,6 @@ from django.utils.translation import gettext_lazy as _
 from core.models import Brand, Category, Product, Tag
 from core.units import to_canonical
 
-from .product_stores import ProductStoreService
-
 if TYPE_CHECKING:
     from core.dtos import ProductCreateInput, ProductMetadataUpdateInput
 
@@ -56,9 +54,6 @@ class ProductCreateService:
 
                 if data.tag_ids:
                     product.tags.set(Tag.objects.filter(id__in=data.tag_ids))
-
-                if data.stores:
-                    ProductStoreService().replace_listings(product, data.stores)
 
                 return product
 

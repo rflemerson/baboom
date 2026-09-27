@@ -10,13 +10,11 @@ from django.test import TestCase
 from core.dtos import (
     ProductCreateInput,
     ProductMetadataUpdateInput,
-    StoreListingPayload,
 )
 from core.models import (
     Brand,
     Category,
     Product,
-    Store,
     Tag,
 )
 from core.services import (
@@ -34,14 +32,9 @@ class ProductCreateServiceTests(TestCase):
         """Create reusable fixtures and services."""
         self.service = ProductCreateService()
         self.brand = Brand.objects.create(name="growth", display_name="Growth")
-        self.store = Store.objects.create(
-            name="growth",
-            display_name="Growth",
-            scraper_slug="growth",
-        )
 
-    def test_execute_creates_product_with_taxonomy_and_store(self) -> None:
-        """Product creation should persist brand, category, tags and store listing."""
+    def test_execute_creates_product_with_taxonomy(self) -> None:
+        """Product creation should persist brand, category and tags."""
         supplements = Category.add_root(name="Supplements")
         protein = supplements.add_child(name="Protein")
         goal = Tag.add_root(name="Goal")
@@ -59,14 +52,6 @@ class ProductCreateServiceTests(TestCase):
                 description="Lean whey isolate",
                 is_published=True,
                 tag_ids=[muscle.id, whey_tag.id],
-                stores=[
-                    StoreListingPayload(
-                        store_id=self.store.id,
-                        external_id="growth-900",
-                        product_link="https://growth.example/whey",
-                        price=149.90,
-                    ),
-                ],
             ),
         )
 
@@ -75,10 +60,6 @@ class ProductCreateServiceTests(TestCase):
         assert product.category is not None
         assert product.category.name == "Protein"
         assert product.tags.count() == self.EXPECTED_TAG_COUNT
-        assert product.store_links.count() == 1
-        listing = product.store_links.first()
-        assert listing is not None
-        assert listing.offer.price_observations.count() == 1
 
     def test_execute_rejects_unknown_brand(self) -> None:
         """Product creation should fail when the brand ID does not exist."""

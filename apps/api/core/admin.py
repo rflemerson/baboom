@@ -13,10 +13,8 @@ from django.utils.html import format_html
 from treebeard.admin import TreeAdmin
 from treebeard.forms import movenodeform_factory
 
-from offers.models import Offer, StockStatus
-
-from .dtos import ProductCreateInput, ProductMetadataUpdateInput, StoreListingPayload
-from .forms import ProductAdminForm, ProductStoreInlineForm, ProductStoreInlineFormSet
+from .dtos import ProductCreateInput, ProductMetadataUpdateInput
+from .forms import ProductAdminForm
 from .models import (
     Active,
     AlertSubscriber,
@@ -36,13 +34,11 @@ from .models import (
 from .services import (
     ProductCreateService,
     ProductMetadataUpdateService,
-    ProductStoreService,
 )
 from .units import DISPLAY_MASS_UNIT
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
-    from django.forms import BaseInlineFormSet
     from django.http import HttpRequest, HttpResponse
 
 
@@ -54,40 +50,6 @@ class NutritionActiveInline(nested_admin.NestedTabularInline):
     min_num = 0
     autocomplete_fields: ClassVar[list[str]] = ["active"]
     classes: ClassVar[list[str]] = ["collapse"]
-
-
-class ProductStoreInline(admin.TabularInline):
-    """Official store listing workflow embedded in the product admin."""
-
-    model = ProductStore
-    form = ProductStoreInlineForm
-    formset = ProductStoreInlineFormSet
-    extra = 0
-    autocomplete_fields: ClassVar[list[str]] = ["store"]
-
-    def get_extra(
-        self,
-        request: HttpRequest,
-        obj: Product | None = None,
-        **kwargs: object,
-    ) -> int:
-        """Show one listing row when adding a product from a captured offer."""
-        if (
-            (obj is None or obj.pk is None)
-            and request.method == "GET"
-            and request.GET.get("source_offer")
-        ):
-            return 1
-        return super().get_extra(request, obj, **kwargs)
-
-    fields = (
-        "store",
-        "external_id",
-        "product_link",
-        "affiliate_link",
-        "price",
-        "stock_status",
-    )
 
 
 class ProductComponentInline(admin.TabularInline):
@@ -134,7 +96,6 @@ class ProductAdmin(admin.ModelAdmin):
     filter_horizontal: ClassVar[list[str]] = ["tags"]
     inlines: ClassVar[list[type[admin.TabularInline]]] = [
         ProductComponentInline,
-        ProductStoreInline,
         ProductNutritionInline,
     ]
     actions = ("delete_products_with_related_data",)
@@ -180,54 +141,6 @@ class ProductAdmin(admin.ModelAdmin):
     def get_category(self, obj: Product) -> str:
         """Return category name."""
         return obj.category.name if obj.category else "-"
-
-    def _source_offer(self, request: HttpRequest) -> Offer | None:
-        """Resolve the selected scraped offer for the product add form."""
-        if request.method != "GET":
-            return None
-        offer_id = request.GET.get("source_offer", "")
-        if not offer_id.isdecimal():
-            return None
-        return Offer.objects.filter(
-            pk=int(offer_id),
-            product_store__isnull=True,
-        ).first()
-
-    def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, object]:
-        """Prefill catalog fields from the selected merchant offer."""
-        initial = super().get_changeform_initial_data(request)
-        offer = self._source_offer(request)
-        if offer is not None:
-            initial.update(name=offer.name, ean=offer.ean)
-        return initial
-
-    def get_formset_kwargs(
-        self,
-        request: HttpRequest,
-        obj: Product | None,
-        inline: admin.InlineModelAdmin,
-        prefix: str,
-    ) -> dict[str, object]:
-        """Prefill the store listing with the captured offer and current price."""
-        kwargs = super().get_formset_kwargs(request, obj, inline, prefix)
-        if (obj is not None and obj.pk is not None) or inline.model is not ProductStore:
-            return kwargs
-        offer = self._source_offer(request)
-        if offer is None:
-            return kwargs
-        store = Store.objects.filter(scraper_slug=offer.store_slug).first()
-        if store is None:
-            return kwargs
-        kwargs["initial"] = [
-            {
-                "store": store.pk,
-                "external_id": offer.external_id,
-                "product_link": offer.url,
-                "price": offer.current_price,
-                "stock_status": offer.current_stock_status,
-            },
-        ]
-        return kwargs
 
     def changeform_view(
         self,
@@ -292,58 +205,6 @@ class ProductAdmin(admin.ModelAdmin):
         )
         obj.pk = created_product.pk
         obj.refresh_from_db()
-
-    def save_related(
-        self,
-        request: HttpRequest,
-        form: ProductAdminForm,
-        formsets: list[BaseInlineFormSet],
-        change: object,
-    ) -> None:
-        """Persist service-backed relations after the product itself is saved."""
-        self._sync_product_store_listings(form.instance, formsets)
-        for formset in formsets:
-            if isinstance(formset, ProductStoreInlineFormSet):
-                continue
-            self.save_formset(request, form, formset, change)
-
-    def _sync_product_store_listings(
-        self,
-        product: Product,
-        formsets: list[BaseInlineFormSet],
-    ) -> None:
-        """Replace product store listings using the service-backed inline rows."""
-        product_store_formset = next(
-            (fs for fs in formsets if isinstance(fs, ProductStoreInlineFormSet)),
-            None,
-        )
-        if product_store_formset is None:
-            return
-
-        store_listings_data: list[StoreListingPayload] = []
-        for inline_form in product_store_formset.forms:
-            cleaned_data = getattr(inline_form, "cleaned_data", None)
-            if not cleaned_data or cleaned_data.get("DELETE"):
-                continue
-            store = cleaned_data.get("store")
-            product_link = cleaned_data.get("product_link")
-            price = cleaned_data.get("price")
-            if store is None or not product_link or price in (None, ""):
-                continue
-            store_listings_data.append(
-                StoreListingPayload(
-                    store_id=store.id,
-                    external_id=cleaned_data.get("external_id") or "",
-                    product_link=product_link,
-                    affiliate_link=cleaned_data.get("affiliate_link") or "",
-                    price=float(price),
-                    stock_status=(
-                        cleaned_data.get("stock_status") or StockStatus.AVAILABLE
-                    ),
-                ),
-            )
-
-        ProductStoreService().replace_listings(product, store_listings_data)
 
     @admin.action(
         description="Delete selected products with links",
@@ -552,53 +413,56 @@ class ProductActiveAdmin(admin.ModelAdmin):
 
 @admin.register(ProductStore)
 class ProductStoreAdmin(admin.ModelAdmin):
-    """Technical support admin for product-store links."""
+    """Link a captured offer to the catalog row it prices.
+
+    This is the one place an offer becomes a price on the site. The curator
+    picks the product, the label its flavor prints and the offer; the store,
+    price, stock, URL and flavor all come from the offer itself.
+    """
 
     show_facets = admin.ShowFacets.ALWAYS
-    list_display = ("product", "store", "get_external_id", "get_last_price")
+    list_display = (
+        "product",
+        "nutrition_profile",
+        "store",
+        "get_flavors",
+        "get_external_id",
+        "get_current_price",
+    )
     list_filter = ("store",)
     search_fields = ("product__name", "store__name", "offer__external_id")
-    autocomplete_fields: ClassVar[list[str]] = ["product", "store"]
-    readonly_fields = (
+    autocomplete_fields: ClassVar[list[str]] = [
         "product",
-        "store",
+        "nutrition_profile",
         "offer",
-        "affiliate_link",
-    )
+    ]
+    fields = ("product", "nutrition_profile", "offer", "affiliate_link", "store")
+    readonly_fields = ("store",)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet:
         """Optimize queryset."""
         return (
             super()
             .get_queryset(request)
-            .select_related("product", "store", "offer")
-            .prefetch_related("offer__price_observations")
+            .select_related("product", "nutrition_profile", "store", "offer")
         )
+
+    @admin.display(description="Flavors")
+    def get_flavors(self, obj: ProductStore) -> str:
+        """Return the flavors the linked offer states."""
+        return ", ".join(obj.offer.flavors) if obj.offer else "-"
 
     @admin.display(description="Store Product ID")
     def get_external_id(self, obj: ProductStore) -> str:
         """Return the merchant identifier from the linked offer."""
         return obj.external_id or "-"
 
-    @admin.display(description="Last Price")
-    def get_last_price(self, obj: ProductStore) -> str:
-        """Return formatted last price from the linked offer."""
-        if obj.offer is None:
+    @admin.display(description="Current Price")
+    def get_current_price(self, obj: ProductStore) -> str:
+        """Return the current price of the linked offer."""
+        if obj.offer is None or obj.offer.current_price is None:
             return "-"
-        last = obj.offer.price_observations.first()
-        return f"R$ {last.price}" if last else "-"
-
-    def has_add_permission(self, _request: HttpRequest) -> bool:
-        """Disallow direct creation; use ProductAdmin instead."""
-        return False
-
-    def has_delete_permission(
-        self,
-        _request: HttpRequest,
-        _obj: ProductStore | None = None,
-    ) -> bool:
-        """Disallow direct deletion; use ProductAdmin instead."""
-        return False
+        return f"R$ {obj.offer.current_price}"
 
 
 @admin.register(NutritionFacts)

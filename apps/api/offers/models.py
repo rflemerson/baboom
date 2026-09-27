@@ -9,6 +9,8 @@ and resolved to a curated ``core.Store`` at the boundary.
 
 from __future__ import annotations
 
+import unicodedata
+
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -27,6 +29,23 @@ class StockStatus(models.TextChoices):
     def normalize(cls, value: str) -> str:
         """Return a supported stock status or the available fallback."""
         return value if value in cls.values else cls.AVAILABLE
+
+
+FLAVOR_OPTION_PREFIXES = ("sabor", "flavor")
+
+
+def fold(text: str) -> str:
+    """Return text compared the way a label is read: no case, accents or gaps."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    stripped = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return " ".join(stripped.casefold().split())
+
+
+class DelistReason(models.TextChoices):
+    """Why an offer stopped being a unit the catalog can price."""
+
+    GONE = "gone", _("The store stopped publishing it")
+    SUPERSEDED = "superseded", _("Replaced by offers for each buyable variant")
 
 
 class Offer(BaseModel):
@@ -129,16 +148,51 @@ class Offer(BaseModel):
         help_text=_("When the unit stopped appearing on a page that did list it"),
     )
 
+    delisted_reason = models.CharField(
+        _("Delisted Reason"),
+        max_length=20,
+        choices=DelistReason,
+        blank=True,
+        default="",
+    )
+
     missed_runs = models.PositiveIntegerField(
         _("Missed Runs"),
         default=0,
         help_text=_("Consecutive successful store runs that did not publish this unit"),
     )
 
+    options = models.JSONField(
+        _("Options"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "Options the store published for this unit, verbatim: "
+            'a list of {"name", "value"} such as {"name": "Sabor", '
+            '"value": "Chocolate"}.',
+        ),
+    )
+
     @property
     def is_listed(self) -> bool:
         """Whether the store still publishes this unit."""
         return self.delisted_at is None
+
+    @property
+    def flavors(self) -> list[str]:
+        """Return the flavor values the store published for this unit.
+
+        Stores name the option freely ("Sabor", "Sabor Whey", "Sabores") and a
+        kit publishes one per item ("Sabor 2"), so every option whose name
+        starts with a flavor word counts, verbatim.
+        """
+        return [
+            str(option["value"])
+            for option in self.options or []
+            if isinstance(option, dict)
+            and option.get("value")
+            and fold(str(option.get("name", ""))).startswith(FLAVOR_OPTION_PREFIXES)
+        ]
 
     class Meta:
         """Meta options."""

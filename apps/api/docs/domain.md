@@ -40,9 +40,13 @@
   `core/units.py` converts only inside arithmetic, into grams. Values the
   catalog cannot convert -- international units, percentages of a daily value
   -- carry no concentration and simply do not rank.
-- Store listings: manage `ProductStore` only through the `ProductAdmin` inline.
+- Store links: a catalog row is one nutrition profile of a product, and a store
+  sells one flavor per offer, so `ProductStore` links a profile (none for a
+  combo) to a captured `Offer`. The rules live in `ProductStore.clean()`: the
+  store comes from the offer through `Store.scraper_slug`, the offer must still
+  be listed, and the flavor it states (`Offer.flavors`) must be one the profile
+  lists. A row shows its cheapest listed offer.
 - Product create/update goes through `ProductCreateService` and `ProductMetadataUpdateService`.
-- Store listing inline rows go through `ProductStoreService`.
 
 ## Public
 

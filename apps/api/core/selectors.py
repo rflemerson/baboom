@@ -9,6 +9,7 @@ from django.db.models import (
     ExpressionWrapper,
     F,
     FloatField,
+    IntegerField,
     OuterRef,
     Q,
     QuerySet,
@@ -18,25 +19,42 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, Coalesce, NullIf
 
-from offers.models import PriceObservation
+from offers.models import Offer
 
 from . import units
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
+# A combo row has no nutrition profile; 0 stands for "no profile" on both
+# sides so the row and its links can be compared with one equality.
+NO_PROFILE = 0
 
-def _latest_price_observation_subquery() -> QuerySet[PriceObservation]:
-    """Return the latest price observations for the outer product.
 
-    Prices live on the merchant offers linked to the product's store listings.
-    The ordering is stable so every annotated field comes from the same latest
-    observation even when multiple rows share the same timestamp.
+def _row_profile_key(field: str) -> Coalesce:
+    """Return a profile id that compares equal when both sides have none."""
+    return Coalesce(F(field), Value(NO_PROFILE), output_field=IntegerField())
+
+
+def _cheapest_offer_subquery() -> QuerySet[Offer]:
+    """Return the listed offers pricing the outer catalog row, cheapest first.
+
+    A row is one nutrition profile of a product, and every offer linked to that
+    profile sells a flavor its label prints, so they compete: the row shows the
+    best current price. The ordering is stable so the price and the link always
+    come from the same offer.
     """
-    return PriceObservation.objects.filter(
-        offer__product_store__product=OuterRef("pk"),
-        offer__current_price__isnull=False,
-        offer__delisted_at__isnull=True,
-    ).order_by("-observed_at", "-pk")
+    return (
+        Offer.objects.annotate(
+            row_profile=_row_profile_key("product_store__nutrition_profile_id"),
+        )
+        .filter(
+            product_store__product=OuterRef("pk"),
+            row_profile=OuterRef("row_profile"),
+            current_price__isnull=False,
+            delisted_at__isnull=True,
+        )
+        .order_by("current_price", "pk")
+    )
 
 
 def catalog_active(slug: str | None = None) -> Active | None:
@@ -50,7 +68,7 @@ def _annotate_catalog_base_fields(
     active: Active | None,
 ) -> QuerySet[Product]:
     """Annotate catalog fields loaded directly from subqueries."""
-    latest_prices = _latest_price_observation_subquery()
+    cheapest = _cheapest_offer_subquery()
 
     fraction = (
         Value(None, output_field=DecimalField(max_digits=12, decimal_places=8))
@@ -78,11 +96,11 @@ def _annotate_catalog_base_fields(
 
     return queryset.annotate(
         last_price=Subquery(
-            latest_prices.values("price")[:1],
+            cheapest.values("current_price")[:1],
             output_field=DecimalField(max_digits=10, decimal_places=2),
         ),
         external_link=Subquery(
-            latest_prices.values("offer__url")[:1],
+            cheapest.values("url")[:1],
             output_field=URLField(),
         ),
         fraction=fraction,
@@ -137,6 +155,7 @@ def public_catalog_products_with_stats(
         .annotate(
             nutrition_profile_id=F("nutrition_profiles__id"),
             nutrition_facts_id=F("nutrition_profiles__nutrition_facts_id"),
+            row_profile=_row_profile_key("nutrition_profiles__id"),
         )
     )
     return _annotate_catalog_metrics(

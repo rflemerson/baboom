@@ -21,6 +21,7 @@ from core.models import (
     Product,
     ProductComponent,
     ProductNutrition,
+    ProductStore,
     Store,
 )
 from core.selectors import (
@@ -32,7 +33,7 @@ from core.tests.helpers import (
     CatalogAnnotatedProduct,
     _link_offer,
 )
-from offers.models import PriceObservation
+from offers.models import Offer
 
 
 class CatalogActiveRankingTests(TestCase):
@@ -378,28 +379,21 @@ class ProductStatsTests(TestCase):
         assert result.price_per_active is None
         assert result.external_link is None
 
-    def test_latest_price_and_external_link_use_same_history_row_on_timestamp_tie(
+    def test_price_and_link_come_from_the_same_offer_when_prices_tie(
         self,
     ) -> None:
-        """Latest price annotations should stay consistent under observed_at ties."""
+        """Two stores at the same price never mix one's price with the other's URL."""
         second_store = Store.objects.create(
             name="Second Store",
             display_name="Second Store",
             scraper_slug="second_store",
         )
-        second_link = _link_offer(
+        _link_offer(
             product=self.product,
             store=second_store,
             product_link="https://example.com/second",
-            price=150.00,
+            price=100.00,
         )
-
-        first_history = self.link.offer.price_observations.first()
-        second_history = second_link.offer.price_observations.first()
-        tied_timestamp = timezone.now()
-        PriceObservation.objects.filter(
-            id__in=[first_history.id, second_history.id],
-        ).update(observed_at=tied_timestamp)
 
         product = cast(
             "CatalogAnnotatedProduct | None",
@@ -407,11 +401,11 @@ class ProductStatsTests(TestCase):
         )
 
         assert product is not None
-        assert product.last_price == Decimal("150.00")
-        assert product.external_link == "https://example.com/second"
+        assert product.last_price == Decimal("100.00")
+        assert product.external_link == self.link.offer.url
 
     def test_catalog_preserves_distinct_nutrition_profiles(self) -> None:
-        """Each label keeps its own concentration and price-per-active metric."""
+        """Each label keeps its own metrics and never borrows another's price."""
         denser_profile = NutritionFacts.objects.create(
             serving_size=Decimal(30),
             proteins=Decimal("27.0"),
@@ -438,10 +432,9 @@ class ProductStatsTests(TestCase):
             Decimal(800),
             Decimal(900),
         ]
-        assert [round(product.price_per_active, 3) for product in products] == [
-            Decimal("0.125"),
-            Decimal("0.111"),
-        ]
+        assert round(products[0].price_per_active, 3) == Decimal("0.125")
+        assert products[1].last_price is None
+        assert products[1].price_per_active is None
 
     def test_rest_ranks_and_filters_flavors_with_their_own_table(self) -> None:
         """Search and concentration filters must select the same profile row."""
@@ -582,3 +575,75 @@ class ProductStatsTests(TestCase):
         )
 
         assert items[:2] == [("Alpha", "Whey A"), ("Beta", "Whey B")]
+
+
+class CatalogRowPriceTests(TestCase):
+    """Each catalog row is priced by the offers of its own nutrition label."""
+
+    def setUp(self) -> None:
+        """Create a whey whose Natural and flavored labels sell separately."""
+        self.store = Store.objects.create(
+            name="Growth",
+            display_name="Growth",
+            scraper_slug="growth",
+        )
+        self.product = Product.objects.create(
+            name="Whey",
+            brand=Brand.objects.create(name="growth", display_name="Growth"),
+            net_mass=Decimal(1000),
+            is_published=True,
+        )
+        self.natural = self._profile("Natural")
+        self.flavored = self._profile("Chocolate", "Morango")
+
+    def _profile(self, *flavors: str) -> ProductNutrition:
+        """Create a label printed by the given flavors."""
+        profile = ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=NutritionFacts.objects.create(
+                serving_size=Decimal(30),
+                proteins=Decimal(24),
+            ),
+        )
+        profile.flavors.set(
+            [Flavor.objects.get_or_create(name=name)[0] for name in flavors],
+        )
+        return profile
+
+    def _sell(self, profile: ProductNutrition, flavor: str, price: str) -> None:
+        """Link a captured offer of one flavor to its label."""
+        offer = Offer.objects.create(
+            store_slug="growth",
+            external_id=flavor,
+            url=f"https://growth.example/{flavor}",
+            current_price=Decimal(price),
+            options=[{"name": "Sabor", "value": flavor}],
+        )
+        ProductStore.objects.create(
+            product=self.product,
+            nutrition_profile=profile,
+            offer=offer,
+        )
+
+    def _row(self, profile: ProductNutrition) -> CatalogAnnotatedProduct:
+        """Return the catalog row of one label of the whey."""
+        return public_catalog_products().get(nutrition_profile_id=profile.pk)
+
+    def test_each_label_shows_the_price_of_its_own_flavors(self) -> None:
+        """The Natural row never borrows the flavored price, and vice versa."""
+        self._sell(self.natural, "Natural", "150.00")
+        self._sell(self.flavored, "Chocolate", "190.00")
+
+        assert self._row(self.natural).last_price == Decimal("150.00")
+        assert self._row(self.flavored).last_price == Decimal("190.00")
+        assert self._row(self.natural).external_link == "https://growth.example/Natural"
+
+    def test_a_label_sold_in_several_flavors_shows_the_cheapest(self) -> None:
+        """Two flavors printing one label compete; the row offers the best price."""
+        self._sell(self.flavored, "Chocolate", "190.00")
+        self._sell(self.flavored, "Morango", "170.00")
+
+        row = self._row(self.flavored)
+
+        assert row.last_price == Decimal("170.00")
+        assert row.external_link == "https://growth.example/Morango"

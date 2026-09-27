@@ -18,6 +18,7 @@ from core.models import (
     Flavor,
     NutritionFacts,
     Product,
+    ProductNutrition,
     ProductStore,
     Store,
 )
@@ -41,8 +42,7 @@ class AdminApiInlineWriteTests(TestCase):
     # An inline is addressed by its formset prefix, which is the related
     # accessor and so is unique per relation.
     NUTRITION_INLINE = "nutrition_profiles"
-    STORE_INLINE = "store_links"
-    EXPECTED_INLINE_COUNT = 3
+    EXPECTED_INLINE_COUNT = 2
 
     def setUp(self) -> None:
         """Create an operator and the references a product write needs."""
@@ -178,37 +178,94 @@ class AdminApiInlineWriteTests(TestCase):
         assert len(inlines) == self.EXPECTED_INLINE_COUNT
         assert len(set(names)) == len(names), f"colliding inline names: {names}"
 
-    def test_store_listing_and_nutrition_travel_in_one_request(self) -> None:
-        """Curation sets the offer link and the nutrition in the same write."""
-        status, body = self._post(
-            self._payload(
-                inlines={
-                    self.NUTRITION_INLINE: {
-                        "items": [
-                            {"pk": None, "fields": {"nutrition_facts": self.facts.pk}}
-                        ],
-                    },
-                    self.STORE_INLINE: {
-                        "items": [
-                            {
-                                "pk": None,
-                                "fields": {
-                                    "store": self.store.pk,
-                                    "external_id": "growth-900",
-                                    "product_link": "https://example.com/whey",
-                                    "price": "129.90",
-                                },
-                            },
-                        ],
-                    },
-                },
+
+class AdminApiStoreLinkTests(TestCase):
+    """Curation links a captured offer through the generic admin API.
+
+    This is the exact surface an MCP client uses: no field is typed about the
+    offer, the store comes from it, and a link that would price the wrong label
+    is refused with a reason the client can act on.
+    """
+
+    URL = "/admin-api/api/v1/core/productstore/"
+
+    def setUp(self) -> None:
+        """Create a Natural whey and the Growth offers the scraper captured."""
+        self.user = get_user_model().objects.create(
+            username="curator",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.force_login(self.user)
+        self.store = Store.objects.create(
+            name="Growth",
+            display_name="Growth Supplements",
+            scraper_slug="growth",
+        )
+        self.product = Product.objects.create(
+            name="Whey Concentrado 1kg",
+            brand=Brand.objects.create(name="growth", display_name="Growth"),
+            net_mass=Decimal(1000),
+        )
+        self.natural = ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=NutritionFacts.objects.create(
+                serving_size=Decimal(30),
+                proteins=Decimal(24),
             ),
         )
+        self.natural.flavors.add(Flavor.objects.create(name="Natural"))
+        self.offers = {
+            flavor: Offer.objects.create(
+                store_slug="growth",
+                external_id=f"185:{flavor}",
+                url=f"https://growth.example/whey?sabor={flavor}",
+                current_price=Decimal("194.33"),
+                options=[{"name": "Sabor", "value": flavor}],
+            )
+            for flavor in ("Natural", "Chocolate")
+        }
+
+    def _post(self, flavor: str) -> tuple[int, dict]:
+        """Link the offer of one flavor to the Natural label."""
+        response = self.client.post(
+            self.URL,
+            data=json.dumps(
+                {
+                    "product": self.product.pk,
+                    "nutrition_profile": self.natural.pk,
+                    "offer": self.offers[flavor].pk,
+                },
+            ),
+            content_type="application/json",
+        )
+        return response.status_code, json.loads(response.content or b"{}")
+
+    def test_a_captured_offer_is_linked_without_retyping_it(self) -> None:
+        """The link reuses the offer and its history, and resolves the store."""
+        status, body = self._post("Natural")
 
         assert status < HTTPStatus.BAD_REQUEST, body
-        product = Product.objects.get(name="Whey Concentrado 900g")
-        assert product.nutrition_profiles.count() == 1
-        assert product.store_links.count() == 1
+        link = ProductStore.objects.get(product=self.product)
+        assert link.offer == self.offers["Natural"]
+        assert link.store == self.store
+        assert Offer.objects.count() == len(self.offers)
+
+    def test_a_link_to_the_wrong_label_is_refused_with_a_reason(self) -> None:
+        """Chocolate cannot price the Natural label, and the client is told why."""
+        status, body = self._post("Chocolate")
+
+        assert status == HTTPStatus.BAD_REQUEST, body
+        assert "Chocolate" in json.dumps(body)
+        assert not ProductStore.objects.exists()
+
+    def test_the_store_is_not_something_the_client_can_type(self) -> None:
+        """The form spec offers the offer and the label, never the store."""
+        response = self.client.get(f"{self.URL}add/form-spec/")
+        fields = json.loads(response.content)["fields"]
+
+        assert {"product", "nutrition_profile", "offer"} <= set(fields)
+        assert "store" not in fields or fields["store"]["readonly"]
 
 
 class ProductAdminActionTests(TestCase):
@@ -230,6 +287,13 @@ class ProductAdminActionTests(TestCase):
             brand=self.brand,
             net_mass=Decimal(900),
             packaging=Product.Packaging.REFILL,
+        )
+        ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=NutritionFacts.objects.create(
+                serving_size=Decimal(30),
+                proteins=Decimal(21),
+            ),
         )
         self.store_link = _link_offer(
             product=self.product,

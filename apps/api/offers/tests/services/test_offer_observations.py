@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from types import SimpleNamespace
 
 from django.test import TestCase
 
@@ -109,22 +108,3 @@ class OfferObservationServiceTests(TestCase):
         offer.refresh_from_db()
         assert offer.current_price is None
         assert offer.current_stock_status == StockStatus.OUT_OF_STOCK
-
-    def test_resolve_for_listing_converts_price_and_empty_identity(self) -> None:
-        """A listing DTO maps its URL and price into the common record operation."""
-        listing = SimpleNamespace(
-            external_id=None,
-            product_link="https://example.com/whey",
-            price=INITIAL_PRICE,
-            stock_status=StockStatus.AVAILABLE,
-        )
-
-        offer = self.service.resolve_for_listing(
-            store_slug="test-store",
-            listing=listing,
-        )
-
-        assert offer.external_id == ""
-        assert offer.url == listing.product_link
-        assert offer.current_price == INITIAL_PRICE
-        assert PriceObservation.objects.get().price == INITIAL_PRICE

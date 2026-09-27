@@ -2,21 +2,8 @@
 
 from pydantic import BaseModel
 
-from offers.models import StockStatus
-
 from .models import Product
 from .units import DISPLAY_MASS_UNIT
-
-
-class StoreListingPayload(BaseModel):
-    """DTO for a store listing attached to a product."""
-
-    store_id: int
-    product_link: str
-    price: float
-    external_id: str | None = ""
-    affiliate_link: str | None = None
-    stock_status: str = StockStatus.AVAILABLE
 
 
 class ProductCreateInput(BaseModel):
@@ -36,7 +23,6 @@ class ProductCreateInput(BaseModel):
     packaging: str = Product.Packaging.CONTAINER
     is_published: bool = False
     tag_ids: list[int] | None = None
-    stores: list[StoreListingPayload] | None = None
 
 
 class ProductMetadataUpdateInput(BaseModel):

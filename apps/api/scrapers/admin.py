@@ -20,13 +20,13 @@ NAME_SUMMARY_MAX_LENGTH = 40
 ERROR_SUMMARY_MAX_LENGTH = 80
 
 
-@admin.action(description="Open product creation from selected item")
-def create_product_from_scraped_item(
+@admin.action(description="Link the selected item's offer to a catalog row")
+def link_scraped_item_offer(
     modeladmin: admin.ModelAdmin,
     request: HttpRequest,
     queryset: QuerySet[ScrapedItem],
 ) -> HttpResponseRedirect | None:
-    """Open the product admin add form prefilled from a scraped item."""
+    """Open the store link form with the item's offer already chosen."""
     item = queryset.first()
     if item is None:
         modeladmin.message_user(
@@ -39,21 +39,18 @@ def create_product_from_scraped_item(
     if queryset.count() > 1:
         modeladmin.message_user(
             request,
-            _("Please select only one item to create a product from."),
+            _("Please select only one item to link."),
             level=messages.WARNING,
         )
         return None
 
     offer = item.offer
-    linked_product = getattr(offer, "product_store", None)
-    if linked_product is not None:
-        return redirect(
-            reverse("admin:core_product_change", args=[linked_product.product_id]),
-        )
+    link = getattr(offer, "product_store", None)
+    if link is not None:
+        return redirect(reverse("admin:core_productstore_change", args=[link.pk]))
 
-    query_string = urlencode({"source_offer": offer.pk})
-    url = reverse("admin:core_product_add") + f"?{query_string}"
-    return redirect(url)
+    query_string = urlencode({"offer": offer.pk})
+    return redirect(reverse("admin:core_productstore_add") + f"?{query_string}")
 
 
 @admin.register(ScrapedItem)
@@ -76,7 +73,7 @@ class ScrapedItemAdmin(admin.ModelAdmin):
         "offer",
     )
 
-    actions = (create_product_from_scraped_item,)
+    actions = (link_scraped_item_offer,)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[ScrapedItem]:
         """Load the linked offer used across list columns."""

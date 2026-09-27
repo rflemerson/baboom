@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
 
 from common.models import BaseModel
+from offers.models import fold
 
 from . import units
 
@@ -497,11 +498,16 @@ class ProductComponent(BaseModel):
 
 
 class ProductStore(BaseModel):
-    """Curated link between a Product and the merchant Offer that fulfils it.
+    """Curated link between a catalog row and the merchant offer that prices it.
 
-    The store identity and price series live on the linked :class:`offers.Offer`.
-    This model holds only the catalog-side curation: which Store the offer maps
-    to and the affiliate tracking URL.
+    A simple product is ranked once per nutrition profile, and a store sells one
+    flavor per offer, so the link names the profile whose label that flavor
+    prints: the flavor the store states must be one the label lists. A combo
+    ranks through its components and has no label, so it links without one.
+
+    The store is whichever one sells the offer. It is resolved from the offer's
+    scraper slug on every save and cannot be chosen, so a link can never show
+    one store's name next to another store's price.
     """
 
     product = models.ForeignKey(
@@ -511,10 +517,25 @@ class ProductStore(BaseModel):
         related_name="store_links",
     )
 
+    nutrition_profile = models.ForeignKey(
+        "ProductNutrition",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_("Nutrition Profile"),
+        related_name="store_links",
+        help_text=_(
+            "The product's label that this offer's flavor prints. Required for "
+            "a simple product, empty for a combo.",
+        ),
+    )
+
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
         verbose_name=_("Associated Store"),
+        editable=False,
+        help_text=_("Resolved from the offer; never chosen."),
     )
 
     offer = models.OneToOneField(
@@ -524,7 +545,10 @@ class ProductStore(BaseModel):
         blank=True,
         verbose_name=_("Merchant Offer"),
         related_name="product_store",
-        help_text=_("Merchant offer that holds the price series for this listing"),
+        help_text=_(
+            "The captured offer that prices this row. Its price, stock, URL and "
+            "flavor come from the scraper; nothing about it is typed here.",
+        ),
     )
 
     affiliate_link = models.URLField(
@@ -542,18 +566,109 @@ class ProductStore(BaseModel):
         verbose_name_plural = _("Store Product Links")
         ordering = ("store__name", "product__name")
 
-        constraints = (
-            models.UniqueConstraint(
-                fields=["product", "store"],
-                name="unique_product_store",
-            ),
-        )
-
         indexes = (models.Index(fields=["store", "product"]),)
 
     def __str__(self) -> str:
         """Return string representation."""
         return f"{self.store.name} -> {self.product.name}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Validate the link and resolve its store before every write."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        """Resolve the store and reject a link that would misprice a row."""
+        super().clean()
+        errors: dict[str, list[str]] = {}
+        if self.offer_id is None:
+            errors.setdefault("offer", []).append(
+                str(_("Link a captured offer.")),
+            )
+        else:
+            self._resolve_store(errors)
+        if self.product_id is not None:
+            self._validate_profile(errors)
+        if not errors and self.offer_id is not None:
+            self._validate_flavor(errors)
+        if errors:
+            raise ValidationError(errors)
+
+    def _resolve_store(self, errors: dict[str, list[str]]) -> None:
+        """Set the store that sells the offer, or report that none is mapped."""
+        offer = self.offer
+        if not offer.is_listed:
+            errors.setdefault("offer", []).append(
+                str(_("The store no longer publishes this offer.")),
+            )
+        store = Store.objects.filter(scraper_slug=offer.store_slug).first()
+        if store is None:
+            errors.setdefault("offer", []).append(
+                format_lazy(
+                    "{} {}.",
+                    _("No store is mapped to the scraper slug"),
+                    offer.store_slug,
+                ),
+            )
+            return
+        self.store = store
+
+    def _validate_profile(self, errors: dict[str, list[str]]) -> None:
+        """Require the product's own label on a simple product, none on a combo."""
+        profile = self.nutrition_profile
+        if self.product.is_combo:
+            if profile is not None:
+                errors.setdefault("nutrition_profile", []).append(
+                    str(_("A combo ranks through its components; leave it empty.")),
+                )
+            return
+        if profile is None:
+            errors.setdefault("nutrition_profile", []).append(
+                str(_("Choose the product's label that this offer's flavor prints.")),
+            )
+        elif profile.product_id != self.product_id:
+            errors.setdefault("nutrition_profile", []).append(
+                str(_("This label belongs to another product.")),
+            )
+
+    def _validate_flavor(self, errors: dict[str, list[str]]) -> None:
+        """Require the flavor the offer states to be one its label lists."""
+        if self.product.is_combo:
+            return
+        sold = self.offer.flavors
+        printed = [flavor.name for flavor in self.nutrition_profile.flavors.all()]
+        sold_folded = {fold(flavor) for flavor in sold}
+        printed_folded = {fold(flavor) for flavor in printed}
+        if len(sold_folded) > 1:
+            message = format_lazy(
+                "{} {}.",
+                _("This offer sells several flavors, so it is a kit:"),
+                ", ".join(sold),
+            )
+        elif printed_folded and not sold_folded:
+            message = format_lazy(
+                "{} {}.",
+                _(
+                    "This offer states no flavor, so it cannot price the label "
+                    "printed by",
+                ),
+                ", ".join(printed),
+            )
+        elif sold_folded - printed_folded:
+            message = format_lazy(
+                "{} {}; {} {}. {}",
+                _("This offer sells"),
+                ", ".join(sold),
+                _("the chosen label lists"),
+                ", ".join(printed) or _("no flavor"),
+                _(
+                    "Link it to the label of that flavor, or add the flavor to "
+                    "this label if the package prints the same table for it.",
+                ),
+            )
+        else:
+            return
+        errors.setdefault("offer", []).append(str(message))
 
     @property
     def external_id(self) -> str:
