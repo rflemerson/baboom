@@ -1,21 +1,20 @@
 """Typed DTOs shared by core services and ingestion workflows."""
 
+from decimal import Decimal
+
 from pydantic import BaseModel
 
 from .models import Product
-from .units import MASS_UNIT
+
+# Keep Decimal in runtime globals: Pydantic resolves this annotation at import time.
+_PYDANTIC_RUNTIME_TYPES = (Decimal,)
 
 
 class ProductCreateInput(BaseModel):
-    """DTO for product creation service.
-
-    ``net_mass`` is expressed in ``mass_unit``; the service converts it to grams,
-    the unit the package mass is stored in.
-    """
+    """DTO for product creation service; ``net_mass`` is in grams, as printed."""
 
     name: str
-    net_mass: float | None = None
-    mass_unit: str = MASS_UNIT
+    net_mass: Decimal | None = None
     brand_id: int
     category_id: int | None = None
     ean: str | None = None
@@ -29,8 +28,7 @@ class ProductMetadataUpdateInput(BaseModel):
     """DTO for metadata-only product updates."""
 
     name: str | None = None
-    net_mass: float | None = None
-    mass_unit: str = MASS_UNIT
+    net_mass: Decimal | None = None
     brand_id: int | None = None
     ean: str | None = None
     description: str | None = None
