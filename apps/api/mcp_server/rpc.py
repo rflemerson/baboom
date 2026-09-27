@@ -160,9 +160,21 @@ def handle(method: str, params: dict[str, Any]) -> dict[str, Any]:
     return HANDLERS[method](params)
 
 
+def _instructions() -> str:
+    """Return every skill, references included, as the server's instructions.
+
+    Prompts, resources and skills reach only clients that ask for them.
+    ``instructions`` is the one field every client receives with the
+    handshake, so the same files travel there too.
+    """
+    return "\n\n".join(_prompt_text(loader.load(slug)) for slug in loader.available())
+
+
 def declare_capabilities(payload: dict[str, Any]) -> dict[str, Any]:
-    """Add what this module serves to an ``initialize`` result."""
-    capabilities = payload.setdefault("result", {}).setdefault("capabilities", {})
+    """Add what this module serves, and how to use it, to an ``initialize``."""
+    result = payload.setdefault("result", {})
+    result["instructions"] = _instructions()
+    capabilities = result.setdefault("capabilities", {})
     capabilities.setdefault("extensions", {})[SKILLS_EXTENSION] = {}
     capabilities.setdefault("prompts", {"listChanged": False})
     capabilities.setdefault("resources", {"listChanged": False, "subscribe": False})

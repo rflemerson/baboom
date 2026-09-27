@@ -209,8 +209,18 @@ class Offer(BaseModel):
         indexes = (models.Index(fields=["store_slug", "external_id"]),)
 
     def __str__(self) -> str:
-        """Return string representation."""
-        return f"[{self.store_slug}] {self.external_id}"
+        """Name the offer the way a curator tells the store's units apart."""
+        parts = [f"[{self.store_slug}] {self.name or self.external_id}"]
+        if flavors := self.flavors:
+            parts.append(", ".join(flavors))
+        parts.append(
+            f"R$ {self.current_price}"
+            if self.current_price is not None
+            else "no price",
+        )
+        if not self.is_listed:
+            parts.append("delisted")
+        return f"{' — '.join(parts)} (#{self.external_id})"
 
 
 class PriceObservation(BaseModel):

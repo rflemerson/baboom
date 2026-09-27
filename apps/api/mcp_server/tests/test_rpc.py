@@ -53,6 +53,20 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
         assert "resources" in capabilities
         assert "tools" in capabilities
 
+    def test_initialize_hands_every_client_the_curation_instructions(self) -> None:
+        """A client that only reads the handshake still learns how to curate.
+
+        Prompts, resources and skills are fetched only by clients that ask;
+        ``instructions`` is the one field every client receives unasked.
+        """
+        instructions = self._rpc(
+            "initialize",
+            {"protocolVersion": "2024-11-05"},
+        )["result"]["instructions"]
+
+        assert "# Product curation" in instructions
+        assert "## references/catalog-rules.md" in instructions
+
     def test_skills_list_names_the_curation_skill(self) -> None:
         """The listing carries the frontmatter a client indexes on."""
         skills = self._rpc("skills/list")["result"]["skills"]

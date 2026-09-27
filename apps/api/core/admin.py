@@ -469,12 +469,25 @@ class ProductStoreAdmin(admin.ModelAdmin):
 class NutritionFactsAdmin(nested_admin.NestedModelAdmin):
     """Technical support admin for nutrition facts."""
 
-    list_display = ("__str__", "serving_size", "energy")
+    list_display = ("__str__", "serving_size", "energy", "used_by")
     search_fields = ("description", "content_hash")
+    readonly_fields = ("used_by",)
     inlines: ClassVar[list[type[nested_admin.NestedTabularInline]]] = [
         NutritionActiveInline,
     ]
     list_per_page = 20
+
+    @admin.display(description="Used by")
+    def used_by(self, obj: NutritionFacts) -> str:
+        """List every product label that prints this table.
+
+        Editing the table rewrites all of them, so this is read before a write.
+        """
+        profiles = obj.product_profiles.select_related(
+            "product",
+            "nutrition_facts",
+        ).prefetch_related("flavors")
+        return "; ".join(str(profile) for profile in profiles) or "-"
 
 
 @admin.register(AlertSubscriber)

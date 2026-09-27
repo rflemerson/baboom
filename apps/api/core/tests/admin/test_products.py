@@ -404,3 +404,40 @@ class AdminApiLabelUnitTests(TestCase):
         for fields, name, unit in expected:
             assert unit in str(fields[name]["label"]), (name, fields[name])
             assert "canonical" not in str(fields[name]["help_text"]), name
+
+
+class NutritionFactsUsageTests(TestCase):
+    """A shared table says who shares it before anyone edits it."""
+
+    def test_retrieving_a_table_lists_every_label_that_prints_it(self) -> None:
+        """Editing one table rewrites every product and flavor listed here."""
+        user = get_user_model().objects.create(
+            username="curator",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.force_login(user)
+        brand = Brand.objects.create(name="black-skull", display_name="Black Skull")
+        facts = NutritionFacts.objects.create(
+            serving_size=Decimal(30),
+            proteins=Decimal(12),
+        )
+        for flavor in ("Chocolate", "Baunilha"):
+            product = Product.objects.create(
+                name=f"Whey 3W {flavor}",
+                brand=brand,
+                net_mass=Decimal(900),
+            )
+            profile = ProductNutrition.objects.create(
+                product=product,
+                nutrition_facts=facts,
+            )
+            profile.flavors.add(Flavor.objects.create(name=flavor))
+
+        response = self.client.get(
+            f"/admin-api/api/v1/core/nutritionfacts/{facts.pk}/",
+        )
+
+        body = json.dumps(json.loads(response.content), ensure_ascii=False)
+        assert "Whey 3W Chocolate — Chocolate" in body
+        assert "Whey 3W Baunilha — Baunilha" in body

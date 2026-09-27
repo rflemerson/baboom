@@ -267,8 +267,8 @@ class Category(MP_Node, BaseModel):
         verbose_name_plural = _("Categories")
 
     def __str__(self) -> str:
-        """Return name."""
-        return self.name
+        """Name the category by its whole path, as a curator places it."""
+        return " › ".join(node.name for node in [*self.get_ancestors(), self])
 
 
 class Product(BaseModel):
@@ -917,8 +917,14 @@ class ProductNutrition(BaseModel):
         )
 
     def __str__(self) -> str:
-        """Return string representation."""
-        return f"{self.product.name} - {self.nutrition_facts}"
+        """Name the label by the product and the flavors that print it."""
+        flavors = (
+            ", ".join(flavor.name for flavor in self.flavors.all()) if self.pk else ""
+        )
+        return (
+            f"{self.product.name} — {flavors or 'no flavor listed'} "
+            f"({self.nutrition_facts})"
+        )
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Persist the link and refresh the product's derived concentrations."""
