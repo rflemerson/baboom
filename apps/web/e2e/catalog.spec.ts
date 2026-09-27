@@ -5,7 +5,7 @@ type Product = {
   name: string
   packagingDisplay: string
   netMass: string
-  lastPrice: string
+  price: string
   pricePerActive: string
   concentration: string
   totalActive: string
@@ -36,7 +36,7 @@ const PRODUCTS: Product[] = [
     name: 'Whey Prime 900g',
     packagingDisplay: 'Refill Package',
     netMass: '900',
-    lastPrice: '129.90',
+    price: '129.90',
     pricePerActive: '0.14',
     concentration: '80',
     totalActive: '720',
@@ -50,7 +50,7 @@ const PRODUCTS: Product[] = [
     name: 'Whey Core 1kg',
     packagingDisplay: 'Container Package',
     netMass: '1000',
-    lastPrice: '149.90',
+    price: '149.90',
     pricePerActive: '0.16',
     concentration: '78',
     totalActive: '780',
@@ -64,7 +64,7 @@ const PRODUCTS: Product[] = [
     name: 'Isolate Gold 1kg',
     packagingDisplay: 'Container Package',
     netMass: '1000',
-    lastPrice: '219.90',
+    price: '219.90',
     pricePerActive: '0.22',
     concentration: '86',
     totalActive: '860',
@@ -78,7 +78,7 @@ const PRODUCTS: Product[] = [
     name: 'Creatine Pure 300g',
     packagingDisplay: 'Container Package',
     netMass: '300',
-    lastPrice: '89.90',
+    price: '89.90',
     pricePerActive: '0.30',
     concentration: '0',
     totalActive: '0',
@@ -92,7 +92,7 @@ const PRODUCTS: Product[] = [
     name: 'Night Casein 900g',
     packagingDisplay: 'Refill Package',
     netMass: '900',
-    lastPrice: '159.90',
+    price: '159.90',
     pricePerActive: '0.18',
     concentration: '74',
     totalActive: '666',
@@ -106,7 +106,7 @@ const PRODUCTS: Product[] = [
     name: 'Protein Blend 2kg',
     packagingDisplay: 'Container Package',
     netMass: '2000',
-    lastPrice: '239.90',
+    price: '239.90',
     pricePerActive: '0.12',
     concentration: '70',
     totalActive: '1400',
@@ -120,7 +120,7 @@ const PRODUCTS: Product[] = [
     name: 'Iso Hydro 900g',
     packagingDisplay: 'Refill Package',
     netMass: '900',
-    lastPrice: '249.90',
+    price: '249.90',
     pricePerActive: '0.28',
     concentration: '90',
     totalActive: '810',
@@ -134,7 +134,7 @@ const PRODUCTS: Product[] = [
     name: 'Whey Budget 900g',
     packagingDisplay: 'Refill Package',
     netMass: '900',
-    lastPrice: '99.90',
+    price: '99.90',
     pricePerActive: '0.11',
     concentration: '68',
     totalActive: '612',
@@ -148,7 +148,7 @@ const PRODUCTS: Product[] = [
     name: 'Pre Rush 300g',
     packagingDisplay: 'Container Package',
     netMass: '300',
-    lastPrice: '109.90',
+    price: '109.90',
     pricePerActive: '0.37',
     concentration: '0',
     totalActive: '0',
@@ -162,7 +162,7 @@ const PRODUCTS: Product[] = [
     name: 'Mass Gainer 3kg',
     packagingDisplay: 'Bag Package',
     netMass: '3000',
-    lastPrice: '199.90',
+    price: '199.90',
     pricePerActive: '0.07',
     concentration: '24',
     totalActive: '720',
@@ -176,7 +176,7 @@ const PRODUCTS: Product[] = [
     name: 'Egg Protein 1kg',
     packagingDisplay: 'Container Package',
     netMass: '1000',
-    lastPrice: '179.90',
+    price: '179.90',
     pricePerActive: '0.19',
     concentration: '72',
     totalActive: '720',
@@ -190,7 +190,7 @@ const PRODUCTS: Product[] = [
     name: 'Peanut Butter 1kg',
     packagingDisplay: 'Container Package',
     netMass: '1000',
-    lastPrice: '39.90',
+    price: '39.90',
     pricePerActive: '0.04',
     concentration: '0',
     totalActive: '250',
@@ -204,7 +204,7 @@ const PRODUCTS: Product[] = [
     name: 'Bar Box 12x',
     packagingDisplay: 'Box Package',
     netMass: '600',
-    lastPrice: '69.90',
+    price: '69.90',
     pricePerActive: '0.12',
     concentration: '20',
     totalActive: '120',
@@ -225,7 +225,7 @@ function sortProducts(products: Product[], sortBy: string, sortDir: string) {
   const readNumber = (product: Product, key: string) => {
     switch (key) {
       case 'last_price':
-        return Number(product.lastPrice)
+        return Number(product.price)
       case 'price_per_active':
         return Number(product.pricePerActive)
       case 'total_active':
@@ -250,7 +250,7 @@ function filterProducts(variables: CatalogVariables) {
     return (
       matchesSearch(product, search) &&
       matchesBrand(product, brand) &&
-      matchesNumericRange(Number(product.lastPrice), variables.priceMin, variables.priceMax) &&
+      matchesNumericRange(Number(product.price), variables.priceMin, variables.priceMax) &&
       matchesNumericRange(
         Number(product.pricePerActive),
         variables.pricePerActiveMin,

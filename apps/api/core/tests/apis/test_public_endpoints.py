@@ -76,5 +76,5 @@ class PublicCatalogPayloadTests(TestCase):
 
         (item,) = json.loads(self.client.get("/api/catalog/products/").content)["items"]
 
-        assert item["price"] == "119.90"
+        assert Decimal(item["price"]) == Decimal("119.90"), item
         assert item["externalLink"] == "https://blackskull.example/whey?skuId=1014"
