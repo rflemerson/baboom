@@ -31,8 +31,7 @@ def _link_offer(
 
     Mirrors the production model: the price series lives on the merchant offer,
     while ProductStore only links a catalog row to that offer. A simple product
-    links through its label; when ``nutrition_profile`` is omitted the product
-    must have exactly one, and a combo links without any.
+    links through the ``nutrition_profile`` it names; a combo passes none.
     """
     product = cast("Product", kwargs["product"])
     store = cast("Store", kwargs["store"])
@@ -57,12 +56,9 @@ def _link_offer(
             price=resolved_price,
             stock_status=stock_status,
         )
-    profile = kwargs.get("nutrition_profile")
-    if profile is None and not product.is_combo:
-        profile = product.nutrition_profiles.get()
     return ProductStore.objects.create(
         product=product,
-        nutrition_profile=profile,
+        nutrition_profile=kwargs.get("nutrition_profile"),
         offer=offer,
     )
 

@@ -75,9 +75,12 @@ class CatalogActiveRankingTests(TestCase):
                 amount=creatine,
                 declared_unit="g",
             )
-        ProductNutrition.objects.create(product=product, nutrition_facts=facts)
+        profile = ProductNutrition.objects.create(
+            product=product, nutrition_facts=facts
+        )
         _link_offer(
             product=product,
+            nutrition_profile=profile,
             store=Store.objects.create(
                 name=name,
                 display_name=name,
@@ -332,13 +335,14 @@ class ProductStatsTests(TestCase):
             description="Standard Whey",
             energy=120,
         )
-        ProductNutrition.objects.create(
+        self.profile = ProductNutrition.objects.create(
             product=self.product,
             nutrition_facts=self.nutrition,
         )
 
         self.link = _link_offer(
             product=self.product,
+            nutrition_profile=self.profile,
             store=self.store,
             product_link="https://example.com",
             price=100.00,
@@ -390,6 +394,7 @@ class ProductStatsTests(TestCase):
         )
         _link_offer(
             product=self.product,
+            nutrition_profile=self.profile,
             store=second_store,
             product_link="https://example.com/second",
             price=100.00,
@@ -549,20 +554,24 @@ class ProductStatsTests(TestCase):
             is_published=True,
         )
 
-        for product in (alpha, beta):
-            ProductNutrition.objects.create(
+        profiles = {
+            product: ProductNutrition.objects.create(
                 product=product,
                 nutrition_facts=self.nutrition,
             )
+            for product in (alpha, beta)
+        }
 
         _link_offer(
             product=alpha,
+            nutrition_profile=profiles[alpha],
             store=self.store,
             product_link="https://example.com/alpha",
             price=100.00,
         )
         _link_offer(
             product=beta,
+            nutrition_profile=profiles[beta],
             store=self.store,
             product_link="https://example.com/beta",
             price=100.00,

@@ -288,7 +288,7 @@ class ProductAdminActionTests(TestCase):
             net_mass=Decimal(900),
             packaging=Product.Packaging.REFILL,
         )
-        ProductNutrition.objects.create(
+        profile = ProductNutrition.objects.create(
             product=self.product,
             nutrition_facts=NutritionFacts.objects.create(
                 serving_size=Decimal(30),
@@ -297,6 +297,7 @@ class ProductAdminActionTests(TestCase):
         )
         self.store_link = _link_offer(
             product=self.product,
+            nutrition_profile=profile,
             store=self.store,
             external_id="568",
             product_link="https://example.com/whey",
