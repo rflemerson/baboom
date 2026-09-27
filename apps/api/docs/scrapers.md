@@ -18,6 +18,13 @@ no spider fetches or stores product-page HTML.
 - Pagination: `offset += 30`, `limit=30`
 - `GROWTH_SSL_VERIFY` controls SSL verification; default is disabled for Sucuri compatibility.
 - Product list usually lives under `conteudo.produtos`.
+- `atributos.simples` lists the buyable units inside one page, each with its
+  own `sku`, `precos` and `estoque` (the 19 flavors of the 1 kg whey, the 400 g
+  and 800 g of Daily Whey): one offer each, keyed `<id>-<idAtributoValor>`.
+  `atributos.unico` lists sibling pages, one product id per value, and names
+  the value the page itself is. A page without `simples` is one offer, `<id>`.
+- The page URL does not change with the chosen unit, so selection is a
+  `form_option` naming the attribute and value to pick.
 
 ## Shopify
 
@@ -29,10 +36,14 @@ no spider fetches or stores product-page HTML.
 ## Nuvemshop
 
 - Used by Dux Nutrition.
-- No public catalog JSON API is used; product JSON-LD blocks embedded in
-  listing pages provide SKU, canonical URL, price, stock, and inventory.
-- The listing does not expose addressable variants, so the normalized
-  `variant_context.selection` is absent.
+- No public catalog JSON API is used. Listing pages name products through
+  JSON-LD, which describes only the first unit of each.
+- Each listed product's page is read for `LS.variants`: one offer per visible
+  variant, keyed by its sku, reachable with `?variant=<id>` (verified to open
+  the page on that unit). Option names come from the `variation_N` labels of
+  the `#product_form`.
+- A product page that cannot be read marks the crawl incomplete and falls back
+  to the listing's single unit, so its price does not freeze.
 
 ## VTEX GraphQL
 
