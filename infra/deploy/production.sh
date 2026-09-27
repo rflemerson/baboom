@@ -51,6 +51,17 @@ if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
   printf "%s\n" "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
 fi
 
+# Every image is tagged sha-<commit>, so a replaced one is never dangling and a
+# plain prune keeps it. -a drops every image no container uses; the running
+# ones stay, and a rollback pulls its tag again. Pruning first leaves room for
+# the pull, which is what fails once the disk is full.
+prune_unused_images() {
+  echo "== Pruning images no container uses =="
+  docker image prune -af
+}
+
+prune_unused_images
+
 case "$DEPLOY_ROLE" in
   web)
     DB_PRIVATE_BIND="${DB_PRIVATE_BIND:?DB_PRIVATE_BIND is required on the web machine}"
@@ -96,8 +107,7 @@ case "$DEPLOY_ROLE" in
     ;;
 esac
 
-echo "== Pruning unused images =="
-docker image prune -f
+prune_unused_images
 
 echo "== Final compose state =="
 compose ps
