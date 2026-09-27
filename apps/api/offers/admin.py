@@ -36,15 +36,24 @@ class OfferAdmin(admin.ModelAdmin):
         "id",
         "store_slug",
         "name_summary",
+        "get_flavors",
         "external_id",
         "current_price",
         "current_stock_status",
+        "delisted_at",
         "updated_at",
     )
     list_filter = ("store_slug", "current_stock_status")
-    search_fields = ("name", "external_id", "ean", "sku")
+    # The admin API exposes no filter for a free-text column, so the store is
+    # searched: "growth whey" narrows to Growth offers that mention whey.
+    search_fields = ("store_slug", "name", "external_id", "ean", "sku")
     readonly_fields = ("created_at", "updated_at")
     inlines = (PriceObservationInline,)
+
+    @admin.display(description="Flavors")
+    def get_flavors(self, obj: OfferType) -> str:
+        """Return the flavors the store published for the unit."""
+        return ", ".join(obj.flavors) or "-"
 
     @admin.display(description="Name")
     def name_summary(self, obj: OfferType) -> str:

@@ -32,11 +32,15 @@ them from evidence; it never types a price, a URL or a store.
 Call `admin.form_spec` for a model before writing to it; field names, units and
 choices come from its answer, not from memory or from these notes.
 
-1. **Pick the offer.** `admin.list` on `offers.offer`, searching with `search`
-   (the MCP adapter translates it to the REST API's `q`) and filtering by
-   `store_slug`. Take a listed offer (no `delisted_at`) with a price, and read
-   its `options`: the flavor it sells is there. An offer with no flavor option
-   on a product sold in flavors cannot be linked to a flavored label.
+1. **Pick the offer.** `admin.list` on `offers.offer` with `search`. Every word
+   must match, and the store slug is searchable, so `"growth whey"` lists
+   Growth offers mentioning whey. The store slugs are `growth`, `black_skull`,
+   `soldiers_nutrition`, `dark_lab`, `integral_medica`, `max_titanium`,
+   `probiotica` and `dux_nutrition`. Unknown parameters are ignored silently,
+   so do not pass the store as a filter. Take a listed offer (empty
+   `delisted_at`) with a price; its `Flavors` column is the flavor it sells. An
+   offer with no flavor on a product sold in flavors cannot be linked to a
+   flavored label.
 2. **Read the label.** Open the offer URL and read the package and nutrition
    table **of that flavor**: net mass, serving size, energy, macros, sodium.
    Stores often show one table per flavor behind a selector. What a page says
