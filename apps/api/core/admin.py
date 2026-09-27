@@ -350,6 +350,15 @@ class ProductNutritionAdmin(admin.ModelAdmin):
     filter_horizontal: ClassVar[list[str]] = ["flavors"]
     list_per_page = 50
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Load what each profile's label names: product, table and flavors."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("product", "nutrition_facts")
+            .prefetch_related("flavors")
+        )
+
 
 @admin.register(Active)
 class ActiveAdmin(admin.ModelAdmin):
