@@ -39,14 +39,15 @@ UNITS: dict[str, UnitSpec] = {
     "kcal": UnitSpec(Dimension.ENERGY, Decimal(1)),
 }
 
+# The unit package, serving and macros are printed, stored and published in.
+MASS_UNIT = "g"
+
 CANONICAL: dict[Dimension, str] = {
-    Dimension.MASS: "g",
+    Dimension.MASS: MASS_UNIT,
     Dimension.ENERGY: "kcal",
 }
 
 DIMENSIONLESS: frozenset[str] = frozenset({"-", "IU", "%"})
-
-DISPLAY_MASS_UNIT = "g"
 
 
 def is_convertible(unit: str) -> bool:
@@ -74,14 +75,6 @@ def to_canonical(value: Decimal, unit: str) -> Decimal | None:
     if spec is None:
         return None
     return convert(value, unit, CANONICAL[spec.dimension])
-
-
-def from_canonical(value: Decimal, unit: str) -> Decimal | None:
-    """Convert a canonical value into the requested unit of its dimension."""
-    spec = UNITS.get(unit)
-    if spec is None:
-        return None
-    return convert(value, CANONICAL[spec.dimension], unit)
 
 
 def unit_choices() -> list[tuple[str, str]]:

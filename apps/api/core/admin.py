@@ -35,7 +35,7 @@ from .services import (
     ProductCreateService,
     ProductMetadataUpdateService,
 )
-from .units import DISPLAY_MASS_UNIT
+from .units import MASS_UNIT
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -130,7 +130,7 @@ class ProductAdmin(admin.ModelAdmin):
             .prefetch_related("tags")
         )
 
-    @admin.display(description=f"Net mass ({DISPLAY_MASS_UNIT})", ordering="net_mass")
+    @admin.display(description=f"Net mass ({MASS_UNIT})", ordering="net_mass")
     def get_net_mass(self, obj: Product) -> str:
         """Return the mass as printed on the package."""
         if obj.net_mass is None:
@@ -167,7 +167,7 @@ class ProductAdmin(admin.ModelAdmin):
                 data=ProductMetadataUpdateInput(
                     name=form.cleaned_data["name"],
                     net_mass=form.cleaned_data["net_mass"],
-                    mass_unit=DISPLAY_MASS_UNIT,
+                    mass_unit=MASS_UNIT,
                     brand_id=form.cleaned_data["brand"].id,
                     ean=form.cleaned_data["ean"],
                     description=form.cleaned_data["description"],
@@ -189,7 +189,7 @@ class ProductAdmin(admin.ModelAdmin):
             ProductCreateInput(
                 name=form.cleaned_data["name"],
                 net_mass=form.cleaned_data["net_mass"],
-                mass_unit=DISPLAY_MASS_UNIT,
+                mass_unit=MASS_UNIT,
                 brand_id=form.cleaned_data["brand"].id,
                 category_id=(
                     form.cleaned_data["category"].id

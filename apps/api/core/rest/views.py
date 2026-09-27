@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -19,6 +18,8 @@ from core.selectors import catalog_active, public_catalog_products
 from core.services import AlertSubscriptionService
 
 if TYPE_CHECKING:
+    from decimal import Decimal
+
     from core.models import Product, ProductNutrition
 
 CATALOG_PER_PAGE_CHOICES = {12, 24, 48}
@@ -91,21 +92,6 @@ def _decimal_to_str(value: Decimal | None) -> str | None:
     return str(value)
 
 
-def _mass_to_str(value: Decimal | None) -> str | None:
-    """Present a canonical mass in the unit the catalog publishes."""
-    if value is None:
-        return None
-    return _decimal_to_str(units.from_canonical(value, units.DISPLAY_MASS_UNIT))
-
-
-def _price_per_mass_to_str(value: Decimal | None) -> str | None:
-    """Present a price per canonical mass as a price per published unit."""
-    if value is None:
-        return None
-    per_display = units.to_canonical(Decimal(1), units.DISPLAY_MASS_UNIT)
-    return _decimal_to_str(value * per_display)
-
-
 def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
     """Index the prefetched profiles of a page by their own id.
 
@@ -139,11 +125,11 @@ def _serialize_catalog_product(
             else None
         ),
         "packagingDisplay": product.get_packaging_display(),
-        "netMass": _mass_to_str(product.net_mass),
+        "netMass": _decimal_to_str(product.net_mass),
         "lastPrice": _decimal_to_str(product.last_price),
-        "pricePerActive": _price_per_mass_to_str(product.price_per_active),
+        "pricePerActive": _decimal_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
-        "totalActive": _mass_to_str(product.total_active),
+        "totalActive": _decimal_to_str(product.total_active),
         "externalLink": product.external_link,
         "brand": {"name": product.brand.name},
         "category": {"name": product.category.name} if product.category else None,
@@ -179,7 +165,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     response = JsonResponse(
         {
             "active": ({"slug": active.slug, "name": active.name} if active else None),
-            "massUnit": units.DISPLAY_MASS_UNIT,
+            "massUnit": units.MASS_UNIT,
             "pageInfo": {
                 "currentPage": page_obj.number,
                 "perPage": per_page,

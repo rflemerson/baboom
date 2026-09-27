@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 from .models import Product
-from .units import DISPLAY_MASS_UNIT
+from .units import MASS_UNIT
 
 
 class ProductCreateInput(BaseModel):
@@ -15,7 +15,7 @@ class ProductCreateInput(BaseModel):
 
     name: str
     net_mass: float | None = None
-    mass_unit: str = DISPLAY_MASS_UNIT
+    mass_unit: str = MASS_UNIT
     brand_id: int
     category_id: int | None = None
     ean: str | None = None
@@ -30,7 +30,7 @@ class ProductMetadataUpdateInput(BaseModel):
 
     name: str | None = None
     net_mass: float | None = None
-    mass_unit: str = DISPLAY_MASS_UNIT
+    mass_unit: str = MASS_UNIT
     brand_id: int | None = None
     ean: str | None = None
     description: str | None = None

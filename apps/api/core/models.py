@@ -310,7 +310,7 @@ class Product(BaseModel):
     )
 
     net_mass = models.DecimalField(
-        format_lazy("{} ({})", _("Net Mass"), units.DISPLAY_MASS_UNIT),
+        format_lazy("{} ({})", _("Net Mass"), units.MASS_UNIT),
         max_digits=16,
         decimal_places=3,
         null=True,
@@ -318,7 +318,7 @@ class Product(BaseModel):
         help_text=format_lazy(
             "{} {}.",
             _("Net content as printed on the package, in"),
-            units.DISPLAY_MASS_UNIT,
+            units.MASS_UNIT,
         ),
     )
 
@@ -381,7 +381,7 @@ class Product(BaseModel):
     def __str__(self) -> str:
         """Return string representation."""
         mass_display = (
-            f"{self.net_mass:g}{units.DISPLAY_MASS_UNIT}"
+            f"{self.net_mass:g}{units.MASS_UNIT}"
             if self.net_mass is not None
             else "No mass"
         )

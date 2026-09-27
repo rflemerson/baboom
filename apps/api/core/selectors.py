@@ -1,7 +1,5 @@
 """Selectors for public catalog querysets and annotations."""
 
-from decimal import Decimal
-
 from django.conf import settings
 from django.db.models import (
     DecimalField,
@@ -21,7 +19,6 @@ from django.db.models.functions import Cast, Coalesce, NullIf
 
 from offers.models import Offer
 
-from . import units
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
@@ -113,7 +110,7 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
 
     Every metric is arithmetic over one dimensionless column, so the same
     expressions serve protein, creatine or caffeine without a per-active branch.
-    Masses stay canonical here; the boundary converts them for presentation.
+    Masses are in grams, as stored and as published.
     """
     total_active_safe = NullIf(F("total_active"), Value(0))
 
@@ -211,33 +208,21 @@ def _apply_catalog_brand_filter(
     return queryset.filter(brand__name__icontains=filters.brand)
 
 
-def _price_per_canonical_mass(value: float | None) -> float | None:
-    """Convert a price per display unit into a price per canonical unit."""
-    if value is None:
-        return None
-    per_display = units.to_canonical(Decimal(1), units.DISPLAY_MASS_UNIT)
-    return float(Decimal(str(value)) / per_display)
-
-
 def _apply_catalog_numeric_filters(
     queryset: QuerySet[Product],
     filters: CatalogProductsFilters,
 ) -> QuerySet[Product]:
-    """Apply numeric range filters to annotated catalog metrics.
-
-    Price bounds arrive in the display unit the catalog presents, so they are
-    converted before they meet the canonical annotation.
-    """
+    """Apply numeric range filters to annotated catalog metrics."""
     numeric_filters = (
         ("last_price__gte", filters.price_min),
         ("last_price__lte", filters.price_max),
         (
             "price_per_active__gte",
-            _price_per_canonical_mass(filters.price_per_active_min),
+            filters.price_per_active_min,
         ),
         (
             "price_per_active__lte",
-            _price_per_canonical_mass(filters.price_per_active_max),
+            filters.price_per_active_max,
         ),
         ("concentration__gte", filters.concentration_min),
         ("concentration__lte", filters.concentration_max),
