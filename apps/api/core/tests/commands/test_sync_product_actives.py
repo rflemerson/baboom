@@ -10,12 +10,11 @@ from django.test import TestCase
 
 from core.models import ComboActive, Product, ProductActive, ProductComponent
 from core.tests.factories import ProductFactory, ProductNutritionFactory
-from core.units import to_canonical
 
 EXPECTED_SIMPLE_ACTIVE_ROWS = 7
 EXPECTED_COMPONENT_ACTIVE_ROWS = 14
 COMPONENT_NET_MASS = Decimal(900)
-EXPECTED_COMBO_TOTAL_MASS = to_canonical(Decimal(2160), "g")
+EXPECTED_COMBO_TOTAL_MASS = Decimal(2160)
 
 
 class SyncProductActivesCommandTests(TestCase):
@@ -40,8 +39,8 @@ class SyncProductActivesCommandTests(TestCase):
 
     def test_command_rebuilds_components_and_combo_totals(self) -> None:
         """The command rebuilds component fractions before combo totals."""
-        first = ProductFactory(net_mass=to_canonical(COMPONENT_NET_MASS, "g"))
-        second = ProductFactory(net_mass=to_canonical(COMPONENT_NET_MASS, "g"))
+        first = ProductFactory(net_mass=COMPONENT_NET_MASS)
+        second = ProductFactory(net_mass=COMPONENT_NET_MASS)
         first_profile = ProductNutritionFactory(product=first)
         second_profile = ProductNutritionFactory(product=second)
         combo = ProductFactory(kind=Product.Kind.COMBO, net_mass=None)

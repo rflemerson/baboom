@@ -32,11 +32,14 @@
   from different labels are never merged or maximized. Run
   `sync_product_actives` to rebuild it. `Category.default_active` names the
   active a category is ranked by.
-- Units: `core/units.py` declares one canonical unit per dimension and every
-  conversion factor. Masses are stored in the canonical unit and converted at
-  the boundary, so no column, annotation, or field name carries a unit. Values
-  the catalog cannot convert -- international units, percentages of a daily
-  value -- carry no concentration and simply do not rank.
+- Units: a stored value is the number printed on the package, in the unit the
+  package prints it in. That unit belongs to the field (`Product.net_mass` in g,
+  `NutritionFacts.LABEL_UNITS`: g for serving and macros, mg for sodium, kcal for
+  energy) or travels with the row (`NutritionActive.declared_unit`), and every
+  field names its unit in its label. Nothing converts on the way in or out;
+  `core/units.py` converts only inside arithmetic, into grams. Values the
+  catalog cannot convert -- international units, percentages of a daily value
+  -- carry no concentration and simply do not rank.
 - Store listings: manage `ProductStore` only through the `ProductAdmin` inline.
 - Product create/update goes through `ProductCreateService` and `ProductMetadataUpdateService`.
 - Store listing inline rows go through `ProductStoreService`.

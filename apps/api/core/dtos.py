@@ -22,8 +22,8 @@ class StoreListingPayload(BaseModel):
 class ProductCreateInput(BaseModel):
     """DTO for product creation service.
 
-    ``net_mass`` is expressed in ``mass_unit``; the service converts it to the
-    canonical unit before it reaches the model.
+    ``net_mass`` is expressed in ``mass_unit``; the service converts it to grams,
+    the unit the package mass is stored in.
     """
 
     name: str

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
@@ -20,9 +22,6 @@ from core.models import (
 from core.services import (
     ProductCreateService,
     ProductMetadataUpdateService,
-)
-from core.tests.helpers import (
-    _grams,
 )
 
 
@@ -99,7 +98,7 @@ class ProductCreateServiceTests(TestCase):
         Product.objects.create(
             name="Existing Whey",
             brand=self.brand,
-            net_mass=_grams(900),
+            net_mass=Decimal(900),
             ean="1234567890123",
             packaging=Product.Packaging.CONTAINER,
         )
@@ -134,7 +133,7 @@ class ProductMetadataUpdateServiceTests(TestCase):
         self.product = Product.objects.create(
             name="Old Whey",
             brand=self.brand,
-            net_mass=_grams(900),
+            net_mass=Decimal(900),
             packaging=Product.Packaging.CONTAINER,
             description="Old description",
         )
@@ -184,7 +183,7 @@ class ProductMetadataUpdateServiceTests(TestCase):
 
         updated_product.refresh_from_db()
         assert updated_product.brand == new_brand
-        assert updated_product.net_mass == _grams(self.UPDATED_MASS_GRAMS)
+        assert updated_product.net_mass == Decimal(self.UPDATED_MASS_GRAMS)
         assert updated_product.ean == "7891234567890"
 
     def test_execute_can_clear_category(self) -> None:

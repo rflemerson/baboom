@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Protocol, cast
 from django.core.exceptions import ValidationError
 
 from core.models import Product, ProductStore, Store
-from core.units import to_canonical
 from offers.models import Offer, PriceObservation, StockStatus
 
 if TYPE_CHECKING:
@@ -23,16 +22,6 @@ def _validation_error(operation: Callable[[], object]) -> ValidationError:
         return error
     message = "Expected the operation to raise a ValidationError."
     raise AssertionError(message)
-
-
-def _grams(value: object) -> Decimal:
-    """Return a mass stated in grams in the unit the models store."""
-    return to_canonical(Decimal(str(value)), "g")
-
-
-def _per_gram(value: Decimal) -> Decimal:
-    """Return a per-canonical-mass metric restated per gram."""
-    return value * to_canonical(Decimal(1), "g")
 
 
 def _link_offer(

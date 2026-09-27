@@ -36,7 +36,8 @@ search for the products that can.
 
 ## Units
 
-Masses are stored in one canonical unit and converted at the boundary. Send a
-value together with its unit and let the server canonicalize; never convert
-first. Values the catalog cannot convert -- international units, percentages of
-a daily value -- carry no concentration and simply do not rank.
+Type every number exactly as the package prints it, in the unit the field's
+label names: net mass and macros in g, sodium in mg, energy in kcal. A nutrition
+active row takes the printed amount with its printed unit. Never convert. Values
+the catalog cannot convert -- international units, percentages of a daily value
+-- carry no concentration and simply do not rank.

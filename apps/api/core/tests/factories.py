@@ -7,7 +7,6 @@ from decimal import Decimal
 import factory
 from factory.django import DjangoModelFactory
 
-from core import units
 from core.models import Brand, NutritionFacts, Product, ProductNutrition, Store
 
 
@@ -45,7 +44,7 @@ class ProductFactory(DjangoModelFactory):
 
     name = factory.Sequence(lambda number: f"Product {number}")
     brand = factory.SubFactory(BrandFactory)
-    net_mass = units.to_canonical(Decimal(900), "g")
+    net_mass = Decimal(900)
     ean = factory.Sequence(lambda number: f"789000000{number:05d}")
 
 
@@ -58,8 +57,8 @@ class NutritionFactsFactory(DjangoModelFactory):
         model = NutritionFacts
 
     description = factory.Sequence(lambda number: f"Label {number}")
-    serving_size = units.to_canonical(Decimal(30), "g")
-    proteins = units.to_canonical(Decimal(24), "g")
+    serving_size = Decimal(30)
+    proteins = Decimal(24)
 
 
 class ProductNutritionFactory(DjangoModelFactory):

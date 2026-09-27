@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from http import HTTPStatus
 from unittest.mock import Mock
 
@@ -21,7 +22,6 @@ from core.models import (
     Store,
 )
 from core.tests.helpers import (
-    _grams,
     _link_offer,
 )
 from offers.models import Offer, PriceObservation
@@ -56,8 +56,8 @@ class AdminApiInlineWriteTests(TestCase):
         self.store = Store.objects.create(name="growth", display_name="Growth")
         self.facts = NutritionFacts.objects.create(
             description="Natural",
-            serving_size=_grams(30),
-            proteins=_grams(24),
+            serving_size=Decimal(30),
+            proteins=Decimal(24),
         )
         self.flavor = Flavor.objects.create(name="Natural")
 
@@ -220,7 +220,7 @@ class ProductAdminActionTests(TestCase):
         self.product = Product.objects.create(
             name="Whey One Refil 900g - Dark Lab",
             brand=self.brand,
-            net_mass=_grams(900),
+            net_mass=Decimal(900),
             packaging=Product.Packaging.REFILL,
         )
         self.store_link = _link_offer(
@@ -247,3 +247,88 @@ class ProductAdminActionTests(TestCase):
         assert Offer.objects.filter(id=self.offer.id).count() == 1
         assert PriceObservation.objects.filter(offer=self.offer).count() == 1
         self.admin.message_user.assert_called_once()
+
+
+class AdminApiLabelUnitTests(TestCase):
+    """The admin API reads and writes masses in the unit the label prints.
+
+    An agent sees only the form spec and the stored value; if either differs
+    from the number on the package, the agent has to guess the conversion.
+    """
+
+    API = "/admin-api/api/v1/core"
+
+    def setUp(self) -> None:
+        """Create an operator and a brand to attach products to."""
+        self.user = get_user_model().objects.create(
+            username="curator",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.force_login(self.user)
+        self.brand = Brand.objects.create(name="growth", display_name="Growth")
+
+    def _create_product(self) -> Product:
+        """Create a 900 g product through the API, as a curator would."""
+        response = self.client.post(
+            f"{self.API}/product/",
+            data=json.dumps(
+                {
+                    "name": "Whey 900g",
+                    "kind": Product.Kind.SIMPLE,
+                    "brand": self.brand.pk,
+                    "net_mass": 900,
+                    "packaging": Product.Packaging.OTHER,
+                    "is_published": False,
+                },
+            ),
+            content_type="application/json",
+        )
+        assert response.status_code < HTTPStatus.BAD_REQUEST, response.content
+        return Product.objects.get(name="Whey 900g")
+
+    def _patch(self, product: Product, payload: dict[str, object]) -> None:
+        """PATCH a product through the API and require success."""
+        response = self.client.patch(
+            f"{self.API}/product/{product.pk}/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code < HTTPStatus.BAD_REQUEST, response.content
+
+    def _form_spec(self, model_name: str) -> dict[str, dict[str, object]]:
+        """Return the add form spec fields of a core model."""
+        response = self.client.get(f"{self.API}/{model_name}/add/form-spec/")
+        assert response.status_code == HTTPStatus.OK, response.content
+        return json.loads(response.content)["fields"]
+
+    def test_the_mass_typed_is_the_mass_stored(self) -> None:
+        """900 typed for a 900 g package is 900 in the database."""
+        assert self._create_product().net_mass == Decimal(900)
+
+    def test_patching_another_field_leaves_the_mass_alone(self) -> None:
+        """Repeated edits of unrelated fields must never rescale the mass."""
+        product = self._create_product()
+
+        self._patch(product, {"description": "first edit"})
+        self._patch(product, {"description": "second edit"})
+
+        product.refresh_from_db()
+        assert product.net_mass == Decimal(900)
+        assert product.is_published is False
+
+    def test_form_spec_names_the_unit_of_every_mass(self) -> None:
+        """Each mass field says which unit to type, and none claims another."""
+        product = self._form_spec("product")
+        facts = self._form_spec("nutritionfacts")
+        expected = (
+            (product, "net_mass", "(g)"),
+            (facts, "serving_size", "(g)"),
+            (facts, "proteins", "(g)"),
+            (facts, "sodium", "(mg)"),
+            (facts, "energy", "(kcal)"),
+        )
+
+        for fields, name, unit in expected:
+            assert unit in str(fields[name]["label"]), (name, fields[name])
+            assert "canonical" not in str(fields[name]["help_text"]), name

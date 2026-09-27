@@ -38,7 +38,7 @@ from .services import (
     ProductMetadataUpdateService,
     ProductStoreService,
 )
-from .units import DISPLAY_MASS_UNIT, from_canonical
+from .units import DISPLAY_MASS_UNIT
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -171,10 +171,10 @@ class ProductAdmin(admin.ModelAdmin):
 
     @admin.display(description=f"Net mass ({DISPLAY_MASS_UNIT})", ordering="net_mass")
     def get_net_mass(self, obj: Product) -> str:
-        """Return the stored canonical mass in the unit the catalog presents."""
+        """Return the mass as printed on the package."""
         if obj.net_mass is None:
             return "-"
-        return f"{from_canonical(obj.net_mass, DISPLAY_MASS_UNIT):g}"
+        return f"{obj.net_mass:g}"
 
     @admin.display(description="Category", ordering="category__name")
     def get_category(self, obj: Product) -> str:
@@ -508,7 +508,7 @@ class ActiveAdmin(admin.ModelAdmin):
 class NutritionActiveAdmin(admin.ModelAdmin):
     """Admin for the actives measured in a nutrition label."""
 
-    list_display = ("nutrition_facts", "active", "declared_amount", "declared_unit")
+    list_display = ("nutrition_facts", "active", "amount", "declared_unit")
     list_filter = ("declared_unit", "active")
     search_fields = ("active__name", "nutrition_facts__description")
     autocomplete_fields: ClassVar[list[str]] = ["nutrition_facts", "active"]

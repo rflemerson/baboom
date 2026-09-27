@@ -1,14 +1,15 @@
-"""Unit registry for the quantities the catalog stores and computes with.
+"""Unit registry for the quantities the catalog computes with.
 
-Storage is canonical: one base unit per dimension, declared here and nowhere
-else. Values are converted on the way in and formatted on the way out, so no
-column, annotation, or field name carries a unit of its own.
+A stored value is the number printed on the package, in the unit the package
+prints it in: that unit belongs to the field (see ``NutritionFacts.LABEL_UNITS``)
+or travels with the row (``NutritionActive.declared_unit``). Nobody converts on
+the way in, so the value a curator types, the value stored and the value read
+back are one number.
 
-The base for mass is the milligram rather than the SI kilogram. Every unit this
-domain uses -- from the micrograms of a vitamin to the kilograms of a package --
-is a power of ten away from it, so conversions stay exact in decimal arithmetic
-and stored values stay readable. Energy keeps the kilocalorie the label is
-printed in, for the same reason.
+Conversion happens only in arithmetic, into the canonical unit of a dimension.
+The canonical mass is the gram: package, serving and macros are printed in it,
+and every other mass unit is a power of ten away, so conversions stay exact in
+decimal arithmetic. Energy keeps the kilocalorie the label is printed in.
 """
 
 from decimal import Decimal
@@ -31,15 +32,15 @@ class UnitSpec(NamedTuple):
 
 
 UNITS: dict[str, UnitSpec] = {
-    "kg": UnitSpec(Dimension.MASS, Decimal(1_000_000)),
-    "g": UnitSpec(Dimension.MASS, Decimal(1_000)),
-    "mg": UnitSpec(Dimension.MASS, Decimal(1)),
-    "mcg": UnitSpec(Dimension.MASS, Decimal("0.001")),
+    "kg": UnitSpec(Dimension.MASS, Decimal(1_000)),
+    "g": UnitSpec(Dimension.MASS, Decimal(1)),
+    "mg": UnitSpec(Dimension.MASS, Decimal("0.001")),
+    "mcg": UnitSpec(Dimension.MASS, Decimal("0.000001")),
     "kcal": UnitSpec(Dimension.ENERGY, Decimal(1)),
 }
 
 CANONICAL: dict[Dimension, str] = {
-    Dimension.MASS: "mg",
+    Dimension.MASS: "g",
     Dimension.ENERGY: "kcal",
 }
 

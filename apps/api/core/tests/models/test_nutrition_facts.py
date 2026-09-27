@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.test import TestCase
 
 from core.models import (
     NutritionFacts,
-)
-from core.tests.helpers import (
-    _grams,
 )
 
 
@@ -19,7 +18,7 @@ class NutritionFactsPartialLabelTests(TestCase):
         """Unknown macros stay null instead of being recorded as zero."""
         facts = NutritionFacts.objects.create(
             description="Parcial",
-            proteins=_grams(24),
+            proteins=Decimal(24),
         )
 
         facts.refresh_from_db()
@@ -29,10 +28,10 @@ class NutritionFactsPartialLabelTests(TestCase):
 
     def test_null_and_zero_macros_hash_differently(self) -> None:
         """An unknown value is not the same fact as a measured zero."""
-        unknown = NutritionFacts.objects.create(proteins=_grams(24))
+        unknown = NutritionFacts.objects.create(proteins=Decimal(24))
         measured = NutritionFacts.objects.create(
-            proteins=_grams(24),
-            carbohydrates=_grams(0),
+            proteins=Decimal(24),
+            carbohydrates=Decimal(0),
         )
 
         assert unknown.content_hash != measured.content_hash

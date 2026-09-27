@@ -29,9 +29,7 @@ from core.selectors import (
 )
 from core.tests.helpers import (
     CatalogAnnotatedProduct,
-    _grams,
     _link_offer,
-    _per_gram,
 )
 from offers.models import PriceObservation
 
@@ -48,8 +46,8 @@ class CatalogActiveRankingTests(TestCase):
             display_unit="g",
         )
 
-        self.whey = self._product("Whey", proteins=_grams(24), creatine=None)
-        self.blend = self._product("Blend", proteins=_grams(12), creatine=_grams(5))
+        self.whey = self._product("Whey", proteins=Decimal(24), creatine=None)
+        self.blend = self._product("Blend", proteins=Decimal(12), creatine=Decimal(5))
 
     def _product(
         self,
@@ -61,11 +59,11 @@ class CatalogActiveRankingTests(TestCase):
         product = Product.objects.create(
             name=name,
             brand=self.brand,
-            net_mass=_grams(1000),
+            net_mass=Decimal(1000),
             is_published=True,
         )
         facts = NutritionFacts.objects.create(
-            serving_size=_grams(30),
+            serving_size=Decimal(30),
             proteins=proteins,
         )
         if creatine is not None:
@@ -162,7 +160,7 @@ class ComboRankingTests(TestCase):
         product = Product.objects.create(
             name=name,
             brand=self.brand,
-            net_mass=_grams(1000),
+            net_mass=Decimal(1000),
         )
         self._label(product, proteins=proteins, creatine=creatine)
         return product
@@ -176,7 +174,7 @@ class ComboRankingTests(TestCase):
     ) -> ProductNutrition:
         """Attach one more nutrition profile to a product."""
         facts = NutritionFacts.objects.create(
-            serving_size=_grams(30),
+            serving_size=Decimal(30),
             proteins=proteins,
         )
         if creatine is not None:
@@ -217,19 +215,19 @@ class ComboRankingTests(TestCase):
         )
         if row.price_per_active is None:
             return None
-        return _per_gram(Decimal(str(row.price_per_active))).quantize(Decimal("0.0001"))
+        return Decimal(str(row.price_per_active)).quantize(Decimal("0.0001"))
 
     def test_combo_ranks_by_the_protein_its_components_sum_to(self) -> None:
         """Two 1kg tubs at 80% protein hold 1600g, so 100 buys 0.0625 per gram."""
-        whey = self._simple("Whey", proteins=_grams(24))
+        whey = self._simple("Whey", proteins=Decimal(24))
         combo = self._combo("Two Wheys", [(whey, 2)])
 
         assert self._price_per_gram(combo) == Decimal("0.0625")
 
     def test_a_combo_has_no_metric_for_an_active_one_component_lacks(self) -> None:
         """Protein is in both components; creatine only in one."""
-        whey = self._simple("Whey", proteins=_grams(24))
-        blend = self._simple("Blend", proteins=_grams(12), creatine=_grams(5))
+        whey = self._simple("Whey", proteins=Decimal(24))
+        blend = self._simple("Blend", proteins=Decimal(12), creatine=Decimal(5))
         combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
 
         assert self._price_per_gram(combo, "creatine") is None
@@ -237,17 +235,17 @@ class ComboRankingTests(TestCase):
 
     def test_a_component_with_several_labels_counts_its_smallest(self) -> None:
         """Flavors differ and the combo does not say which it ships."""
-        whey = self._simple("Whey", proteins=_grams(24))
+        whey = self._simple("Whey", proteins=Decimal(24))
         combo = self._combo("Two Wheys", [(whey, 2)])
 
-        self._label(whey, proteins=_grams(15))
+        self._label(whey, proteins=Decimal(15))
 
         assert self._price_per_gram(combo) == Decimal("0.1000")
 
     def test_deleting_a_component_product_updates_the_combo(self) -> None:
         """Cascade removes the link without calling its delete() method."""
-        whey = self._simple("Whey", proteins=_grams(24))
-        blend = self._simple("Blend", proteins=_grams(12))
+        whey = self._simple("Whey", proteins=Decimal(24))
+        blend = self._simple("Blend", proteins=Decimal(12))
         combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
 
         blend.delete()
@@ -256,8 +254,8 @@ class ComboRankingTests(TestCase):
 
     def test_removing_a_component_by_queryset_updates_the_combo(self) -> None:
         """A queryset delete never calls the model's delete() method."""
-        whey = self._simple("Whey", proteins=_grams(24))
-        blend = self._simple("Blend", proteins=_grams(12))
+        whey = self._simple("Whey", proteins=Decimal(24))
+        blend = self._simple("Blend", proteins=Decimal(12))
         combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
 
         combo.component_links.filter(component=blend).delete()
@@ -266,21 +264,21 @@ class ComboRankingTests(TestCase):
 
     def test_removing_a_label_by_queryset_updates_the_combo(self) -> None:
         """Dropping a profile by queryset still refreshes the combo total."""
-        whey = self._simple("Whey", proteins=_grams(24))
+        whey = self._simple("Whey", proteins=Decimal(24))
         combo = self._combo("Two Wheys", [(whey, 2)])
-        self._label(whey, proteins=_grams(15))
+        self._label(whey, proteins=Decimal(15))
         assert self._price_per_gram(combo) == Decimal("0.1000")
 
         whey.nutrition_profiles.filter(
-            nutrition_facts__proteins=_grams(15),
+            nutrition_facts__proteins=Decimal(15),
         ).delete()
 
         assert self._price_per_gram(combo) == Decimal("0.0625")
 
     def test_removing_a_component_updates_the_combo(self) -> None:
         """The derived total follows the component list."""
-        whey = self._simple("Whey", proteins=_grams(24))
-        blend = self._simple("Blend", proteins=_grams(12))
+        whey = self._simple("Whey", proteins=Decimal(24))
+        blend = self._simple("Blend", proteins=Decimal(12))
         combo = self._combo("Whey and Blend", [(whey, 1), (blend, 1)])
 
         combo.component_links.get(component=blend).delete()
@@ -289,10 +287,10 @@ class ComboRankingTests(TestCase):
 
     def test_changing_a_component_mass_updates_the_combo(self) -> None:
         """Net mass is half of the arithmetic, so it must trigger a resync."""
-        whey = self._simple("Whey", proteins=_grams(24))
+        whey = self._simple("Whey", proteins=Decimal(24))
         combo = self._combo("Two Wheys", [(whey, 2)])
 
-        whey.net_mass = _grams(1500)
+        whey.net_mass = Decimal(1500)
         whey.save()
 
         assert self._price_per_gram(combo) == Decimal("0.0417")
@@ -309,14 +307,14 @@ class ProductStatsTests(TestCase):
         self.product = Product.objects.create(
             name="Whey Protein",
             brand=self.brand,
-            net_mass=_grams(1000),
+            net_mass=Decimal(1000),
         )
 
         self.nutrition = NutritionFacts.objects.create(
-            serving_size=_grams(30),
-            proteins=_grams("24.0"),
-            carbohydrates=_grams(0),
-            total_fats=_grams(0),
+            serving_size=Decimal(30),
+            proteins=Decimal("24.0"),
+            carbohydrates=Decimal(0),
+            total_fats=Decimal(0),
             description="Standard Whey",
             energy=120,
         )
@@ -341,8 +339,8 @@ class ProductStatsTests(TestCase):
 
         assert product is not None
         assert product.concentration == Decimal("80.0")
-        assert product.total_active == _grams(800)
-        assert round(_per_gram(product.price_per_active), 3) == Decimal("0.125")
+        assert product.total_active == Decimal(800)
+        assert round(product.price_per_active, 3) == Decimal("0.125")
         assert product.external_link == "https://example.com"
 
     def test_missing_price_handling(self) -> None:
@@ -350,7 +348,7 @@ class ProductStatsTests(TestCase):
         product_without_price = Product.objects.create(
             name="No Price Whey",
             brand=self.brand,
-            net_mass=_grams(500),
+            net_mass=Decimal(500),
         )
 
         result = cast(
@@ -401,10 +399,10 @@ class ProductStatsTests(TestCase):
     def test_catalog_preserves_distinct_nutrition_profiles(self) -> None:
         """Each label keeps its own concentration and price-per-active metric."""
         denser_profile = NutritionFacts.objects.create(
-            serving_size=_grams(30),
-            proteins=_grams("27.0"),
-            carbohydrates=_grams(0),
-            total_fats=_grams(0),
+            serving_size=Decimal(30),
+            proteins=Decimal("27.0"),
+            carbohydrates=Decimal(0),
+            total_fats=Decimal(0),
             description="Isolate profile",
             energy=120,
         )
@@ -423,12 +421,10 @@ class ProductStatsTests(TestCase):
             Decimal("90.0"),
         ]
         assert [product.total_active for product in products] == [
-            _grams(800),
-            _grams(900),
+            Decimal(800),
+            Decimal(900),
         ]
-        assert [
-            round(_per_gram(product.price_per_active), 3) for product in products
-        ] == [
+        assert [round(product.price_per_active, 3) for product in products] == [
             Decimal("0.125"),
             Decimal("0.111"),
         ]
@@ -441,8 +437,8 @@ class ProductStatsTests(TestCase):
         chocolate = Flavor.objects.create(name="Chocolate")
         original.flavors.add(chocolate)
         vanilla_facts = NutritionFacts.objects.create(
-            serving_size=_grams(30),
-            proteins=_grams(21),
+            serving_size=Decimal(30),
+            proteins=Decimal(21),
         )
         vanilla = ProductNutrition.objects.create(
             product=self.product,
@@ -512,8 +508,8 @@ class ProductStatsTests(TestCase):
         profile_ids = [original.pk]
         for index in range(12):
             facts = NutritionFacts.objects.create(
-                serving_size=_grams(30),
-                proteins=_grams(24),
+                serving_size=Decimal(30),
+                proteins=Decimal(24),
                 description=str(index),
             )
             profile_ids.append(
@@ -536,13 +532,13 @@ class ProductStatsTests(TestCase):
         alpha = Product.objects.create(
             name="Whey A",
             brand=alpha_brand,
-            net_mass=_grams(1000),
+            net_mass=Decimal(1000),
             is_published=True,
         )
         beta = Product.objects.create(
             name="Whey B",
             brand=beta_brand,
-            net_mass=_grams(1000),
+            net_mass=Decimal(1000),
             is_published=True,
         )
 

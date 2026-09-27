@@ -22,7 +22,6 @@ from core.services import (
     ProductStoreService,
 )
 from core.tests.helpers import (
-    _grams,
     _link_offer,
 )
 from offers.models import StockStatus
@@ -40,7 +39,7 @@ class ProductStoreServiceTests(TestCase):
         self.product = Product.objects.create(
             name="Whey Concentrado",
             brand=self.brand,
-            net_mass=_grams(900),
+            net_mass=Decimal(900),
             packaging=Product.Packaging.CONTAINER,
         )
         self.store = Store.objects.create(name="growth", display_name="Growth")

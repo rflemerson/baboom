@@ -10,6 +10,7 @@ from typing import ClassVar
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
 
@@ -18,14 +19,29 @@ from common.models import BaseModel
 from . import units
 
 
-def mass_field(label: object, **kwargs: object) -> models.DecimalField:
-    """Return a nullable mass column stored in the canonical unit."""
+def label_field(
+    label: object,
+    unit: str,
+    *,
+    max_digits: int = 16,
+    **kwargs: object,
+) -> models.DecimalField:
+    """Return a nullable column holding a value as the label prints it.
+
+    The unit is part of the field's name and help text, so every surface that
+    renders the field -- admin, form spec, MCP -- tells the curator what to type.
+    """
     return models.DecimalField(
-        label,
-        max_digits=16,
+        format_lazy("{} ({})", label, unit),
+        max_digits=max_digits,
         decimal_places=3,
         null=True,
         blank=True,
+        help_text=format_lazy(
+            "{} {}.",
+            _("As printed on the label, in"),
+            unit,
+        ),
         **kwargs,
     )
 
@@ -282,12 +298,16 @@ class Product(BaseModel):
     )
 
     net_mass = models.DecimalField(
-        _("Net Mass"),
+        format_lazy("{} ({})", _("Net Mass"), units.DISPLAY_MASS_UNIT),
         max_digits=16,
         decimal_places=3,
         null=True,
         blank=True,
-        help_text=_("Net content of the package, stored in the canonical unit."),
+        help_text=format_lazy(
+            "{} {}.",
+            _("Net content as printed on the package, in"),
+            units.DISPLAY_MASS_UNIT,
+        ),
     )
 
     ean = models.CharField(
@@ -348,13 +368,10 @@ class Product(BaseModel):
 
     def __str__(self) -> str:
         """Return string representation."""
-        mass = (
-            None
-            if self.net_mass is None
-            else units.from_canonical(self.net_mass, units.DISPLAY_MASS_UNIT)
-        )
         mass_display = (
-            f"{mass:g}{units.DISPLAY_MASS_UNIT}" if mass is not None else "No mass"
+            f"{self.net_mass:g}{units.DISPLAY_MASS_UNIT}"
+            if self.net_mass is not None
+            else "No mass"
         )
         return f"{self.brand.display_name} - {self.name} ({mass_display})"
 
@@ -541,6 +558,21 @@ class ProductStore(BaseModel):
 class NutritionFacts(BaseModel):
     """Nutritional information model."""
 
+    # The unit each column is printed in on a Brazilian label (RDC 429/2020).
+    LABEL_UNITS: ClassVar[dict[str, str]] = {
+        "serving_size": "g",
+        "energy": "kcal",
+        "proteins": "g",
+        "carbohydrates": "g",
+        "total_sugars": "g",
+        "added_sugars": "g",
+        "total_fats": "g",
+        "saturated_fats": "g",
+        "trans_fats": "g",
+        "dietary_fiber": "g",
+        "sodium": "mg",
+    }
+
     HASH_FIELDS: ClassVar[tuple[str, ...]] = (
         "serving_size",
         "energy",
@@ -564,29 +596,33 @@ class NutritionFacts(BaseModel):
         ),
     )
 
-    serving_size = models.DecimalField(
-        _("Serving Size"),
-        max_digits=16,
-        decimal_places=3,
-        null=True,
-        blank=True,
+    serving_size = label_field(_("Serving Size"), LABEL_UNITS["serving_size"])
+    energy = label_field(_("Energy"), LABEL_UNITS["energy"], max_digits=10)
+    proteins = label_field(_("Proteins"), LABEL_UNITS["proteins"])
+    carbohydrates = label_field(_("Carbs"), LABEL_UNITS["carbohydrates"])
+    total_sugars = label_field(
+        _("Total Sugars"),
+        LABEL_UNITS["total_sugars"],
+        default=0,
     )
-    energy = models.DecimalField(
-        _("Energy"),
-        max_digits=10,
-        decimal_places=3,
-        null=True,
-        blank=True,
+    added_sugars = label_field(
+        _("Added Sugars"),
+        LABEL_UNITS["added_sugars"],
+        default=0,
     )
-    proteins = mass_field(_("Proteins"))
-    carbohydrates = mass_field(_("Carbs"))
-    total_sugars = mass_field(_("Total Sugars"), default=0)
-    added_sugars = mass_field(_("Added Sugars"), default=0)
-    total_fats = mass_field(_("Total Fats"))
-    saturated_fats = mass_field(_("Saturated Fats"), default=0)
-    trans_fats = mass_field(_("Trans Fats"), default=0)
-    dietary_fiber = mass_field(_("Dietary Fiber"), default=0)
-    sodium = mass_field(_("Sodium"), default=0)
+    total_fats = label_field(_("Total Fats"), LABEL_UNITS["total_fats"])
+    saturated_fats = label_field(
+        _("Saturated Fats"),
+        LABEL_UNITS["saturated_fats"],
+        default=0,
+    )
+    trans_fats = label_field(_("Trans Fats"), LABEL_UNITS["trans_fats"], default=0)
+    dietary_fiber = label_field(
+        _("Dietary Fiber"),
+        LABEL_UNITS["dietary_fiber"],
+        default=0,
+    )
+    sodium = label_field(_("Sodium"), LABEL_UNITS["sodium"], default=0)
 
     content_hash = models.CharField(
         _("Content Hash"),
@@ -679,7 +715,7 @@ class NutritionActive(BaseModel):
         _("Amount"),
         max_digits=16,
         decimal_places=3,
-        help_text=_("Stored in the canonical unit of the declared dimension."),
+        help_text=_("As printed on the label, in the declared unit."),
     )
 
     declared_unit = models.CharField(
@@ -704,12 +740,7 @@ class NutritionActive(BaseModel):
 
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.active.name}: {self.declared_amount}{self.declared_unit}"
-
-    @property
-    def declared_amount(self) -> Decimal | None:
-        """Return the amount in the unit the label declared it in."""
-        return units.from_canonical(self.amount, self.declared_unit)
+        return f"{self.active.name}: {self.amount}{self.declared_unit}"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Persist the amount and refresh its parent facts hash."""
@@ -800,10 +831,10 @@ class ProductActiveManager(models.Manager):
     ) -> dict[int, Decimal]:
         """Return the mass fraction of each active in one label.
 
-        Both sides of the ratio are already canonical, so the result is a plain
-        dimensionless number and no unit is named anywhere in the arithmetic.
+        Each side is read in the unit its label prints and brought to grams
+        here, so the result is a plain dimensionless number.
         """
-        serving = facts.serving_size
+        serving = self._in_grams(facts.serving_size, facts.LABEL_UNITS["serving_size"])
         if not serving:
             return {}
 
@@ -812,15 +843,26 @@ class ProductActiveManager(models.Manager):
         for active in actives:
             if not active.nutrition_field:
                 continue
-            value = getattr(facts, active.nutrition_field)
+            value = self._in_grams(
+                getattr(facts, active.nutrition_field),
+                facts.LABEL_UNITS[active.nutrition_field],
+            )
             if value is not None:
-                amounts[active.pk] = Decimal(value) / serving
+                amounts[active.pk] = value / serving
 
         for entry in facts.actives.all():
-            if units.is_convertible(entry.declared_unit):
-                amounts[entry.active_id] = entry.amount / serving
+            value = self._in_grams(entry.amount, entry.declared_unit)
+            if value is not None:
+                amounts[entry.active_id] = value / serving
 
         return amounts
+
+    @staticmethod
+    def _in_grams(value: Decimal | None, unit: str) -> Decimal | None:
+        """Return a printed value in grams, or None when it has no mass."""
+        if value is None:
+            return None
+        return units.to_canonical(Decimal(value), unit)
 
 
 class ProductActive(BaseModel):
