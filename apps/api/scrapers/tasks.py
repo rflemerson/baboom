@@ -186,9 +186,15 @@ def run_spider_monitor(spider_name: str, label: str) -> str:
         raise RuntimeError(error_message)
 
     if not items_count and _monitor_has_produced_items(label):
+        rate_limited = _stat_int(stats, "downloader/response_status_count/429")
+        cause = (
+            f"The store refused {rate_limited} responses with HTTP 429, its "
+            f"rate limit: the catalog was not read, and nothing was delisted."
+            if rate_limited
+            else "The store layout or endpoint has most likely changed."
+        )
         message = (
-            f"{label} Monitor returned no products, but previous runs did. "
-            f"The store layout or endpoint has most likely changed."
+            f"{label} Monitor returned no products, but previous runs did. {cause}"
         )
         _finish_run(
             run,

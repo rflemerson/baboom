@@ -148,6 +148,27 @@ class EmptyMonitorRunTests(TestCase):
         assert run.status == ScraperRun.Status.ERROR
         assert "most likely changed" in run.error_message
 
+    def test_an_empty_run_refused_by_rate_limit_says_so(self) -> None:
+        """A 429 is the store throttling us, not its layout changing."""
+        ScraperRun.objects.create(
+            label=self.LABEL,
+            status=ScraperRun.Status.SUCCESS,
+            items_count=112,
+        )
+        stats = {
+            "item_scraped_count": 0,
+            "downloader/request_count": 8,
+            "downloader/response_status_count/429": 8,
+        }
+
+        with _fake_crawl(stats):
+            _raised(lambda: run_spider_monitor("dux", self.LABEL), EmptyMonitorRunError)
+
+        run = ScraperRun.objects.filter(items_count=0).get()
+        assert "rate limit" in run.error_message
+        assert "8" in run.error_message
+        assert "layout" not in run.error_message
+
     def test_empty_run_of_another_monitor_does_not_raise(self) -> None:
         """History is per monitor, so a healthy store does not fail its peer."""
         ScraperRun.objects.create(
