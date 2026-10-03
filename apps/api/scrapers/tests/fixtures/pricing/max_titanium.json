@@ -1,0 +1,943 @@
+{
+  "store_slug": "max_titanium",
+  "platform": "vtex",
+  "source_url": "https://www.maxtitanium.com.br/api/catalog_system/pub/products/search?fq=skuId:123",
+  "fetched_at": "2026-10-03T17:26:19+00:00",
+  "notes": "",
+  "payload": {
+    "productId": "52",
+    "productName": "Whey Pro 1kg — Whey Protein Concentrado Max Titanium — 15g de Proteína por Dose",
+    "itemId": "123",
+    "variations": {
+      "Sabor 1": [
+        "Chocolate"
+      ]
+    },
+    "sellers": [
+      {
+        "sellerId": "1",
+        "sellerDefault": true,
+        "commertialOffer": {
+          "Price": 99,
+          "ListPrice": 126.2,
+          "PriceWithoutDiscount": 99,
+          "FullSellingPrice": 99,
+          "PriceValidUntil": "2027-10-03T00:00:00Z",
+          "AvailableQuantity": 99999,
+          "IsAvailable": true,
+          "Installments": [
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 3 vezes sem juros"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 3 vezes sem juros"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 3 vezes sem juros"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 3 vezes sem juros"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Boleto Bancário",
+              "PaymentSystemGroupName": "bankInvoicePaymentGroup",
+              "Name": "Boleto Bancário à vista"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 3 vezes sem juros"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 3 vezes sem juros"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Vale",
+              "PaymentSystemGroupName": "giftCardPaymentGroup",
+              "Name": "Vale à vista"
+            },
+            {
+              "Value": 99,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB à vista"
+            },
+            {
+              "Value": 49.5,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 2 vezes sem juros"
+            },
+            {
+              "Value": 33,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 99,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 3 vezes sem juros"
+            },
+            {
+              "Value": 96.03,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 96.03,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Pix",
+              "PaymentSystemGroupName": "instantPaymentPaymentGroup",
+              "Name": "Pix à vista"
+            }
+          ],
+          "Teasers": [],
+          "PromotionTeasers": [],
+          "DiscountHighLight": [],
+          "GiftSkuIds": [],
+          "BuyTogether": [],
+          "PaymentOptions": {
+            "installmentOptions": [
+              {
+                "paymentSystem": "1",
+                "bin": null,
+                "paymentName": "American Express",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "2",
+                "bin": null,
+                "paymentName": "Visa",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "3",
+                "bin": null,
+                "paymentName": "Diners",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "4",
+                "bin": null,
+                "paymentName": "Mastercard",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "6",
+                "bin": null,
+                "paymentName": "Boleto Bancário",
+                "paymentGroupName": "bankInvoicePaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "8",
+                "bin": null,
+                "paymentName": "Hipercard",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "9",
+                "bin": null,
+                "paymentName": "Elo",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "16",
+                "bin": null,
+                "paymentName": "Vale",
+                "paymentGroupName": "giftCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "21",
+                "bin": null,
+                "paymentName": "JCB",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9900,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9900,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4950,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4950,
+                        "total": 9900
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3300,
+                    "total": 9900,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3300,
+                        "total": 9900
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "125",
+                "bin": null,
+                "paymentName": "Pix",
+                "paymentGroupName": "instantPaymentPaymentGroup",
+                "value": 9900,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9603,
+                    "total": 9603,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "LOJAMAXTITANIUM",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9603,
+                        "total": 9603
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "paymentSystems": [
+              {
+                "id": 16,
+                "name": "Vale",
+                "groupName": "giftCardPaymentGroup",
+                "validator": null,
+                "stringId": "16",
+                "template": "giftCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 6,
+                "name": "Boleto Bancário",
+                "groupName": "bankInvoicePaymentGroup",
+                "validator": null,
+                "stringId": "6",
+                "template": "bankInvoicePaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 1,
+                "name": "American Express",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "1",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 2,
+                "name": "Visa",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "2",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 3,
+                "name": "Diners",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "3",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 4,
+                "name": "Mastercard",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "4",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 8,
+                "name": "Hipercard",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "8",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 9,
+                "name": "Elo",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "9",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 21,
+                "name": "JCB",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "21",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 125,
+                "name": "Pix",
+                "groupName": "instantPaymentPaymentGroup",
+                "validator": null,
+                "stringId": "125",
+                "template": "instantPaymentPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T17:00:00Z",
+                "availablePayments": null
+              }
+            ],
+            "payments": [],
+            "giftCards": [],
+            "giftCardMessages": [],
+            "availableAccounts": [],
+            "availableTokens": []
+          },
+          "RewardValue": 0
+        },
+        "commertialOffer_keys": [
+          "AvailableQuantity",
+          "BuyTogether",
+          "CacheVersionUsedToCallCheckout",
+          "DeliverySlaSamples",
+          "DeliverySlaSamplesPerRegion",
+          "DiscountHighLight",
+          "FullSellingPrice",
+          "GetInfoErrorMessage",
+          "GiftSkuIds",
+          "Installments",
+          "IsAvailable",
+          "ItemMetadataAttachment",
+          "ListPrice",
+          "PaymentOptions",
+          "Price",
+          "PriceToken",
+          "PriceValidUntil",
+          "PriceWithoutDiscount",
+          "PromotionTeasers",
+          "RewardValue",
+          "Tax",
+          "Teasers"
+        ]
+      }
+    ],
+    "cart_simulation": {
+      "request": {
+        "sku": "123",
+        "seller": "1",
+        "quantity": 1,
+        "sc": "1",
+        "country": "BRA",
+        "postalCode": "01310100"
+      },
+      "refused": {
+        "status": 403,
+        "title": "Acesso bloqueado (403)"
+      }
+    }
+  }
+}

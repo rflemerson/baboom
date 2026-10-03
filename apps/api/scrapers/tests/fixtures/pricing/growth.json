@@ -1,0 +1,365 @@
+{
+  "store_slug": "growth",
+  "platform": "wapstore",
+  "source_url": "https://www.gsuplementos.com.br/api/v2/front/url/product/detail?url=/whey-protein-concentrado-1kg-growth-supplements-p985936",
+  "fetched_at": "2026-10-03T17:25:48+00:00",
+  "notes": "Product-level precos and the first four in-page units (atributos.simples) of product 185, verbatim.",
+  "payload": {
+    "id": 185,
+    "sku": "33",
+    "nome": "(TOP) Whey Protein Concentrado 1Kg",
+    "precos": {
+      "de": 222.11,
+      "por": 222.11,
+      "vista": 199.9,
+      "descontoVista": 10,
+      "editavel": false,
+      "dadosDescontoVista": {},
+      "parcelamento": [
+        {
+          "parcelas": 1,
+          "valorParcela": 222.11,
+          "valorTotal": 222.11,
+          "taxa": 0,
+          "exibirTaxa": true
+        },
+        {
+          "parcelas": 2,
+          "valorParcela": 111.06,
+          "valorTotal": 222.11,
+          "taxa": 0,
+          "exibirTaxa": true
+        },
+        {
+          "parcelas": 3,
+          "valorParcela": 74.04,
+          "valorTotal": 222.11,
+          "taxa": 0,
+          "exibirTaxa": true
+        },
+        {
+          "parcelas": 4,
+          "valorParcela": 55.53,
+          "valorTotal": 222.11,
+          "taxa": 0,
+          "exibirTaxa": true
+        },
+        {
+          "parcelas": 5,
+          "valorParcela": 44.42,
+          "valorTotal": 222.11,
+          "taxa": 0,
+          "exibirTaxa": true
+        },
+        {
+          "parcelas": 6,
+          "valorParcela": 37.02,
+          "valorTotal": 222.11,
+          "taxa": 0,
+          "exibirTaxa": true
+        }
+      ],
+      "regrasAtacado": []
+    },
+    "estoque": 382233,
+    "atributos_simples_nome": "Sabor",
+    "atributos_simples_valores_first4": [
+      {
+        "idAtributoValor": 1,
+        "sku": "10003",
+        "label": "Chocolate",
+        "estoque": 47409,
+        "precos": {
+          "de": 222.11,
+          "por": 222.11,
+          "vista": 199.9,
+          "descontoVista": 10,
+          "dadosDescontoVista": {},
+          "parcelamento": [
+            {
+              "parcelas": 1,
+              "valorParcela": 222.11,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 2,
+              "valorParcela": 111.06,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 3,
+              "valorParcela": 74.04,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 4,
+              "valorParcela": 55.53,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 5,
+              "valorParcela": 44.42,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 6,
+              "valorParcela": 37.02,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            }
+          ],
+          "regrasAtacado": []
+        },
+        "carrinho": {
+          "hash": "185-1-0-0-1",
+          "url": "https://www.gsuplementos.com.br/checkout/carrinho?add=185-1-0-0-1",
+          "tipo": "produto",
+          "itens": [
+            {
+              "idProduto": "185",
+              "idAtributoSimples": "1",
+              "idUnidadeVenda": "0",
+              "idArmazem": "0",
+              "quantidade": "1",
+              "adicional": "",
+              "parametros": ""
+            }
+          ]
+        }
+      },
+      {
+        "idAtributoValor": 2,
+        "sku": "10006",
+        "label": "Morango",
+        "estoque": 24049,
+        "precos": {
+          "de": 222.11,
+          "por": 222.11,
+          "vista": 199.9,
+          "descontoVista": 10,
+          "dadosDescontoVista": {},
+          "parcelamento": [
+            {
+              "parcelas": 1,
+              "valorParcela": 222.11,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 2,
+              "valorParcela": 111.06,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 3,
+              "valorParcela": 74.04,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 4,
+              "valorParcela": 55.53,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 5,
+              "valorParcela": 44.42,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 6,
+              "valorParcela": 37.02,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            }
+          ],
+          "regrasAtacado": []
+        },
+        "carrinho": {
+          "hash": "185-2-0-0-1",
+          "url": "https://www.gsuplementos.com.br/checkout/carrinho?add=185-2-0-0-1",
+          "tipo": "produto",
+          "itens": [
+            {
+              "idProduto": "185",
+              "idAtributoSimples": "2",
+              "idUnidadeVenda": "0",
+              "idArmazem": "0",
+              "quantidade": "1",
+              "adicional": "",
+              "parametros": ""
+            }
+          ]
+        }
+      },
+      {
+        "idAtributoValor": 3,
+        "sku": "20005",
+        "label": "Baunilha",
+        "estoque": 48755,
+        "precos": {
+          "de": 222.11,
+          "por": 222.11,
+          "vista": 199.9,
+          "descontoVista": 10,
+          "dadosDescontoVista": {},
+          "parcelamento": [
+            {
+              "parcelas": 1,
+              "valorParcela": 222.11,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 2,
+              "valorParcela": 111.06,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 3,
+              "valorParcela": 74.04,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 4,
+              "valorParcela": 55.53,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 5,
+              "valorParcela": 44.42,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 6,
+              "valorParcela": 37.02,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            }
+          ],
+          "regrasAtacado": []
+        },
+        "carrinho": {
+          "hash": "185-3-0-0-1",
+          "url": "https://www.gsuplementos.com.br/checkout/carrinho?add=185-3-0-0-1",
+          "tipo": "produto",
+          "itens": [
+            {
+              "idProduto": "185",
+              "idAtributoSimples": "3",
+              "idUnidadeVenda": "0",
+              "idArmazem": "0",
+              "quantidade": "1",
+              "adicional": "",
+              "parametros": ""
+            }
+          ]
+        }
+      },
+      {
+        "idAtributoValor": 4,
+        "sku": "10010",
+        "label": "Natural",
+        "estoque": 24848,
+        "precos": {
+          "de": 222.11,
+          "por": 222.11,
+          "vista": 199.9,
+          "descontoVista": 10,
+          "dadosDescontoVista": {},
+          "parcelamento": [
+            {
+              "parcelas": 1,
+              "valorParcela": 222.11,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 2,
+              "valorParcela": 111.06,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 3,
+              "valorParcela": 74.04,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 4,
+              "valorParcela": 55.53,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 5,
+              "valorParcela": 44.42,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            },
+            {
+              "parcelas": 6,
+              "valorParcela": 37.02,
+              "valorTotal": 222.11,
+              "taxa": 0,
+              "exibirTaxa": true
+            }
+          ],
+          "regrasAtacado": []
+        },
+        "carrinho": {
+          "hash": "185-4-0-0-1",
+          "url": "https://www.gsuplementos.com.br/checkout/carrinho?add=185-4-0-0-1",
+          "tipo": "produto",
+          "itens": [
+            {
+              "idProduto": "185",
+              "idAtributoSimples": "4",
+              "idUnidadeVenda": "0",
+              "idArmazem": "0",
+              "quantidade": "1",
+              "adicional": "",
+              "parametros": ""
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

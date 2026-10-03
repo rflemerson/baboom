@@ -1,0 +1,1491 @@
+{
+  "store_slug": "probiotica",
+  "platform": "vtex",
+  "source_url": "https://www.probiotica.com.br/api/catalog_system/pub/products/search?fq=skuId:1550",
+  "fetched_at": "2026-10-03T17:26:19+00:00",
+  "notes": "",
+  "payload": {
+    "productId": "78",
+    "productName": "Whey Protein Concentrado 100% Pure Whey 900g | Probiótica",
+    "itemId": "1550",
+    "variations": {
+      "Sabor": [
+        "Cappuccino"
+      ]
+    },
+    "sellers": [
+      {
+        "sellerId": "1",
+        "sellerDefault": true,
+        "commertialOffer": {
+          "Price": 252.49,
+          "ListPrice": 252.49,
+          "PriceWithoutDiscount": 252.49,
+          "FullSellingPrice": 252.49,
+          "PriceValidUntil": "2027-10-03T00:00:00Z",
+          "AvailableQuantity": 99999,
+          "IsAvailable": true,
+          "Installments": [
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Boleto Bancário",
+              "PaymentSystemGroupName": "bankInvoicePaymentGroup",
+              "Name": "Boleto Bancário à vista"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Vale",
+              "PaymentSystemGroupName": "giftCardPaymentGroup",
+              "Name": "Vale à vista"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB à vista"
+            },
+            {
+              "Value": 126.24,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 2 vezes sem juros"
+            },
+            {
+              "Value": 84.16,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 3 vezes sem juros"
+            },
+            {
+              "Value": 63.12,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 4,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 4 vezes sem juros"
+            },
+            {
+              "Value": 50.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 5,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 5 vezes sem juros"
+            },
+            {
+              "Value": 42.08,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 6,
+              "PaymentSystemName": "JCB",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "JCB 6 vezes sem juros"
+            },
+            {
+              "Value": 252.49,
+              "InterestRate": 0,
+              "TotalValuePlusInterestRate": 252.49,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Pix",
+              "PaymentSystemGroupName": "instantPaymentPaymentGroup",
+              "Name": "Pix à vista"
+            }
+          ],
+          "Teasers": [],
+          "PromotionTeasers": [],
+          "DiscountHighLight": [],
+          "GiftSkuIds": [
+            "1768"
+          ],
+          "BuyTogether": [],
+          "PaymentOptions": {
+            "installmentOptions": [
+              {
+                "paymentSystem": "1",
+                "bin": null,
+                "paymentName": "American Express",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "2",
+                "bin": null,
+                "paymentName": "Visa",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "3",
+                "bin": null,
+                "paymentName": "Diners",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "4",
+                "bin": null,
+                "paymentName": "Mastercard",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "6",
+                "bin": null,
+                "paymentName": "Boleto Bancário",
+                "paymentGroupName": "bankInvoicePaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "8",
+                "bin": null,
+                "paymentName": "Hipercard",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "9",
+                "bin": null,
+                "paymentName": "Elo",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "16",
+                "bin": null,
+                "paymentName": "Vale",
+                "paymentGroupName": "giftCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "21",
+                "bin": null,
+                "paymentName": "JCB",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 12624,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 12624,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 8416,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 8416,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 4,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 6312,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 4,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 6312,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 5,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 5049,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 5,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 5049,
+                        "total": 25249
+                      }
+                    ]
+                  },
+                  {
+                    "count": 6,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4208,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 6,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4208,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "125",
+                "bin": null,
+                "paymentName": "Pix",
+                "paymentGroupName": "instantPaymentPaymentGroup",
+                "value": 25249,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 25249,
+                    "total": 25249,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "SUPLEYLAB",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 25249,
+                        "total": 25249
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "paymentSystems": [
+              {
+                "id": 16,
+                "name": "Vale",
+                "groupName": "giftCardPaymentGroup",
+                "validator": null,
+                "stringId": "16",
+                "template": "giftCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 1,
+                "name": "American Express",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "1",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 2,
+                "name": "Visa",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "2",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 3,
+                "name": "Diners",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "3",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 4,
+                "name": "Mastercard",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "4",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 8,
+                "name": "Hipercard",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "8",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 9,
+                "name": "Elo",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "9",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 21,
+                "name": "JCB",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "21",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 6,
+                "name": "Boleto Bancário",
+                "groupName": "bankInvoicePaymentGroup",
+                "validator": null,
+                "stringId": "6",
+                "template": "bankInvoicePaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 125,
+                "name": "Pix",
+                "groupName": "instantPaymentPaymentGroup",
+                "validator": null,
+                "stringId": "125",
+                "template": "instantPaymentPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T01:00:00Z",
+                "availablePayments": null
+              }
+            ],
+            "payments": [],
+            "giftCards": [],
+            "giftCardMessages": [],
+            "availableAccounts": [],
+            "availableTokens": []
+          },
+          "RewardValue": 0
+        },
+        "commertialOffer_keys": [
+          "AvailableQuantity",
+          "BuyTogether",
+          "CacheVersionUsedToCallCheckout",
+          "DeliverySlaSamples",
+          "DeliverySlaSamplesPerRegion",
+          "DiscountHighLight",
+          "FullSellingPrice",
+          "GetInfoErrorMessage",
+          "GiftSkuIds",
+          "Installments",
+          "IsAvailable",
+          "ItemMetadataAttachment",
+          "ListPrice",
+          "PaymentOptions",
+          "Price",
+          "PriceToken",
+          "PriceValidUntil",
+          "PriceWithoutDiscount",
+          "PromotionTeasers",
+          "RewardValue",
+          "Tax",
+          "Teasers"
+        ]
+      }
+    ],
+    "cart_simulation": {
+      "request": {
+        "sku": "1550",
+        "seller": "1",
+        "quantity": 1,
+        "sc": "1",
+        "country": "BRA",
+        "postalCode": "01310100"
+      },
+      "refused": {
+        "status": 403,
+        "title": "Acesso bloqueado (403)"
+      }
+    }
+  }
+}

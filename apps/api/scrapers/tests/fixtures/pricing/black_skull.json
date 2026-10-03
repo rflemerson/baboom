@@ -1,0 +1,1432 @@
+{
+  "store_slug": "black_skull",
+  "platform": "vtex",
+  "source_url": "https://www.blackskullusa.com.br/api/catalog_system/pub/products/search?fq=skuId:1014",
+  "fetched_at": "2026-10-03T17:25:48+00:00",
+  "notes": "",
+  "payload": {
+    "productId": "398",
+    "productName": "Whey 100% HD Gourmet - Refil 900g - Black Skull",
+    "itemId": "1014",
+    "variations": {
+      "COR": [
+        "N/A"
+      ],
+      "SABOR": [
+        "CHOCOLATE"
+      ],
+      "TAMANHO": [
+        "N/A"
+      ]
+    },
+    "sellers": [
+      {
+        "sellerId": "1",
+        "sellerDefault": true,
+        "commertialOffer": {
+          "Price": 99.9,
+          "ListPrice": 119.9,
+          "PriceWithoutDiscount": 99.9,
+          "FullSellingPrice": 99.9,
+          "PriceValidUntil": "2026-10-12T00:00:00Z",
+          "AvailableQuantity": 100,
+          "IsAvailable": true,
+          "Installments": [
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "American Express",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "American Express 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Visa",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Visa 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Diners",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Diners 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Mastercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Mastercard 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Boleto Bancário",
+              "PaymentSystemGroupName": "bankInvoicePaymentGroup",
+              "Name": "Boleto Bancário à vista"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Hipercard",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Hipercard 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Elo",
+              "PaymentSystemGroupName": "creditCardPaymentGroup",
+              "Name": "Elo 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Vale",
+              "PaymentSystemGroupName": "giftCardPaymentGroup",
+              "Name": "Vale à vista"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Apple Pay",
+              "PaymentSystemGroupName": "ApplePayPaymentGroup",
+              "Name": "Apple Pay à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "Apple Pay",
+              "PaymentSystemGroupName": "ApplePayPaymentGroup",
+              "Name": "Apple Pay 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "Apple Pay",
+              "PaymentSystemGroupName": "ApplePayPaymentGroup",
+              "Name": "Apple Pay 3 vezes sem juros"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Pagaleve Transparente",
+              "PaymentSystemGroupName": "Pagaleve TransparentePaymentGroup",
+              "Name": "Pagaleve Transparente à vista"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "Pagaleve Pix A Vista Transparente",
+              "PaymentSystemGroupName": "PagalevePixAVistaTransparentePaymentGroup",
+              "Name": "Pagaleve Pix A Vista Transparente à vista"
+            },
+            {
+              "Value": 99.9,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 1,
+              "PaymentSystemName": "WH Google Pay",
+              "PaymentSystemGroupName": "WH Google PayPaymentGroup",
+              "Name": "WH Google Pay à vista"
+            },
+            {
+              "Value": 49.95,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 2,
+              "PaymentSystemName": "WH Google Pay",
+              "PaymentSystemGroupName": "WH Google PayPaymentGroup",
+              "Name": "WH Google Pay 2 vezes sem juros"
+            },
+            {
+              "Value": 33.3,
+              "InterestRate": 0.0,
+              "TotalValuePlusInterestRate": 99.9,
+              "NumberOfInstallments": 3,
+              "PaymentSystemName": "WH Google Pay",
+              "PaymentSystemGroupName": "WH Google PayPaymentGroup",
+              "Name": "WH Google Pay 3 vezes sem juros"
+            }
+          ],
+          "Teasers": [],
+          "PromotionTeasers": [],
+          "DiscountHighLight": [],
+          "GiftSkuIds": [],
+          "BuyTogether": [],
+          "PaymentOptions": {
+            "installmentOptions": [
+              {
+                "paymentSystem": "1",
+                "bin": null,
+                "paymentName": "American Express",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "2",
+                "bin": null,
+                "paymentName": "Visa",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "3",
+                "bin": null,
+                "paymentName": "Diners",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "4",
+                "bin": null,
+                "paymentName": "Mastercard",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "6",
+                "bin": null,
+                "paymentName": "Boleto Bancário",
+                "paymentGroupName": "bankInvoicePaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "8",
+                "bin": null,
+                "paymentName": "Hipercard",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "9",
+                "bin": null,
+                "paymentName": "Elo",
+                "paymentGroupName": "creditCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "16",
+                "bin": null,
+                "paymentName": "Vale",
+                "paymentGroupName": "giftCardPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "69",
+                "bin": null,
+                "paymentName": "Apple Pay",
+                "paymentGroupName": "ApplePayPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "198",
+                "bin": null,
+                "paymentName": "Pagaleve Transparente",
+                "paymentGroupName": "Pagaleve TransparentePaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "713",
+                "bin": null,
+                "paymentName": "Pagaleve Pix A Vista Transparente",
+                "paymentGroupName": "PagalevePixAVistaTransparentePaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "paymentSystem": "900",
+                "bin": null,
+                "paymentName": "WH Google Pay",
+                "paymentGroupName": "WH Google PayPaymentGroup",
+                "value": 9990,
+                "installments": [
+                  {
+                    "count": 1,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 9990,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 1,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 9990,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 2,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 4995,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 2,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 4995,
+                        "total": 9990
+                      }
+                    ]
+                  },
+                  {
+                    "count": 3,
+                    "hasInterestRate": false,
+                    "interestRate": 0,
+                    "value": 3330,
+                    "total": 9990,
+                    "sellerMerchantInstallments": [
+                      {
+                        "id": "BLACKSKULLUSA",
+                        "count": 3,
+                        "hasInterestRate": false,
+                        "interestRate": 0,
+                        "value": 3330,
+                        "total": 9990
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "paymentSystems": [
+              {
+                "id": 6,
+                "name": "Boleto Bancário",
+                "groupName": "bankInvoicePaymentGroup",
+                "validator": null,
+                "stringId": "6",
+                "template": "bankInvoicePaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 198,
+                "name": "Pagaleve Transparente",
+                "groupName": "Pagaleve TransparentePaymentGroup",
+                "validator": null,
+                "stringId": "198",
+                "template": "Pagaleve TransparentePaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 713,
+                "name": "Pagaleve Pix A Vista Transparente",
+                "groupName": "PagalevePixAVistaTransparentePaymentGroup",
+                "validator": null,
+                "stringId": "713",
+                "template": "PagalevePixAVistaTransparentePaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 16,
+                "name": "Vale",
+                "groupName": "giftCardPaymentGroup",
+                "validator": null,
+                "stringId": "16",
+                "template": "giftCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 2,
+                "name": "Visa",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "2",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 1,
+                "name": "American Express",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "1",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 3,
+                "name": "Diners",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "3",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 4,
+                "name": "Mastercard",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "4",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 8,
+                "name": "Hipercard",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "8",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 9,
+                "name": "Elo",
+                "groupName": "creditCardPaymentGroup",
+                "validator": null,
+                "stringId": "9",
+                "template": "creditCardPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 69,
+                "name": "Apple Pay",
+                "groupName": "ApplePayPaymentGroup",
+                "validator": null,
+                "stringId": "69",
+                "template": "ApplePayPaymentGroup-template",
+                "requiresDocument": true,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              },
+              {
+                "id": 900,
+                "name": "WH Google Pay",
+                "groupName": "WH Google PayPaymentGroup",
+                "validator": null,
+                "stringId": "900",
+                "template": "WH Google PayPaymentGroup-template",
+                "requiresDocument": false,
+                "isCustom": false,
+                "description": null,
+                "requiresAuthentication": false,
+                "dueDate": "2026-10-10T15:00:00Z",
+                "availablePayments": null
+              }
+            ],
+            "payments": [],
+            "giftCards": [],
+            "giftCardMessages": [],
+            "availableAccounts": [],
+            "availableTokens": []
+          },
+          "RewardValue": 0.0
+        },
+        "commertialOffer_keys": [
+          "AvailableQuantity",
+          "BuyTogether",
+          "CacheVersionUsedToCallCheckout",
+          "DeliverySlaSamples",
+          "DeliverySlaSamplesPerRegion",
+          "DiscountHighLight",
+          "FullSellingPrice",
+          "GetInfoErrorMessage",
+          "GiftSkuIds",
+          "Installments",
+          "IsAvailable",
+          "ItemMetadataAttachment",
+          "ListPrice",
+          "PaymentOptions",
+          "Price",
+          "PriceToken",
+          "PriceValidUntil",
+          "PriceWithoutDiscount",
+          "PromotionTeasers",
+          "RewardValue",
+          "Tax",
+          "Teasers"
+        ]
+      }
+    ],
+    "cart_simulation": {
+      "request": {
+        "sku": "1014",
+        "seller": "1",
+        "quantity": 1,
+        "sc": "1",
+        "country": "BRA",
+        "postalCode": "01310100"
+      },
+      "items": [
+        {
+          "id": "1014",
+          "price": 9990,
+          "listPrice": 11990,
+          "sellingPrice": 9990,
+          "priceTags": [],
+          "priceDefinition": {
+            "calculatedSellingPrice": 9990,
+            "total": 9990,
+            "sellingPrices": [
+              {
+                "value": 9990,
+                "quantity": 1
+              }
+            ],
+            "reason": "priceTable",
+            "pricePerUnit": 9990
+          }
+        }
+      ],
+      "totals": [
+        {
+          "id": "Items",
+          "name": "Total dos Itens",
+          "value": 9990
+        }
+      ],
+      "ratesAndBenefitsData": {
+        "rateAndBenefitsIdentifiers": [],
+        "teaser": [],
+        "campaigns": []
+      },
+      "paymentData": {
+        "installmentOptions": [
+          {
+            "paymentSystem": "1",
+            "paymentName": "American Express",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "2",
+            "paymentName": "Visa",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "3",
+            "paymentName": "Diners",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "4",
+            "paymentName": "Mastercard",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "6",
+            "paymentName": "Boleto Bancário",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "8",
+            "paymentName": "Hipercard",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "9",
+            "paymentName": "Elo",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "16",
+            "paymentName": "Vale",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "69",
+            "paymentName": "Apple Pay",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "198",
+            "paymentName": "Pagaleve Transparente",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "713",
+            "paymentName": "Pagaleve Pix A Vista Transparente",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              }
+            ]
+          },
+          {
+            "paymentSystem": "900",
+            "paymentName": "WH Google Pay",
+            "installments": [
+              {
+                "count": 1,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 9990,
+                "total": 9990
+              },
+              {
+                "count": 2,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 4995,
+                "total": 9990
+              },
+              {
+                "count": 3,
+                "hasInterestRate": false,
+                "interestRate": 0,
+                "value": 3330,
+                "total": 9990
+              }
+            ]
+          }
+        ]
+      },
+      "logistics_slas": [
+        [
+          {
+            "id": "Transportadora Mandaê",
+            "name": "Transportadora Mandaê",
+            "price": 1073,
+            "listPrice": 1073,
+            "shippingEstimate": "6bd"
+          },
+          {
+            "id": "Transportadora Total express",
+            "name": "Transportadora Total express",
+            "price": 1354,
+            "listPrice": 1354,
+            "shippingEstimate": "8bd"
+          },
+          {
+            "id": "CORREIOS PAC",
+            "name": "CORREIOS PAC",
+            "price": 2134,
+            "listPrice": 2134,
+            "shippingEstimate": "9bd"
+          },
+          {
+            "id": "CORREIOS SEDEX",
+            "name": "CORREIOS SEDEX",
+            "price": 3064,
+            "listPrice": 3064,
+            "shippingEstimate": "5bd"
+          }
+        ]
+      ]
+    }
+  }
+}

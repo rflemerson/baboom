@@ -1,0 +1,94 @@
+{
+  "fetched_at": "2026-10-03",
+  "note": "Verbatim excerpts from official store pages. Evidence of what each store announces, not proof of what its checkout grants.",
+  "benefits": [
+    {
+      "store_slug": "integral_medica",
+      "source_url": "https://www.integralmedica.com.br/central-promocoes",
+      "mechanics": ["coupon_percentage", "new_customer", "min_order", "shipping"],
+      "excerpts": [
+        "Primeira Compra com 20%OFF + Frete Fixo!",
+        "Na sua primeira compra acima de R$249, você garante FRETE FIXO automaticamente e 20%OFF Utilizando o cupom PRIMEIRACOMPRA",
+        "Frete Grátis em Compras Acima de R$280!",
+        "os cupons promocionais são válidos para apenas 1 (um) pedido por CPF durante o período da campanha."
+      ],
+      "unknown": ["campaign end date", "whether 20% stacks with the 5% Pix discount", "whether R$249 is measured before or after the coupon"]
+    },
+    {
+      "store_slug": "integral_medica",
+      "source_url": "https://www.integralmedica.com.br/central-promocoes",
+      "mechanics": ["payment_discount"],
+      "excerpts": ["Ganhe 5% Off Pagando no Pix"],
+      "unknown": ["exclusions", "whether it applies after coupons"]
+    },
+    {
+      "store_slug": "integral_medica",
+      "source_url": "https://totvsibi-integralmedica-dc.myshopify.com/products/whey-protein-concentrado-pouch-900g",
+      "mechanics": ["payment_discount", "storewide_with_exclusions"],
+      "excerpts": ["Coleção de Produtos Sem Évora XT | Pix 20%"],
+      "unknown": ["everything but the collection name: rate, validity, which products are in the collection"]
+    },
+    {
+      "store_slug": "dux_nutrition",
+      "source_url": "https://duxhumanhealth.com/regulamentos/",
+      "mechanics": ["payment_discount", "compatibility"],
+      "excerpts": [
+        "O desconto de 5% é concebido automaticamente após selecionar o meio de pagamento Pix.",
+        "O uso do Vale-Presente não é cumulativo com promoções de método de pagamento, portanto, o desconto de 5% via PIX não será aplicado na compra."
+      ],
+      "unknown": ["product exclusions"]
+    },
+    {
+      "store_slug": "dux_nutrition",
+      "source_url": "https://duxhumanhealth.com/regulamentos/",
+      "mechanics": ["cashback"],
+      "excerpts": ["Política de Cashback DUX Company", "oferecendo um percentual de retorno sobre cada compra realizada no site oficial"],
+      "unknown": ["rate, base, credit form, delay, expiry: the linked regulation (https://www.duxhumanhealth.com/regulamento-cashback/) redirects back to /regulamentos/"],
+      "status": "pending: terms not accessible"
+    },
+    {
+      "store_slug": "soldiers_nutrition",
+      "source_url": "https://soldiersnutrition.com.br/pages/cashback",
+      "mechanics": ["points", "store_credit_coupon"],
+      "excerpts": [
+        "Você pode trocar pontos acumulados por Cashback e utilizá-los em descontos em sua próxima compra",
+        "O limite máximo de troca de pontos por cashback é de 750 pontos, que equivale a R$60,00 de desconto.",
+        "Após o resgate você receberá um código referente a um cupom de desconto, que poderá ser usado em sua compra",
+        "o cliente não poderá mais solicitar o cancelamento, nem mesmo solicitar a troca por valor em dinheiro."
+      ],
+      "unknown": ["points earned per real spent", "points expiry"]
+    },
+    {
+      "store_slug": "soldiers_nutrition",
+      "source_url": "https://soldiersnutrition.com.br/products/whey-concentrado-60?variant=47416556060921",
+      "mechanics": ["payment_discount"],
+      "excerpts": ["5% OFF no PIX", "data-price=\"14590\" data-pix-discount=\"5\" data-installment-count=\"6\"", "data-price=\"14590\" data-compare-at-price=\"17990\" data-pix-discount=\"5\" data-installment-count=\"3\""],
+      "unknown": ["which installment count is true: the same page states 6 and 3"]
+    },
+    {
+      "store_slug": "dark_lab",
+      "source_url": "https://www.darklabsuplementos.com.br/products/whey-100-refil-900g-dark-lab-1?variant=43512530960590",
+      "mechanics": ["payment_discount"],
+      "excerpts": ["pixDiscount = 10.0", "Para pagamentos via PIX", "variant.price * (100 - pixDiscount) / 100"],
+      "unknown": ["exclusions; this is a storefront theme setting, not the checkout rule"]
+    },
+    {
+      "store_slug": "max_titanium",
+      "source_url": "https://www.maxtitanium.com.br/central-de-promocao",
+      "mechanics": ["payment_discount"],
+      "excerpts": ["PIX E BOLETO COM 5% OFF", "1X NO CARTÃO COM ATÉ 5% OFF"],
+      "unknown": ["the catalog prices Pix at R$ 96.03 for a R$ 99.00 item (3%), not 5%"]
+    },
+    {
+      "store_slug": "probiotica",
+      "source_url": "https://www.probiotica.com.br/",
+      "mechanics": ["payment_discount"],
+      "excerpts": ["PIX E BOLETO COM ATÉ 5% OFF"],
+      "unknown": ["which products: the catalog prices Pix at full price for 100% Pure Whey 1550"]
+    }
+  ],
+  "searched_not_found": [
+    "verifiable monetary cashback with full terms (DUX regulation link broken; Max Titanium tiers 4/5/8% only on a third-party coupon site)",
+    "fixed-amount coupon with minimum or cap on an official page"
+  ]
+}

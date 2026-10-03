@@ -1,0 +1,42 @@
+{
+  "store_slug": "soldiers_nutrition",
+  "platform": "shopify",
+  "source_url": "https://soldiersnutrition.com.br/products/whey-concentrado-60.js",
+  "fetched_at": "2026-10-03T17:25:48+00:00",
+  "notes": "Shopify .js prices are integer cents. product_page_pix_mentions are verbatim text around 'pix' on the variant page, to see whether the storefront advertises a payment discount the API omits.",
+  "payload": {
+    "product_id": 9253278908665,
+    "title": "Whey Protein Concentrado - 1kg",
+    "price_range_cents": {
+      "price": 14590,
+      "price_min": 14590,
+      "price_max": 14590,
+      "compare_at_price": 17990,
+      "compare_at_price_min": 17990,
+      "compare_at_price_max": 17990
+    },
+    "variant": {
+      "id": 47416556060921,
+      "title": "Baunilha",
+      "sku": "76",
+      "price": 14590,
+      "compare_at_price": 17990,
+      "available": true,
+      "option1": "Baunilha",
+      "option2": "Default Title",
+      "option3": null,
+      "requires_selling_plan": false,
+      "selling_plan_allocations": []
+    },
+    "product_page_pix_mentions": [
+      "!-- End Meta Pixel Code --",
+      "!-- Meta Pixel Code --",
+      "!-- TikTok Pixel Code End --",
+      "!-- TikTok Pixel Code Start --",
+      "$ 41,71\",\n              \"price\": \"R$ 29,00\",\n              \"pix\": \"R$ 27,55\",\n              \"installment\": \"R$ 9,67\"",
+      "$ 52,90\",\n              \"price\": \"R$ 29,90\",\n              \"pix\": \"R$ 28,40\",\n              \"installment\": \"R$ 9,97\"",
+      "$ 78,90\",\n              \"price\": \"R$ 39,90\",\n              \"pix\": \"R$ 37,90\",\n              \"installment\": \"R$ 13,30\"",
+      ".price .ec-price-custom__pix-discount,\n.template--21902133952761__related-products .card"
+    ]
+  }
+}
