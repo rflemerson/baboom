@@ -1,10 +1,7 @@
-"""Offer layer: merchant listings and their price observations.
+"""Offers: one seller's buyable proposal for one unit, and its price history.
 
-This app is the neutral kernel of the pricing domain. It depends only on
-``common`` and is referenced by both ``scrapers`` (which writes offers) and
-``core`` (which links canonical products to offers). It must never import from
-either of those apps, so store identity is kept as a raw ``store_slug`` string
-and resolved to a curated ``core.Store`` at the boundary.
+``store_slug`` and ``external_id`` are the legacy identity, kept as an alias
+until every reader uses the listing, variant and seller account.
 """
 
 from __future__ import annotations
@@ -46,6 +43,15 @@ def fold(text: str) -> str:
     return " ".join(stripped.casefold().split())
 
 
+class ItemCondition(models.TextChoices):
+    """The state of the item a seller offers."""
+
+    NEW = "new", _("New")
+    USED = "used", _("Used")
+    REFURBISHED = "refurbished", _("Refurbished")
+    UNKNOWN = "unknown", _("Unknown")
+
+
 class DelistReason(models.TextChoices):
     """Why an offer stopped being a unit the catalog can price."""
 
@@ -54,12 +60,14 @@ class DelistReason(models.TextChoices):
 
 
 class Offer(BaseModel):
-    """A product-for-sale at a specific merchant, identified by store + id.
+    """One seller's proposal for one buyable unit.
 
     The offer exists from the moment the scraper first sees it, independent of
     whether it has been linked to a canonical catalog product. It holds the
     latest observed snapshot; the full price series lives in
-    :class:`PriceObservation`.
+    :class:`PriceObservation`. Its identity is the listing variant, the seller
+    account, the item condition and the fulfillment profile; the store slug
+    and external id remain as the legacy alias.
     """
 
     store_slug = models.CharField(
@@ -176,6 +184,38 @@ class Offer(BaseModel):
             'a list of {"name", "value"} such as {"name": "Sabor", '
             '"value": "Chocolate"}.',
         ),
+    )
+
+    listing_variant = models.ForeignKey(
+        "offers.ListingVariant",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="offers",
+        verbose_name=_("Listing Variant"),
+    )
+    seller_account = models.ForeignKey(
+        "commerce.SellerAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="offers",
+        verbose_name=_("Seller Account"),
+        help_text=_("Empty while the source has not said who sells it."),
+    )
+    fulfillment_profile = models.ForeignKey(
+        "commerce.FulfillmentProfile",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="offers",
+        verbose_name=_("Fulfillment Profile"),
+    )
+    item_condition = models.CharField(
+        _("Item Condition"),
+        max_length=12,
+        choices=ItemCondition,
+        default=ItemCondition.UNKNOWN,
     )
 
     @property

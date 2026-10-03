@@ -9,6 +9,7 @@ from decimal import Decimal
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
+    SellerInput,
     StockReading,
     VariantContext,
     VariantOption,
@@ -169,6 +170,8 @@ class ShopifyNormalizer:
             ),
             sku=str(variant.get("sku") or ""),
             ean=str(variant.get("barcode") or ""),
+            # The platform sells only the store's own stock.
+            seller=SellerInput(is_channel_owner=True),
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=product_id,

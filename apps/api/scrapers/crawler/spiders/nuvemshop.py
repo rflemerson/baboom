@@ -154,7 +154,7 @@ class NuvemshopSpider(CatalogSpider):
         if product is not None:
             self._set_stat("offers_collected", len(product.offers))
             self._set_stat("products_collected")
-            yield product
+            yield self.with_market(product)
 
     @staticmethod
     def extract_variants(html: str) -> list[dict[str, object]]:

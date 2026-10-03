@@ -11,8 +11,16 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from commerce.services import CommerceIdentityService, MarketRef, SellerRef
 from offers.models import DelistReason, Offer, StockStatus
-from offers.services import OfferObservationResult, OfferObservationService
+from offers.services import (
+    ListingRef,
+    OfferIdentityRef,
+    OfferIdentityService,
+    OfferObservationResult,
+    OfferObservationService,
+    VariantRef,
+)
 
 from .contracts import ScrapedItemIngestionInput
 from .models import ScrapedItem, ScrapedPage
@@ -20,13 +28,33 @@ from .models import ScrapedItem, ScrapedPage
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from .contracts import ScrapedProductInput, VariantContext
+    from commerce.models import Market
+
+    from .contracts import (
+        MarketInput,
+        ScrapedOfferInput,
+        ScrapedProductInput,
+        VariantContext,
+    )
 
 logger = logging.getLogger(__name__)
 
 # Two daily runs: one incomplete crawl cannot delist, and a unit that is really
 # gone leaves the ranking within two days.
 MISSED_RUNS_BEFORE_DELISTING = 2
+
+
+def market_ref(declared: MarketInput) -> MarketRef:
+    """Translate a spider's declared market into the commerce reference."""
+    return MarketRef(
+        namespace=declared.namespace,
+        channel_name=declared.channel_name,
+        channel_kind=declared.channel_kind,
+        adapter=declared.adapter,
+        country=declared.country,
+        currency=declared.currency,
+        timezone=declared.timezone,
+    )
 
 
 class ScraperService:
@@ -107,6 +135,14 @@ class ScraperService:
         if page_updates:
             page.save(update_fields=page_updates)
 
+        market = ScraperService._market(product)
+        if market is not None and page.listing_id is None:
+            page.listing = OfferIdentityService().listing(
+                market,
+                ScraperService._listing_ref(product),
+            )
+            page.save(update_fields=["listing", "updated_at"])
+
         saved: list[ScrapedItem] = []
         seen_at = timezone.now()
         seen_ids: set[str] = set()
@@ -133,6 +169,8 @@ class ScraperService:
                 delisted_reason="",
                 missed_runs=0,
             )
+            if market is not None:
+                ScraperService._bind_identity(observation.offer, product, offer, market)
             item, _created = ScraperService._upsert_scraped_item(
                 observation,
                 page,
@@ -145,6 +183,69 @@ class ScraperService:
             ScraperService._reconcile_absent_units(product, page, seen_ids, seen_at)
 
         return saved
+
+    @staticmethod
+    def _market(product: ScrapedProductInput) -> Market | None:
+        """Return the market a page was read from, when its spider declares one."""
+        if product.market is None:
+            return None
+        return CommerceIdentityService.market(market_ref(product.market))
+
+    @staticmethod
+    def _listing_ref(product: ScrapedProductInput) -> ListingRef:
+        """Describe the page as the listing its market publishes."""
+        title = product.offers[0].variant_context.title if product.offers else ""
+        return ListingRef(
+            external_id=product.provider_product_id,
+            url=product.page_url,
+            title=title,
+        )
+
+    @staticmethod
+    def _bind_identity(
+        offer_row: Offer,
+        product: ScrapedProductInput,
+        offer: ScrapedOfferInput,
+        market: Market,
+    ) -> None:
+        """Place an offer under its listing, variant and seller account."""
+        seller = (
+            CommerceIdentityService.seller(
+                market,
+                SellerRef(
+                    external_id=offer.seller.external_id,
+                    name=offer.seller.name,
+                    is_channel_owner=offer.seller.is_channel_owner,
+                ),
+            )
+            if offer.seller is not None
+            else None
+        )
+        context = offer.variant_context
+        variant_id = context.provider_variant_id or offer.external_id
+        seller_key = (
+            "owner"
+            if offer.seller is not None and offer.seller.is_channel_owner
+            else (offer.seller.external_id if offer.seller else "unknown")
+        )
+        OfferIdentityService().bind(
+            offer_row,
+            OfferIdentityRef(
+                market=market,
+                listing=ScraperService._listing_ref(product),
+                variant=VariantRef(
+                    external_id=variant_id,
+                    options=tuple(option.model_dump() for option in context.options),
+                    selection=(
+                        context.selection.model_dump() if context.selection else None
+                    ),
+                    gtin=offer.ean,
+                ),
+                seller_account=seller,
+                scheme=product.provider,
+                key=f"{variant_id}@{seller_key}",
+            ),
+        )
 
     @staticmethod
     @transaction.atomic

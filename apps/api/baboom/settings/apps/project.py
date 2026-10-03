@@ -4,7 +4,7 @@ from baboom.settings.base import INSTALLED_APPS
 from baboom.settings.env import BASE_DIR
 
 # Project apps
-INSTALLED_APPS += ["common", "offers", "core", "scrapers", "mcp_server"]
+INSTALLED_APPS += ["common", "commerce", "offers", "core", "scrapers", "mcp_server"]
 
 # Treebeard
 INSTALLED_APPS += ["treebeard"]

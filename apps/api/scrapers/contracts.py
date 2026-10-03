@@ -62,6 +62,30 @@ class VariantContext(BaseModel):
     selection: VariantSelection | None = None
 
 
+class SellerInput(BaseModel):
+    """The seller of a unit, as the source names it.
+
+    On a platform without third-party sellers the normalizer states the
+    channel owner; a marketplace states the seller's own id.
+    """
+
+    external_id: str = ""
+    name: str = ""
+    is_channel_owner: bool = False
+
+
+class MarketInput(BaseModel):
+    """The market a spider reads, as its configuration declares it."""
+
+    namespace: str
+    channel_name: str
+    channel_kind: Literal["independent_store", "marketplace", "app"]
+    adapter: str
+    country: str
+    currency: str
+    timezone: str
+
+
 class ScrapedOfferInput(BaseModel):
     """One independently buyable and priced unit from a product page."""
 
@@ -74,6 +98,7 @@ class ScrapedOfferInput(BaseModel):
     sku: str = ""
     ean: str = ""
     variant_context: VariantContext
+    seller: SellerInput | None = None
 
 
 class ScrapedProductInput(BaseModel):
@@ -88,6 +113,7 @@ class ScrapedProductInput(BaseModel):
     offers: list[ScrapedOfferInput]
     # Only an exhaustive, successfully parsed unit list may establish absence.
     complete_unit_list: bool = False
+    market: MarketInput | None = None
 
 
 class ScrapedItemIngestionInput(BaseModel):

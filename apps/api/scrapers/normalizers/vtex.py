@@ -9,6 +9,7 @@ from decimal import Decimal
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
+    SellerInput,
     StockReading,
     VariantContext,
     VariantOption,
@@ -17,6 +18,9 @@ from ..contracts import (
 from .parsing import is_http_url, parse_optional_int, parse_positive_price
 
 logger = logging.getLogger(__name__)
+
+# VTEX numbers the store's own seller "1"; any other id is a marketplace seller.
+VTEX_CHANNEL_OWNER_SELLER_ID = "1"
 
 
 class VtexNormalizer:
@@ -137,6 +141,7 @@ class VtexNormalizer:
             ),
             sku=item_id,
             ean=str(sku.get("ean") or ""),
+            seller=self._seller_input(seller),
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=product_id,
@@ -160,6 +165,21 @@ class VtexNormalizer:
                 return seller
         first = sellers[0]
         return first if isinstance(first, dict) else None
+
+    @staticmethod
+    def _seller_input(seller: dict) -> SellerInput | None:
+        """Name the seller; VTEX seller "1" is the store that runs the channel.
+
+        A seller entry without an id names nobody: the offer keeps no seller.
+        """
+        seller_id = str(seller.get("sellerId") or "")
+        if not seller_id:
+            return None
+        return SellerInput(
+            external_id=seller_id,
+            name=str(seller.get("sellerName") or ""),
+            is_channel_owner=seller_id == VTEX_CHANNEL_OWNER_SELLER_ID,
+        )
 
     def _sku_options(self, sku: dict) -> list[VariantOption]:
         """Read VTEX variations in the order published by the SKU."""

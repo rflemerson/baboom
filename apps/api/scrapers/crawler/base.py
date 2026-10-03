@@ -10,10 +10,11 @@ from urllib.parse import urlencode
 
 from scrapy import Request, Spider
 
+from ..contracts import MarketInput, ScrapedProductInput
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
 
-    from ..contracts import ScrapedProductInput
     from ..normalizers.base import ProductNormalizer
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,12 @@ class CatalogSpider(Spider):
     BASE_URL = ""
     FALLBACK_CATEGORIES: tuple[str, ...] = ()
     STARTUP_JITTER_SECONDS = (0.0, 5.0)
+    # The market a store sells in, declared by its configuration rather than
+    # read from each payload.
+    CHANNEL_KIND = "independent_store"
+    MARKET_COUNTRY = "BR"
+    MARKET_CURRENCY = "BRL"
+    MARKET_TIMEZONE = "America/Sao_Paulo"
 
     def __init__(
         self, categories: list[str] | str | None = None, **kwargs: object
@@ -151,11 +158,28 @@ class CatalogSpider(Spider):
             base_url=self.BASE_URL,
             category=category,
         )
-        if product is not None:
-            if claim_id:
-                self.processed_ids.add(product_id)
-            self._set_stat("offers_collected", len(product.offers))
-        return [product] if product is not None else []
+        if product is None:
+            return []
+        if claim_id:
+            self.processed_ids.add(product_id)
+        self._set_stat("offers_collected", len(product.offers))
+        return [self.with_market(product)]
+
+    def market_input(self) -> MarketInput:
+        """Return the market this spider's configuration declares."""
+        return MarketInput(
+            namespace=self.STORE_SLUG,
+            channel_name=self.BRAND_NAME or self.STORE_SLUG,
+            channel_kind=self.CHANNEL_KIND,
+            adapter=self.normalizer.provider,
+            country=self.MARKET_COUNTRY,
+            currency=self.MARKET_CURRENCY,
+            timezone=self.MARKET_TIMEZONE,
+        )
+
+    def with_market(self, product: ScrapedProductInput) -> ScrapedProductInput:
+        """Attach the declared market to a normalized page."""
+        return product.model_copy(update={"market": self.market_input()})
 
     def product_id(self, raw: dict) -> str:
         """Return the platform product identifier used for cross-category dedupe."""

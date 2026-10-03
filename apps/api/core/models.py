@@ -172,6 +172,15 @@ class Store(BaseModel):
         blank=True,
         help_text=_("Store description"),
     )
+    seller_account = models.OneToOneField(
+        "commerce.SellerAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="catalog_store",
+        verbose_name=_("Seller Account"),
+        help_text=_("The account this store sells through, in its own market."),
+    )
 
     class Meta:
         """Meta options."""

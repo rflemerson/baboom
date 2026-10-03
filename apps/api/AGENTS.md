@@ -72,6 +72,16 @@ offers that a successful crawl no longer sees.
 - Complete Shopify/VTEX unit lists reconcile absent variants; partial lists
   never delist. A price-less unit remains present but unavailable. Delisting
   and missing prices clear the current price without deleting price history.
+- Commercial identity: `commerce` (channel, market, seller account, merchant,
+  fulfillment, payment method, programme) imports only `common`; `offers`
+  imports only `common` and `commerce`. A spider declares its market
+  (`CatalogSpider.MARKET_*`), each normalizer names the seller
+  (`SellerInput`), and ingestion places every offer under its listing, variant
+  and seller account (`OfferIdentityService`). A known seller is never
+  overwritten. `baboom/tests/test_import_boundaries.py` enforces the imports.
+- `backfill_commercial_identity` previews, and with `--apply` writes, the
+  identity of offers captured before it existed; sellers come only from the
+  captured context, and the rest are listed for review.
 - `scrapers/management/commands/cutover_offer_identities.py` is an explicit,
   preview-first legacy-identity transition. It never runs on deployment;
   operators must review ambiguous mappings before opting into archival.

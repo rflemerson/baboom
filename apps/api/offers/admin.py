@@ -6,7 +6,14 @@ from typing import TYPE_CHECKING
 
 from django.contrib import admin
 
-from .models import Offer, PriceObservation
+from .models import (
+    FeaturedOfferObservation,
+    Listing,
+    ListingVariant,
+    Offer,
+    OfferSourceIdentity,
+    PriceObservation,
+)
 
 if TYPE_CHECKING:
     from .models import Offer as OfferType
@@ -43,11 +50,17 @@ class OfferAdmin(admin.ModelAdmin):
         "delisted_at",
         "updated_at",
     )
-    list_filter = ("store_slug", "current_stock_status")
+    list_filter = ("store_slug", "current_stock_status", "item_condition")
     # The admin API exposes no filter for a free-text column, so the store is
     # searched: "growth whey" narrows to Growth offers that mention whey.
     search_fields = ("store_slug", "name", "external_id", "ean", "sku")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = (
+        "listing_variant",
+        "seller_account",
+        "fulfillment_profile",
+        "created_at",
+        "updated_at",
+    )
     inlines = (PriceObservationInline,)
 
     @admin.display(description="Flavors")
@@ -74,3 +87,54 @@ class PriceObservationAdmin(admin.ModelAdmin):
     search_fields = ("offer__name", "offer__external_id")
     readonly_fields = ("offer", "price", "stock_status", "observed_at")
     ordering = ("-observed_at",)
+
+
+class ListingVariantInline(admin.TabularInline):
+    """The selectable units of a listing, as the source published them."""
+
+    model = ListingVariant
+    extra = 0
+    can_delete = False
+    readonly_fields = ("external_id", "options", "selection", "gtin")
+
+    def has_add_permission(self, _request: object, _obj: object = None) -> bool:
+        """Variants come from ingestion."""
+        return False
+
+
+@admin.register(Listing)
+class ListingAdmin(admin.ModelAdmin):
+    """Pages and advertisements markets publish."""
+
+    list_display = ("__str__", "market", "external_id", "catalog_product_id")
+    list_filter = ("market",)
+    search_fields = ("title", "external_id", "catalog_product_id", "url")
+    readonly_fields = ("market", "external_id", "url", "title", "catalog_product_id")
+    inlines = (ListingVariantInline,)
+
+
+@admin.register(ListingVariant)
+class ListingVariantAdmin(admin.ModelAdmin):
+    """Selectable units, searched by listing or GTIN."""
+
+    list_display = ("__str__", "external_id", "gtin")
+    search_fields = ("listing__title", "external_id", "gtin")
+    readonly_fields = ("listing", "external_id", "options", "selection", "gtin")
+
+
+@admin.register(OfferSourceIdentity)
+class OfferSourceIdentityAdmin(admin.ModelAdmin):
+    """Every name a source gives an offer."""
+
+    list_display = ("__str__", "offer")
+    list_filter = ("scheme", "namespace")
+    search_fields = ("key",)
+    readonly_fields = ("offer", "namespace", "scheme", "scheme_version", "key")
+
+
+@admin.register(FeaturedOfferObservation)
+class FeaturedOfferObservationAdmin(admin.ModelAdmin):
+    """Which offer a listing variant featured, when."""
+
+    list_display = ("listing_variant", "offer", "observed_at")
+    readonly_fields = ("listing_variant", "offer", "observed_at")

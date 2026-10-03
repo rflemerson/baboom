@@ -30,7 +30,17 @@ PERMISSIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "active": ("view",),
         "store": ("view",),
     },
-    "offers": {"offer": ("view",)},
+    "offers": {
+        "offer": ("view",),
+        "listing": ("view",),
+        "listingvariant": ("view",),
+    },
+    "commerce": {
+        "market": ("view",),
+        "selleraccount": ("view",),
+        "paymentmethod": ("view",),
+        "program": ("view",),
+    },
     "scrapers": {
         "scrapeditem": ("view",),
         "scrapedpage": ("view",),

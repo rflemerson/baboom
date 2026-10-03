@@ -10,6 +10,7 @@ from typing import Any, NamedTuple
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
+    SellerInput,
     StockReading,
     VariantContext,
     VariantOption,
@@ -124,6 +125,8 @@ class NuvemshopNormalizer:
             # The listing's barcode describes its own unit, not its siblings.
             ean=page.listing_ean if sku and sku == page.listing_sku else "",
             sku=sku,
+            # The platform sells only the store's own stock.
+            seller=SellerInput(is_channel_owner=True),
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=page.product_id,
@@ -229,6 +232,7 @@ class NuvemshopNormalizer:
                     ean=str(raw.get("gtin13") or ""),
                     sku=sku,
                     variant_context=context,
+                    seller=SellerInput(is_channel_owner=True),
                 ),
             ],
         )

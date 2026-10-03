@@ -24,6 +24,14 @@ class ScrapedPage(models.Model):
         blank=True,
         help_text=_("Normalized product context collected from store APIs"),
     )
+    listing = models.ForeignKey(
+        "offers.Listing",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scraped_pages",
+        help_text=_("The listing this crawl evidence describes"),
+    )
     scraped_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

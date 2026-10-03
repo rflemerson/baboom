@@ -10,6 +10,7 @@ from typing import NamedTuple
 from ..contracts import (
     ScrapedOfferInput,
     ScrapedProductInput,
+    SellerInput,
     StockReading,
     VariantContext,
     VariantOption,
@@ -135,6 +136,8 @@ class WapStoreNormalizer:
             stock_status=self._resolve_stock_status(stock_quantity, price),
             ean=str(source.get("ean") or source.get("gtin") or ""),
             sku=sku,
+            # The platform sells only the store's own stock.
+            seller=SellerInput(is_channel_owner=True),
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=page.page_id,
