@@ -22,6 +22,12 @@ if [ "${DEPLOY_SKIP_GIT_UPDATE:-0}" != "1" ]; then
   git pull --ff-only origin main
 fi
 
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "::error::Tracked files changed on this machine; refusing to deploy over them"
+  git status --short --untracked-files=no
+  exit 1
+fi
+
 commit_sha="$(git rev-parse HEAD)"
 if [ -n "${DEPLOY_SHA:-}" ] && [ "$commit_sha" != "$DEPLOY_SHA" ]; then
   echo "::error::Checked out ${commit_sha}, expected ${DEPLOY_SHA}"
@@ -112,6 +118,11 @@ case "$DEPLOY_ROLE" in
 esac
 
 prune_unused_images
+
+echo "== Running images =="
+for container in $(compose ps -q); do
+  docker inspect --format '{{.Name}} {{.Config.Image}} {{.Image}}' "$container"
+done
 
 echo "== Final compose state =="
 compose ps

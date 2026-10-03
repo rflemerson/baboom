@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: production
@@ -17,6 +18,20 @@ jobs:
     environment: production
     timeout-minutes: 40
     steps:
+      # CI publishes the images of a main commit only when it passes, so a
+      # commit without a successful CI run has no images to deploy.
+      - name: Require a successful CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${DEPLOY_SHA}&branch=main" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+          if [ "$conclusion" = "0" ]; then
+            echo "::error::No successful CI run on main for ${DEPLOY_SHA}"
+            exit 1
+          fi
+
       - name: Install SSH key
         run: |
           install -m 700 -d ~/.ssh
