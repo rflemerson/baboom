@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from ..contracts import (
     ScrapedOfferInput,
@@ -16,6 +16,9 @@ from ..contracts import (
     VariantSelection,
 )
 from .parsing import is_http_url, parse_positive_price
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +166,7 @@ class ShopifyNormalizer:
             external_id=variant_id,
             offer_url=f"{page_url}?variant={variant_id}",
             name=name,
-            price=None if price is None else Decimal(str(price)),
+            price=price,
             stock_quantity=stock_quantity,
             stock_status=(
                 StockReading.AVAILABLE if is_available else StockReading.OUT_OF_STOCK
@@ -209,7 +212,7 @@ class ShopifyNormalizer:
                 options.append(VariantOption(name=name, value=str(value)))
         return options
 
-    def parse_price(self, raw_price: object) -> float | None:
+    def parse_price(self, raw_price: object) -> Decimal | None:
         """Parse the price format used by this Shopify endpoint."""
         return parse_positive_price(
             raw_price,

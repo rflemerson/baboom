@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from decimal import Decimal
 from typing import Any, NamedTuple
 
 from ..contracts import (
@@ -117,7 +116,7 @@ class NuvemshopNormalizer:
             external_id=external_id,
             offer_url=f"{page.url}?variant={variant_id}",
             name=page.title,
-            price=None if price is None else Decimal(str(price)),
+            price=price,
             stock_quantity=stock_quantity if available else 0,
             stock_status=(
                 StockReading.AVAILABLE if available else StockReading.OUT_OF_STOCK
@@ -222,7 +221,7 @@ class NuvemshopNormalizer:
                     external_id=sku,
                     offer_url=offer_url,
                     name=title,
-                    price=None if price is None else Decimal(str(price)),
+                    price=price,
                     stock_quantity=stock_quantity if price is not None else 0,
                     stock_status=(
                         StockReading.AVAILABLE

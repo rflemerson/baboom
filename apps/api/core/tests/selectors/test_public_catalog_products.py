@@ -537,6 +537,7 @@ class CatalogRowPriceTests(TestCase):
             external_id=flavor,
             url=f"https://growth.example/{flavor}",
             current_price=Decimal(price),
+            current_stock_status=StockStatus.AVAILABLE,
             options=[{"name": "Sabor", "value": flavor}],
         )
         ProductStore.objects.create(product=product, offer=offer)
@@ -597,6 +598,15 @@ class CatalogAvailabilityTests(TestCase):
             current_stock_status=stock,
         )
         ProductStore.objects.create(product=self.product, offer=offer)
+
+    def test_an_offer_of_unknown_stock_never_wins(self) -> None:
+        """A source that said nothing about stock has not said it is buyable."""
+        self._sell("unknown", "80.00", StockStatus.UNKNOWN)
+        self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
+
+        row = public_catalog_products().get(pk=self.product.pk)
+
+        assert row.price == Decimal("120.00")
 
     def test_a_sold_out_offer_never_wins_over_one_in_stock(self) -> None:
         """The cheapest price must be one the buyer can actually pay."""

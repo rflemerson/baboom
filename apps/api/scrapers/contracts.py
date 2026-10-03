@@ -25,6 +25,9 @@ class StockReading(StrEnum):
     AVAILABLE = "A"
     LAST_UNITS = "L"
     OUT_OF_STOCK = "O"
+    PREORDER = "P"
+    BACKORDER = "B"
+    UNKNOWN = "U"
 
 
 # How a buyable unit is reached on its page. Closed on purpose: an unknown
@@ -93,7 +96,7 @@ class ScrapedOfferInput(BaseModel):
     offer_url: str = ""
     name: str = ""
     price: Decimal | None = None
-    stock_status: StockReading = StockReading.AVAILABLE
+    stock_status: StockReading = StockReading.UNKNOWN
     stock_quantity: int | None = None
     sku: str = ""
     ean: str = ""
@@ -129,7 +132,7 @@ class ScrapedItemIngestionInput(BaseModel):
     name: str = ""
     price: str | float | decimal.Decimal | None = None
     stock_quantity: int | None = None
-    stock_status: StockReading = StockReading.AVAILABLE
+    stock_status: StockReading = StockReading.UNKNOWN
     ean: str = ""
     sku: str = ""
     pid: str = ""

@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 import re
+from decimal import Decimal, InvalidOperation
 
-PRICE_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
+PRICE_PATTERN = re.compile(r"-?\d[\d.,]*")
+CENTS = Decimal(100)
+THOUSANDS_GROUP = 3
 logger = logging.getLogger(__name__)
 
 
@@ -19,13 +22,22 @@ def parse_positive_price(
     *,
     cents_for_int: bool = False,
     cents_for_digit_string: bool = False,
-) -> float | None:
-    """Parse positive numeric price values from mixed API payload formats."""
-    if raw_price is None:
+) -> Decimal | None:
+    """Parse a positive price to an exact decimal, or None.
+
+    A JSON float becomes the decimal it was written as (``Decimal(repr)``), an
+    integer or digit string may be cents, and a formatted string may use either
+    comma or dot as the decimal separator, with the other as thousands.
+    """
+    if raw_price is None or isinstance(raw_price, bool):
         return None
     if isinstance(raw_price, int):
-        value = float(raw_price) / 100.0 if cents_for_int else float(raw_price)
+        value: Decimal | None = Decimal(raw_price)
+        if cents_for_int:
+            value = value / CENTS
     elif isinstance(raw_price, float):
+        value = Decimal(repr(raw_price))
+    elif isinstance(raw_price, Decimal):
         value = raw_price
     else:
         value = _parse_string_price(
@@ -33,7 +45,7 @@ def parse_positive_price(
             cents_for_digit_string=cents_for_digit_string,
         )
 
-    if value is None or value <= 0:
+    if value is None or not value.is_finite() or value <= 0:
         return None
     return value
 
@@ -42,20 +54,44 @@ def _parse_string_price(
     raw_price: str,
     *,
     cents_for_digit_string: bool,
-) -> float | None:
+) -> Decimal | None:
     raw = raw_price.strip()
     if not raw:
         return None
     if raw.isdigit():
-        return float(raw) / 100.0 if cents_for_digit_string else float(raw)
-    normalized = raw.replace(",", ".")
-    match = PRICE_PATTERN.search(normalized)
+        value = Decimal(raw)
+        return value / CENTS if cents_for_digit_string else value
+    match = PRICE_PATTERN.search(raw)
     if not match:
         return None
+    number = match.group(0)
+    decimal_separator = max(number.rfind(","), number.rfind("."))
+    if decimal_separator >= 0 and _is_decimal_separator(number, decimal_separator):
+        whole = re.sub(r"[.,]", "", number[:decimal_separator])
+        number = f"{whole}.{number[decimal_separator + 1 :]}"
+    else:
+        number = re.sub(r"[.,]", "", number)
     try:
-        return float(match.group(0))
-    except TypeError, ValueError:
+        return Decimal(number)
+    except InvalidOperation:
         return None
+
+
+def _is_decimal_separator(number: str, position: int) -> bool:
+    """Whether the last separator splits decimals rather than thousands.
+
+    "1.234" with no other separator reads as thousands only when exactly three
+    digits follow and the same mark does not appear earlier as a decimal; a
+    different earlier mark ("1.234,56") makes the last one the decimal mark.
+    """
+    mark = number[position]
+    other = "," if mark == "." else "."
+    digits_after = len(number) - position - 1
+    if other in number[:position]:
+        return True
+    if number.count(mark) > 1:
+        return False
+    return digits_after != THOUSANDS_GROUP
 
 
 def parse_optional_int(value: object) -> int | None:

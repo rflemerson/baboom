@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from decimal import Decimal
 
 from ..contracts import (
     ScrapedOfferInput,
@@ -132,7 +131,7 @@ class VtexNormalizer:
             external_id=item_id,
             offer_url=f"{page_url}?skuId={item_id}",
             name=sku_name or product_name,
-            price=None if price is None else Decimal(str(price)),
+            price=price,
             stock_quantity=stock_quantity if price is not None else 0,
             stock_status=(
                 StockReading.AVAILABLE

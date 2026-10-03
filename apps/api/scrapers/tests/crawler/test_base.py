@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from email.utils import format_datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,8 +22,8 @@ from scrapers.stores.dark_lab import DarkLabSpider
 from scrapers.tests.helpers import EXPECTED_FALLBACK_CATEGORY_COUNT
 
 RETRY_AFTER_SECONDS = 20
-SOLDIERS_PRICE_IN_REAIS = 129.90
-DARK_LAB_PRICE_IN_REAIS = 12990.0
+SOLDIERS_PRICE_IN_REAIS = Decimal("129.90")
+DARK_LAB_PRICE_IN_REAIS = Decimal(12990)
 
 
 class _DummyCatalogSpider(CatalogSpider):

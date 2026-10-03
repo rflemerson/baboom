@@ -37,10 +37,10 @@ class OfferObservationServiceTests(TestCase):
         assert result.offer == offer
         assert result.created is True
         assert result.changed is True
-        assert offer.current_stock_status == StockStatus.AVAILABLE
+        assert offer.current_stock_status == StockStatus.UNKNOWN
         assert offer.url == "https://example.com/whey"
         assert observation.price == INITIAL_PRICE
-        assert observation.stock_status == StockStatus.AVAILABLE
+        assert observation.stock_status == StockStatus.UNKNOWN
 
     def test_unchanged_record_updates_snapshot_without_new_observation(self) -> None:
         """Repeating the same price and stock does not grow price history."""
@@ -108,3 +108,18 @@ class OfferObservationServiceTests(TestCase):
         offer.refresh_from_db()
         assert offer.current_price is None
         assert offer.current_stock_status == StockStatus.OUT_OF_STOCK
+
+
+class StockReadingTests(TestCase):
+    """An unreadable stock is unknown, never available."""
+
+    def test_unknown_value_normalizes_to_unknown(self) -> None:
+        """A value outside the vocabulary is not a sale."""
+        assert StockStatus.normalize("?") == StockStatus.UNKNOWN
+
+    def test_purchasable_states_are_an_allowlist(self) -> None:
+        """Only available and last units can be bought now."""
+        assert set(StockStatus.purchasable()) == {
+            StockStatus.AVAILABLE,
+            StockStatus.LAST_UNITS,
+        }

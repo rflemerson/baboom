@@ -21,11 +21,14 @@ class StockStatus(models.TextChoices):
     AVAILABLE = "A", _("Available")
     LAST_UNITS = "L", _("Last Units")
     OUT_OF_STOCK = "O", _("Out of Stock")
+    PREORDER = "P", _("Pre-order")
+    BACKORDER = "B", _("Backorder")
+    UNKNOWN = "U", _("Unknown")
 
     @classmethod
     def normalize(cls, value: str) -> str:
-        """Return a supported stock status or the available fallback."""
-        return value if value in cls.values else cls.AVAILABLE
+        """Return a supported stock status; anything else is unknown."""
+        return value if value in cls.values else cls.UNKNOWN
 
     @classmethod
     def purchasable(cls) -> tuple[str, ...]:
@@ -135,7 +138,7 @@ class Offer(BaseModel):
         _("Current Stock Status"),
         max_length=1,
         choices=StockStatus,
-        default=StockStatus.AVAILABLE,
+        default=StockStatus.UNKNOWN,
     )
     current_stock_quantity = models.IntegerField(
         _("Current Stock Quantity"),

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from decimal import Decimal
 from typing import NamedTuple
 
 from ..contracts import (
@@ -131,7 +130,7 @@ class WapStoreNormalizer:
             external_id=external_id,
             offer_url=page.url,
             name=page.name,
-            price=None if price is None else Decimal(str(price)),
+            price=price,
             stock_quantity=stock_quantity if price is not None else 0,
             stock_status=self._resolve_stock_status(stock_quantity, price),
             ean=str(source.get("ean") or source.get("gtin") or ""),
