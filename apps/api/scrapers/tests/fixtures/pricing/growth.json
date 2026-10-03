@@ -1,9 +1,14 @@
 {
+  "artifact": {
+    "kind": "source_excerpt",
+    "origin": "real",
+    "normalizer_input": false,
+    "limits": "Product-level precos and the first four in-page units (atributos.simples) of one product detail response."
+  },
   "store_slug": "growth",
   "platform": "wapstore",
   "source_url": "https://www.gsuplementos.com.br/api/v2/front/url/product/detail?url=/whey-protein-concentrado-1kg-growth-supplements-p985936",
   "fetched_at": "2026-10-03T17:25:48+00:00",
-  "notes": "Product-level precos and the first four in-page units (atributos.simples) of product 185, verbatim.",
   "payload": {
     "id": 185,
     "sku": "33",

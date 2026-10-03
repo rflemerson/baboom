@@ -1,9 +1,15 @@
 {
+  "artifact": {
+    "kind": "source_excerpt",
+    "origin": "real",
+    "normalizer_input": false,
+    "limits": "One variant of one product from /products/<handle>.js, plus price_range in integer cents. Options and the other variants are not kept."
+  },
   "store_slug": "integral_medica",
   "platform": "shopify",
   "source_url": "https://totvsibi-integralmedica-dc.myshopify.com/products/whey-protein-concentrado-pouch-900g.js",
   "fetched_at": "2026-10-03T17:25:48+00:00",
-  "notes": "Shopify .js prices are integer cents. product_page_pix_mentions are verbatim text around 'pix' on the variant page, to see whether the storefront advertises a payment discount the API omits.",
+  "notes": "Prices are integer cents.",
   "payload": {
     "product_id": 8912569991422,
     "title": "Whey Protein Concentrado Pouch 900g",
@@ -27,8 +33,13 @@
       "option3": null,
       "requires_selling_plan": false,
       "selling_plan_allocations": []
-    },
-    "product_page_pix_mentions": [
+    }
+  },
+  "raw_text_matches": {
+    "pattern": "pix, case-insensitive, on the variant page",
+    "classified": false,
+    "note": "Raw evidence only. Most matches are tracking pixels, theme scripts or related products; benefits.json holds the selected excerpts tied to this variant.",
+    "matches": [
       "\",\n        \n            \"Coleção de Produtos Sem Évora XT | Pix 20%\",\n        \n            \"Coleção diferente de Kits, aces",
       "\"type\":\"CUSTOM\",\"privacyPurposes\":[],\"name\":\"Insider Custom Pixel\"},{\"id\":\"116490494\",\"eventPayloadVersion\":\"1\",\"runtimeCon",
       ",\"type\":\"CUSTOM\",\"privacyPurposes\":[\"SALE_OF_DATA\"],\"name\":\"Pixel CityAds\"},{\"id\":\"117375230\",\"eventPayloadVersion\":\"1\",\"ru",

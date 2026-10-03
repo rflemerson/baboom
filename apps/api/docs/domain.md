@@ -49,7 +49,9 @@
   `Store.scraper_slug`, the offer must still be listed, and once the product's
   table lists flavors, the flavor the offer states (`Offer.flavors`) must be one
   of them. A product whose table is not in yet takes any single-flavor offer, so
-  a price never waits for the label. A product shows its cheapest listed offer.
+  a price never waits for the label. A product shows its cheapest listed offer
+  in a purchasable state (`StockStatus.purchasable()`); one without any keeps
+  its row, without a price.
 - Product create/update goes through `ProductCreateService` and `ProductMetadataUpdateService`.
 
 ## Public
@@ -62,8 +64,8 @@
 - Each catalog row is one product and includes `nutritionProfile` with its ID,
   nutrition table ID and the flavors that print it. A product without a table
   has `nutritionProfile: null` and no nutritional metrics.
-- `price` and `externalLink` come from the cheapest listed offer linked to the
-  product, which sells one of the flavors its table lists.
+- `price` and `externalLink` come from the cheapest listed, purchasable offer
+  linked to the product, which sells one of the flavors its table lists.
 
 ## Scraped evidence
 

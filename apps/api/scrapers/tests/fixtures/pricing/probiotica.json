@@ -1,9 +1,14 @@
 {
+  "artifact": {
+    "kind": "source_excerpt",
+    "origin": "real",
+    "normalizer_input": false,
+    "limits": "One SKU of one product: variations, the sellers array as published and, where the store allowed it, one cart simulation with its request. Product-level fields the normalizer needs (linkText, items) are not kept."
+  },
   "store_slug": "probiotica",
   "platform": "vtex",
   "source_url": "https://www.probiotica.com.br/api/catalog_system/pub/products/search?fq=skuId:1550",
   "fetched_at": "2026-10-03T17:26:19+00:00",
-  "notes": "",
   "payload": {
     "productId": "78",
     "productName": "Whey Protein Concentrado 100% Pure Whey 900g | Probiótica",

@@ -30,6 +30,11 @@ class StockStatus(models.TextChoices):
         """Return a supported stock status or the available fallback."""
         return value if value in cls.values else cls.AVAILABLE
 
+    @classmethod
+    def purchasable(cls) -> tuple[str, ...]:
+        """Return the states a buyer can order now; a new state starts outside."""
+        return (cls.AVAILABLE, cls.LAST_UNITS)
+
 
 FLAVOR_OPTION_PREFIXES = ("sabor", "flavor")
 

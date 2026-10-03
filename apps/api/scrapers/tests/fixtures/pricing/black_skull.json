@@ -1,9 +1,14 @@
 {
+  "artifact": {
+    "kind": "source_excerpt",
+    "origin": "real",
+    "normalizer_input": false,
+    "limits": "One SKU of one product: variations, the sellers array as published and, where the store allowed it, one cart simulation with its request. Product-level fields the normalizer needs (linkText, items) are not kept."
+  },
   "store_slug": "black_skull",
   "platform": "vtex",
   "source_url": "https://www.blackskullusa.com.br/api/catalog_system/pub/products/search?fq=skuId:1014",
   "fetched_at": "2026-10-03T17:25:48+00:00",
-  "notes": "",
   "payload": {
     "productId": "398",
     "productName": "Whey 100% HD Gourmet - Refil 900g - Black Skull",

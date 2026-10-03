@@ -1,9 +1,14 @@
 {
+  "artifact": {
+    "kind": "source_excerpt",
+    "origin": "real",
+    "normalizer_input": false,
+    "limits": "The first two LS.variants entries of one product page and the key list of a variant. The listing entry is not kept."
+  },
   "store_slug": "dux_nutrition",
   "platform": "nuvemshop",
   "source_url": "https://duxhumanhealth.com/produtos/whey-protein-concentrado-pote-900g/",
   "fetched_at": "2026-10-03T17:25:48+00:00",
-  "notes": "",
   "payload": {
     "variants_first2": [
       {

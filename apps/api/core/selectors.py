@@ -30,15 +30,12 @@ def _cheapest_offer_subquery() -> QuerySet[Offer]:
     and in stock. A product with none keeps its row, without a price. The
     ordering is stable so the price and the link come from the same offer.
     """
-    return (
-        Offer.objects.filter(
-            product_store__product=OuterRef("pk"),
-            current_price__isnull=False,
-            delisted_at__isnull=True,
-        )
-        .exclude(current_stock_status=StockStatus.OUT_OF_STOCK)
-        .order_by("current_price", "pk")
-    )
+    return Offer.objects.filter(
+        product_store__product=OuterRef("pk"),
+        current_price__isnull=False,
+        delisted_at__isnull=True,
+        current_stock_status__in=StockStatus.purchasable(),
+    ).order_by("current_price", "pk")
 
 
 def catalog_active(slug: str | None = None) -> Active | None:

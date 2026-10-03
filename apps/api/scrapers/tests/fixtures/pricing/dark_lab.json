@@ -1,9 +1,15 @@
 {
+  "artifact": {
+    "kind": "source_excerpt",
+    "origin": "real",
+    "normalizer_input": false,
+    "limits": "One variant of one product from /products/<handle>.js, plus price_range in integer cents. Options and the other variants are not kept."
+  },
   "store_slug": "dark_lab",
   "platform": "shopify",
   "source_url": "https://www.darklabsuplementos.com.br/products/whey-100-refil-900g-dark-lab-1.js",
   "fetched_at": "2026-10-03T17:25:48+00:00",
-  "notes": "Shopify .js prices are integer cents. product_page_pix_mentions are verbatim text around 'pix' on the variant page, to see whether the storefront advertises a payment discount the API omits.",
+  "notes": "Prices are integer cents.",
   "payload": {
     "product_id": 7542702407886,
     "title": "100% Whey Protein Refil 900g - Dark Lab",
@@ -27,8 +33,13 @@
       "option3": null,
       "requires_selling_plan": false,
       "selling_plan_allocations": []
-    },
-    "product_page_pix_mentions": [
+    }
+  },
+  "raw_text_matches": {
+    "pattern": "pix, case-insensitive, on the variant page",
+    "classified": false,
+    "note": "Raw evidence only. Most matches are tracking pixels, theme scripts or related products; benefits.json holds the selected excerpts tied to this variant.",
+    "matches": [
       "! channel/|google/)google(?!(?:wv|app|/google| pixel))|(?",
       ".debug(\"shogun: Visitor has consented to tracking, starting pixel tracking for optimizations\");try{s.publish(\"shogun:load\",",
       ".price * (100 - pixDiscount) / 100));\n    if (installmentsEl) {\n      const ins",
