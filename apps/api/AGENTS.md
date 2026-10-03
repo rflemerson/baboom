@@ -86,6 +86,13 @@ offers that a successful crawl no longer sees.
   (`SellerInput`), and ingestion places every offer under its listing, variant
   and seller account (`OfferIdentityService`). A known seller is never
   overwritten. `baboom/tests/test_import_boundaries.py` enforces the imports.
+- Promotions (`promotions`): a `Promotion` has versioned `PromotionRevision`s
+  that own their codes, scopes, effects, reward terms and compatibility rules.
+  Setting a draft's status to informative or executable publishes it through
+  `PromotionService` (validated, hashed, frozen); a published revision changes
+  only status, guarded in the models and, on PostgreSQL, by triggers. Edits
+  start a new revision (admin action). The MCP skill `promotion-curation`
+  explains the workflow to agents.
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

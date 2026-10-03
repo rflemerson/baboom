@@ -71,9 +71,13 @@ class SkillOverMcpTests(_OperatorTokenMixin, TestCase):
         """The listing carries the frontmatter a client indexes on."""
         skills = self._rpc("skills/list")["result"]["skills"]
 
-        assert [skill["name"] for skill in skills] == ["product-curation"]
-        assert skills[0]["frontmatter"]["description"]
-        assert skills[0]["uri"].endswith("/SKILL.md")
+        assert [skill["name"] for skill in skills] == [
+            "product-curation",
+            "promotion-curation",
+        ]
+        for skill in skills:
+            assert skill["frontmatter"]["description"]
+            assert skill["uri"].endswith("/SKILL.md")
 
     def test_resources_read_returns_a_referenced_file(self) -> None:
         """A reference named by the skill can be fetched by its URI."""

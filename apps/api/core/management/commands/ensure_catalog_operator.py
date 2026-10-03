@@ -30,7 +30,18 @@ PERMISSIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "active": ("view",),
         "store": ("view",),
     },
+    "promotions": {
+        "promotion": ("add", "change", "view"),
+        "promotionrevision": ("add", "change", "view"),
+        "activationcode": ("add", "change", "view"),
+        "promotionscope": ("add", "change", "view"),
+        "promotioneffect": ("add", "change", "view"),
+        "rewardterms": ("add", "change", "view"),
+        "compatibilityrule": ("add", "change", "view"),
+        "purchaseroute": ("add", "change", "view"),
+    },
     "offers": {
+        "evidence": ("add", "change", "view"),
         "offer": ("view",),
         "listing": ("view",),
         "listingvariant": ("view",),

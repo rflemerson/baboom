@@ -50,6 +50,14 @@ class ImportBoundaryTests(SimpleTestCase):
         allowed = {"common", "commerce", "offers"}
         assert _violations("offers", APPS - allowed) == []
 
+    def test_core_never_imports_promotions_or_pricing(self) -> None:
+        """The catalog does not know the commercial rules that price it."""
+        assert _violations("core", {"promotions", "pricing", "scrapers"}) == []
+
+    def test_promotions_import_no_pricing_or_scrapers(self) -> None:
+        """Curated rules sit below the engine and above the facts."""
+        assert _violations("promotions", {"pricing", "scrapers"}) == []
+
     def test_normalizers_never_import_django_models(self) -> None:
         """A normalizer is payload in, DTO out."""
         forbidden = {"django", *APPS}

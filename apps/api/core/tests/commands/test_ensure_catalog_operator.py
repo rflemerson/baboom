@@ -14,7 +14,7 @@ from django.test import TestCase
 class CatalogOperatorCommandTests(TestCase):
     """Coverage for the restricted catalog operator command."""
 
-    EXPECTED_PERMISSION_COUNT = 34
+    EXPECTED_PERMISSION_COUNT = 61
 
     def test_command_is_idempotent_and_syncs_permissions(self) -> None:
         """Create one staff user and the exact configured permission set."""
