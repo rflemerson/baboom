@@ -94,7 +94,8 @@ offers that a successful crawl no longer sees.
 - `django_admin_rest_api` exposes the registered `ModelAdmin` classes as JSON at
   `/admin-api/`, under the same session auth and model permissions as the HTML
   admin. Authorization belongs to those permissions, not to the endpoint.
-- See `docs/domain.md` for catalog and human curation boundaries.
+- See `docs/domain.md` for catalog and human curation boundaries, and
+  `docs/pricing.md` for the pricing domain: its decisions, model and migration.
 
 ## Patterns
 

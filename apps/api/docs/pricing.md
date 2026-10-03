@@ -5,6 +5,8 @@ rewards and shipping change what a buyer pays, and how the catalog ranks it.
 The domain covers independent stores and marketplaces in any market; the eight
 stores crawled today are integration samples, not its definition.
 
+- [Model](./pricing-model.md): every entity, its kind, fields and guarantees.
+- [Migration](./pricing-migration.md): deliveries, data migration, known gaps.
 - [Audit](./pricing-audit.md): what each sampled store published on
   2026-10-03, with fixtures.
 
@@ -42,3 +44,21 @@ stores crawled today are integration samples, not its definition.
   response and a cart quote prove different things, and each fact records
   which one it rests on. A coincidence observed today is not the cause of a
   past difference.
+
+## Model decisions
+
+Each entry names what was chosen, what it keeps and what the rejected option
+would have lost or cost.
+
+| Decision | Keeps | Rejected, and why |
+| --- | --- | --- |
+| Domain apps inside the Django monolith; pure engine package | Admin, MCP, migrations and one deploy; an engine extractable later | A commerce platform or SaaS: another runtime, and it still would not know external store rules |
+| New neutral `commerce` app below `offers` | Offers never import the catalog; sellers and markets usable by promotions | Identity in `core`: offers would depend on the catalog |
+| Offer = one seller's proposal for one variant; listing and variant above it | Several sellers and markets without collision | Keeping `(store_slug, external_id)` as the identity: a seller change overwrites history |
+| Aggregate price without a seller is an observation of the variant | No invented seller | Attributing it to the default seller |
+| Payment terms as observation columns | Integrity and a plain ranking filter | A terms table: no row would be shared |
+| Condition tree as a typed document in the revision | Validated, hashed and read whole | A table per node: no query filters by a leaf |
+| Scopes, effects, rewards, compatibility and codes as revision-owned rows | Immutability, integrity and queries by scope | Shared mutable lists: a published revision would change under a quote |
+| Context, cart lines, groups and results as typed structures | Personal data never persisted outside a fingerprinted quote | Tables for every context: personal data at rest |
+| Projections per offer, market, policy and currency | Ranking before pagination | Re-pricing the first page in Python: not a global ranking |
+| Shipping, tax and conversion as observed quotes | No invented calculator | A world tax and freight engine |
