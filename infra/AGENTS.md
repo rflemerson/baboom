@@ -23,3 +23,5 @@
 - Production deploy logic lives in `infra/deploy/`; keep GitHub Actions YAML thin
   and put orchestration, health waits, and diagnostics in versioned shell scripts.
 - The deploy uses immutable GHCR image tags based on the full Git commit SHA.
+  Both machines move to the commit the workflow was dispatched on
+  (`DEPLOY_SHA`), never to whatever `main` is when they pull.

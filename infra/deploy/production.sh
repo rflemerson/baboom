@@ -23,6 +23,10 @@ if [ "${DEPLOY_SKIP_GIT_UPDATE:-0}" != "1" ]; then
 fi
 
 commit_sha="$(git rev-parse HEAD)"
+if [ -n "${DEPLOY_SHA:-}" ] && [ "$commit_sha" != "$DEPLOY_SHA" ]; then
+  echo "::error::Checked out ${commit_sha}, expected ${DEPLOY_SHA}"
+  exit 1
+fi
 short_sha="$(git rev-parse --short HEAD)"
 image_tag="sha-${commit_sha}"
 

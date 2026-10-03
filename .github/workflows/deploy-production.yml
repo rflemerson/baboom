@@ -68,6 +68,7 @@ jobs:
           SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_TRACES_SAMPLE_RATE }}
           SENTRY_SEND_DEFAULT_PII: ${{ vars.SENTRY_SEND_DEFAULT_PII }}
           SENTRY_MONITOR_CELERY_BEAT: ${{ vars.SENTRY_MONITOR_CELERY_BEAT }}
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
           deploy() {
             host="$1"
@@ -75,8 +76,10 @@ jobs:
             echo "::group::Deploying ${role} on ${host}"
             ssh -i ~/.ssh/production_key "${PRODUCTION_USER}@${host}" \
               "cd /home/ubuntu/app/baboom \
-                && git pull --ff-only origin main \
+                && git fetch origin main \
+                && git merge --ff-only $(printf '%q' "$DEPLOY_SHA") \
                 && DEPLOY_SKIP_GIT_UPDATE=1 \
+                  DEPLOY_SHA=$(printf '%q' "$DEPLOY_SHA") \
                   DEPLOY_ROLE=$(printf '%q' "$role") \
                   DB_PRIVATE_BIND=$(printf '%q' "$DB_PRIVATE_BIND") \
                   REGISTRY=$(printf '%q' "$REGISTRY") \
