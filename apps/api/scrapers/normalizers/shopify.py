@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..contracts import (
+    PriceInput,
     ScrapedOfferInput,
     ScrapedProductInput,
     SellerInput,
@@ -15,7 +16,7 @@ from ..contracts import (
     VariantOption,
     VariantSelection,
 )
-from .parsing import is_http_url, parse_positive_price
+from .parsing import coverage, is_http_url, parse_positive_price
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -117,7 +118,16 @@ class ShopifyNormalizer:
             category=category,
             api_context=self._build_product_context(raw),
             offers=offers,
-            complete_unit_list=len(offers) == len(variants),
+            coverage=[
+                coverage("variants", complete=len(offers) == len(variants)),
+                coverage("sellers", complete=True),
+                coverage("offers", complete=len(offers) == len(variants)),
+                coverage(
+                    "payment_prices",
+                    complete=False,
+                    reason="the product endpoint publishes no payment prices",
+                ),
+            ],
         )
 
     def _normalize_variant(
@@ -175,6 +185,7 @@ class ShopifyNormalizer:
             ean=str(variant.get("barcode") or ""),
             # The platform sells only the store's own stock.
             seller=SellerInput(is_channel_owner=True),
+            prices=self._prices(variant, price),
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=product_id,
@@ -187,6 +198,24 @@ class ShopifyNormalizer:
                 ),
             ),
         )
+
+    def _prices(self, variant: dict, price: Decimal | None) -> list[PriceInput]:
+        """Read the variant price and its compare-at reference."""
+        if price is None:
+            return []
+        prices = [
+            PriceInput(role="payable", amount=price, source_field="variant.price"),
+        ]
+        reference = self.parse_price(variant.get("compare_at_price"))
+        if reference is not None:
+            prices.append(
+                PriceInput(
+                    role="reference",
+                    amount=reference,
+                    source_field="variant.compare_at_price",
+                ),
+            )
+        return prices
 
     def _option_names(self, product: dict) -> list[str]:
         """Read Shopify option names in the order published by the product."""

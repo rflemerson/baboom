@@ -232,4 +232,4 @@ class GrowthVariantTests(SimpleTestCase):
         product = _normalize_spider_item(self.spider, self.whey, "/proteina/")
 
         assert product is not None
-        assert product.complete_unit_list is True
+        assert product.is_complete("offers")

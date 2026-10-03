@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import TYPE_CHECKING, NamedTuple
 
 from ..contracts import (
+    PriceInput,
     ScrapedOfferInput,
     ScrapedProductInput,
     SellerInput,
@@ -14,16 +16,44 @@ from ..contracts import (
     VariantOption,
     VariantSelection,
 )
-from .parsing import is_http_url, parse_optional_int, parse_positive_price
+from .parsing import coverage, is_http_url, parse_optional_int, parse_positive_price
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
 # VTEX numbers the store's own seller "1"; any other id is a marketplace seller.
 VTEX_CHANNEL_OWNER_SELLER_ID = "1"
 
+# VTEX payment groups mapped to payment method codes. A group not listed keeps
+# its published name and no method: an unknown method is never Pix or "any".
+PAYMENT_GROUP_METHODS = {
+    "creditCardPaymentGroup": "credit_card",
+    "debitCardPaymentGroup": "debit_card",
+    "bankInvoicePaymentGroup": "boleto",
+    "instantPaymentPaymentGroup": "pix",
+    "giftCardPaymentGroup": "gift_card",
+}
+
+
+class _Unit(NamedTuple):
+    """What every seller of one SKU shares."""
+
+    product_id: str
+    product_name: str
+    page_url: str
+    sku: dict
+
 
 class VtexNormalizer:
-    """Normalize one VTEX product into one offer per catalog SKU."""
+    """Normalize one VTEX product into one offer per SKU and seller.
+
+    Every seller a SKU lists is its own offer. The store's own seller ("1")
+    keeps the SKU id as its external id, so offers captured before sellers were
+    kept stay the same rows; another seller's offer is ``<sku>@<seller>``. The
+    default seller is marked ``featured``: a selection, not an identity.
+    """
 
     provider = "vtex"
 
@@ -50,43 +80,30 @@ class VtexNormalizer:
             )
             return None
 
-        product_name = str(raw.get("productName") or "")
-        offers: list[ScrapedOfferInput] = []
         items = raw.get("items") or []
         if not isinstance(items, list):
             logger.debug("Skipping malformed VTEX product %s items", product_id)
             return None
+        product_name = str(raw.get("productName") or "")
+        offers: list[ScrapedOfferInput] = []
+        complete_items = 0
+        complete_sellers = True
         for sku in items:
             if not isinstance(sku, dict):
                 logger.debug("Skipping malformed VTEX item for product %s", product_id)
+                complete_sellers = False
                 continue
-            try:
-                offer = self._normalize_sku(
-                    sku,
-                    product_id=product_id,
-                    product_name=product_name,
-                    page_url=page_url,
-                )
-            except (
-                AttributeError,
-                KeyError,
-                TypeError,
-                ValueError,
-                OverflowError,
-            ) as exc:
-                logger.debug(
-                    "Skipping malformed VTEX item %s for product %s: %s",
-                    sku.get("itemId") or "<missing>",
-                    product_id,
-                    exc,
-                )
-                offer = None
-            if offer is not None:
-                offers.append(offer)
+            unit = _Unit(product_id, product_name, page_url, sku)
+            sku_offers, all_sellers = self._normalize_sku(unit)
+            if sku_offers:
+                complete_items += 1
+            complete_sellers = complete_sellers and all_sellers
+            offers.extend(sku_offers)
 
         if not offers:
             return None
 
+        variants_complete = complete_items == len(items)
         return ScrapedProductInput(
             store_slug=store_slug,
             provider=self.provider,
@@ -95,27 +112,51 @@ class VtexNormalizer:
             category=category,
             api_context=self._build_product_context(raw),
             offers=offers,
-            complete_unit_list=len(offers) == len(items),
+            coverage=[
+                coverage("variants", complete=variants_complete),
+                coverage("sellers", complete=complete_sellers),
+                coverage("offers", complete=variants_complete and complete_sellers),
+                coverage("payment_prices", complete=True),
+            ],
         )
 
-    def _normalize_sku(
-        self,
-        sku: dict,
-        *,
-        product_id: str,
-        product_name: str,
-        page_url: str,
-    ) -> ScrapedOfferInput | None:
-        """Normalize one SKU, returning None for malformed unit data."""
-        item_id = str(sku.get("itemId") or "")
-        seller = self._select_seller(sku)
-        if not item_id:
-            logger.debug("Skipping malformed VTEX item without itemId")
-            return None
-        if seller is None:
-            logger.debug("Skipping VTEX item %s without seller", item_id)
-            return None
+    def _normalize_sku(self, unit: _Unit) -> tuple[list[ScrapedOfferInput], bool]:
+        """Return the offers of every seller of one SKU, and whether all parsed."""
+        item_id = str(unit.sku.get("itemId") or "")
+        sellers = unit.sku.get("sellers") or []
+        if not item_id or not isinstance(sellers, list) or not sellers:
+            logger.debug("Skipping VTEX item %s without id or seller", item_id)
+            return [], False
+        named = [seller for seller in sellers if isinstance(seller, dict)]
+        anonymous = [seller for seller in named if not seller.get("sellerId")]
+        if anonymous and len(named) > 1:
+            # Two sellers, one without an id: the anonymous one cannot be told
+            # apart from the next run's, so only identified sellers are kept.
+            named = [seller for seller in named if seller.get("sellerId")]
+        offers: list[ScrapedOfferInput] = []
+        for seller in named:
+            try:
+                offer = self._seller_offer(unit, item_id, seller)
+            except (
+                AttributeError,
+                KeyError,
+                TypeError,
+                ValueError,
+                OverflowError,
+            ) as exc:
+                logger.debug("Skipping malformed VTEX seller of %s: %s", item_id, exc)
+                offer = None
+            if offer is not None:
+                offers.append(offer)
+        return offers, len(offers) == len(sellers)
 
+    def _seller_offer(
+        self,
+        unit: _Unit,
+        item_id: str,
+        seller: dict,
+    ) -> ScrapedOfferInput | None:
+        """Build one seller's offer of one SKU."""
         commercial = seller.get("commertialOffer") or {}
         if not isinstance(commercial, dict):
             logger.debug("Skipping malformed VTEX item %s commercial offer", item_id)
@@ -126,11 +167,17 @@ class VtexNormalizer:
             # would leave the previous price standing as if still on sale.
             logger.warning("VTEX item %s has no usable price", item_id)
         stock_quantity = parse_optional_int(commercial.get("AvailableQuantity"))
-        sku_name = str(sku.get("nameComplete") or sku.get("name") or "")
+        seller_input = self._seller_input(seller)
+        external_id = (
+            item_id
+            if seller_input is None or seller_input.is_channel_owner
+            else f"{item_id}@{seller_input.external_id}"
+        )
+        sku_name = str(unit.sku.get("nameComplete") or unit.sku.get("name") or "")
         return ScrapedOfferInput(
-            external_id=item_id,
-            offer_url=f"{page_url}?skuId={item_id}",
-            name=sku_name or product_name,
+            external_id=external_id,
+            offer_url=f"{unit.page_url}?skuId={item_id}",
+            name=sku_name or unit.product_name,
             price=price,
             stock_quantity=stock_quantity if price is not None else 0,
             stock_status=(
@@ -139,14 +186,16 @@ class VtexNormalizer:
                 else StockReading.OUT_OF_STOCK
             ),
             sku=item_id,
-            ean=str(sku.get("ean") or ""),
-            seller=self._seller_input(seller),
+            ean=str(unit.sku.get("ean") or ""),
+            seller=seller_input,
+            featured=bool(seller.get("sellerDefault")),
+            prices=self._prices(commercial, price),
             variant_context=VariantContext(
                 provider=self.provider,
-                provider_product_id=product_id,
+                provider_product_id=unit.product_id,
                 provider_variant_id=item_id,
-                title=str(sku.get("name") or ""),
-                options=self._sku_options(sku),
+                title=str(unit.sku.get("name") or ""),
+                options=self._sku_options(unit.sku),
                 selection=VariantSelection(
                     kind="query_parameter",
                     parameters={"skuId": item_id},
@@ -154,16 +203,33 @@ class VtexNormalizer:
             ),
         )
 
-    def _select_seller(self, sku: dict) -> dict | None:
-        """Select the default seller, falling back to the first seller."""
-        sellers = sku.get("sellers") or []
-        if not isinstance(sellers, list) or not sellers:
-            return None
-        for seller in sellers:
-            if isinstance(seller, dict) and seller.get("sellerDefault"):
-                return seller
-        first = sellers[0]
-        return first if isinstance(first, dict) else None
+    @staticmethod
+    def _prices(commercial: dict, price: Decimal | None) -> list[PriceInput]:
+        """Read the selling price, the list price and every payment option."""
+        if price is None:
+            return []
+        prices = [
+            PriceInput(
+                role="payable",
+                amount=price,
+                source_field="commertialOffer.Price",
+            ),
+        ]
+        list_price = parse_positive_price(commercial.get("ListPrice"))
+        if list_price is not None:
+            prices.append(
+                PriceInput(
+                    role="reference",
+                    amount=list_price,
+                    source_field="commertialOffer.ListPrice",
+                ),
+            )
+        prices.extend(
+            option
+            for entry in commercial.get("Installments") or []
+            if isinstance(entry, dict) and (option := _installment(entry))
+        )
+        return prices
 
     @staticmethod
     def _seller_input(seller: dict) -> SellerInput | None:
@@ -219,3 +285,25 @@ class VtexNormalizer:
             "items": item.get("items") or [],
         }
         return json.dumps(payload, ensure_ascii=False)
+
+
+def _installment(entry: dict) -> PriceInput | None:
+    """Read one payment option: a method, a count and the total it charges."""
+    total = parse_positive_price(entry.get("TotalValuePlusInterestRate"))
+    count = parse_optional_int(entry.get("NumberOfInstallments"))
+    if total is None or count is None or count < 1:
+        return None
+    group = str(entry.get("PaymentSystemGroupName") or "")
+    rate = parse_positive_price(entry.get("InterestRate"))
+    return PriceInput(
+        role="payable",
+        amount=total,
+        source_field="commertialOffer.Installments",
+        payment_scope="method",
+        payment_method=PAYMENT_GROUP_METHODS.get(group, ""),
+        payment_label_raw=str(entry.get("Name") or group),
+        payment_provider_raw=str(entry.get("PaymentSystemName") or ""),
+        installment_count=count,
+        installment_amount=parse_positive_price(entry.get("Value")),
+        interest="yes" if rate is not None else "no",
+    )

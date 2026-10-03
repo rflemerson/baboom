@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from commerce.services import CommerceIdentityService, MarketRef, SellerRef
 from offers.models import DelistReason, Offer, StockStatus
+from offers.observations import CoverageRecord, ObservationService, PriceRecord
 from offers.services import (
     ListingRef,
     OfferIdentityRef,
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from commerce.models import Market
+    from offers.models import ListingVariant, ObservationBatch
 
     from .contracts import (
         MarketInput,
@@ -142,6 +144,17 @@ class ScraperService:
                 ScraperService._listing_ref(product),
             )
             page.save(update_fields=["listing", "updated_at"])
+        observations = ObservationService()
+        batch = (
+            observations.open_batch(
+                market,
+                adapter=product.provider,
+                adapter_version=product.adapter_version,
+                request_context={"page_url": product.page_url},
+            )
+            if market is not None
+            else None
+        )
 
         saved: list[ScrapedItem] = []
         seen_at = timezone.now()
@@ -169,8 +182,16 @@ class ScraperService:
                 delisted_reason="",
                 missed_runs=0,
             )
-            if market is not None:
-                ScraperService._bind_identity(observation.offer, product, offer, market)
+            if market is not None and batch is not None:
+                variant = ScraperService._bind_identity(
+                    observation.offer,
+                    product,
+                    offer,
+                    market,
+                )
+                ScraperService._observe(observations, batch, observation.offer, offer)
+                if offer.featured:
+                    observations.record_featured(batch, variant, observation.offer)
             item, _created = ScraperService._upsert_scraped_item(
                 observation,
                 page,
@@ -179,10 +200,62 @@ class ScraperService:
             saved.append(item)
             seen_ids.add(offer.external_id)
 
-        if product.complete_unit_list and seen_ids:
+        if product.is_complete("offers") and seen_ids:
             ScraperService._reconcile_absent_units(product, page, seen_ids, seen_at)
+        if batch is not None:
+            partition = f"listing:{product.provider_product_id}"
+            observations.close_batch(
+                batch,
+                [
+                    CoverageRecord(
+                        dimension=item.dimension,
+                        partition=partition,
+                        status=item.status,
+                        reason=item.reason,
+                    )
+                    for item in product.coverage
+                ],
+            )
 
         return saved
+
+    @staticmethod
+    def _observe(
+        observations: ObservationService,
+        batch: ObservationBatch,
+        offer_row: Offer,
+        offer: ScrapedOfferInput,
+    ) -> None:
+        """Append the offer's typed prices and its stock reading."""
+        observations.record_prices(
+            batch,
+            [
+                PriceRecord(
+                    role=price.role,
+                    amount=price.amount,
+                    source_field=price.source_field,
+                    payment_scope=price.payment_scope,
+                    payment_method=price.payment_method,
+                    payment_label_raw=price.payment_label_raw,
+                    payment_provider_raw=price.payment_provider_raw,
+                    installment_count=price.installment_count,
+                    installment_amount=price.installment_amount,
+                    interest=price.interest,
+                    capture_stage=price.capture_stage,
+                    evidence_level=price.evidence_level,
+                    composition=price.composition,
+                    included_adjustments=tuple(price.included_adjustments),
+                )
+                for price in offer.prices
+            ],
+            offer=offer_row,
+        )
+        observations.record_availability(
+            batch,
+            offer_row,
+            status=StockStatus.normalize(str(offer.stock_status)),
+            quantity=offer.stock_quantity,
+        )
 
     @staticmethod
     def _market(product: ScrapedProductInput) -> Market | None:
@@ -207,7 +280,7 @@ class ScraperService:
         product: ScrapedProductInput,
         offer: ScrapedOfferInput,
         market: Market,
-    ) -> None:
+    ) -> ListingVariant:
         """Place an offer under its listing, variant and seller account."""
         seller = (
             CommerceIdentityService.seller(
@@ -228,7 +301,7 @@ class ScraperService:
             if offer.seller is not None and offer.seller.is_channel_owner
             else (offer.seller.external_id if offer.seller else "unknown")
         )
-        OfferIdentityService().bind(
+        return OfferIdentityService().bind(
             offer_row,
             OfferIdentityRef(
                 market=market,

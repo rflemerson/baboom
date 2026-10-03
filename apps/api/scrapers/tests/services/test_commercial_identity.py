@@ -91,7 +91,7 @@ class IngestionIdentityTests(TestCase):
         assert accounts["1"].is_channel_owner
         assert not accounts["acme"].is_channel_owner
         assert accounts["acme"].name_raw == "Acme"
-        assert accounts["acme"].offers.get().external_id == "771"
+        assert accounts["acme"].offers.get().external_id == "771@acme"
 
     def test_the_source_page_points_at_its_listing(self) -> None:
         """Crawl evidence stays, attached to the listing it describes."""

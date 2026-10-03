@@ -5,6 +5,9 @@ from __future__ import annotations
 import logging
 import re
 from decimal import Decimal, InvalidOperation
+from typing import Literal
+
+from ..contracts import CoverageInput
 
 PRICE_PATTERN = re.compile(r"-?\d[\d.,]*")
 CENTS = Decimal(100)
@@ -102,3 +105,24 @@ def parse_optional_int(value: object) -> int | None:
         return int(value)
     except TypeError, ValueError:
         return None
+
+
+def coverage(
+    dimension: Literal[
+        "variants",
+        "sellers",
+        "offers",
+        "payment_prices",
+        "availability",
+        "pagination",
+    ],
+    *,
+    complete: bool,
+    reason: str = "",
+) -> CoverageInput:
+    """Return how completely a page's normalizer read one dimension."""
+    return CoverageInput(
+        dimension=dimension,
+        status="complete" if complete else "partial",
+        reason=reason,
+    )

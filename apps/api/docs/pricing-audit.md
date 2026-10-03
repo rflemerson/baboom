@@ -45,13 +45,10 @@ Fixtures under `scrapers/tests/fixtures/pricing/` keep the excerpts:
 - **Banners and catalog disagree.** Max Titanium announces 5% for Pix and
   boleto; its catalog priced Pix 3% lower. Probiótica announces "up to 5%";
   this whey had none.
-- **The current contract carries one price.** `ScrapedOfferInput.price` takes
-  the field in the table above; the payment prices, references and
-  installments are dropped at ingestion. `parse_positive_price` returns a
-  float, so every price passes through binary floating point on the way in.
-- **VTEX stores one seller per SKU.** `VtexNormalizer._select_seller` takes the
-  default seller or the first one. A change of seller keeps writing to the same
-  offer, with nothing recording it.
+- **At audit time the contract carried one price,** parsed through a float, and
+  VTEX kept one seller per SKU. Both were fixed in delivery 3: every value in
+  the table becomes a typed `OfferPriceObservation`, parsed to an exact
+  decimal, and every VTEX seller is its own offer.
 
 ### Coverage of the cash scenario in this sample
 

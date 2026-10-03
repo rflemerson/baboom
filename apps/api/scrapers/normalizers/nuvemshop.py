@@ -7,6 +7,7 @@ import logging
 from typing import Any, NamedTuple
 
 from ..contracts import (
+    PriceInput,
     ScrapedOfferInput,
     ScrapedProductInput,
     SellerInput,
@@ -15,7 +16,12 @@ from ..contracts import (
     VariantOption,
     VariantSelection,
 )
-from .parsing import is_http_url, parse_optional_int, parse_positive_price
+from .parsing import (
+    coverage,
+    is_http_url,
+    parse_optional_int,
+    parse_positive_price,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +97,12 @@ class NuvemshopNormalizer:
                 ensure_ascii=False,
             ),
             offers=offers,
-            complete_unit_list=True,
+            coverage=[
+                coverage("variants", complete=True),
+                coverage("sellers", complete=True),
+                coverage("offers", complete=True),
+                coverage("payment_prices", complete=True),
+            ],
         )
 
     def _variant_offer(self, variant: dict, page: _Page) -> ScrapedOfferInput | None:
@@ -126,6 +137,7 @@ class NuvemshopNormalizer:
             sku=sku,
             # The platform sells only the store's own stock.
             seller=SellerInput(is_channel_owner=True),
+            prices=_variant_prices(variant) if price is not None else [],
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=page.product_id,
@@ -232,6 +244,17 @@ class NuvemshopNormalizer:
                     sku=sku,
                     variant_context=context,
                     seller=SellerInput(is_channel_owner=True),
+                    prices=(
+                        [
+                            PriceInput(
+                                role="payable",
+                                amount=price,
+                                source_field="offers.price",
+                            ),
+                        ]
+                        if price is not None
+                        else []
+                    ),
                 ),
             ],
         )
@@ -253,3 +276,76 @@ class NuvemshopNormalizer:
             return int(float(value))
         except TypeError, ValueError:
             return None
+
+
+def _variant_prices(variant: dict) -> list[PriceInput]:
+    """Read a variant's price, reference, payment price and installments.
+
+    ``price_with_payment_discount_short`` is a formatted price paid at once
+    with the store's payment discount; the field does not name the method.
+    """
+    prices: list[PriceInput] = []
+    if (price := parse_positive_price(variant.get("price_number"))) is not None:
+        prices.append(
+            PriceInput(role="payable", amount=price, source_field="price_number"),
+        )
+    reference = parse_positive_price(variant.get("compare_at_price_number"))
+    if reference is not None:
+        prices.append(
+            PriceInput(
+                role="reference",
+                amount=reference,
+                source_field="compare_at_price_number",
+            ),
+        )
+    discounted = parse_positive_price(variant.get("price_with_payment_discount_short"))
+    if discounted is not None:
+        prices.append(
+            PriceInput(
+                role="payable",
+                amount=discounted,
+                source_field="price_with_payment_discount_short",
+                payment_scope="cash",
+                payment_label_raw="payment discount",
+                composition="partial",
+                included_adjustments=[{"kind": "payment_discount"}],
+            ),
+        )
+    prices.extend(_installments(variant.get("installments_data")))
+    return prices
+
+
+def _installments(raw: object) -> list[PriceInput]:
+    """Read ``installments_data``: per gateway, per count, the total charged."""
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(raw, dict):
+        return []
+    options: list[PriceInput] = []
+    for gateway, plans in raw.items():
+        if not isinstance(plans, dict):
+            continue
+        for count, plan in plans.items():
+            if not isinstance(plan, dict) or not str(count).isdigit():
+                continue
+            total = parse_positive_price(plan.get("total_value"))
+            if total is None:
+                continue
+            options.append(
+                PriceInput(
+                    role="payable",
+                    amount=total,
+                    source_field="installments_data",
+                    payment_provider_raw=str(gateway),
+                    payment_label_raw=str(gateway),
+                    installment_count=int(count),
+                    installment_amount=parse_positive_price(
+                        plan.get("installment_value"),
+                    ),
+                    interest="no" if plan.get("without_interests") else "yes",
+                ),
+            )
+    return options

@@ -7,10 +7,15 @@ from typing import TYPE_CHECKING
 from django.contrib import admin
 
 from .models import (
+    AvailabilityObservation,
+    CollectionCoverage,
+    Evidence,
     FeaturedOfferObservation,
     Listing,
     ListingVariant,
+    ObservationBatch,
     Offer,
+    OfferPriceObservation,
     OfferSourceIdentity,
     PriceObservation,
 )
@@ -32,6 +37,32 @@ class PriceObservationInline(admin.TabularInline):
 
     def has_add_permission(self, _request: object, _obj: object = None) -> bool:
         """Price observations are appended by the scraper, never by hand."""
+        return False
+
+
+class OfferPriceObservationInline(admin.TabularInline):
+    """Typed prices of the offer, newest first."""
+
+    model = OfferPriceObservation
+    fk_name = "offer"
+    extra = 0
+    can_delete = False
+    ordering = ("-observed_at",)
+    fields = (
+        "role",
+        "amount",
+        "currency",
+        "payment_scope",
+        "payment_method",
+        "payment_label_raw",
+        "installment_count",
+        "source_field",
+        "observed_at",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, _request: object, _obj: object = None) -> bool:
+        """Observations are appended by ingestion."""
         return False
 
 
@@ -61,7 +92,7 @@ class OfferAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
-    inlines = (PriceObservationInline,)
+    inlines = (OfferPriceObservationInline, PriceObservationInline)
 
     @admin.display(description="Flavors")
     def get_flavors(self, obj: OfferType) -> str:
@@ -138,3 +169,69 @@ class FeaturedOfferObservationAdmin(admin.ModelAdmin):
 
     list_display = ("listing_variant", "offer", "observed_at")
     readonly_fields = ("listing_variant", "offer", "observed_at")
+
+
+class ReadOnlyAdmin(admin.ModelAdmin):
+    """An append-only fact: inspected, never edited."""
+
+    def has_add_permission(self, _request: object) -> bool:
+        """Facts come from ingestion."""
+        return False
+
+    def has_change_permission(self, _request: object, _obj: object = None) -> bool:
+        """Facts are never edited."""
+        return False
+
+
+@admin.register(OfferPriceObservation)
+class OfferPriceObservationAdmin(ReadOnlyAdmin):
+    """Every typed price, filterable by meaning."""
+
+    list_display = (
+        "offer",
+        "role",
+        "amount",
+        "currency",
+        "payment_scope",
+        "payment_method",
+        "installment_count",
+        "semantics",
+        "observed_at",
+    )
+    list_filter = ("role", "payment_scope", "semantics", "capture_stage")
+    search_fields = ("offer__name", "offer__external_id", "source_field")
+
+
+@admin.register(AvailabilityObservation)
+class AvailabilityObservationAdmin(ReadOnlyAdmin):
+    """Stock readings."""
+
+    list_display = ("offer", "status", "quantity", "observed_at")
+    list_filter = ("status",)
+
+
+class CollectionCoverageInline(admin.TabularInline):
+    """How completely each dimension was read."""
+
+    model = CollectionCoverage
+    extra = 0
+    can_delete = False
+    readonly_fields = ("dimension", "partition", "status", "reason", "cursor")
+
+
+@admin.register(ObservationBatch)
+class ObservationBatchAdmin(ReadOnlyAdmin):
+    """Values read together, and their coverage."""
+
+    list_display = ("__str__", "adapter", "status", "started_at", "finished_at")
+    list_filter = ("adapter", "status")
+    inlines = (CollectionCoverageInline,)
+
+
+@admin.register(Evidence)
+class EvidenceAdmin(admin.ModelAdmin):
+    """What facts rest on; a curator may record a manual reading."""
+
+    list_display = ("__str__", "kind", "observed_at", "captured_by")
+    list_filter = ("kind",)
+    search_fields = ("source_url", "excerpt")

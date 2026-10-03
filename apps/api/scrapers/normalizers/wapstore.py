@@ -7,6 +7,7 @@ import logging
 from typing import NamedTuple
 
 from ..contracts import (
+    PriceInput,
     ScrapedOfferInput,
     ScrapedProductInput,
     SellerInput,
@@ -15,7 +16,12 @@ from ..contracts import (
     VariantOption,
     VariantSelection,
 )
-from .parsing import is_http_url, parse_optional_int, parse_positive_price
+from .parsing import (
+    coverage,
+    is_http_url,
+    parse_optional_int,
+    parse_positive_price,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +116,12 @@ class WapStoreNormalizer:
             category=category,
             api_context=self._build_product_context(raw),
             offers=offers,
-            complete_unit_list=units is not None,
+            coverage=[
+                coverage("variants", complete=units is not None),
+                coverage("sellers", complete=True),
+                coverage("offers", complete=units is not None),
+                coverage("payment_prices", complete=True),
+            ],
         )
 
     def _offer(self, source: dict, page: _Page, unit: _Unit) -> ScrapedOfferInput:
@@ -137,6 +148,7 @@ class WapStoreNormalizer:
             sku=sku,
             # The platform sells only the store's own stock.
             seller=SellerInput(is_channel_owner=True),
+            prices=self._prices(source) if price is not None else [],
             variant_context=VariantContext(
                 provider=self.provider,
                 provider_product_id=page.page_id,
@@ -189,6 +201,55 @@ class WapStoreNormalizer:
             return value
         return f"{base_url}/{value.lstrip('/')}"
 
+    @staticmethod
+    def _prices(source: dict) -> list[PriceInput]:
+        """Read ``por``, ``de``, the cash price and the installment plan.
+
+        ``vista`` is the price paid at once; the store does not name the
+        method, so its scope is ``cash`` and it already includes the published
+        ``descontoVista``.
+        """
+        precos = source.get("precos")
+        if not isinstance(precos, dict):
+            price = parse_positive_price(source.get("price"))
+            return (
+                [PriceInput(role="payable", amount=price, source_field="price")]
+                if price is not None
+                else []
+            )
+        prices: list[PriceInput] = []
+        if (por := parse_positive_price(precos.get("por"))) is not None:
+            prices.append(
+                PriceInput(role="payable", amount=por, source_field="precos.por"),
+            )
+        if (de := parse_positive_price(precos.get("de"))) is not None:
+            prices.append(
+                PriceInput(role="reference", amount=de, source_field="precos.de"),
+            )
+        if (vista := parse_positive_price(precos.get("vista"))) is not None:
+            rate = parse_positive_price(precos.get("descontoVista"))
+            prices.append(
+                PriceInput(
+                    role="payable",
+                    amount=vista,
+                    source_field="precos.vista",
+                    payment_scope="cash",
+                    payment_label_raw="vista",
+                    composition="known" if rate is not None else "unknown",
+                    included_adjustments=(
+                        [{"kind": "payment_discount", "rate": str(rate)}]
+                        if rate is not None
+                        else []
+                    ),
+                ),
+            )
+        prices.extend(
+            option
+            for plan in precos.get("parcelamento") or []
+            if isinstance(plan, dict) and (option := _installment(plan))
+        )
+        return prices
+
     def _extract_raw_price(self, item: dict) -> object:
         """Extract the price token used by the Wap.Store payload."""
         prices = item.get("precos")
@@ -222,3 +283,21 @@ class WapStoreNormalizer:
             },
         }
         return json.dumps(payload, ensure_ascii=False)
+
+
+def _installment(plan: dict) -> PriceInput | None:
+    """Read one row of ``precos.parcelamento``; the method is not named."""
+    total = parse_positive_price(plan.get("valorTotal"))
+    count = parse_optional_int(plan.get("parcelas"))
+    if total is None or count is None or count < 1:
+        return None
+    rate = parse_positive_price(plan.get("taxa"))
+    return PriceInput(
+        role="payable",
+        amount=total,
+        source_field="precos.parcelamento",
+        payment_label_raw="parcelamento",
+        installment_count=count,
+        installment_amount=parse_positive_price(plan.get("valorParcela")),
+        interest="yes" if rate is not None else "no",
+    )

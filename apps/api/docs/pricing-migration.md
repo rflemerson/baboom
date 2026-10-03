@@ -12,7 +12,7 @@ what works, what was tested and what is still pending.
 | 0 | Audit corrections, executable fixtures, purchasable allowlist, deploy pinned to a CI-passed SHA | Done: `3e17bf4`, `34098e4`, `fb97f44` |
 | 1 | This model, its decisions and this plan | Reviewed before any migration |
 | 2 | `commerce` (currency, channel, market, seller account, merchant binding, fulfillment, payment method, provider, program); `Listing`, `ListingVariant`, `OfferSourceIdentity`, `FeaturedOfferObservation`; offer identity fields; store bindings | Done. Two sellers and two markets of one listing coexist without collision; every existing offer, link and price history kept; run `backfill_commercial_identity` (preview, then `--apply`) after deploying |
-| 3 | `ObservationBatch`, `CollectionCoverage`, `Evidence`, `OfferPriceObservation`, `AvailabilityObservation`; the scraper contract carries several prices, Decimal from parse to row; VTEX keeps every seller; coverage replaces `complete_unit_list` | The audit fixtures produce typed observations; a payment price is never applied twice; 403/429 never delist |
+| 3 | `ObservationBatch`, `CollectionCoverage`, `Evidence`, `OfferPriceObservation`, `AvailabilityObservation`; the scraper contract carries several prices, Decimal from parse to row; VTEX keeps every seller; coverage replaces `complete_unit_list` | Done. The audit fixtures produce typed observations; a cash price records the discount it includes; 403/429 never delist; run `backfill_legacy_price_observations` after the identity backfill |
 | 4 | `promotions` with immutable revisions, scopes, conditions, effects, reward terms, compatibility, codes, evidence and routes; `PromotionService` for admin and MCP | A real promotion from `benefits.json` is registered through admin and MCP; editing it publishes a new revision and the old one is unchanged |
 | 5 | `pricing.domain`: every mechanic listed in the model, the condition tree, stages and precedence, allocation, rewards | The acceptance matrix passes offline; unknowns never yield values |
 | 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `CurrencyConversionQuote`, `PricingQuote` | Known composition is never duplicated; partial totals say so |
@@ -60,13 +60,10 @@ Counts come from the database at migration time, never from a conversation.
 `Offer.current_price` keeps its meaning only with a known market, currency and
 policy; before a second currency exists it is replaced by a projection.
 
-## Known gaps in today's code
+## Gaps closed
 
-- `parse_positive_price` returns a float; prices pass through binary floating
-  point before becoming Decimal.
-- `StockStatus.normalize` and the default `StockReading` turn an unknown stock
-  into `AVAILABLE`.
-- `VtexNormalizer._select_seller` keeps one seller per SKU.
-- `ScrapedOfferInput` carries one price; payment prices, references and
-  installments are dropped.
-- `complete_unit_list` is one flag for every dimension of a crawl.
+Delivery 3 closed the gaps the audit found: prices parse to exact decimals
+(also `R$ 1.234,56`, read before as 1.234); an unread stock is `unknown`,
+never available; every VTEX seller is its own offer, its default seller a
+`FeaturedOfferObservation`; the contract carries every price with its meaning;
+and per-dimension coverage replaced the single `complete_unit_list` flag.

@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from offers.models import DelistReason, Offer, PriceObservation
 from scrapers.contracts import (
+    CoverageInput,
     ScrapedItemIngestionInput,
     ScrapedOfferInput,
     ScrapedProductInput,
@@ -268,7 +269,7 @@ class VariantIngestionTests(TestCase):
         both = self._page(("111", "129.90", "1kg"), ("222", "229.90", "2kg"))
         ScraperService.save_product_snapshot(both)
         remaining = self._variant("111", "129.90", "1kg")
-        remaining.complete_unit_list = True
+        remaining.coverage = [CoverageInput(dimension="offers", status="complete")]
 
         ScraperService.save_product_snapshot(remaining)
 
@@ -296,7 +297,7 @@ class VariantIngestionTests(TestCase):
         both = self._page(("111", "129.90", "1kg"), ("222", "229.90", "2kg"))
         ScraperService.save_product_snapshot(both)
         remaining = self._variant("111", "129.90", "1kg")
-        remaining.complete_unit_list = True
+        remaining.coverage = [CoverageInput(dimension="offers", status="complete")]
         ScraperService.save_product_snapshot(remaining)
 
         ScraperService.save_product_snapshot(both)
@@ -318,7 +319,11 @@ class OfferVariantRecordTests(TestCase):
             provider="wapstore",
             provider_product_id="185",
             page_url=self.URL,
-            complete_unit_list=complete,
+            coverage=(
+                [CoverageInput(dimension="offers", status="complete")]
+                if complete
+                else []
+            ),
             offers=[
                 ScrapedOfferInput(
                     external_id=f"185-{flavor}",

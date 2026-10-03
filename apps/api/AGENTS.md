@@ -69,8 +69,15 @@ offers that a successful crawl no longer sees.
 - Celery launches one `scrapy crawl <spider>` subprocess per monitor and uses
   the dumped Scrapy statistics to close `ScraperRun`; the task preserves the
   empty-after-history failure rule and terminates crawls over 30 minutes.
-- Complete Shopify/VTEX unit lists reconcile absent variants; partial lists
-  never delist. A price-less unit remains present but unavailable. Delisting
+- Each normalized page states its coverage per dimension (`CoverageInput`):
+  only a page whose `offers` were read completely reconciles absent units;
+  partial pages never delist. A price-less unit remains present but
+  unavailable; an unread stock is `unknown`, never available.
+- Every price a source states travels as a `PriceInput` (role, payment scope
+  and method, installments, what it already includes) and is appended by
+  `offers.observations.ObservationService` as an `OfferPriceObservation` only
+  when its condition's amount changes. Prices are exact decimals from parse to
+  row. Delisting
   and missing prices clear the current price without deleting price history.
 - Commercial identity: `commerce` (channel, market, seller account, merchant,
   fulfillment, payment method, programme) imports only `common`; `offers`

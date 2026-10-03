@@ -89,6 +89,49 @@ class MarketInput(BaseModel):
     timezone: str
 
 
+class PriceInput(BaseModel):
+    """One value a source states for a unit, with what it means.
+
+    ``payment_scope`` ``unknown`` is not ``any``; ``cash`` is one immediate
+    payment whose method the source does not name; ``method`` names it in
+    ``payment_method`` (a code such as ``pix``, ``credit_card``, ``boleto``).
+    """
+
+    role: Literal["payable", "reference"]
+    amount: Decimal
+    source_field: str
+    payment_scope: Literal["unknown", "any", "cash", "method"] = "unknown"
+    payment_method: str = ""
+    payment_label_raw: str = ""
+    payment_provider_raw: str = ""
+    installment_count: int | None = None
+    installment_amount: Decimal | None = None
+    interest: Literal["yes", "no", "unknown"] = "unknown"
+    capture_stage: Literal["catalog", "product_page", "cart", "checkout"] = "catalog"
+    evidence_level: Literal[
+        "advertised",
+        "observed_in_catalog",
+        "quoted_for_context",
+    ] = "observed_in_catalog"
+    composition: Literal["known", "partial", "unknown"] = "unknown"
+    included_adjustments: list[dict[str, str]] = Field(default_factory=list)
+
+
+class CoverageInput(BaseModel):
+    """How completely a page's normalizer read one dimension of it."""
+
+    dimension: Literal[
+        "variants",
+        "sellers",
+        "offers",
+        "payment_prices",
+        "availability",
+        "pagination",
+    ]
+    status: Literal["complete", "partial", "failed", "access_unavailable"]
+    reason: str = ""
+
+
 class ScrapedOfferInput(BaseModel):
     """One independently buyable and priced unit from a product page."""
 
@@ -102,6 +145,8 @@ class ScrapedOfferInput(BaseModel):
     ean: str = ""
     variant_context: VariantContext
     seller: SellerInput | None = None
+    featured: bool = False
+    prices: list[PriceInput] = Field(default_factory=list)
 
 
 class ScrapedProductInput(BaseModel):
@@ -114,9 +159,17 @@ class ScrapedProductInput(BaseModel):
     category: str = ""
     api_context: str | dict = ""
     offers: list[ScrapedOfferInput]
-    # Only an exhaustive, successfully parsed unit list may establish absence.
-    complete_unit_list: bool = False
+    # Only a dimension read completely may establish absence within the page.
+    coverage: list[CoverageInput] = Field(default_factory=list)
     market: MarketInput | None = None
+    adapter_version: str = "1"
+
+    def is_complete(self, dimension: str) -> bool:
+        """Whether the normalizer read this dimension of the page completely."""
+        return any(
+            item.dimension == dimension and item.status == "complete"
+            for item in self.coverage
+        )
 
 
 class ScrapedItemIngestionInput(BaseModel):

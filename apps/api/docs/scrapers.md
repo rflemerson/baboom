@@ -34,6 +34,8 @@ no spider fetches or stores product-page HTML.
 - Endpoints: `/collections.json`, `/collections/{handle}/products.json`, `/products/{handle}.js`
 - Paginate with `page` and `limit=250`.
 - Use detail JSON for variants, options, images, price, and availability.
+- The product endpoint publishes no payment price; `compare_at_price` is the
+  reference.
 
 ## Nuvemshop
 
@@ -63,6 +65,11 @@ no spider fetches or stores product-page HTML.
 - Pagination: `_from` and `_to`.
 - HTTP 206 is a normal successful response.
 - Empty list ends pagination.
-- Price/stock: `items[].sellers[].commertialOffer`.
+- Price/stock: `items[].sellers[].commertialOffer`. Every seller is its own
+  offer: seller "1" (the store) keeps the SKU id, another seller is
+  `<sku>@<seller>`, and `sellerDefault` is recorded as the featured offer.
+- `commertialOffer.Installments` gives one total per payment system and count;
+  the payment group maps to a method (`instantPaymentPaymentGroup` is Pix), and
+  an unknown group keeps its name with no method.
 
 All scraper rows should be skipped when URL or price cannot be parsed.

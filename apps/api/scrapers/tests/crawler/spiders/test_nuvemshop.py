@@ -126,7 +126,7 @@ class NuvemshopProductPageTests(SimpleTestCase):
         assert [o.model_dump() for o in neutro.variant_context.options] == [
             {"name": "Sabores", "value": "Neutro"},
         ]
-        assert product.complete_unit_list is True
+        assert product.is_complete("offers")
 
     def test_each_offer_links_to_its_flavor_selected(self) -> None:
         """Nuvemshop opens the page on the unit named by ?variant=."""
@@ -151,5 +151,5 @@ class NuvemshopProductPageTests(SimpleTestCase):
         (product,) = self._product_page("", status=503)
 
         assert [offer.external_id for offer in product.offers] == ["410713079"]
-        assert product.complete_unit_list is False
+        assert not product.is_complete("offers")
         assert self.spider.crawler.stats.inc_value.call_args_list

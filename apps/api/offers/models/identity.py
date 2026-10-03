@@ -158,6 +158,14 @@ class FeaturedOfferObservation(BaseModel):
         related_name="featured_observations",
         verbose_name=_("Offer"),
     )
+    batch = models.ForeignKey(
+        "offers.ObservationBatch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="featured_offers",
+        verbose_name=_("Batch"),
+    )
     observed_at = models.DateTimeField(_("Observed At"), default=timezone.now)
 
     class Meta:
