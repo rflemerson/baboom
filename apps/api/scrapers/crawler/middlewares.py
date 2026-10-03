@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 # scrapy_impersonate delegates the browser TLS fingerprint to curl_cffi.
 HTTP_OK = 200
 MAX_RETRY_AFTER_SECONDS = 120.0
+# Shopify answers 429 with no Retry-After. Retrying at once spends every
+# attempt in seconds; doubling from here spreads them over minutes.
+RATE_LIMIT_BACKOFF_SECONDS = 30.0
+HTTP_TOO_MANY_REQUESTS = 429
 RETRYABLE_STATUS_CODES = frozenset({403, 429, 500, 502, 503, 504})
 IMPERSONATIONS = ("chrome120", "chrome119", "chrome116", "safari17_0")
 
@@ -69,6 +73,14 @@ def parse_retry_after(
     return min(wait, max_seconds) if wait > 0 else None
 
 
+def rate_limit_backoff(attempt: int) -> float:
+    """Return how long the given retry of a rate-limited request waits."""
+    return min(
+        RATE_LIMIT_BACKOFF_SECONDS * 2 ** max(attempt - 1, 0),
+        MAX_RETRY_AFTER_SECONDS,
+    )
+
+
 def is_blocked(body: str) -> bool:
     """Return whether a response body is a known WAF challenge page."""
     return any(indicator in body for indicator in BLOCKED_INDICATORS)
@@ -105,9 +117,11 @@ class ImpersonationMiddleware:
             return response
         retry.meta["impersonate"] = self._next_identity(spider)
         wait = parse_retry_after(response)
+        if wait is None and response.status == HTTP_TOO_MANY_REQUESTS:
+            wait = rate_limit_backoff(int(retry.meta.get("retry_times", 1)))
         if wait is None:
             return retry
-        logger.info("Honoring Retry-After=%.1fs for %s", wait, request.url)
+        logger.info("Waiting %.1fs before retrying %s", wait, request.url)
         return deferLater(reactor, wait, lambda: retry)
 
     def _current_identity(self, spider: Spider) -> str:

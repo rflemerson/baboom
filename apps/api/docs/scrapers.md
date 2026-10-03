@@ -3,7 +3,9 @@
 Scrapers are API-first and run as Scrapy subprocesses. Scrapy owns request
 scheduling, concurrency, retries, throttling, duplicate URLs, and statistics;
 the custom downloader middleware retains TLS impersonation rotation, WAF
-detection, and `Retry-After`. The platform spiders only discover and paginate
+detection, and `Retry-After`; a 429 without that header waits 30 s, then
+twice as long on each retry, because Shopify throttles by IP and answers
+without one. The platform spiders only discover and paginate
 their endpoints, while pure normalizers under `scrapers/normalizers/` map
 payloads to one source page and its independently buyable, priced offers.
 `CatalogPipeline` is the only handoff to `ScraperService.save_product_snapshot`;

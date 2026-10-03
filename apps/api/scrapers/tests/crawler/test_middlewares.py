@@ -12,6 +12,7 @@ from scrapy.http import TextResponse
 
 from scrapers.crawler.middlewares import (
     MAX_RETRY_AFTER_SECONDS,
+    RATE_LIMIT_BACKOFF_SECONDS,
     ImpersonationMiddleware,
     is_blocked,
     parse_retry_after,
@@ -155,3 +156,45 @@ class ImpersonationMiddlewareTests(SimpleTestCase):
             wait = parse_retry_after(response)
 
         assert wait == MAX_RETRY_AFTER_SECONDS
+
+
+class RateLimitBackoffTests(SimpleTestCase):
+    """A 429 without Retry-After waits longer on each attempt.
+
+    Shopify answers ``429 local_rate_limited`` with no header. Retrying at
+    once spent every attempt in seconds and turned a short block into a lost
+    crawl.
+    """
+
+    def _wait_before(self, attempt: int) -> float:
+        """Return how long the retry numbered ``attempt`` is delayed."""
+        middleware = ImpersonationMiddleware()
+        spider = SimpleNamespace(name="soldiers")
+        request = Request("https://example.com/collections.json")
+        response = TextResponse(
+            request.url,
+            status=HTTP_TOO_MANY_REQUESTS,
+            body=b"local_rate_limited",
+            request=request,
+        )
+        retry = request.replace()
+        retry.meta["retry_times"] = attempt
+        with (
+            patch(
+                "scrapers.crawler.middlewares.get_retry_request",
+                return_value=retry,
+            ),
+            patch("scrapers.crawler.middlewares.deferLater") as defer_later,
+        ):
+            middleware.process_response(request, response, spider)
+
+        assert defer_later.called, "a rate-limited retry went out at once"
+        return defer_later.call_args.args[1]
+
+    def test_the_first_retry_waits(self) -> None:
+        """Even the first retry gives the limit time to clear."""
+        assert self._wait_before(1) == RATE_LIMIT_BACKOFF_SECONDS
+
+    def test_each_retry_waits_twice_as_long(self) -> None:
+        """Backing off spreads the attempts over minutes, not seconds."""
+        assert self._wait_before(3) == RATE_LIMIT_BACKOFF_SECONDS * 4
