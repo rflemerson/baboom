@@ -16,24 +16,29 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, Coalesce, NullIf
 
-from offers.models import Offer
+from offers.models import Offer, StockStatus
 
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
 
 def _cheapest_offer_subquery() -> QuerySet[Offer]:
-    """Return the listed offers pricing the outer product, cheapest first.
+    """Return the offers a buyer can take now for the outer product, cheapest first.
 
     Every offer linked to a product sells a flavor its one table prints, so
-    they compete: the product shows the best current price. The ordering is
-    stable so the price and the link always come from the same offer.
+    they compete: the product shows the best current price among those listed
+    and in stock. A product with none keeps its row, without a price. The
+    ordering is stable so the price and the link come from the same offer.
     """
-    return Offer.objects.filter(
-        product_store__product=OuterRef("pk"),
-        current_price__isnull=False,
-        delisted_at__isnull=True,
-    ).order_by("current_price", "pk")
+    return (
+        Offer.objects.filter(
+            product_store__product=OuterRef("pk"),
+            current_price__isnull=False,
+            delisted_at__isnull=True,
+        )
+        .exclude(current_stock_status=StockStatus.OUT_OF_STOCK)
+        .order_by("current_price", "pk")
+    )
 
 
 def catalog_active(slug: str | None = None) -> Active | None:

@@ -33,7 +33,7 @@ from core.tests.helpers import (
     CatalogAnnotatedProduct,
     _link_offer,
 )
-from offers.models import Offer
+from offers.models import Offer, StockStatus
 
 
 class CatalogActiveRankingTests(TestCase):
@@ -563,3 +563,58 @@ class CatalogRowPriceTests(TestCase):
 
         assert row.price == Decimal("170.00")
         assert row.external_link == "https://growth.example/Morango"
+
+
+class CatalogAvailabilityTests(TestCase):
+    """A product is priced by what can be bought now, and stays listed regardless."""
+
+    def setUp(self) -> None:
+        """Create a published, labelled product sold by one store."""
+        Store.objects.create(
+            name="Growth", display_name="Growth", scraper_slug="growth"
+        )
+        self.product = Product.objects.create(
+            name="Whey 1 kg",
+            brand=Brand.objects.create(name="growth", display_name="Growth"),
+            net_mass=Decimal(1000),
+            is_published=True,
+        )
+        ProductNutrition.objects.create(
+            product=self.product,
+            nutrition_facts=NutritionFacts.objects.create(
+                serving_size=Decimal(30),
+                proteins=Decimal(24),
+            ),
+        )
+
+    def _sell(self, external_id: str, price: str, stock: str) -> None:
+        """Link an offer with the given price and stock reading."""
+        offer = Offer.objects.create(
+            store_slug="growth",
+            external_id=external_id,
+            url=f"https://growth.example/{external_id}",
+            current_price=Decimal(price),
+            current_stock_status=stock,
+        )
+        ProductStore.objects.create(product=self.product, offer=offer)
+
+    def test_a_sold_out_offer_never_wins_over_one_in_stock(self) -> None:
+        """The cheapest price must be one the buyer can actually pay."""
+        self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
+        self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
+
+        row = public_catalog_products().get(pk=self.product.pk)
+
+        assert row.price == Decimal("120.00")
+        assert row.external_link == "https://growth.example/in-stock"
+
+    def test_a_product_with_only_sold_out_offers_stays_listed_without_price(
+        self,
+    ) -> None:
+        """Publication is editorial; a missing price is not a missing product."""
+        self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
+
+        row = public_catalog_products().get(pk=self.product.pk)
+
+        assert row.price is None
+        assert row.external_link is None
