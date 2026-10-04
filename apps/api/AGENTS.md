@@ -93,6 +93,13 @@ offers that a successful crawl no longer sees.
   only status, guarded in the models and, on PostgreSQL, by triggers. Edits
   start a new revision (admin action). The MCP skill `promotion-curation`
   explains the workflow to agents.
+- The pricing engine (`pricing/domain/`) is pure: frozen dataclasses in,
+  `PricingResult` out, `now` passed in, no Django, database, network or
+  clock. `evaluate(Inputs)` selects a base price per line for the policy's
+  scenario (listed, cash, payment), keeps the executable revisions the
+  scenario counts, applies every compatible combination stage by stage and
+  returns the cheapest, with a decision for every candidate. Unknown is never
+  zero; rewards never lower what is paid.
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

@@ -58,6 +58,11 @@ class ImportBoundaryTests(SimpleTestCase):
         """Curated rules sit below the engine and above the facts."""
         assert _violations("promotions", {"pricing", "scrapers"}) == []
 
+    def test_the_pricing_engine_imports_no_framework_or_app(self) -> None:
+        """The engine is pure: no Django, no database, no app."""
+        forbidden = {"django", "pydantic", *APPS}
+        assert _violations("pricing/domain", forbidden) == []
+
     def test_normalizers_never_import_django_models(self) -> None:
         """A normalizer is payload in, DTO out."""
         forbidden = {"django", *APPS}
