@@ -181,16 +181,6 @@ class RankingTests(TwoProductCatalog, TestCase):
 
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-    def test_publishing_a_promotion_schedules_a_refresh(self) -> None:
-        """Rules changed: projections are recomputed after commit."""
-        with (
-            patch("pricing.receivers.refresh_projections.delay") as delay,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            self._promote_b("10")
-
-        delay.assert_called_with(offer_ids=None)
-
 
 class MexicanMarket(TwoProductCatalog):
     """Product B's store moved to Mexico, priced in pesos."""

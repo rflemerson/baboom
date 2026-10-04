@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.core.management.base import BaseCommand
 
-from pricing.projections import ProjectionService, linked_offer_ids, public_policies
+from pricing.projections import ProjectionService
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
@@ -24,13 +24,14 @@ class Command(BaseCommand):
     def handle(self, *args: object, **options: object) -> None:
         """Report the expected scope before any writes."""
         _ = args
-        ids = linked_offer_ids()
-        policies = public_policies()
+        service = ProjectionService()
+        ids = service.linked_offers()
+        policies = service.policies()
         self.stdout.write(
             f"Linked offers: {len(ids)}; public policies: {len(policies)}"
         )
         if options["apply"]:
-            count = ProjectionService().refresh(ids)
+            count = service.refresh(ids)
             self.stdout.write(f"Rebuilt projections: {count}")
         else:
             self.stdout.write(

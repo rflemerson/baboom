@@ -72,13 +72,6 @@ class PublishResult:
     errors: tuple[str, ...]
 
 
-def _exists(label: str, ids: list[int]) -> list[int]:
-    """Return the ids among ``ids`` that do not exist in the model ``label``."""
-    model: type[Model] = apps.get_model(label)
-    found = set(model.objects.filter(pk__in=ids).values_list("pk", flat=True))
-    return [pk for pk in ids if pk not in found]
-
-
 class PromotionService:
     """The one path to publish or revise a promotion's terms."""
 
@@ -106,16 +99,20 @@ class PromotionService:
         errors: list[str] = []
         for leaf in leaves(tree.root):
             if isinstance(leaf, ChannelIn):
-                missing = _exists("commerce.Channel", leaf.channel_ids)
+                missing = PromotionService._exists("commerce.Channel", leaf.channel_ids)
             elif isinstance(leaf, MarketIn):
-                missing = _exists("commerce.Market", leaf.market_ids)
+                missing = PromotionService._exists("commerce.Market", leaf.market_ids)
             elif isinstance(leaf, SellerIn):
-                missing = _exists("commerce.SellerAccount", leaf.seller_account_ids)
+                missing = PromotionService._exists(
+                    "commerce.SellerAccount", leaf.seller_account_ids
+                )
             elif isinstance(leaf, ProgramMember):
-                missing = _exists("commerce.Program", [leaf.program_id])
+                missing = PromotionService._exists(
+                    "commerce.Program", [leaf.program_id]
+                )
             elif isinstance(leaf, NewCustomer):
                 label = NEW_CUSTOMER_ISSUERS[leaf.issuer]
-                missing = _exists(label, [leaf.issuer_id])
+                missing = PromotionService._exists(label, [leaf.issuer_id])
             else:
                 missing = []
             if missing:
@@ -166,7 +163,7 @@ class PromotionService:
         graph = {position: set() for position in positions}
         for edge in edges:
             graph[edge.before].add(edge.after)
-        if _has_cycle(graph):
+        if PromotionService._has_cycle(graph):
             return ["Precedence has a cycle: no effect can be computed first."]
         return []
 
@@ -175,7 +172,11 @@ class PromotionService:
         errors: list[str] = []
         for scope in revision.scopes.all():
             label = SCOPE_MODELS.get(scope.kind)
-            if label and scope.ref_id is not None and _exists(label, [scope.ref_id]):
+            if (
+                label
+                and scope.ref_id is not None
+                and PromotionService._exists(label, [scope.ref_id])
+            ):
                 errors.append(f"Scope {scope}: no {scope.kind} #{scope.ref_id}.")
         return errors
 
@@ -251,7 +252,7 @@ class PromotionService:
             return PublishResult(published=False, errors=tuple(errors))
         locked.status = status
         locked.published_at = timezone.now()
-        locked.content_hash = content_hash(locked)
+        locked.content_hash = PromotionService.content_hash(locked)
         PromotionRevision.objects.filter(pk=locked.pk).update(
             status=locked.status,
             published_at=locked.published_at,
@@ -337,6 +338,81 @@ class PromotionService:
             )
         return draft
 
+    @staticmethod
+    def snapshot(revision: PromotionRevision) -> dict[str, object]:
+        """Return the canonical content of a revision and everything it owns."""
+        return {
+            "promotion": revision.promotion_id,
+            "number": revision.number,
+            "currency": revision.currency_id,
+            "starts_at": revision.starts_at.isoformat() if revision.starts_at else None,
+            "ends_at": revision.ends_at.isoformat() if revision.ends_at else None,
+            "timezone": revision.timezone,
+            "conditions": revision.conditions,
+            "ordering": revision.ordering,
+            "limitations": revision.limitations,
+            "evidence": sorted(revision.evidence.values_list("pk", flat=True)),
+            "codes": sorted(
+                [code.kind, code.code, code.channel_scope]
+                for code in revision.codes.all()
+            ),
+            "scopes": sorted(
+                [s.role, s.mode, s.kind, s.ref_id or 0, s.external_ref, s.combine]
+                for s in revision.scopes.all()
+            ),
+            "effects": [
+                {
+                    **{field: str(getattr(effect, field)) for field in _EFFECT_FIELDS},
+                    "reward": (
+                        {
+                            field: str(getattr(effect.reward_terms, field))
+                            for field in _REWARD_FIELDS
+                        }
+                        if hasattr(effect, "reward_terms")
+                        else None
+                    ),
+                }
+                for effect in revision.effects.order_by("position")
+            ],
+            "compatibility": sorted(
+                [rule.other_kind, rule.other_ref, rule.verdict, rule.chooser]
+                for rule in revision.compatibility.all()
+            ),
+        }
+
+    @staticmethod
+    def content_hash(revision: PromotionRevision) -> str:
+        """Hash a revision's canonical content."""
+        canonical = json.dumps(
+            PromotionService.snapshot(revision), sort_keys=True, default=str
+        )
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
+    @staticmethod
+    def _exists(label: str, ids: list[int]) -> list[int]:
+        """Return the ids among ``ids`` that do not exist in the model ``label``."""
+        model: type[Model] = apps.get_model(label)
+        found = set(model.objects.filter(pk__in=ids).values_list("pk", flat=True))
+        return [pk for pk in ids if pk not in found]
+
+    @staticmethod
+    def _has_cycle(graph: dict[int, set[int]]) -> bool:
+        """Whether a directed graph has a cycle (Kahn's algorithm)."""
+        incoming = dict.fromkeys(graph, 0)
+        for targets in graph.values():
+            for target in targets:
+                incoming[target] += 1
+        ready = [node for node, count in incoming.items() if count == 0]
+        visited = 0
+        while ready:
+            node = ready.pop()
+            visited += 1
+            for target in graph[node]:
+                incoming[target] -= 1
+                if incoming[target] == 0:
+                    ready.append(target)
+        return visited != len(graph)
+
 
 _EFFECT_FIELDS = (
     "position",
@@ -366,68 +442,3 @@ _REWARD_FIELDS = (
     "redemption_minimum",
     "cancellation_terms",
 )
-
-
-def _has_cycle(graph: dict[int, set[int]]) -> bool:
-    """Whether a directed graph has a cycle (Kahn's algorithm)."""
-    incoming = dict.fromkeys(graph, 0)
-    for targets in graph.values():
-        for target in targets:
-            incoming[target] += 1
-    ready = [node for node, count in incoming.items() if count == 0]
-    visited = 0
-    while ready:
-        node = ready.pop()
-        visited += 1
-        for target in graph[node]:
-            incoming[target] -= 1
-            if incoming[target] == 0:
-                ready.append(target)
-    return visited != len(graph)
-
-
-def snapshot(revision: PromotionRevision) -> dict[str, object]:
-    """Return the canonical content of a revision and everything it owns."""
-    return {
-        "promotion": revision.promotion_id,
-        "number": revision.number,
-        "currency": revision.currency_id,
-        "starts_at": revision.starts_at.isoformat() if revision.starts_at else None,
-        "ends_at": revision.ends_at.isoformat() if revision.ends_at else None,
-        "timezone": revision.timezone,
-        "conditions": revision.conditions,
-        "ordering": revision.ordering,
-        "limitations": revision.limitations,
-        "evidence": sorted(revision.evidence.values_list("pk", flat=True)),
-        "codes": sorted(
-            [code.kind, code.code, code.channel_scope] for code in revision.codes.all()
-        ),
-        "scopes": sorted(
-            [s.role, s.mode, s.kind, s.ref_id or 0, s.external_ref, s.combine]
-            for s in revision.scopes.all()
-        ),
-        "effects": [
-            {
-                **{field: str(getattr(effect, field)) for field in _EFFECT_FIELDS},
-                "reward": (
-                    {
-                        field: str(getattr(effect.reward_terms, field))
-                        for field in _REWARD_FIELDS
-                    }
-                    if hasattr(effect, "reward_terms")
-                    else None
-                ),
-            }
-            for effect in revision.effects.order_by("position")
-        ],
-        "compatibility": sorted(
-            [rule.other_kind, rule.other_ref, rule.verdict, rule.chooser]
-            for rule in revision.compatibility.all()
-        ),
-    }
-
-
-def content_hash(revision: PromotionRevision) -> str:
-    """Hash a revision's canonical content."""
-    canonical = json.dumps(snapshot(revision), sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode()).hexdigest()

@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from offers.models import PriceObservation, StockStatus
 from offers.observations import ObservationService, PriceRead, PriceRecord, PriceSubject
-from pricing.services import FactLoader
+from pricing.facts import FactLoader
 from pricing.tests.services.test_pricing_service import _ingest_max_titanium
 
 WINDOW = timedelta(hours=72)

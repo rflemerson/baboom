@@ -20,10 +20,11 @@ from offers.models import Offer, OfferPriceObservation, PriceObservation, StockS
 from offers.observations import ObservationService, PriceRead, PriceRecord, PriceSubject
 from pricing.domain.engine import evaluate
 from pricing.domain.types import CartLine, RewardTermsFact
+from pricing.facts import FactLoader
 from pricing.models import OfferScenarioProjection
 from pricing.projections import ProjectionService
 from pricing.selectors import projected_prices
-from pricing.services import FactLoader, PricingService, QuoteRequest, _private_safe
+from pricing.services import PricingService, QuoteRequest
 from pricing.tests.domain.builders import (
     context,
     effect,
@@ -208,7 +209,7 @@ class EngineReview(SimpleTestCase):
             revisions=(rule,),
         )
         assert (
-            evaluate(_private_safe(data)).merchandise_total
+            evaluate(PricingService.private_safe(data)).merchandise_total
             == evaluate(data).merchandise_total
         )
 

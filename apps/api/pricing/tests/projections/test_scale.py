@@ -15,9 +15,9 @@ from django.test.utils import CaptureQueriesContext
 
 from core.models import Product, ProductStore
 from offers.models import Offer, StockStatus
+from pricing.facts import FactLoader
 from pricing.models import PricingPolicyRevision
 from pricing.projections import ProjectionService
-from pricing.services import FactLoader
 from pricing.tests.projections.test_projections import TwoProductCatalog
 
 

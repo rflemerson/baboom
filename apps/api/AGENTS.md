@@ -112,15 +112,23 @@ offers that a successful crawl no longer sees.
   to `core.selectors.public_catalog_products` as its price source; expiry is
   checked at read time. `?scenario=<policy key>` picks the policy (default:
   the `is_default` one); every request ranks one market (`?country=`,
-  `?currency=`, default BR/BRL). There is no legacy price path. A finished crawl
-  (`offers.signals.offers_observed`) and a promotion change
-  (`promotions.signals.revision_changed`) enqueue `refresh_projections`
-  after commit; an hourly beat entry refreshes everything.
+  `?currency=`, default BR/BRL). There is no legacy price path.
+- `pricing.invalidation.Repricing` decides what a change reaches and
+  schedules `refresh_projections` after commit. Crawls and promotions announce
+  themselves with their own signals (`offers_observed`, `revision_changed`;
+  a promotion reprices only the offers its target scopes name). Admin-edited
+  rows of other apps (`ProductStore`, `Product`, `PurchaseRoute`) use model
+  signals in `pricing/receivers.py`; pricing's own writes (policy admin) call
+  `Repricing` directly. An hourly beat entry refreshes everything.
+- Services are classes; a module-level function is a selector, a task or a
+  signal receiver. Helpers live as methods of the class that uses them.
 - The engine also receives purchase routes (a tracked cashback needs an
   activation route per line), quoted shipping and taxes (`fees_status`:
   included in prices, consulted, or not consulted, which is unknown), and
   refuses order-level terms across several checkout groups as unsupported.
-  `pricing.replay` re-evaluates a kept quote from its snapshot alone.
+  `pricing.replay.QuoteReplay` re-evaluates a kept quote from its snapshot
+  alone; the quote admin's "Replay from the snapshot" action reports which
+  quotes still reproduce.
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
-from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.contrib.admin import site
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
-from core.models import Brand, Product
-from pricing.models import OfferScenarioProjection, PricingPolicyRevision, ShippingQuote
+from core.models import Brand, Product, ProductStore
+from pricing.admin import PricingPolicyRevisionAdmin
+from pricing.models import OfferScenarioProjection, PricingPolicyRevision
 from pricing.projections import ProjectionService
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import PurchaseRoute
 
-DELAY = "pricing.receivers.refresh_projections.delay"
+DELAY = "pricing.invalidation.refresh_projections.delay"
 
 
 class InvalidationTests(TwoProductCatalog, TestCase):
@@ -49,35 +49,36 @@ class InvalidationTests(TwoProductCatalog, TestCase):
         assert all(row.expires_at <= now for row in b)
         assert all(row.expires_at is None or row.expires_at > now for row in a)
 
-    def test_a_shipping_quote_reprices_its_sellers_offers(self) -> None:
-        """Both offers belong to the store's seller."""
-        calls = self._scheduled(
-            lambda: ShippingQuote.objects.create(
-                group_fingerprint="g",
-                seller_account=self.seller,
-                country="BR",
-                postal_code_hash="",
-                amount=Decimal(10),
-                currency_id="BRL",
-                source="synthetic",
-                expires_at=timezone.now() + timedelta(hours=1),
-            ),
-        )
-
-        assert calls == [sorted(offer.pk for offer in self.offers.values())]
-
-    def test_a_published_policy_reprices_everything(self) -> None:
+    def test_publishing_a_policy_in_the_admin_reprices_everything(self) -> None:
         """A new public scenario needs every projection."""
+        policy = PricingPolicyRevision(
+            key="new",
+            number=1,
+            scenario="cash",
+            published_at=timezone.now(),
+        )
+        admin = PricingPolicyRevisionAdmin(PricingPolicyRevision, site)
+
         calls = self._scheduled(
-            lambda: PricingPolicyRevision.objects.create(
-                key="new",
-                number=1,
-                scenario="cash",
-                published_at=timezone.now(),
+            lambda: admin.save_model(
+                RequestFactory().post("/"), policy, None, change=False
             ),
         )
 
         assert calls == [None]
+
+    def test_a_promotion_reprices_only_the_offers_it_targets(self) -> None:
+        """A discount on B leaves A's projections alone."""
+        calls = self._scheduled(lambda: self._promote_b("10"))
+
+        assert calls == [[self.offers["B"].pk]]
+
+    def test_unlinking_an_offer_drops_its_projections(self) -> None:
+        """Nothing ranks an offer no product sells."""
+        ProductStore.objects.filter(offer=self.offers["A"]).delete()
+
+        assert not OfferScenarioProjection.objects.filter(offer=self.offers["A"])
+        assert OfferScenarioProjection.objects.filter(offer=self.offers["B"])
 
     def test_a_brand_change_reprices_the_products_offers(self) -> None:
         """A promotion scoped by brand may now reach product A."""

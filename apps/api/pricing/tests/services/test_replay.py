@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
+from unittest.mock import patch
 
-from django.test import TestCase
+from django.contrib.admin import site
+from django.test import RequestFactory, TestCase
 
+from pricing.admin import PricingQuoteAdmin
 from pricing.domain.types import CartLine, Claim, Destination
-from pricing.models import PricingPolicyRevision
-from pricing.replay import replay
+from pricing.models import PricingPolicyRevision, PricingQuote
+from pricing.replay import QuoteReplay
 from pricing.services import PricingService, QuoteRequest
 from pricing.tests.services.test_pricing_service import _ingest_max_titanium
 from promotions.models import ActivationCode, PromotionScope
@@ -79,7 +82,7 @@ class ReplayTests(TestCase):
         for code in ("PRIMEIRACOMPRA", PERSONAL):
             with self.subTest(code):
                 quote = self._quote(code, POSTAL)
-                replayed = replay(quote)
+                replayed = QuoteReplay().replay(quote)
                 assert quote.merchandise_total == Decimal("79.20")
                 assert replayed.merchandise_total == quote.merchandise_total
                 assert replayed.applied_revisions == tuple(
@@ -91,7 +94,7 @@ class ReplayTests(TestCase):
         quote = self._quote("PRIMEIRACOMPRA", "20000-000")
 
         assert quote.merchandise_total == Decimal("99.00")
-        assert replay(quote).merchandise_total == Decimal("99.00")
+        assert QuoteReplay().replay(quote).merchandise_total == Decimal("99.00")
 
     def test_the_snapshot_keeps_no_private_value(self) -> None:
         """Neither the personal code nor the postal code is stored in clear."""
@@ -109,7 +112,7 @@ class ReplayTests(TestCase):
             "archived",
         )
 
-        assert replay(quote).merchandise_total == Decimal("79.20")
+        assert QuoteReplay().replay(quote).merchandise_total == Decimal("79.20")
 
     def test_both_fingerprints_are_kept(self) -> None:
         """The original input fingerprint and the protected one."""
@@ -117,3 +120,15 @@ class ReplayTests(TestCase):
 
         assert quote.input_fingerprint
         assert quote.snapshot["protected_fingerprint"] != quote.input_fingerprint
+
+    def test_the_admin_action_reports_reproduced_quotes(self) -> None:
+        """A curator replays kept quotes and sees which still reproduce."""
+        quote = self._quote("PRIMEIRACOMPRA", POSTAL)
+        admin = PricingQuoteAdmin(PricingQuote, site)
+        request = RequestFactory().post("/")
+
+        with patch.object(admin, "message_user") as message_user:
+            admin.replay(request, PricingQuote.objects.filter(pk=quote.pk))
+
+        text = message_user.call_args.args[1]
+        assert text.startswith("1 reproduced; differ: none"), text

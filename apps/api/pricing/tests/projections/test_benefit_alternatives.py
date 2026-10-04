@@ -19,7 +19,7 @@ from pricing.domain.types import CartLine
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision, ShippingQuote
 from pricing.projections import ProjectionService
 from pricing.selectors import BenefitFilter, projected_prices
-from pricing.services import group_fingerprint
+from pricing.services import PricingService
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import (
     ActivationCode,
@@ -86,7 +86,7 @@ class BenefitCatalog(TwoProductCatalog):
             )
         evidence = Evidence.objects.create(kind="announcement", excerpt="x")
         revision.evidence.add(evidence)
-        with patch("pricing.receivers.refresh_projections.delay"):
+        with patch("pricing.invalidation.refresh_projections.delay"):
             assert PromotionService().publish(revision, "executable").published
         return revision
 
@@ -171,7 +171,9 @@ class ObjectiveTests(BenefitCatalog, TestCase):
         self.market.save()
         for offer in self.offers.values():
             ShippingQuote.objects.create(
-                group_fingerprint=group_fingerprint((CartLine(offer.pk, 1),), None),
+                group_fingerprint=PricingService.group_fingerprint(
+                    (CartLine(offer.pk, 1),), None
+                ),
                 seller_account=self.seller,
                 country="BR",
                 postal_code_hash="",
@@ -291,7 +293,7 @@ class PersonalBenefitTests(BenefitCatalog, TestCase):
             },
         }
         draft.save()
-        with patch("pricing.receivers.refresh_projections.delay"):
+        with patch("pricing.invalidation.refresh_projections.delay"):
             assert PromotionService().publish(draft, "executable").published
         ProjectionService().refresh()
 

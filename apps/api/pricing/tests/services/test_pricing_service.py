@@ -26,7 +26,6 @@ from pricing.models import (
 from pricing.services import (
     PricingService,
     QuoteRequest,
-    group_fingerprint,
 )
 from promotions.models import (
     PromotionEffect,
@@ -292,7 +291,7 @@ class StoredCostTests(TestCase):
         request = QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed"))
         without = PricingService().evaluate(request)
         ShippingQuote.objects.create(
-            group_fingerprint=group_fingerprint(request.lines, None),
+            group_fingerprint=PricingService.group_fingerprint(request.lines, None),
             seller_account=offer.seller_account,
             country="BR",
             postal_code_hash="",
@@ -316,7 +315,7 @@ class StoredCostTests(TestCase):
         market.save()
         request = QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed"))
         ShippingQuote.objects.create(
-            group_fingerprint=group_fingerprint(request.lines, None),
+            group_fingerprint=PricingService.group_fingerprint(request.lines, None),
             seller_account=offer.seller_account,
             country="BR",
             postal_code_hash="",

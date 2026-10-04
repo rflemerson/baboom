@@ -14,7 +14,7 @@ from promotions.models import (
     PromotionScope,
     PublishedRevisionError,
 )
-from promotions.services import PromotionService, content_hash
+from promotions.services import PromotionService
 from promotions.tests.factories import first_purchase_draft
 
 
@@ -33,7 +33,9 @@ class PublishTests(TestCase):
         assert result.published, result.errors
         assert self.revision.status == "executable"
         assert self.revision.published_at is not None
-        assert self.revision.content_hash == content_hash(self.revision)
+        assert self.revision.content_hash == PromotionService.content_hash(
+            self.revision
+        )
 
     def test_a_revision_without_evidence_is_only_informative(self) -> None:
         """No evidence: it can be recorded, never computed."""
@@ -190,12 +192,12 @@ class FrozenTests(TestCase):
 
     def test_status_moves_among_published_states(self) -> None:
         """Suspend and archive only change status."""
-        before = content_hash(self.revision)
+        before = PromotionService.content_hash(self.revision)
 
         PromotionService.set_status(self.revision, "suspended")
 
         assert self.revision.status == "suspended"
-        assert content_hash(self.revision) == before
+        assert PromotionService.content_hash(self.revision) == before
         raised(
             lambda: PromotionService.set_status(self.revision, "draft"),
             ValueError,

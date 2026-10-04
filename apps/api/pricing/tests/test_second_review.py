@@ -20,6 +20,7 @@ from pricing.domain.types import (
     RouteFact,
     ShippingFact,
 )
+from pricing.facts import FactLoader
 from pricing.models import (
     OfferScenarioProjection,
     PricingPolicyRevision,
@@ -27,7 +28,7 @@ from pricing.models import (
     TaxFeeQuote,
 )
 from pricing.projections import ProjectionService
-from pricing.services import FactLoader, PricingService, QuoteRequest
+from pricing.services import PricingService, QuoteRequest
 from pricing.tests.domain.builders import (
     NOW,
     context,
@@ -126,7 +127,7 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
     def test_curated_route_reaches_rest(self) -> None:
         """The route URL and seller flag must describe the same link."""
         route_url = "https://synthetic.example/selected?seller=9&variant=2"
-        with patch("pricing.receivers.refresh_projections.delay"):
+        with patch("pricing.invalidation.refresh_projections.delay"):
             PurchaseRoute.objects.create(
                 offer=self.offers["B"],
                 kind="marketplace_listing",

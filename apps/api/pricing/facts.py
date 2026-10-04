@@ -8,7 +8,6 @@ with the snapshot that reproduces the result.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -27,7 +26,6 @@ from .domain.types import (
     CompatibilityFact,
     EffectRule,
     OfferFact,
-    Policy,
     PriceFact,
     RevisionRule,
     RewardTermsFact,
@@ -37,6 +35,7 @@ from .domain.types import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from datetime import timedelta
 
     from .models import PricingPolicyRevision
 
@@ -48,45 +47,6 @@ EMPTY_AMOUNTS = Amounts(
     shipping=None,
     quantity=0,
 )
-DEFAULT_FRESHNESS_HOURS = 72
-POLICY_FIELDS = (
-    "objective",
-    "accepted_semantics",
-    "accepted_evidence",
-    "cash_methods",
-    "include_unknown_payment",
-    "allow_codes",
-    "auto_public_codes",
-    "allow_private_codes",
-    "allow_rewards",
-    "allow_conditions",
-    "net_cost_counts_money_rewards",
-    "assume_full_caps",
-    "max_combinations",
-)
-
-
-def policy_from(revision: PricingPolicyRevision) -> Policy:
-    """Read a policy revision's typed rules; unknown keys are ignored."""
-    rules = revision.rules or {}
-    values: dict[str, object] = {}
-    for name in POLICY_FIELDS:
-        if name not in rules:
-            continue
-        value = rules[name]
-        values[name] = frozenset(value) if isinstance(value, list) else value
-    return Policy(
-        key=revision.key,
-        version=revision.number,
-        scenario=revision.scenario,
-        **values,
-    )
-
-
-def freshness(revision: PricingPolicyRevision) -> timedelta:
-    """How long an observation stays usable after a read confirmed it."""
-    hours = (revision.rules or {}).get("freshness_hours", DEFAULT_FRESHNESS_HOURS)
-    return timedelta(hours=int(hours))
 
 
 @dataclass(frozen=True)
@@ -112,7 +72,7 @@ class FactLoader:
         offers = self.offers(ids)
         return Facts(
             offers=offers,
-            prices=self.prices(ids, freshness(policy)),
+            prices=self.prices(ids, policy.freshness),
             revisions=reaching(self.revisions(), offers.values()),
             routes=self.routes(ids),
         )
@@ -177,7 +137,7 @@ class FactLoader:
                 "product__category",
             )
         }
-        lineage = _category_lineage(
+        lineage = FactLoader._category_lineage(
             {link.category for link in links.values() if link.category is not None},
         )
         facts: dict[int, OfferFact] = {}
@@ -283,7 +243,7 @@ class FactLoader:
                 quantity_max=row.quantity_max,
                 amount_basis=row.amount_basis,
                 capture_stage=row.capture_stage,
-                context=_context_pairs(row.context),
+                context=FactLoader._context_pairs(row.context),
             )
             for row in latest.values()
         ]
@@ -334,119 +294,119 @@ class FactLoader:
         newest: dict[int, PromotionRevision] = {}
         for revision in published:
             newest.setdefault(revision.promotion_id, revision)
-        return tuple(_rule(revision) for revision in newest.values())
+        return tuple(FactLoader._rule(revision) for revision in newest.values())
 
+    @staticmethod
+    def _category_lineage(categories: set[Category]) -> dict[int, frozenset[int]]:
+        """Return each category with its ancestors, in one query for all of them.
 
-def _category_lineage(categories: set[Category]) -> dict[int, frozenset[int]]:
-    """Return each category with its ancestors, in one query for all of them.
-
-    A materialized path names every ancestor by prefix, so the ancestors of
-    every category of a batch come from a single lookup by path.
-    """
-    if not categories:
-        return {}
-    step = Category.steplen
-    prefixes = {
-        category.path[:end]
-        for category in categories
-        for end in range(step, len(category.path), step)
-    }
-    by_path = dict(
-        Category.objects.filter(path__in=prefixes).values_list("path", "pk"),
-    )
-    return {
-        category.pk: frozenset(
-            [
-                category.pk,
-                *(
-                    by_path[category.path[:end]]
-                    for end in range(step, len(category.path), step)
-                    if category.path[:end] in by_path
-                ),
-            ],
+        A materialized path names every ancestor by prefix, so the ancestors of
+        every category of a batch come from a single lookup by path.
+        """
+        if not categories:
+            return {}
+        step = Category.steplen
+        prefixes = {
+            category.path[:end]
+            for category in categories
+            for end in range(step, len(category.path), step)
+        }
+        by_path = dict(
+            Category.objects.filter(path__in=prefixes).values_list("path", "pk"),
         )
-        for category in categories
-    }
+        return {
+            category.pk: frozenset(
+                [
+                    category.pk,
+                    *(
+                        by_path[category.path[:end]]
+                        for end in range(step, len(category.path), step)
+                        if category.path[:end] in by_path
+                    ),
+                ],
+            )
+            for category in categories
+        }
 
+    @staticmethod
+    def _context_pairs(context: object) -> tuple[tuple[str, str], ...]:
+        """Flatten an observation's context into sorted, hashable pairs."""
+        if not isinstance(context, dict):
+            return ()
+        return tuple(sorted((str(key), str(value)) for key, value in context.items()))
 
-def _context_pairs(context: object) -> tuple[tuple[str, str], ...]:
-    """Flatten an observation's context into sorted, hashable pairs."""
-    if not isinstance(context, dict):
-        return ()
-    return tuple(sorted((str(key), str(value)) for key, value in context.items()))
-
-
-def _rule(revision: PromotionRevision) -> RevisionRule:
-    """Translate a revision and everything it owns into an engine rule."""
-    effects = []
-    for effect in revision.effects.all():
-        terms = getattr(effect, "reward_terms", None)
-        effects.append(
-            EffectRule(
-                position=effect.position,
-                kind=effect.kind,
-                stage=effect.stage,
-                basis=effect.basis,
-                target=effect.target,
-                allocation=effect.allocation,
-                params=dict(effect.parameters or {}),
-                cap=effect.cap,
-                max_applications=effect.max_applications,
-                consumes_units=effect.consumes_units,
-                reward=(
-                    RewardTermsFact(
-                        credited_as=terms.credited_as,
-                        rate=terms.rate,
-                        cap=terms.cap,
-                        cap_period=terms.cap_period,
-                        minimum=terms.minimum,
-                        includes_shipping=terms.includes_shipping,
-                        eligible_basis=terms.eligible_basis,
-                        program_id=terms.program_id,
-                        credit_delay_days=terms.credit_delay_days,
-                        tracking_required=terms.tracking_required,
-                    )
-                    if terms is not None
-                    else None
+    @staticmethod
+    def _rule(revision: PromotionRevision) -> RevisionRule:
+        """Translate a revision and everything it owns into an engine rule."""
+        effects = []
+        for effect in revision.effects.all():
+            terms = getattr(effect, "reward_terms", None)
+            effects.append(
+                EffectRule(
+                    position=effect.position,
+                    kind=effect.kind,
+                    stage=effect.stage,
+                    basis=effect.basis,
+                    target=effect.target,
+                    allocation=effect.allocation,
+                    params=dict(effect.parameters or {}),
+                    cap=effect.cap,
+                    max_applications=effect.max_applications,
+                    consumes_units=effect.consumes_units,
+                    reward=(
+                        RewardTermsFact(
+                            credited_as=terms.credited_as,
+                            rate=terms.rate,
+                            cap=terms.cap,
+                            cap_period=terms.cap_period,
+                            minimum=terms.minimum,
+                            includes_shipping=terms.includes_shipping,
+                            eligible_basis=terms.eligible_basis,
+                            program_id=terms.program_id,
+                            credit_delay_days=terms.credit_delay_days,
+                            tracking_required=terms.tracking_required,
+                        )
+                        if terms is not None
+                        else None
+                    ),
                 ),
+            )
+        return RevisionRule(
+            id=revision.pk,
+            promotion_id=revision.promotion_id,
+            number=revision.number,
+            status=revision.status,
+            currency=revision.currency_id,
+            timezone=revision.timezone,
+            conditions=dict(revision.conditions or {}),
+            effects=tuple(effects),
+            scopes=tuple(
+                ScopeRule(
+                    role=scope.role,
+                    mode=scope.mode,
+                    kind=scope.kind,
+                    ref_id=scope.ref_id,
+                    external_ref=scope.external_ref,
+                    combine=scope.combine,
+                )
+                for scope in revision.scopes.all()
             ),
+            codes=tuple((code.kind, code.code) for code in revision.codes.all()),
+            compatibility=tuple(
+                CompatibilityFact(
+                    other_kind=rule.other_kind,
+                    other_ref=rule.other_ref,
+                    verdict=rule.verdict,
+                    chooser=rule.chooser,
+                )
+                for rule in revision.compatibility.all()
+            ),
+            ordering=tuple(
+                (int(edge["before"]), int(edge["after"]))
+                for edge in revision.ordering or []
+                if isinstance(edge, dict)
+            ),
+            starts_at=revision.starts_at,
+            ends_at=revision.ends_at,
+            content_hash=revision.content_hash,
         )
-    return RevisionRule(
-        id=revision.pk,
-        promotion_id=revision.promotion_id,
-        number=revision.number,
-        status=revision.status,
-        currency=revision.currency_id,
-        timezone=revision.timezone,
-        conditions=dict(revision.conditions or {}),
-        effects=tuple(effects),
-        scopes=tuple(
-            ScopeRule(
-                role=scope.role,
-                mode=scope.mode,
-                kind=scope.kind,
-                ref_id=scope.ref_id,
-                external_ref=scope.external_ref,
-                combine=scope.combine,
-            )
-            for scope in revision.scopes.all()
-        ),
-        codes=tuple((code.kind, code.code) for code in revision.codes.all()),
-        compatibility=tuple(
-            CompatibilityFact(
-                other_kind=rule.other_kind,
-                other_ref=rule.other_ref,
-                verdict=rule.verdict,
-                chooser=rule.chooser,
-            )
-            for rule in revision.compatibility.all()
-        ),
-        ordering=tuple(
-            (int(edge["before"]), int(edge["after"]))
-            for edge in revision.ordering or []
-            if isinstance(edge, dict)
-        ),
-        starts_at=revision.starts_at,
-        ends_at=revision.ends_at,
-        content_hash=revision.content_hash,
-    )

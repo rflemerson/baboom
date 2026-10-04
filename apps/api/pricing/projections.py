@@ -15,42 +15,21 @@ from django.db import transaction
 from django.utils import timezone
 
 from commerce.models import Market
-from core.models import ProductStore
 from offers.models import Offer
 
-from .context import Terms, assemble_inputs
+from .context import Terms
 from .costs import CostBook
 from .domain.engine import evaluate
 from .domain.types import CartLine, PurchaseContext
+from .facts import LEGACY_PRICE_ID, FactLoader, Facts
 from .models import OfferScenarioProjection, PricingPolicyRevision
-from .services import LEGACY_PRICE_ID, FactLoader, Facts, group_fingerprint, policy_from
+from .services import PricingService
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from datetime import datetime
 
     from .domain.types import Policy, PricingResult
-
-
-def public_policies() -> list[PricingPolicyRevision]:
-    """Return the newest published revision of each public policy key."""
-    newest: dict[str, PricingPolicyRevision] = {}
-    published = PricingPolicyRevision.objects.filter(
-        published_at__isnull=False,
-    ).order_by("key", "-number")
-    for policy in published:
-        newest.setdefault(policy.key, policy)
-    return list(newest.values())
-
-
-def linked_offer_ids() -> list[int]:
-    """Return the offers some catalog product is priced by."""
-    return list(
-        ProductStore.objects.filter(offer__isnull=False).values_list(
-            "offer_id",
-            flat=True,
-        ),
-    )
 
 
 @dataclass(frozen=True)
@@ -108,20 +87,23 @@ class ProjectionService:
         own ``now``, so an older run cannot overwrite a newer one.
         """
         moment = now or timezone.now()
-        ids = sorted(set(offer_ids) if offer_ids is not None else linked_offer_ids())
+        ids = sorted(set(offer_ids) if offer_ids is not None else self.linked_offers())
         if not ids:
             return 0
         list(Offer.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
         shared = _Refresh(
-            markets=_markets(ids),
+            markets=self._markets(ids),
             moment=moment,
             costs=CostBook.load(
-                [group_fingerprint((CartLine(pk, 1),), None) for pk in ids],
+                [
+                    PricingService.group_fingerprint((CartLine(pk, 1),), None)
+                    for pk in ids
+                ],
                 moment,
             ),
         )
         written = 0
-        for policy_row in public_policies():
+        for policy_row in self.policies():
             batch = self._batch(policy_row, ids, shared)
             newer = set(
                 OfferScenarioProjection.objects.filter(
@@ -159,7 +141,7 @@ class ProjectionService:
         ids: list[int],
         shared: _Refresh,
     ) -> _Batch:
-        policy = policy_from(policy_row)
+        policy = policy_row.as_policy()
         facts = self.loader.load(ids, policy_row)
         codes = (
             frozenset(
@@ -181,9 +163,8 @@ class ProjectionService:
             codes,
         )
 
-    @classmethod
     def _projections(
-        cls, offer_id: int, batch: _Batch
+        self, offer_id: int, batch: _Batch
     ) -> list[OfferScenarioProjection]:
         """Project the winner and the best alternative using each benefit.
 
@@ -193,14 +174,14 @@ class ProjectionService:
         """
         rows = []
         for requirement in batch.requirements():
-            row = cls._projection(offer_id, batch, requirement)
+            row = self._projection(offer_id, batch, requirement)
             if requirement and row.status != OfferScenarioProjection.Status.PRICED:
                 continue
             rows.append(row)
         return rows
 
-    @staticmethod
     def _projection(
+        self,
         offer_id: int,
         batch: _Batch,
         requirement: frozenset[str],
@@ -218,15 +199,16 @@ class ProjectionService:
             codes=batch.codes,
         )
         result = evaluate(
-            assemble_inputs(
+            Terms(
+                tax_inclusion=market.tax_inclusion,
+                requirement=requirement,
+                costs=batch.costs,
+            ).inputs(
                 facts,
                 batch.policy_row,
                 context,
-                group_key=group_fingerprint(context.lines, context.destination),
-                terms=Terms(
-                    tax_inclusion=market.tax_inclusion,
-                    requirement=requirement,
-                    costs=batch.costs,
+                group_key=PricingService.group_fingerprint(
+                    context.lines, context.destination
                 ),
             ),
         )
@@ -239,7 +221,7 @@ class ProjectionService:
             market=market,
             currency_id=market.currency_id,
             amount=result.merchandise_total,
-            status=_status(result, purchasable=offer.purchasable),
+            status=self._status(result, purchasable=offer.purchasable),
             payment_method=(
                 result.selected_prices[0].payment_method
                 if result.selected_prices
@@ -251,7 +233,7 @@ class ProjectionService:
                 and result.selected_prices[0].observation_id != LEGACY_PRICE_ID
                 else None
             ),
-            comparison_amount=_comparison(result, policy.objective),
+            comparison_amount=self._comparison(result, policy.objective),
             objective=policy.objective,
             total_payable=result.total_payable,
             estimated_net_cost=result.estimated_net_cost,
@@ -274,7 +256,7 @@ class ProjectionService:
             resolved_url=(route.url or "") if route else "",
             link_fixes_variant=bool(route and route.fixes_variant),
             explanation={
-                **_explanation(result),
+                **self._explanation(result),
                 "objective": policy.objective,
                 "public_codes": sorted(
                     {
@@ -291,61 +273,85 @@ class ProjectionService:
             expires_at=result.expires_at,
         )
 
+    @staticmethod
+    def policies() -> list[PricingPolicyRevision]:
+        """Return the newest published revision of each public policy key."""
+        newest: dict[str, PricingPolicyRevision] = {}
+        published = PricingPolicyRevision.objects.filter(
+            published_at__isnull=False,
+        ).order_by("key", "-number")
+        for policy in published:
+            newest.setdefault(policy.key, policy)
+        return list(newest.values())
 
-def _comparison(result: PricingResult, objective: str) -> Decimal | None:
-    """Return the amount the policy's objective compares; unknown stays None."""
-    if objective == "items_payable":
-        return result.merchandise_total
-    return getattr(result, objective, None)
+    @staticmethod
+    def linked_offers(
+        store_slug: str | None = None,
+        offer_ids: Iterable[int] | None = None,
+    ) -> list[int]:
+        """Return the offers some catalog product is priced by, optionally narrowed."""
+        linked = Offer.objects.filter(product_store__isnull=False)
+        if store_slug:
+            linked = linked.filter(store_slug=store_slug)
+        if offer_ids is not None:
+            linked = linked.filter(pk__in=list(offer_ids))
+        return list(linked.values_list("pk", flat=True).distinct())
 
+    @staticmethod
+    def _comparison(result: PricingResult, objective: str) -> Decimal | None:
+        """Return the amount the policy's objective compares; unknown stays None."""
+        if objective == "items_payable":
+            return result.merchandise_total
+        return getattr(result, objective, None)
 
-def _markets(ids: list[int]) -> dict[int, Market]:
-    """Index the markets of these offers, with their currencies."""
-    namespaces = set(
-        Offer.objects.filter(pk__in=ids).values_list("store_slug", flat=True),
-    )
-    rows = Market.objects.select_related("currency").filter(
-        listings__variants__offers__pk__in=ids,
-    ) | Market.objects.select_related("currency").filter(namespace__in=namespaces)
-    return {market.pk: market for market in rows.distinct()}
+    @staticmethod
+    def _markets(ids: list[int]) -> dict[int, Market]:
+        """Index the markets of these offers, with their currencies."""
+        namespaces = set(
+            Offer.objects.filter(pk__in=ids).values_list("store_slug", flat=True),
+        )
+        rows = Market.objects.select_related("currency").filter(
+            listings__variants__offers__pk__in=ids,
+        ) | Market.objects.select_related("currency").filter(namespace__in=namespaces)
+        return {market.pk: market for market in rows.distinct()}
 
+    @staticmethod
+    def _status(result: PricingResult, *, purchasable: bool) -> str:
+        if result.merchandise_total is not None:
+            return OfferScenarioProjection.Status.PRICED
+        if not purchasable:
+            return OfferScenarioProjection.Status.UNAVAILABLE
+        return OfferScenarioProjection.Status.NO_PRICE
 
-def _status(result: PricingResult, *, purchasable: bool) -> str:
-    if result.merchandise_total is not None:
-        return OfferScenarioProjection.Status.PRICED
-    if not purchasable:
-        return OfferScenarioProjection.Status.UNAVAILABLE
-    return OfferScenarioProjection.Status.NO_PRICE
-
-
-def _explanation(result: PricingResult) -> dict[str, object]:
-    """Keep what the catalog shows about how a projected amount was reached."""
-    return {
-        "scenario": result.scenario,
-        "applied": list(result.applied_revisions),
-        "adjustments": [
-            {"kind": a.kind, "amount": str(a.amount), "revision": a.revision_id}
-            for a in result.adjustments
-        ],
-        "missing": list(result.missing_context),
-        "route_limitations": list(result.route_limitations),
-        "routes": [
-            {
-                "id": route.route_id,
-                "url": route.url,
-                "fixes_variant": route.fixes_variant,
-                "instructions": route.instructions,
-            }
-            for route in result.purchase_routes
-        ],
-        "assumptions": list(result.assumptions),
-        "selected": [
-            {
-                "payment_method": p.payment_method,
-                "payment_scope": p.payment_scope,
-                "installments": p.installment_count,
-                "already_included": list(p.already_included),
-            }
-            for p in result.selected_prices
-        ],
-    }
+    @staticmethod
+    def _explanation(result: PricingResult) -> dict[str, object]:
+        """Keep what the catalog shows about how a projected amount was reached."""
+        return {
+            "scenario": result.scenario,
+            "applied": list(result.applied_revisions),
+            "adjustments": [
+                {"kind": a.kind, "amount": str(a.amount), "revision": a.revision_id}
+                for a in result.adjustments
+            ],
+            "missing": list(result.missing_context),
+            "route_limitations": list(result.route_limitations),
+            "routes": [
+                {
+                    "id": route.route_id,
+                    "url": route.url,
+                    "fixes_variant": route.fixes_variant,
+                    "instructions": route.instructions,
+                }
+                for route in result.purchase_routes
+            ],
+            "assumptions": list(result.assumptions),
+            "selected": [
+                {
+                    "payment_method": p.payment_method,
+                    "payment_scope": p.payment_scope,
+                    "installments": p.installment_count,
+                    "already_included": list(p.already_included),
+                }
+                for p in result.selected_prices
+            ],
+        }

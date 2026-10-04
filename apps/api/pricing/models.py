@@ -8,6 +8,8 @@ adapter results; nothing here invents a freight or tax engine.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -15,7 +17,27 @@ from django.utils.translation import gettext_lazy as _
 
 from common.models import BaseModel
 
+from .domain.types import Policy
+
 MONEY = {"max_digits": 19, "decimal_places": 6}
+
+
+DEFAULT_FRESHNESS_HOURS = 72
+POLICY_FIELDS = (
+    "objective",
+    "accepted_semantics",
+    "accepted_evidence",
+    "cash_methods",
+    "include_unknown_payment",
+    "allow_codes",
+    "auto_public_codes",
+    "allow_private_codes",
+    "allow_rewards",
+    "allow_conditions",
+    "net_cost_counts_money_rewards",
+    "assume_full_caps",
+    "max_combinations",
+)
 
 
 class PricingPolicyRevision(BaseModel):
@@ -71,6 +93,24 @@ class PricingPolicyRevision(BaseModel):
     def __str__(self) -> str:
         """Return key and number."""
         return f"{self.key} v{self.number}"
+
+    def as_policy(self) -> Policy:
+        """Read the typed rules the engine applies; unknown keys are ignored."""
+        rules = self.rules or {}
+        values: dict[str, object] = {}
+        for name in POLICY_FIELDS:
+            if name in rules:
+                value = rules[name]
+                values[name] = frozenset(value) if isinstance(value, list) else value
+        return Policy(
+            key=self.key, version=self.number, scenario=self.scenario, **values
+        )
+
+    @property
+    def freshness(self) -> timedelta:
+        """How long an observation stays usable after a read confirmed it."""
+        hours = (self.rules or {}).get("freshness_hours", DEFAULT_FRESHNESS_HOURS)
+        return timedelta(hours=int(hours))
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Refuse changes to a published policy; publish a new number instead."""
