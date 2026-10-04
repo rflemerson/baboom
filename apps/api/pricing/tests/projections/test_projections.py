@@ -27,8 +27,8 @@ from promotions.services import PromotionService
 URL = "/api/catalog/products/"
 
 
-class RankingTests(TestCase):
-    """Two products; the cheaper raw price can lose to a promotion."""
+class TwoProductCatalog:
+    """Products A (R$ 100) and B (R$ 120) of one store, and a way to promote B."""
 
     def setUp(self) -> None:
         """Product A at R$ 100, product B at R$ 120, one store."""
@@ -97,6 +97,10 @@ class RankingTests(TestCase):
         revision.evidence.add(Evidence.objects.create(kind="announcement", excerpt="B"))
         assert PromotionService().publish(revision, "executable").published
         return revision
+
+
+class RankingTests(TwoProductCatalog, TestCase):
+    """Two products; the cheaper raw price can lose to a promotion."""
 
     def _page(self, **params: str) -> dict:
         query = {"per_page": "12", "sort_by": "price", "sort_dir": "asc", **params}

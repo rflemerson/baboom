@@ -18,7 +18,7 @@ what works, what was tested and what is still pending.
 | 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `CurrencyConversionQuote`, `PricingQuote` | Done. Quotes keep a snapshot and the revisions and observations they read; shipping, tax and conversion are quoted facts; an unknown shipping or fee leaves the total unknown; a complete read withdraws a price condition it no longer states |
 | 7 | `PricingPolicyRevision`, `OfferScenarioProjection`, invalidation, REST, Vue | Done. Projections per offer and policy, refreshed after crawls and promotion changes and hourly; ranking and pagination in the database; `?scenario=cash` in the API and a "Price shown" selector in Vue; the default stays legacy until `PRICING_READ_PROJECTIONS` |
 | 8 | Current adapters on the new contract; Amazon and Mercado Livre per authorized access; onboarding procedure; quota-aware scheduling | Done for what access allows: capabilities per adapter, provider limits, a configuration-only feed adapter proven by synthetic marketplace tests, and the onboarding procedure. Amazon and Mercado Livre wait for authorized access (see connectors) |
-| 9 | Shadow run, comparison, activation per market and policy, rollback, removal of compatibility fields | The new flow is the only one, end to end |
+| 9 | Shadow run, comparison, activation per market and policy, rollback, removal of compatibility fields | Code done: `compare_pricing_shadow`, the `PRICING_READ_PROJECTIONS` switch and the runbook below. Activation and the removal of compatibility fields wait for a production shadow run |
 
 ## Moving today's data
 
@@ -67,3 +67,29 @@ Delivery 3 closed the gaps the audit found: prices parse to exact decimals
 never available; every VTEX seller is its own offer, its default seller a
 `FeaturedOfferObservation`; the contract carries every price with its meaning;
 and per-dimension coverage replaced the single `complete_unit_list` flag.
+
+## Cutover runbook
+
+Each step is reversible until the last one. Nothing here deletes a fact.
+
+1. **Deploy** the code. Migrations only add tables and columns; old workers
+   keep working against them.
+2. **Identity:** `manage.py backfill_commercial_identity`, read the preview
+   (offers without a seller are listed for review), then run it with
+   `--apply`.
+3. **History:** `manage.py backfill_legacy_price_observations`, then with
+   `--apply`. Legacy prices become `legacy_unknown`, nothing more.
+4. **Projections:** `manage.py shell -c "from pricing.tasks import
+   refresh_projections; print(refresh_projections())"`, or wait for the next
+   crawl or the hourly refresh.
+5. **Shadow:** `manage.py compare_pricing_shadow --policy listed`. With no
+   promotion published, both sources must agree; every difference is read,
+   explained and fixed at its cause. `--strict` turns any difference into a
+   failure, for a gate.
+6. **Scenarios first:** `?scenario=cash` is live from step 4 without changing
+   the default ranking; check it against the stores' own pages.
+7. **Switch:** set `PRICING_READ_PROJECTIONS=true`. Rollback is setting it
+   back to false: legacy prices are still written by every crawl.
+8. **Later, once production has run on projections without regressions:**
+   stop writing `PriceObservation`, then remove `Offer.current_price` and the
+   legacy selector in their own migrations.

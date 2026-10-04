@@ -168,3 +168,28 @@ class CurrencyPrecisionTests(TestCase):
         """Chilean pesos have no cents; reais have two."""
         assert Currency.objects.get(code="CLP").minor_unit == 0
         assert Currency.objects.get(code="BRL").minor_unit == len("00")
+
+
+class FeedRobustnessTests(TestCase):
+    """Malformed entries are skipped, never guessed."""
+
+    def test_malformed_parts_are_skipped(self) -> None:
+        """No id, bad variants, bad offers and bad prices produce no rows."""
+        broken = copy.deepcopy(LISTING)
+        broken["complete"] = True
+        broken["variants"].extend(["text", {"offers": []}])
+        offers = broken["variants"][0]["offers"]
+        offers.extend(["text", {"seller": "text"}])
+        offers[1]["prices"] = [
+            {"role": "gift", "amount": "1"},
+            {"role": "payable", "amount": "zero"},
+            "text",
+        ]
+
+        spider = SyntheticMarketplaceMX()
+        (product,) = spider.process_raw_product(broken, "feed")
+
+        assert [offer.external_id for offer in product.offers] == ["v1@123", "v1@456"]
+        assert product.offers[1].price is None
+        assert not product.is_complete("offers")
+        assert spider.process_raw_product({"id": "", "url": "x"}, "feed") == []
