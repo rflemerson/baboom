@@ -90,6 +90,21 @@ class OfferFact:
     external_categories: frozenset[str] = frozenset()
     purchasable: bool = True
     access_available: bool = True
+    seller_is_owner: bool = True
+
+
+@dataclass(frozen=True)
+class RouteFact:
+    """A curated way to buy an offer, and what following it preserves."""
+
+    id: int
+    offer_id: int
+    kind: str
+    url: str
+    program_id: int | None = None
+    fixes_variant: bool = False
+    fixes_seller: bool = False
+    compatible_programs: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -329,6 +344,17 @@ class ScheduledPayment:
 
 
 @dataclass(frozen=True)
+class ChosenRoute:
+    """How to buy one line so the priced scenario holds, or why it may not."""
+
+    offer_id: int
+    route_id: int | None
+    url: str | None
+    fixes_seller: bool
+    reason: str
+
+
+@dataclass(frozen=True)
 class Decision:
     """What happened to one candidate, and why."""
 
@@ -372,6 +398,8 @@ class PricingResult:
     assumptions: tuple[str, ...]
     missing_context: tuple[str, ...]
     applied_revisions: tuple[int, ...]
+    purchase_routes: tuple[ChosenRoute, ...]
+    route_limitations: tuple[str, ...]
     input_fingerprint: str
     engine_version: str
     policy_key: str

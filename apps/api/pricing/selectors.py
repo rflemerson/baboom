@@ -48,7 +48,7 @@ def projected_prices(
                 currency_id=currency,
             )
             .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
-            .annotate(url=F("offer__url"))
+            .annotate(url=F("offer__url"), link_fixes=F("link_fixes_seller"))
             .order_by("amount", "offer_id")
         )
 

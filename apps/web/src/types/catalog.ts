@@ -45,6 +45,7 @@ export interface CatalogProduct {
   externalLink?: string | null
   paymentMethod?: string | null
   currency?: string | null
+  linkSelectsSeller?: boolean | null
   brand: {
     name: string
   }

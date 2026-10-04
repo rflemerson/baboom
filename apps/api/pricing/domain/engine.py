@@ -17,11 +17,19 @@ from typing import TYPE_CHECKING
 
 from .conditions import Amounts, ConditionInput
 from .conditions import evaluate as evaluate_conditions
-from .effects import STAGES, SUPPORTED_EFFECTS, Environment, LineState, apply_effect
+from .effects import (
+    STAGES,
+    SUPPORTED_EFFECTS,
+    Environment,
+    LineState,
+    apply_effect,
+    unsupported_limits,
+)
 from .money import ZERO, allocate, round_money
 from .types import (
     ENGINE_VERSION,
     CartLine,
+    ChosenRoute,
     Decision,
     DecisionStatus,
     DeferredReward,
@@ -44,6 +52,7 @@ if TYPE_CHECKING:
         PriceFact,
         PurchaseContext,
         RevisionRule,
+        RouteFact,
         ShippingFact,
     )
 
@@ -62,6 +71,7 @@ class Inputs:
     policy: Policy
     shipping: tuple[ShippingFact, ...] = ()
     fees: tuple[FeeFact, ...] = ()
+    routes: tuple[RouteFact, ...] = ()
 
 
 @dataclass
@@ -79,6 +89,7 @@ class _Outcome:
     shipping: Decimal | None = None
     shipping_known: bool = False
     schedule_rates: tuple[Decimal, ...] = ()
+    routes: dict[int, RouteFact] = field(default_factory=dict)
 
 
 def evaluate(inputs: Inputs) -> PricingResult:
@@ -245,39 +256,48 @@ def _base_price(
     )
 
 
+def _single_payment(price: PriceFact) -> bool:
+    """Tell whether a price is one payment, with no installment plan."""
+    return price.installment_count in (None, 1)
+
+
 def _unstated(price: PriceFact) -> bool:
     """Tell whether a price states no payment and no installments."""
     return price.payment_scope == "unknown" and price.installment_count is None
 
 
+def _universal(price: PriceFact) -> bool:
+    """Tell whether a price holds for any payment method, paid at once."""
+    return price.payment_scope == "any" and _single_payment(price)
+
+
 def _fits_listed(price: PriceFact, _inputs: Inputs) -> bool:
-    """Accept the store's price, payment not stated."""
-    return _unstated(price)
+    """Accept the store's price: unstated, or stated valid for any method."""
+    return _unstated(price) or _universal(price)
 
 
 def _fits_cash(price: PriceFact, inputs: Inputs) -> bool:
-    """Accept a cash price, a cash method in one payment, or unstated."""
+    """Accept a price paid at once: cash, a cash method, any method, or unstated."""
     policy = inputs.policy
-    if price.payment_scope == "cash":
+    if price.payment_scope == "cash" or _universal(price):
         return True
     if price.payment_scope == "method":
-        single = price.installment_count in (None, 1)
-        return single and price.payment_method in policy.cash_methods
+        return _single_payment(price) and price.payment_method in policy.cash_methods
     return _unstated(price) and policy.include_unknown_payment
 
 
 def _fits_payment(price: PriceFact, inputs: Inputs) -> bool:
-    """Accept the chosen method and count, or unstated in one payment."""
+    """Accept the chosen method and count, or a single payment any method takes."""
     payment = inputs.context.payment
     if payment is None:
         return False
     if price.payment_scope == "method":
         count = price.installment_count or 1
         return price.payment_method == payment.method and count == payment.installments
-    return (
-        _unstated(price)
-        and inputs.policy.include_unknown_payment
-        and payment.installments == 1
+    if payment.installments != 1:
+        return False
+    return _universal(price) or (
+        _unstated(price) and inputs.policy.include_unknown_payment
     )
 
 
@@ -363,6 +383,9 @@ def _status_refusal(
     unsupported = [e.kind for e in revision.effects if e.kind not in SUPPORTED_EFFECTS]
     if unsupported:
         return DecisionStatus.UNSUPPORTED, f"effects {unsupported} not computed"
+    limits = [problem for e in revision.effects for problem in unsupported_limits(e)]
+    if limits:
+        return DecisionStatus.UNSUPPORTED, "; ".join(limits)
     return None
 
 
@@ -569,7 +592,12 @@ def _apply(
     context = inputs.context
     lines = [line.copy() for line in start]
     outcome = _Outcome(lines=lines)
-    env = Environment(context, _targets, inputs.policy.assume_full_caps)
+    env = Environment(
+        context,
+        _targets,
+        inputs.policy.assume_full_caps,
+        inputs.routes,
+    )
     _shipping(inputs, outcome)
     initial = {line.offer.id: line.initial for line in lines}
     checkpoints: dict[str, dict[int, Decimal]] = {}
@@ -766,6 +794,7 @@ def _result(
         if total is not None and policy.net_cost_counts_money_rewards
         else None
     )
+    routes, limitations = _routes(inputs, outcome)
     return PricingResult(
         scenario=policy.scenario,
         currency=context.currency,
@@ -785,6 +814,8 @@ def _result(
         assumptions=tuple(dict.fromkeys(assumptions)),
         missing_context=tuple(dict.fromkeys(missing)),
         applied_revisions=tuple(outcome.applied),
+        purchase_routes=routes,
+        route_limitations=limitations,
         input_fingerprint=fingerprint(inputs),
         engine_version=ENGINE_VERSION,
         policy_key=policy.key,
@@ -793,6 +824,68 @@ def _result(
         expires_at=_expiry(inputs, outcome),
         optimization_status=status,
     )
+
+
+ROUTE_PREFERENCE = ("direct", "affiliate", "marketplace_listing")
+
+
+def _routes(
+    inputs: Inputs,
+    outcome: _Outcome,
+) -> tuple[tuple[ChosenRoute, ...], tuple[str, ...]]:
+    """Choose how to buy each line, and say where a link may not hold.
+
+    A route a reward required wins; otherwise the curated direct, affiliate
+    or listing route, preferring one that opens the exact variant. A line
+    with none keeps the offer's own link. A third-party seller's offer whose
+    link does not fix the seller is reported: the page may sell another's.
+    """
+    offers = {offer.id: offer for offer in inputs.offers}
+    chosen: list[ChosenRoute] = []
+    limitations: list[str] = []
+    for line in inputs.context.lines:
+        route = outcome.routes.get(line.offer_id) or _curated_route(
+            inputs, line.offer_id
+        )
+        offer = offers.get(line.offer_id)
+        fixes_seller = bool(route and route.fixes_seller) or bool(
+            offer and offer.seller_is_owner,
+        )
+        reason = (
+            "required by a reward"
+            if line.offer_id in outcome.routes
+            else ("curated route" if route else "the offer's own link")
+        )
+        chosen.append(
+            ChosenRoute(
+                offer_id=line.offer_id,
+                route_id=route.id if route else None,
+                url=route.url if route else None,
+                fixes_seller=fixes_seller,
+                reason=reason,
+            ),
+        )
+        if not fixes_seller:
+            limitations.append(
+                f"the link to offer {line.offer_id} may open another seller",
+            )
+    return tuple(chosen), tuple(limitations)
+
+
+def _curated_route(inputs: Inputs, offer_id: int) -> RouteFact | None:
+    candidates = [
+        route
+        for route in inputs.routes
+        if route.offer_id == offer_id and route.kind in ROUTE_PREFERENCE
+    ]
+    candidates.sort(
+        key=lambda route: (
+            not route.fixes_variant,
+            ROUTE_PREFERENCE.index(route.kind),
+            route.id,
+        ),
+    )
+    return candidates[0] if candidates else None
 
 
 def _fees(inputs: Inputs) -> tuple[Decimal | None, list[str]]:
@@ -890,6 +983,8 @@ def _empty(
         assumptions=tuple(assumptions),
         missing_context=tuple(dict.fromkeys(missing)),
         applied_revisions=(),
+        purchase_routes=(),
+        route_limitations=(),
         input_fingerprint=fingerprint(inputs),
         engine_version=ENGINE_VERSION,
         policy_key=policy.key,

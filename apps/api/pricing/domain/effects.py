@@ -29,6 +29,8 @@ if TYPE_CHECKING:
         OfferFact,
         PurchaseContext,
         RevisionRule,
+        RewardTermsFact,
+        RouteFact,
         SelectedPrice,
     )
 
@@ -47,6 +49,32 @@ SUPPORTED_EFFECTS = frozenset(
         "subscription",
     },
 )
+
+
+# What each handler honours. The promotion validator holds the same lists;
+# a test keeps the two equal.
+CAPPED_EFFECTS = frozenset(
+    {
+        "percentage",
+        "fixed_amount",
+        "fixed_price",
+        "shipping_discount",
+        "multibuy",
+        "tiered",
+        "subscription",
+    },
+)
+LIMITED_EFFECTS = frozenset({"fixed_amount", "multibuy"})
+
+
+def unsupported_limits(effect: EffectRule) -> list[str]:
+    """Return the limits an effect sets that its handler would not apply."""
+    problems: list[str] = []
+    if effect.cap is not None and effect.kind not in CAPPED_EFFECTS:
+        problems.append(f"{effect.kind} takes no cap")
+    if effect.max_applications is not None and effect.kind not in LIMITED_EFFECTS:
+        problems.append(f"{effect.kind} takes no application limit")
+    return problems
 
 
 @dataclass
@@ -96,6 +124,7 @@ class Outcome(Protocol):
     shipping: Decimal | None
     shipping_known: bool
     schedule_rates: tuple[Decimal, ...]
+    routes: dict[int, RouteFact]
 
 
 @dataclass(frozen=True)
@@ -105,6 +134,7 @@ class Environment:
     context: PurchaseContext
     targets: Callable[[RevisionRule, OfferFact], bool]
     assume_full_caps: bool = False
+    routes: tuple[RouteFact, ...] = ()
 
 
 @dataclass
@@ -147,7 +177,34 @@ def apply_effect(
     """Apply one effect of one revision to the outcome."""
     step = _Step(revision, effect, outcome, env)
     step.targets = [line for line in outcome.lines if env.targets(revision, line.offer)]
+    if effect.stage == "payment":
+        step.targets = _without_included_payment_discount(step)
+        if not step.targets:
+            return
     HANDLERS[effect.kind](step)
+
+
+def _without_included_payment_discount(step: _Step) -> list[LineState]:
+    """Drop lines whose price already includes a payment discount.
+
+    A line priced by Pix already carries its payment discount; a payment
+    effect reaches only the other lines, and says which it left out.
+    """
+    included = [
+        line
+        for line in step.targets
+        if "payment_discount" in line.price.already_included
+    ]
+    if included:
+        step.outcome.decisions.append(
+            Decision(
+                f"revision {step.revision.id}",
+                DecisionStatus.CONFLICT,
+                "payment discount already in the price of offers "
+                f"{sorted(line.offer.id for line in included)}; not applied to them",
+            ),
+        )
+    return [line for line in step.targets if line not in included]
 
 
 # Immediate discounts
@@ -265,7 +322,10 @@ def _multibuy(step: _Step) -> None:
         for line, count in zip(step.targets, used, strict=True):
             line.consumed += count
     basis = sum((line.current for line in step.targets), ZERO)
-    amount = round_money(sum(per_line, ZERO), step.minor)
+    amount = sum(per_line, ZERO)
+    if step.effect.cap is not None:
+        amount = min(amount, step.effect.cap)
+    amount = round_money(amount, step.minor)
     shares = allocate(amount, per_line, step.minor)
     for line, share in zip(step.targets, shares, strict=True):
         line.current -= share
@@ -401,6 +461,8 @@ def _cashback(step: _Step) -> None:
             Decision(subject, DecisionStatus.UNKNOWN, "cashback rate unknown"),
         )
         return
+    if terms.tracking_required and not _tracked(step, terms):
+        return
     if basis is None:
         step.outcome.decisions.append(
             Decision(subject, DecisionStatus.UNKNOWN, "cashback basis needs shipping"),
@@ -439,6 +501,44 @@ def _cashback(step: _Step) -> None:
             Decision(subject, DecisionStatus.UNKNOWN, "remaining cap unknown"),
         )
     step.outcome.assumptions.extend(assumptions)
+
+
+def _tracked(step: _Step, terms: RewardTermsFact) -> bool:
+    """Find, for every target line, a route that keeps the programme's tracking.
+
+    Cashback a programme credits only through its own activation link is not
+    a reward of the purchase unless the buyer is sent through that link.
+    Without such a route for every line, the reward is unknown.
+    """
+    chosen: dict[int, RouteFact] = {}
+    for line in step.targets:
+        route = next(
+            (
+                route
+                for route in step.env.routes
+                if route.offer_id == line.offer.id
+                and route.kind == "cashback_activation"
+                and (
+                    terms.program_id is None
+                    or route.program_id == terms.program_id
+                    or terms.program_id in route.compatible_programs
+                )
+            ),
+            None,
+        )
+        if route is None:
+            step.outcome.decisions.append(
+                Decision(
+                    f"revision {step.revision.id}",
+                    DecisionStatus.UNKNOWN,
+                    f"cashback needs tracking; no activation route for offer "
+                    f"{line.offer.id}",
+                ),
+            )
+            return False
+        chosen[line.offer.id] = route
+    step.outcome.routes.update(chosen)
+    return True
 
 
 def _points(step: _Step) -> None:

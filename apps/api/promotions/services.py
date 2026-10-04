@@ -26,7 +26,9 @@ from .models import (
     RewardTerms,
 )
 from .schemas import (
+    CAPPED_EFFECTS,
     EFFECT_PARAMS,
+    LIMITED_EFFECTS,
     MONETARY_EFFECTS,
     ORDERING,
     ChannelIn,
@@ -149,6 +151,7 @@ class PromotionService:
                 errors.append(f"Effect {effect}: a shipping discount targets shipping.")
             if effect.kind in MONETARY_EFFECTS and not revision.currency_id:
                 errors.append(f"Effect {effect}: a fixed value needs a currency.")
+            errors.extend(_unsupported_limits(effect))
         return errors
 
     @staticmethod
@@ -369,6 +372,20 @@ _REWARD_FIELDS = (
     "redemption_minimum",
     "cancellation_terms",
 )
+
+
+def _unsupported_limits(effect: PromotionEffect) -> list[str]:
+    """Refuse a cap, a limit or a basis the engine does not apply to this kind."""
+    errors: list[str] = []
+    if effect.cap is not None and effect.kind not in CAPPED_EFFECTS:
+        errors.append(f"Effect {effect}: this kind takes no cap.")
+    if effect.max_applications is not None and effect.kind not in LIMITED_EFFECTS:
+        errors.append(f"Effect {effect}: this kind takes no application limit.")
+    if (effect.basis == "component") != (effect.kind == "shipping_discount"):
+        errors.append(
+            f"Effect {effect}: only shipping discounts use the component basis."
+        )
+    return errors
 
 
 def _has_cycle(graph: dict[int, set[int]]) -> bool:

@@ -82,5 +82,8 @@ defineProps<{
         </a>
       </template>
     </BaseMetricCard>
+    <p v-if="product.linkSelectsSeller === false" class="app-copy-muted mt-2 text-xs">
+      The store's page may open another seller's offer.
+    </p>
   </article>
 </template>

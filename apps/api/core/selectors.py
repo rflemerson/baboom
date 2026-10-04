@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from django.conf import settings
 from django.db.models import (
+    BooleanField,
     CharField,
     DateTimeField,
     DecimalField,
@@ -55,6 +56,10 @@ def _cheapest_offer_subquery() -> QuerySet[Offer]:
             payment_method=Value(""),
             offer_id=F("pk"),
             expires_at=Value(None, output_field=DateTimeField()),
+            link_fixes=Coalesce(
+                F("seller_account__is_channel_owner"),
+                Value(value=True),
+            ),
         )
         .order_by("current_price", "pk")
     )
@@ -135,6 +140,10 @@ def _annotate_catalog_base_fields(
         price_expires_at=Subquery(
             cheapest.values("expires_at")[:1],
             output_field=DateTimeField(),
+        ),
+        link_selects_seller=Subquery(
+            cheapest.values("link_fixes")[:1],
+            output_field=BooleanField(),
         ),
         fraction=fraction,
         combo_total_active=combo_total_active,

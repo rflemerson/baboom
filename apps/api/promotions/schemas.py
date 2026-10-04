@@ -359,6 +359,22 @@ EFFECT_PARAMS: dict[str, type[_Closed]] = {
     "subscription": SubscriptionParams,
 }
 
+# Which effect kinds the engine limits by a monetary cap, and by a maximum
+# number of applications. A revision setting either on another kind is
+# refused at publication: the engine would ignore it.
+CAPPED_EFFECTS = frozenset(
+    {
+        "percentage",
+        "fixed_amount",
+        "fixed_price",
+        "shipping_discount",
+        "multibuy",
+        "tiered",
+        "subscription",
+    },
+)
+LIMITED_EFFECTS = frozenset({"fixed_amount", "multibuy"})
+
 # Effects whose amounts are money of the revision's currency.
 MONETARY_EFFECTS = frozenset({"fixed_amount", "fixed_price"})
 

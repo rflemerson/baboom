@@ -302,3 +302,22 @@ class CacheTests(TwoProductCatalog, TestCase):
         assert int(directives["max-age"]) <= five_minutes
         assert int(directives["s-maxage"]) <= five_minutes
         assert "Expires" in response
+
+
+class LinkSellerTests(TwoProductCatalog, TestCase):
+    """R06: the catalog says when a link may open another seller."""
+
+    def test_a_third_party_offer_is_flagged_in_both_sources(self) -> None:
+        """Legacy and projected rows agree on the link limitation."""
+        third = CommerceIdentityService.seller(
+            self.market,
+            SellerRef(external_id="third", name="Third"),
+        )
+        Offer.objects.filter(pk=self.offers["B"].pk).update(seller_account=third)
+        ProjectionService().refresh()
+
+        for params in ({}, {"scenario": "listed"}):
+            with self.subTest(params):
+                items = json.loads(self.client.get(URL, params).content)["items"]
+                flags = {item["name"]: item["linkSelectsSeller"] for item in items}
+                assert flags == {"A": True, "B": False}

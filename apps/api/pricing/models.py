@@ -374,6 +374,11 @@ class OfferScenarioProjection(BaseModel):
         verbose_name=_("Observation"),
     )
     explanation = models.JSONField(_("Explanation"), default=dict, blank=True)
+    link_fixes_seller = models.BooleanField(
+        _("Link opens this seller"),
+        default=True,
+        help_text=_("False when the offer's link may open another seller's offer."),
+    )
     fingerprint = models.CharField(_("Fingerprint"), max_length=64)
     computed_at = models.DateTimeField(_("Computed At"))
     expires_at = models.DateTimeField(_("Expires At"), null=True, blank=True)

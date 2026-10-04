@@ -112,6 +112,7 @@ class ProjectionService:
                 prices=tuple(p for p in facts.prices if p.offer_id == offer_id),
                 revisions=facts.revisions,
                 policy=policy_from(policy_row),
+                routes=tuple(r for r in facts.routes if r.offer_id == offer_id),
             ),
         )
         return OfferScenarioProjection(
@@ -133,6 +134,9 @@ class ProjectionService:
                 else None
             ),
             explanation=_explanation(result),
+            link_fixes_seller=all(
+                route.fixes_seller for route in result.purchase_routes
+            ),
             fingerprint=result.input_fingerprint,
             computed_at=moment,
             expires_at=result.expires_at,
@@ -168,6 +172,7 @@ def _explanation(result: PricingResult) -> dict[str, object]:
             for a in result.adjustments
         ],
         "missing": list(result.missing_context),
+        "route_limitations": list(result.route_limitations),
         "assumptions": list(result.assumptions),
         "selected": [
             {

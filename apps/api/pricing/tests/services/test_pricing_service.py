@@ -12,6 +12,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
+from commerce.models import Program
 from common.testing import raised
 from offers.models import Offer, PriceObservation, StockStatus
 from pricing.domain.types import CartLine, Claim
@@ -21,7 +22,12 @@ from pricing.models import (
     PricingQuote,
 )
 from pricing.services import PricingService, QuoteRequest, convert_for_display
-from promotions.models import PromotionScope
+from promotions.models import (
+    PromotionEffect,
+    PromotionScope,
+    PurchaseRoute,
+    RewardTerms,
+)
 from promotions.services import PromotionService
 from promotions.tests.factories import first_purchase_draft
 from scrapers.crawler.pipelines import CatalogPipeline
@@ -211,3 +217,64 @@ class LegacyAndTypedTests(TestCase):
         )
 
         assert result.merchandise_total == Decimal("99.00")
+
+
+class StoredRouteTests(TestCase):
+    """R06: routes curated in the database reach the engine and the quote."""
+
+    def test_a_curated_activation_route_enables_tracked_cashback(self) -> None:
+        """Without the route nothing; with it, the reward and the route."""
+        offer = _ingest_max_titanium()
+        revision = first_purchase_draft()
+        program = Program.objects.create(
+            name="Cashback X",
+            kind=Program.Kind.CASHBACK,
+            issuer_name="X",
+            unit="BRL",
+        )
+        PromotionScope.objects.filter(revision=revision).update(
+            kind="offer",
+            ref_id=offer.pk,
+        )
+        revision.conditions = {"root": None}
+        revision.codes.all().delete()
+        revision.effects.all().delete()
+        revision.save()
+        cashback = PromotionEffect.objects.create(
+            revision=revision,
+            position=1,
+            kind="cashback",
+            stage="reward",
+            basis="eligible_subtotal",
+            target="order",
+            allocation="once",
+        )
+        RewardTerms.objects.create(
+            effect=cashback,
+            credited_as="money",
+            rate=Decimal(10),
+            tracking_required=True,
+            program=program,
+        )
+        assert PromotionService().publish(revision, "executable").published
+        rewards = PricingPolicyRevision.objects.create(
+            key="rewards",
+            number=1,
+            scenario="listed",
+            rules={"allow_rewards": True},
+        )
+        request = QuoteRequest(lines=(CartLine(offer.pk),), policy=rewards)
+
+        without = PricingService().evaluate(request)
+        PurchaseRoute.objects.create(
+            offer=offer,
+            kind="cashback_activation",
+            program=program,
+            url="https://cashback.example/go",
+            fixes_variant=True,
+        )
+        with_route = PricingService().evaluate(request)
+
+        assert without.deferred_rewards == ()
+        assert with_route.deferred_rewards[0].amount == Decimal("9.90")
+        assert with_route.purchase_routes[0].url == "https://cashback.example/go"

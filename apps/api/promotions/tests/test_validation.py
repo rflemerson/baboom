@@ -76,6 +76,30 @@ class ValidationTests(TestCase):
         assert "a reward applies at the reward stage" in errors
         assert "targets shipping" in errors
 
+    def test_limits_the_engine_would_ignore_are_refused(self) -> None:
+        """A capped gift, a limited percentage, a component basis elsewhere."""
+        PromotionEffect.objects.filter(revision=self.revision).update(
+            max_applications=2,
+            basis="component",
+        )
+        PromotionEffect.objects.create(
+            revision=self.revision,
+            position=2,
+            kind="gift",
+            stage="order",
+            basis="current",
+            target="order",
+            allocation="once",
+            parameters={"quantity": 1},
+            cap=5,
+        )
+
+        errors = self._errors()
+
+        assert "takes no application limit" in errors
+        assert "takes no cap" in errors
+        assert "component basis" in errors
+
     def test_ordering_problems(self) -> None:
         """A malformed edge, or one naming a missing effect."""
         self.revision.ordering = [{"before": "x"}]

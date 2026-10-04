@@ -14,12 +14,13 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from commerce.models import Market
 from core.models import ProductStore
 from offers.models import Offer, OfferPriceObservation, StockStatus
-from promotions.models import PromotionRevision
+from promotions.models import PromotionRevision, PurchaseRoute
 
 from .domain.engine import Inputs, canonical, evaluate
 from .domain.types import (
@@ -33,6 +34,7 @@ from .domain.types import (
     PurchaseContext,
     RevisionRule,
     RewardTermsFact,
+    RouteFact,
     ScopeRule,
 )
 from .models import (
@@ -88,11 +90,12 @@ def freshness(revision: PricingPolicyRevision) -> timedelta:
 
 @dataclass(frozen=True)
 class Facts:
-    """Offers, prices and revisions loaded for a set of offers."""
+    """Offers, prices, revisions and purchase routes loaded for a set of offers."""
 
     offers: dict[int, OfferFact]
     prices: tuple[PriceFact, ...]
     revisions: tuple[RevisionRule, ...]
+    routes: tuple[RouteFact, ...] = ()
 
 
 class FactLoader:
@@ -110,13 +113,55 @@ class FactLoader:
             offers=offers,
             prices=self.prices(ids, freshness(policy)),
             revisions=self.revisions(),
+            routes=self.routes(ids),
         )
+
+    @staticmethod
+    def routes(ids: list[int]) -> tuple[RouteFact, ...]:
+        """Return the curated purchase routes of these offers, or of their listings."""
+        listing_of = dict(
+            Offer.objects.filter(pk__in=ids).values_list(
+                "pk",
+                "listing_variant__listing_id",
+            ),
+        )
+        rows = PurchaseRoute.objects.filter(
+            Q(offer_id__in=ids) | Q(listing_id__in=set(listing_of.values()) - {None}),
+        ).prefetch_related("compatible_programs")
+        facts: list[RouteFact] = []
+        for route in rows:
+            targets = (
+                [route.offer_id]
+                if route.offer_id is not None
+                else [
+                    pk
+                    for pk, listing in listing_of.items()
+                    if listing == route.listing_id
+                ]
+            )
+            facts.extend(
+                RouteFact(
+                    id=route.pk,
+                    offer_id=offer_id,
+                    kind=route.kind,
+                    url=route.url,
+                    program_id=route.program_id,
+                    fixes_variant=route.fixes_variant,
+                    fixes_seller=route.fixes_seller,
+                    compatible_programs=frozenset(
+                        program.pk for program in route.compatible_programs.all()
+                    ),
+                )
+                for offer_id in targets
+            )
+        return tuple(facts)
 
     @staticmethod
     def offers(ids: list[int]) -> dict[int, OfferFact]:
         """Return each offer with its market, seller and catalog product."""
         rows = Offer.objects.filter(pk__in=ids).select_related(
             "listing_variant__listing__market",
+            "seller_account",
         )
         namespaces = {
             market.namespace: market
@@ -159,6 +204,9 @@ class FactLoader:
                 purchasable=(
                     offer.delisted_at is None
                     and offer.current_stock_status in StockStatus.purchasable()
+                ),
+                seller_is_owner=bool(
+                    offer.seller_account and offer.seller_account.is_channel_owner,
                 ),
             )
         return facts
@@ -403,6 +451,7 @@ class PricingService:
             prices=facts.prices,
             revisions=facts.revisions,
             policy=policy_from(request.policy),
+            routes=facts.routes,
         )
 
     def evaluate(

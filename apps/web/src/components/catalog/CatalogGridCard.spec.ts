@@ -52,4 +52,21 @@ describe('CatalogGridCard', () => {
     expect(wrapper.text()).toContain('Total price (Pix)')
     expect(wrapper.text()).toContain('96.03')
   })
+
+  it('warns when the link may open another seller', () => {
+    const wrapper = mount(CatalogGridCard, {
+      props: {
+        product: {
+          id: 3,
+          name: 'Whey',
+          packagingDisplay: 'Refill Package',
+          linkSelectsSeller: false,
+          brand: { name: 'x' },
+          tags: [],
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain("may open another seller's offer")
+  })
 })

@@ -147,6 +147,7 @@ def _serialize_catalog_product(
         "totalActive": _decimal_to_str(product.total_active),
         "externalLink": product.external_link,
         "paymentMethod": product.payment_method or None,
+        "linkSelectsSeller": product.link_selects_seller,
         "brand": {"name": product.brand.name},
         "category": {"name": product.category.name} if product.category else None,
         "tags": [{"name": tag.name} for tag in product.tags.all()],
