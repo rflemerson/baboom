@@ -39,9 +39,18 @@ const {
   toggleSortDirection,
   variables,
 } = useCatalogFilters()
-const { active, error, loading, massUnit, pageInfo, products, refetch } = useCatalogQuery(variables)
+const { active, error, loading, massUnit, pageInfo, products, refetch, scenarioAvailable } =
+  useCatalogQuery(variables)
 const { setViewMode, viewMode } = useCatalogViewMode()
 const filtersOpen = ref(false)
+
+// Only the normal price exists where the market has no projections yet.
+const scenarioChoices = computed(() =>
+  scenarioAvailable.value
+    ? scenarioOptions
+    : scenarioOptions.filter((option) => option.value === ''),
+)
+const shownScenario = computed(() => (scenarioAvailable.value ? scenario.value : ''))
 
 const advancedFiltersActive = computed(() => {
   return Boolean(
@@ -84,8 +93,8 @@ function applyAdvancedFilters(payload: {
       <CatalogToolbar
         :advanced-filters-active="advancedFiltersActive"
         :per-page="perPage"
-        :scenario="scenario"
-        :scenario-options="scenarioOptions"
+        :scenario="shownScenario"
+        :scenario-options="scenarioChoices"
         :search="search"
         :sort-by="sortBy"
         :sort-dir="sortDir"

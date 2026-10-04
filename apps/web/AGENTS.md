@@ -84,3 +84,13 @@ cd apps/web && npm run format
 - Keep API contract changes reflected in `src/types/` and composable tests.
 - Keep frontend prek hooks in `apps/web/prek.toml`; use `npm`-backed local hooks for format, lint, type-check, and unit tests.
 - Keep Stylelint naming rules enabled; fix naming to the linter instead of disabling rules or broadening ignore files.
+
+## Price scenarios
+
+- The "Price shown" selector offers `best` only where the API answers with a
+  projected scenario. A response with `scenario.key === "current"` (a market
+  not yet switched to projections) hides "Best price" and later requests send
+  no `scenario`.
+- A card tells what the shown price needs: `couponCodes`, `paymentMethod`,
+  `cashback` (apart from `price`) and `routeInstructions`, through
+  `CatalogPriceNotes`.

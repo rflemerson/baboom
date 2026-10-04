@@ -84,4 +84,40 @@ describe('useCatalogQuery', () => {
     await vi.waitFor(() => expect(loading.value).toBe(false))
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('scenario=best')
   })
+
+  it('stops asking for a scenario once the market answers with the current price', async () => {
+    const payload = (key: string) => ({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        active: null,
+        massUnit: 'g',
+        scenario: { key, version: null },
+        pageInfo: {
+          currentPage: 1,
+          perPage: 12,
+          totalPages: 0,
+          totalCount: 0,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        },
+        items: [],
+      }),
+    })
+    const fetchMock = vi.fn().mockResolvedValue(payload('current'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { loading, refetch, scenarioAvailable } = useCatalogQuery({
+      filters: { page: 1, scenario: 'best' },
+    })
+
+    await vi.waitFor(() => expect(loading.value).toBe(false))
+    expect(scenarioAvailable.value).toBe(false)
+    await refetch()
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('scenario=best')
+    expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain('scenario')
+
+    fetchMock.mockResolvedValue(payload('normal'))
+    await refetch()
+    expect(scenarioAvailable.value).toBe(true)
+  })
 })

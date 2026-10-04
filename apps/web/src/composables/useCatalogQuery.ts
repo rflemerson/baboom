@@ -21,7 +21,7 @@ function appendOptionalParam(
   params.set(name, String(value))
 }
 
-function buildCatalogUrl(variables: CatalogProductsVariables) {
+function buildCatalogUrl(variables: CatalogProductsVariables, scenarioAvailable: boolean) {
   const filters = variables.filters ?? {}
   const params = new URLSearchParams()
 
@@ -38,7 +38,9 @@ function buildCatalogUrl(variables: CatalogProductsVariables) {
   appendOptionalParam(params, 'concentration_max', filters.concentrationMax)
   appendOptionalParam(params, 'sort_by', filters.sortBy)
   appendOptionalParam(params, 'sort_dir', filters.sortDir)
-  appendOptionalParam(params, 'scenario', filters.scenario)
+  if (scenarioAvailable) {
+    appendOptionalParam(params, 'scenario', filters.scenario)
+  }
 
   const queryString = params.toString()
   return queryString ? `${catalogApiUrl}?${queryString}` : catalogApiUrl
@@ -48,6 +50,9 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
   const result = ref<CatalogProductsResponse | null>(null)
   const loading = ref(false)
   const error = ref<Error | null>(null)
+  // A market that still reads last-crawl prices answers with the "current"
+  // scenario: there is no other price to choose, so none is asked for.
+  const scenarioAvailable = ref(true)
   let requestId = 0
 
   async function fetchCatalog() {
@@ -57,7 +62,7 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
     error.value = null
 
     try {
-      const response = await fetch(buildCatalogUrl(toValue(variables)), {
+      const response = await fetch(buildCatalogUrl(toValue(variables), scenarioAvailable.value), {
         headers: {
           Accept: 'application/json',
         },
@@ -70,6 +75,7 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
       const payload = (await response.json()) as CatalogProductsResponse
       if (currentRequestId === requestId) {
         result.value = payload
+        scenarioAvailable.value = payload.scenario?.key !== 'current'
       }
     } catch (caughtError) {
       if (currentRequestId === requestId) {
@@ -102,5 +108,6 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
     products,
     refetch: fetchCatalog,
     result,
+    scenarioAvailable,
   }
 }
