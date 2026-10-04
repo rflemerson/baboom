@@ -9,7 +9,8 @@ rules it used have changed.
 from __future__ import annotations
 
 import types
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import field as dataclass_field
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, ClassVar, Union, get_args, get_origin, get_type_hints
@@ -32,6 +33,14 @@ NAMESPACE: dict[str, object] = {
 }
 
 
+@dataclass(frozen=True)
+class ReplayCheck:
+    """What replaying a quote showed, and which result fields differ."""
+
+    status: str
+    differences: list[str] = dataclass_field(default_factory=list)
+
+
 class QuoteReplay:
     """Rebuild a quote's inputs from its snapshot and evaluate them again."""
 
@@ -50,13 +59,32 @@ class QuoteReplay:
             raise ValueError(msg)
         return evaluate(self.inputs(quote.snapshot))
 
-    def reproduces(self, quote: PricingQuote) -> bool:
-        """Say whether replaying a quote gives back the totals it kept."""
-        result = self.replay(quote)
-        return (
-            result.merchandise_total == quote.merchandise_total
-            and result.total_payable == quote.total_payable
+    def check(self, quote: PricingQuote) -> ReplayCheck:
+        """Replay a quote and compare the whole result it kept.
+
+        The input fingerprint is left out: the snapshot keeps protected
+        inputs, whose fingerprint is ``protected_fingerprint`` instead.
+        """
+        version = quote.snapshot.get("schema_version")
+        if version != 1 or quote.engine_version != domain_types.ENGINE_VERSION:
+            return ReplayCheck("other_engine")
+        try:
+            result = self.replay(quote)
+        except KeyError, TypeError, ValueError:
+            return ReplayCheck("invalid_snapshot")
+        kept = dict(quote.snapshot.get("result") or {})
+        again = engine.canonical(result)
+        if not isinstance(again, dict):  # pragma: no cover - result is a dataclass
+            return ReplayCheck("invalid_snapshot")
+        for name in ("input_fingerprint",):
+            kept.pop(name, None)
+            again.pop(name, None)
+        differences = sorted(
+            name
+            for name in kept.keys() | again.keys()
+            if kept.get(name) != again.get(name)
         )
+        return ReplayCheck("differs" if differences else "reproduced", differences)
 
     def inputs(self, snapshot: dict[str, object]) -> Inputs:
         """Rebuild the protected inputs a quote kept."""

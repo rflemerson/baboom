@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from .invalidation import Repricing
 from .models import (
     OfferScenarioProjection,
     PricingPolicyRevision,
@@ -16,6 +17,7 @@ from .models import (
     ShippingQuote,
     TaxFeeQuote,
 )
+from .policies import PolicyService
 from .replay import QuoteReplay
 
 if TYPE_CHECKING:
@@ -45,18 +47,23 @@ class PricingPolicyRevisionAdmin(admin.ModelAdmin):
 
     list_display = ("__str__", "scenario", "market", "is_default", "published_at")
     list_filter = ("scenario", "is_default")
+    readonly_fields = ("published_at",)
+    actions = ("publish",)
 
-    def save_model(
+    @admin.action(description=_("Publish and project"))
+    def publish(
         self,
         request: HttpRequest,
-        obj: PricingPolicyRevision,
-        form: object,
-        change: object,
+        queryset: QuerySet[PricingPolicyRevision],
     ) -> None:
-        """Project a published policy for every linked offer."""
-        super().save_model(request, obj, form, change)
-        if obj.published_at is not None:
-            Repricing().offers(None)
+        """Publish each draft whose rules are valid; report the others."""
+        for policy in queryset:
+            try:
+                PolicyService().publish(policy)
+            except ValidationError as error:
+                self.message_user(request, f"{policy}: {error}", messages.ERROR)
+            else:
+                self.message_user(request, f"{policy} published", messages.SUCCESS)
 
 
 class QuoteLineInline(admin.TabularInline):
@@ -81,20 +88,22 @@ class PricingQuoteAdmin(ReadOnlyAdmin):
     def replay(self, request: HttpRequest, queryset: QuerySet[PricingQuote]) -> None:
         """Evaluate each quote again from its snapshot and report what differs."""
         replay = QuoteReplay()
-        reproduced, differ, unsupported = 0, [], 0
+        counts: Counter[str] = Counter()
+        differ = []
         for quote in queryset:
-            try:
-                if replay.reproduces(quote):
-                    reproduced += 1
-                else:
-                    differ.append(str(quote.pk))
-            except ValueError:
-                unsupported += 1
+            check = replay.check(quote)
+            counts[check.status] += 1
+            if check.differences:
+                differ.append(f"{quote.pk} ({', '.join(check.differences)})")
+        differences = "; ".join(differ) or "none"
         self.message_user(
             request,
-            f"{reproduced} reproduced; differ: {', '.join(differ) or 'none'}; "
-            f"other engine version: {unsupported}",
-            messages.SUCCESS if not differ else messages.WARNING,
+            f"{counts['reproduced']} reproduced; differ: {differences}; "
+            f"other engine version: {counts['other_engine']}; "
+            f"invalid snapshot: {counts['invalid_snapshot']}",
+            messages.SUCCESS
+            if counts["reproduced"] == len(queryset)
+            else messages.WARNING,
         )
 
 

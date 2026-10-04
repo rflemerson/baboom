@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('key', models.SlugField(verbose_name='Key')),
                 ('number', models.PositiveIntegerField(verbose_name='Number')),
-                ('scenario', models.CharField(choices=[('listed', "The store's price"), ('cash', 'Paid at once'), ('payment', 'A payment method')], max_length=10, verbose_name='Scenario')),
+                ('scenario', models.CharField(choices=[('listed', "The store's price"), ('best', 'The best price paid now'), ('cash', 'Paid at once'), ('payment', 'A payment method')], max_length=10, verbose_name='Scenario')),
                 ('rules', models.JSONField(blank=True, default=dict, verbose_name='Rules')),
                 ('is_default', models.BooleanField(default=False, help_text='The scenario the public catalog ranks by when none is chosen.', verbose_name='Default ranking')),
                 ('published_at', models.DateTimeField(blank=True, null=True, verbose_name='Published At')),

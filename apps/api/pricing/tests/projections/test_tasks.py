@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 
 from common.testing import raised
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision
+from pricing.policies import PolicyService
 from pricing.tasks import refresh_projections
 from pricing.tests.projections.test_projections import TwoProductCatalog
 
@@ -67,3 +69,30 @@ class PolicyTriggerTests(TestCase):
             Exception,
         )
         raised(policy.delete, ValueError)
+
+
+class PolicyValidationTests(TestCase):
+    """A policy is checked before it is frozen."""
+
+    def test_wrong_rules_are_refused_before_publishing(self) -> None:
+        """An unknown key, a string flag and an unknown objective."""
+        policy = PricingPolicyRevision.objects.create(
+            key="broken",
+            number=1,
+            scenario="best",
+            rules={"allow_code": True, "allow_rewards": "yes", "objective": "cheap"},
+        )
+
+        error = raised(lambda: PolicyService().publish(policy), ValidationError)
+
+        text = str(error)
+        assert "unknown rule 'allow_code'" in text
+        assert "allow_rewards must be true or false" in text
+        assert "objective must be one of" in text
+        policy.refresh_from_db()
+        assert policy.published_at is None
+
+    def test_seeded_policies_are_valid(self) -> None:
+        """The seeds pass the same check."""
+        for policy in PricingPolicyRevision.objects.all():
+            policy.clean()

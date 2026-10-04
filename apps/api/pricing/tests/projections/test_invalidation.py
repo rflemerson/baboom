@@ -61,21 +61,22 @@ class InvalidationTests(TwoProductCatalog, TestCase):
         assert all(row.expires_at is None or row.expires_at > now for row in a)
 
     def test_publishing_a_policy_in_the_admin_reprices_everything(self) -> None:
-        """A new public scenario needs every projection."""
-        policy = PricingPolicyRevision(
+        """The admin publishes through the workflow, which projects it."""
+        policy = PricingPolicyRevision.objects.create(
             key="new",
             number=1,
             scenario="cash",
-            published_at=timezone.now(),
+            rules={"allow_codes": True},
         )
         admin = PricingPolicyRevisionAdmin(PricingPolicyRevision, site)
+        request = RequestFactory().post("/")
+        queryset = PricingPolicyRevision.objects.filter(pk=policy.pk)
 
-        calls = self._scheduled(
-            lambda: admin.save_model(
-                RequestFactory().post("/"), policy, None, change=False
-            ),
-        )
+        with patch.object(admin, "message_user"):
+            calls = self._scheduled(lambda: admin.publish(request, queryset))
 
+        policy.refresh_from_db()
+        assert policy.published_at is not None
         assert calls == [None]
 
     def test_a_promotion_reprices_only_the_offers_it_targets(self) -> None:

@@ -132,3 +132,27 @@ class ReplayTests(TestCase):
 
         text = message_user.call_args.args[1]
         assert text.startswith("1 reproduced; differ: none"), text
+
+    def test_a_changed_benefit_is_a_difference_even_with_equal_totals(self) -> None:
+        """Totals equal, applied revisions differ: not reproduced."""
+        quote = self._quote("PRIMEIRACOMPRA", POSTAL)
+        result = dict(quote.snapshot["result"])
+        result["applied_revisions"] = [*result["applied_revisions"], 999]
+        quote.snapshot = {**quote.snapshot, "result": result}
+
+        check = QuoteReplay().check(quote)
+
+        assert check.status == "differs"
+        assert check.differences == ["applied_revisions"]
+
+    def test_another_engine_and_a_broken_snapshot_are_told_apart(self) -> None:
+        """Neither is reported as a difference in the result."""
+        quote = self._quote("PRIMEIRACOMPRA", POSTAL)
+        other = PricingQuote(snapshot=quote.snapshot, engine_version="0.0.1")
+        broken = PricingQuote(
+            snapshot={"schema_version": 1, "inputs": {}},
+            engine_version=quote.engine_version,
+        )
+
+        assert QuoteReplay().check(other).status == "other_engine"
+        assert QuoteReplay().check(broken).status == "invalid_snapshot"

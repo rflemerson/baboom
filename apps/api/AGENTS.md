@@ -135,8 +135,12 @@ offers that a successful crawl no longer sees.
   included in prices, consulted, or not consulted, which is unknown), and
   refuses order-level terms across several checkout groups as unsupported.
   `pricing.replay.QuoteReplay` re-evaluates a kept quote from its snapshot
-  alone; the quote admin's "Replay from the snapshot" action reports which
-  quotes still reproduce.
+  alone; `check()` compares the whole canonical result and tells apart
+  "differs", "other engine version" and "invalid snapshot" (quote admin
+  action "Replay from the snapshot").
+- Policies are published only through `pricing.policies.PolicyService`
+  (admin action "Publish and project"): `PricingPolicyRevision.clean`
+  refuses unknown rule keys and wrongly typed values (`models.RULES`).
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

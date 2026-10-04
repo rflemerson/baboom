@@ -9,7 +9,9 @@ adapter results; nothing here invents a freight or tax engine.
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -19,26 +21,61 @@ from common.models import BaseModel
 
 from .domain.types import Policy
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 MONEY = {"max_digits": 19, "decimal_places": 6}
 
 
 DEFAULT_FRESHNESS_HOURS = 72
-POLICY_FIELDS = (
-    "objective",
-    "apply_benefits",
-    "accepted_semantics",
-    "accepted_evidence",
-    "cash_methods",
-    "include_unknown_payment",
-    "allow_codes",
-    "auto_public_codes",
-    "allow_private_codes",
-    "allow_rewards",
-    "allow_conditions",
-    "net_cost_counts_money_rewards",
-    "assume_full_caps",
-    "max_combinations",
-)
+OBJECTIVES = frozenset({"items_payable", "total_payable", "estimated_net_cost"})
+
+
+def _flag(value: object) -> bool:
+    return isinstance(value, bool)
+
+
+def _names(value: object) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _positive(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+RULES: dict[str, tuple[Callable[[object], bool], str]] = {
+    "objective": (lambda value: value in OBJECTIVES, f"one of {sorted(OBJECTIVES)}"),
+    "apply_benefits": (_flag, "true or false"),
+    "accepted_semantics": (_names, "a list of names"),
+    "accepted_evidence": (_names, "a list of names"),
+    "cash_methods": (_names, "a list of names"),
+    "include_unknown_payment": (_flag, "true or false"),
+    "allow_codes": (_flag, "true or false"),
+    "auto_public_codes": (_flag, "true or false"),
+    "allow_private_codes": (_flag, "true or false"),
+    "allow_rewards": (_flag, "true or false"),
+    "allow_conditions": (_names, "a list of names"),
+    "net_cost_counts_money_rewards": (_flag, "true or false"),
+    "assume_full_caps": (_flag, "true or false"),
+    "max_combinations": (_positive, "a positive integer"),
+    "freshness_hours": (_positive, "a positive integer"),
+}
+
+
+def rule_errors(rules: object) -> list[str]:
+    """Return what is wrong with a policy's rules; empty when they are valid."""
+    if not isinstance(rules, dict):
+        return ["rules must be an object"]
+    errors = [f"unknown rule {key!r}" for key in sorted(set(rules) - set(RULES))]
+    for key, value in sorted(rules.items()):
+        check = RULES.get(key)
+        if check is not None and not check[0](value):
+            errors.append(f"{key} must be {check[1]}, not {value!r}")
+    return errors
+
+
+# The rules the engine's Policy reads; freshness is read by the fact loader.
+POLICY_FIELDS = tuple(key for key in RULES if key != "freshness_hours")
 
 
 class PricingPolicyRevision(BaseModel):
@@ -65,6 +102,7 @@ class PricingPolicyRevision(BaseModel):
         max_length=10,
         choices=[
             ("listed", _("The store's price")),
+            ("best", _("The best price paid now")),
             ("cash", _("Paid at once")),
             ("payment", _("A payment method")),
         ],
@@ -94,6 +132,12 @@ class PricingPolicyRevision(BaseModel):
     def __str__(self) -> str:
         """Return key and number."""
         return f"{self.key} v{self.number}"
+
+    def clean(self) -> None:
+        """Refuse rules the engine would misread; checked before publishing."""
+        errors = rule_errors(self.rules)
+        if errors:
+            raise ValidationError({"rules": errors})
 
     def as_policy(self) -> Policy:
         """Read the typed rules the engine applies; unknown keys are ignored."""
