@@ -218,7 +218,6 @@ class FrozenTests(TestCase):
         assert draft.number == self.revision.number + 1
         assert self.revision.content_hash == old_hash
         assert draft.content_hash != old_hash
-        assert self.revision.promotion.active_revision == draft
 
     def test_the_database_refuses_raw_updates_on_postgresql(self) -> None:
         """Below the ORM, the trigger freezes the terms too."""

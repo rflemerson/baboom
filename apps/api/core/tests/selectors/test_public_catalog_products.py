@@ -26,14 +26,16 @@ from core.models import (
 )
 from core.selectors import (
     catalog_active,
-    public_catalog_products,
-    public_catalog_products_with_stats,
 )
 from core.tests.helpers import (
     CatalogAnnotatedProduct,
     _link_offer,
+    projected_catalog,
+    projected_catalog_with_stats,
+    store_seller,
 )
 from offers.models import Offer, StockStatus
+from pricing.projections import ProjectionService
 
 
 class CatalogActiveRankingTests(TestCase):
@@ -90,7 +92,7 @@ class CatalogActiveRankingTests(TestCase):
 
     def test_default_active_ranks_by_protein(self) -> None:
         """Without an explicit active the catalog uses the configured default."""
-        results = list(public_catalog_products())
+        results = list(projected_catalog())
 
         assert [product.name for product in results] == ["Whey", "Blend"]
 
@@ -101,7 +103,7 @@ class CatalogActiveRankingTests(TestCase):
         link.offer.current_price = None
         link.offer.save(update_fields=["current_price"])
 
-        row = public_catalog_products().get(pk=self.whey.pk)
+        row = projected_catalog().get(pk=self.whey.pk)
 
         assert row.price is None
         assert row.external_link is None
@@ -113,13 +115,13 @@ class CatalogActiveRankingTests(TestCase):
         link.offer.delisted_at = timezone.now()
         link.offer.save(update_fields=["delisted_at"])
 
-        assert public_catalog_products().get(pk=self.whey.pk).price is None
+        assert projected_catalog().get(pk=self.whey.pk).price is None
         assert link.offer.price_observations.count() == 1
 
     def test_requesting_another_active_changes_the_ranking(self) -> None:
         """The same expressions rank creatine without a per-active branch."""
         results = list(
-            public_catalog_products(CatalogProductsFilters(active="creatine")),
+            projected_catalog(CatalogProductsFilters(active="creatine")),
         )
 
         assert results[0].name == "Blend"
@@ -131,7 +133,7 @@ class CatalogActiveRankingTests(TestCase):
         assert catalog_active("unobtainium") is None
 
         results = list(
-            public_catalog_products(CatalogProductsFilters(active="unobtainium")),
+            projected_catalog(CatalogProductsFilters(active="unobtainium")),
         )
 
         assert all(product.price_per_active is None for product in results)
@@ -220,7 +222,7 @@ class ComboRankingTests(TestCase):
     def _price_per_gram(
         self, combo: Product, active: str = "protein"
     ) -> Decimal | None:
-        row = public_catalog_products(CatalogProductsFilters(active=active)).get(
+        row = projected_catalog(CatalogProductsFilters(active=active)).get(
             pk=combo.pk,
         )
         if row.price_per_active is None:
@@ -336,7 +338,7 @@ class ProductStatsTests(TestCase):
         """Derived metrics should be annotated for the catalog's default active."""
         product = cast(
             "CatalogAnnotatedProduct | None",
-            public_catalog_products_with_stats().first(),
+            projected_catalog_with_stats().first(),
         )
 
         assert product is not None
@@ -355,7 +357,7 @@ class ProductStatsTests(TestCase):
 
         result = cast(
             "CatalogAnnotatedProduct | None",
-            public_catalog_products_with_stats()
+            projected_catalog_with_stats()
             .filter(
                 pk=product_without_price.pk,
             )
@@ -385,7 +387,7 @@ class ProductStatsTests(TestCase):
 
         product = cast(
             "CatalogAnnotatedProduct | None",
-            public_catalog_products_with_stats().get(pk=self.product.pk),
+            projected_catalog_with_stats().get(pk=self.product.pk),
         )
 
         assert product is not None
@@ -410,6 +412,7 @@ class ProductStatsTests(TestCase):
                 proteins=Decimal(21),
             ),
         ).flavors.add(Flavor.objects.create(name="Vanilla"))
+        ProjectionService().refresh()
 
         payload = self.client.get("/api/catalog/products/").json()
         assert [row["id"] for row in payload["items"]] == [self.product.pk, vanilla.pk]
@@ -490,7 +493,7 @@ class ProductStatsTests(TestCase):
         )
 
         items = list(
-            public_catalog_products(
+            projected_catalog(
                 CatalogProductsFilters(sort_by="price", sort_dir="asc"),
             ).values_list("brand__name", "name"),
         )
@@ -533,6 +536,7 @@ class CatalogRowPriceTests(TestCase):
     def _sell(self, product: Product, flavor: str, price: str) -> None:
         """Link the captured offer of one flavor to its product."""
         offer = Offer.objects.create(
+            seller_account=store_seller("growth"),
             store_slug="growth",
             external_id=flavor,
             url=f"https://growth.example/{flavor}",
@@ -544,7 +548,7 @@ class CatalogRowPriceTests(TestCase):
 
     def _row(self, product: Product) -> CatalogAnnotatedProduct:
         """Return the catalog row of one product."""
-        return public_catalog_products().get(pk=product.pk)
+        return projected_catalog().get(pk=product.pk)
 
     def test_each_product_shows_the_price_of_its_own_flavors(self) -> None:
         """The Natural product never borrows the flavored price, nor the reverse."""
@@ -591,6 +595,7 @@ class CatalogAvailabilityTests(TestCase):
     def _sell(self, external_id: str, price: str, stock: str) -> None:
         """Link an offer with the given price and stock reading."""
         offer = Offer.objects.create(
+            seller_account=store_seller("growth"),
             store_slug="growth",
             external_id=external_id,
             url=f"https://growth.example/{external_id}",
@@ -604,7 +609,7 @@ class CatalogAvailabilityTests(TestCase):
         self._sell("unknown", "80.00", StockStatus.UNKNOWN)
         self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
 
-        row = public_catalog_products().get(pk=self.product.pk)
+        row = projected_catalog().get(pk=self.product.pk)
 
         assert row.price == Decimal("120.00")
 
@@ -613,7 +618,7 @@ class CatalogAvailabilityTests(TestCase):
         self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
         self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
 
-        row = public_catalog_products().get(pk=self.product.pk)
+        row = projected_catalog().get(pk=self.product.pk)
 
         assert row.price == Decimal("120.00")
         assert row.external_link == "https://growth.example/in-stock"
@@ -624,7 +629,7 @@ class CatalogAvailabilityTests(TestCase):
         """Publication is editorial; a missing price is not a missing product."""
         self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
 
-        row = public_catalog_products().get(pk=self.product.pk)
+        row = projected_catalog().get(pk=self.product.pk)
 
         assert row.price is None
         assert row.external_link is None

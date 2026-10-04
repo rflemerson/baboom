@@ -1,4 +1,4 @@
-"""The whole migration path on legacy data: backfills, a new crawl, projections, shadow.
+"""The whole migration path on legacy data: backfills, a new crawl, projections.
 
 The legacy state is what production had before identities: offers keyed by
 store and SKU, price history, one VTEX SKU whose default seller was a third
@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from core.models import Brand, Product, ProductStore, Store
 from offers.models import Offer, OfferPriceObservation, PriceObservation, StockStatus
+from pricing.models import OfferScenarioProjection
 from pricing.projections import ProjectionService
 from scrapers.crawler.pipelines import CatalogPipeline
 from scrapers.models import ScrapedItem, ScrapedPage
@@ -113,7 +114,7 @@ class MigrationPathTests(TestCase):
             CatalogPipeline().process_item(product, spider)
 
     def test_the_path(self) -> None:
-        """Backfills, a crawl, projections and the shadow gate, end to end."""
+        """Backfills, a crawl and projections, end to end."""
         self._run("backfill_commercial_identity", "--apply")
         self._run("backfill_legacy_price_observations", "--apply")
         self.own.refresh_from_db()
@@ -133,7 +134,11 @@ class MigrationPathTests(TestCase):
         assert self.third.current_price == Decimal("250.00")
         assert moved.current_price == Decimal("99.90")
 
-        # Projections and the shadow gate agree with legacy for linked offers.
+        # Projections price each linked offer at what the crawl read.
         ProjectionService().refresh()
-        output = self._run("compare_pricing_shadow", "--policy", "listed")
-        assert "2 equal, 0 different" in output, output
+        projected = OfferScenarioProjection.objects.filter(
+            policy__key="listed",
+            alternative="best",
+        ).select_related("offer")
+        assert {row.offer for row in projected} == {self.own, self.third}
+        assert all(row.amount == row.offer.current_price for row in projected)

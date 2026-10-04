@@ -156,7 +156,3 @@ def unsupported_settings(effect: EffectSettings) -> list[str]:
             f"{effect.allocation!r}",
         )
     return problems
-
-
-# The name both callers used before the matrix covered every setting.
-unsupported_limits = unsupported_settings

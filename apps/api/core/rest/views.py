@@ -18,7 +18,7 @@ from django.views.decorators.http import require_GET, require_POST
 from commerce.models import Currency
 from core import units
 from core.dtos import CatalogProductsFilters
-from core.selectors import catalog_active, legacy_prices, public_catalog_products
+from core.selectors import catalog_active, public_catalog_products
 from core.services import AlertSubscriptionService
 from pricing.selectors import projected_prices, public_policy
 
@@ -162,30 +162,20 @@ def _apply_catalog_cache_headers(
     response: JsonResponse,
     *,
     expires_at: datetime | None,
-    projected: bool,
 ) -> JsonResponse:
     """Tell browsers and the CDN how long this page of prices may be cached.
 
-    No cache may outlive the earliest expiry of a price on the page. Projected
-    prices follow promotions that can be suspended at any moment, so their
-    edge TTL is capped and no stale copy is served while revalidating.
+    No cache may outlive the earliest expiry of a price on the page. Prices
+    follow promotions that can be suspended at any moment, so the edge TTL is
+    capped and no stale copy is served while revalidating.
     """
     browser_ttl = max(int(settings.CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS), 0)
     edge_ttl = max(int(settings.CATALOG_PRODUCTS_EDGE_CACHE_SECONDS), 0)
-    stale = 86400
-    if projected:
-        edge_ttl = min(edge_ttl, max(int(settings.PRICING_EDGE_CACHE_SECONDS), 0))
-        stale = 0
     if expires_at is not None:
         remaining = max(int((expires_at - timezone.now()).total_seconds()), 0)
-        browser_ttl, edge_ttl, stale = (
-            min(browser_ttl, remaining),
-            min(edge_ttl, remaining),
-            0,
-        )
+        browser_ttl, edge_ttl = min(browser_ttl, remaining), min(edge_ttl, remaining)
     response["Cache-Control"] = (
-        f"public, max-age={browser_ttl}, s-maxage={edge_ttl}, "
-        f"stale-while-revalidate={stale}"
+        f"public, max-age={browser_ttl}, s-maxage={edge_ttl}, stale-while-revalidate=0"
     )
     if expires_at is not None:
         response["Expires"] = http_date(expires_at.timestamp())
@@ -213,18 +203,16 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     except ValueError:
         return HttpResponseBadRequest("Invalid catalog query parameter.")
 
-    scenario = _optional_str(request.GET.get("scenario"))
-    reads_projections = country in settings.PRICING_PROJECTION_COUNTRIES
-    policy = public_policy(scenario) if scenario or reads_projections else None
-    if scenario and policy is None:
+    policy = public_policy(_optional_str(request.GET.get("scenario")))
+    if policy is None:
         return HttpResponseBadRequest("Unknown pricing scenario.")
-    now = timezone.now()
-    price_source = (
-        projected_prices(policy, now, country=country, currency=currency)
-        if policy
-        else legacy_prices(country, currency)
+    price_source = projected_prices(
+        policy,
+        timezone.now(),
+        country=country,
+        currency=currency,
     )
-    queryset = public_catalog_products(query_filters, price_source)
+    queryset = public_catalog_products(price_source, query_filters)
     currency_row = Currency.objects.get(code=currency)
     active = catalog_active(query_filters.active)
     paginator = Paginator(queryset, per_page)
@@ -240,11 +228,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
             "active": ({"slug": active.slug, "name": active.name} if active else None),
             "massUnit": units.MASS_UNIT,
             "market": {"country": country, "currency": currency},
-            "scenario": (
-                {"key": policy.key, "version": policy.number, "source": "projection"}
-                if policy
-                else {"key": "listed", "version": None, "source": "legacy"}
-            ),
+            "scenario": {"key": policy.key, "version": policy.number},
             "pageInfo": {
                 "currentPage": page_obj.number,
                 "perPage": per_page,
@@ -262,7 +246,6 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     return _apply_catalog_cache_headers(
         response,
         expires_at=min(expiries) if expiries else None,
-        projected=policy is not None,
     )
 
 

@@ -15,7 +15,7 @@ what works, what was tested and what is still pending.
 | 3 | `ObservationBatch`, `CollectionCoverage`, `Evidence`, `OfferPriceObservation`, `AvailabilityObservation`; the scraper contract carries several prices, Decimal from parse to row; VTEX keeps every seller; coverage replaces `complete_unit_list` | Done. The audit fixtures produce typed observations; a cash price records the discount it includes; 403/429 never delist; run `backfill_legacy_price_observations` after the identity backfill |
 | 4 | `promotions` with immutable revisions, scopes, conditions, effects, reward terms, compatibility, codes, evidence and routes; `PromotionService` for admin and MCP | Done. PRIMEIRACOMPRA is registered and published through the admin JSON API (the MCP surface); a published revision is frozen in the models and by PostgreSQL triggers; a new revision leaves the old hash intact |
 | 5 | `pricing.domain`: every mechanic listed in the model, the condition tree, stages and precedence, allocation, rewards | Done. `pricing/tests/domain/test_engine.py` runs the matrix offline, including the research's full example (R$ 114.60, net R$ 109.47) |
-| 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `CurrencyConversionQuote`, `PricingQuote` | Done for single-checkout purchases. Quotes replay from their snapshot alone (`pricing.replay`), with codes and postal codes as keyed tokens; stored shipping and tax quotes reach the engine; taxes are unknown unless the market's prices include them or a source was consulted. **Pending:** no adapter writes `ShippingQuote` or `TaxFeeQuote` yet (the VTEX cart simulation is a pilot, not enabled), and order-level terms across several checkout groups are reported `unsupported` instead of evaluated per group |
+| 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `PricingQuote` | Done for single-checkout purchases. Quotes replay from their snapshot alone (`pricing.replay`), with codes and postal codes as keyed tokens; stored shipping and tax quotes reach the engine; taxes are unknown unless the market's prices include them or a source was consulted. **Pending:** no adapter writes `ShippingQuote` or `TaxFeeQuote` yet (the VTEX cart simulation is a pilot, not enabled), and order-level terms across several checkout groups are reported `unsupported` instead of evaluated per group |
 | 7 | `PricingPolicyRevision`, `OfferScenarioProjection`, invalidation, REST, Vue | Done. Projections per offer, policy and market; ranking and pagination in the database, one country and currency per request; `?scenario=cash` in the API and a "Price shown" selector in Vue; caches bounded by the earliest expiry; the link limitation of third-party sellers shown; the default stays legacy per country until listed in `PRICING_PROJECTION_COUNTRIES` |
 | 8 | Current adapters on the new contract; Amazon and Mercado Livre per authorized access; onboarding procedure; quota-aware scheduling | Done for what access allows: capabilities per adapter, provider limits, a configuration-only feed adapter proven by synthetic marketplace tests, and the onboarding procedure. Amazon and Mercado Livre wait for authorized access (see connectors) |
 | 9 | Shadow run, comparison, activation per market and policy, rollback, removal of compatibility fields | Code done: `compare_pricing_shadow` per market (amount, offer, seller, variant, link), the per-country switch and the runbook below. Activation and the removal of compatibility fields wait for a production shadow run |
@@ -70,31 +70,24 @@ and per-dimension coverage replaced the single `complete_unit_list` flag.
 
 ## Cutover runbook
 
-Each step is reversible until the last one. Nothing here deletes a fact.
+Production runs `767150b`: none of the pricing apps exist there, so there is
+no switch and no shadow period. The deploy is the cutover; rollback is the
+previous release (the new apps' tables stay, unused).
 
-1. **Deploy** the code. Migrations only add tables and columns; old workers
-   keep working against them.
+1. **Deploy** the code. Migrations create `commerce`, `promotions` and
+   `pricing`, add identity columns to `offers`, `core` and `scrapers`, seed the
+   reference data and policies, and install the freeze triggers.
 2. **Identity:** `manage.py backfill_commercial_identity`, read the preview
    (offers without a seller are listed for review), then run it with
    `--apply`.
 3. **History:** `manage.py backfill_legacy_price_observations`, then with
    `--apply`. Legacy prices become `legacy_unknown`, nothing more.
-4. **Projections:** `manage.py shell -c "from pricing.tasks import
-   refresh_projections; print(refresh_projections())"`, or wait for the next
-   crawl or the hourly refresh.
-5. **Shadow:** `manage.py compare_pricing_shadow --policy listed --country BR
-   --currency BRL`. With no
-   promotion published, both sources must agree; every difference is read,
-   explained and fixed at its cause. `--strict` turns any difference into a
-   failure, for a gate.
-6. **Scenarios first:** `?scenario=cash` is live from step 4 without changing
-   the default ranking; check it against the stores' own pages.
-7. **Switch:** add the country to `PRICING_PROJECTION_COUNTRIES` (e.g.
-   `BR`). Rollback is removing it
-   back to false: legacy prices are still written by every crawl.
-8. **Later, once production has run on projections without regressions:**
-   stop writing `PriceObservation`, then remove `Offer.current_price` and the
-   legacy selector in their own migrations.
+4. **Projections:** `manage.py rebuild_pricing_projections --apply`. Only
+   prices confirmed within a policy's freshness are priced; the first crawl
+   after the deploy prices the rest.
+5. **After the first full crawl:** delete the three one-off commands above
+   and the `Offer.current_price` / `PriceObservation` writes in their own
+   change.
 
 ## External review, 2026-10-04
 
@@ -126,44 +119,24 @@ acceptance tests beside the code it concerns:
   the currency and the seller warning). CI does not run E2E; run them
   locally with `npx playwright test`.
 
-## Local second-review migrations 0006–0011
+## Migrations
 
-| Migration | Change |
+Nothing below is applied in production, so each new app starts at `0001`:
+
+| App | Migrations |
 | --- | --- |
-| 0006 | projection link fields (seller/variant fixed, resolved URL, route) |
-| 0007 | projection comparison amount, objective, coupon/cashback flags |
-| 0008 | `TaxFeeQuote.covers_all_charges`; one fee read no longer proves the total |
-| 0009 | projection `alternative` (best, coupon, cashback, cashback+coupon); unique per offer, policy, alternative |
-| 0010 | `ShippingQuote.order_value`; a quote applies only to the order value it was read for |
-| 0011 | PostgreSQL trigger freezing published policy revisions (only `is_default` may change; delete refused) |
+| commerce | `0001_initial`, `0002_seed_reference_data` |
+| offers | `0005_commercial_identity` |
+| core | `0010_store_seller_account` |
+| scrapers | `0004_scrapedpage_listing` |
+| promotions | `0001_initial`, `0002_freeze_published_revisions` (PostgreSQL trigger) |
+| pricing | `0001_initial`, `0002_default_policies`, `0003_hourly_projection_refresh`, `0004_freeze_published_policies` (PostgreSQL trigger) |
 
-All migrations add fields without modifying historical price observations,
-quotes, commercial IDs or published promotion revisions. No production migration
-or backfill was run by this task. Existing projection rows have no comparison
-amount or alternative after 0007/0009 and require rebuilding before enabling projection reads.
+Verified on 2026-10-04 against a local restore of the production dump:
+`migrate`, both backfills and `rebuild_pricing_projections --apply` (644
+linked offers, 1288 projections, 523 products in the catalog).
 
-Preview the disposable rebuild with:
-
-```sh
-python manage.py migrate --plan
-python manage.py rebuild_pricing_projections
-```
-
-After reviewing the preview, in an authorized environment:
-
-```sh
-python manage.py migrate
-python manage.py rebuild_pricing_projections --apply
-```
-
-The rebuild is repeatable. It locks offer rows, preserves projections computed
-at a later requested moment and never changes price history or published rules.
-The preview reports scope only, not identity reconciliation ambiguities; no
-identity reconciliation is performed by this command.
-
-For rollback, turn off projection cutover and stop consumers requesting the new
-policies, restore the previous application release, and reverse the
-pricing migrations to 0005 if needed (0011 drops its trigger on reverse). New disposable projection fields are lost;
-historical quotes/observations remain. New engine 1.1.0 snapshots require schema
-version 1 and that exact engine version for replay. Old engine snapshots must
-be replayed with their original engine, not silently upgraded.
+`rebuild_pricing_projections` is repeatable. It locks offer rows, preserves
+projections computed at a later requested moment and never changes price
+history or published rules. Engine 1.1.0 snapshots require schema version 1
+and that exact engine version for replay.

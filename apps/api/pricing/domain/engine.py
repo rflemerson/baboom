@@ -17,8 +17,8 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from pricing_contracts.conditions import leaves
-from pricing_contracts.effects import REWARD_EFFECTS
+from promotions.rules.conditions import leaves
+from promotions.rules.effects import REWARD_EFFECTS
 
 from .base_prices import select_prices
 from .conditions import Amounts, ConditionInput
@@ -675,12 +675,6 @@ def _objective_amount(inputs: Inputs, outcome: _Outcome) -> Decimal:
         return total - _money_rewards(outcome)
     msg = f"Unknown comparison objective: {inputs.policy.objective}"
     raise ValueError(msg)
-
-
-def _comparable_total(outcome: _Outcome) -> Decimal:
-    """Return what a combination costs now: merchandise, and shipping if known."""
-    merchandise = sum((line.current for line in outcome.lines), ZERO)
-    return merchandise + (outcome.shipping or ZERO)
 
 
 # Result

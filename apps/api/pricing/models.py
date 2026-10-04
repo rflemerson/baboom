@@ -330,55 +330,6 @@ class TaxFeeQuote(BaseModel):
         return f"{self.kind} {self.currency_id} {self.amount}"
 
 
-class CurrencyConversionQuote(BaseModel):
-    """A rate to display one currency in another; it never changes a charge."""
-
-    base = models.ForeignKey(
-        "commerce.Currency",
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("From"),
-    )
-    quote = models.ForeignKey(
-        "commerce.Currency",
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("To"),
-    )
-    rate = models.DecimalField(_("Rate"), max_digits=24, decimal_places=10)
-    spread = models.DecimalField(
-        _("Spread"),
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True,
-        help_text=_("Empty when unknown; unknown is not zero."),
-    )
-    source = models.CharField(_("Source"), max_length=100)
-    observed_at = models.DateTimeField(_("Observed At"))
-    valid_until = models.DateTimeField(_("Valid Until"))
-
-    class Meta:
-        """Meta options."""
-
-        verbose_name = _("Currency Conversion Quote")
-        verbose_name_plural = _("Currency Conversion Quotes")
-        ordering = ("-observed_at",)
-        constraints = (
-            models.CheckConstraint(
-                condition=Q(rate__gt=0), name="conversion_rate_positive"
-            ),
-            models.CheckConstraint(
-                condition=~Q(base=models.F("quote")),
-                name="conversion_between_two_currencies",
-            ),
-        )
-
-    def __str__(self) -> str:
-        """Return the pair and rate."""
-        return f"{self.base_id}/{self.quote_id} {self.rate}"
-
-
 class OfferScenarioProjection(BaseModel):
     """An offer's amount under one public policy, read by the ranking.
 

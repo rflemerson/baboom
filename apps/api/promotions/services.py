@@ -17,8 +17,6 @@ from django.db import transaction
 from django.utils import timezone
 from pydantic import ValidationError as SchemaError
 
-from pricing_contracts.effects import REWARD_EFFECTS, unsupported_settings
-
 from .models import (
     ActivationCode,
     CompatibilityRule,
@@ -27,6 +25,7 @@ from .models import (
     PromotionScope,
     RewardTerms,
 )
+from .rules.effects import REWARD_EFFECTS, unsupported_settings
 from .schemas import (
     EFFECT_PARAMS,
     MONETARY_EFFECTS,

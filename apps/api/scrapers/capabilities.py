@@ -37,5 +37,4 @@ PROVIDER_LIMITS: dict[str, dict[str, float | int]] = {
     "vtex": {"CONCURRENT_REQUESTS_PER_DOMAIN": 2, "DOWNLOAD_DELAY": 0.5},
     "wapstore": {"CONCURRENT_REQUESTS_PER_DOMAIN": 2, "DOWNLOAD_DELAY": 0.5},
     "nuvemshop": {"CONCURRENT_REQUESTS_PER_DOMAIN": 1, "DOWNLOAD_DELAY": 1.0},
-    "feed": {"CONCURRENT_REQUESTS_PER_DOMAIN": 1, "DOWNLOAD_DELAY": 0.0},
 }

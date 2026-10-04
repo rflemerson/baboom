@@ -15,10 +15,9 @@ from django.utils import timezone
 from commerce.models import Program
 from common.testing import raised
 from offers.models import Offer, PriceObservation, StockStatus
-from pricing.costs import load_costs
+from pricing.costs import CostBook
 from pricing.domain.types import CartLine, Claim
 from pricing.models import (
-    CurrencyConversionQuote,
     PricingPolicyRevision,
     PricingQuote,
     ShippingQuote,
@@ -27,7 +26,6 @@ from pricing.models import (
 from pricing.services import (
     PricingService,
     QuoteRequest,
-    convert_for_display,
     group_fingerprint,
 )
 from promotions.models import (
@@ -185,29 +183,6 @@ class QuoteTests(TestCase):
 
         raised(quote.save, ValueError)
         assert PricingQuote.objects.get().engine_version != "changed"
-
-
-class ConversionTests(TestCase):
-    """A display conversion never changes what is charged."""
-
-    def test_converts_with_a_valid_rate_only(self) -> None:
-        """No valid rate, no converted amount; an unknown spread is reported."""
-        now = timezone.now()
-        assert convert_for_display(Decimal(100), "BRL", "USD", now) is None
-        CurrencyConversionQuote.objects.create(
-            base_id="BRL",
-            quote_id="USD",
-            rate=Decimal("0.18"),
-            source="test",
-            observed_at=now - timedelta(hours=1),
-            valid_until=now + timedelta(hours=1),
-        )
-
-        shown = convert_for_display(Decimal(100), "BRL", "USD", now)
-
-        assert shown is not None
-        assert shown.amount == Decimal("18.00")
-        assert not shown.spread_known
 
 
 class LegacyAndTypedTests(TestCase):
@@ -372,7 +347,10 @@ class FeeStatusTests(TestCase):
         return TaxFeeQuote.objects.create(**{**base, **values})
 
     def _status(self, tax_inclusion: str) -> tuple[str, Decimal]:
-        _shipping, fees, status = load_costs(["g"], timezone.now(), tax_inclusion)
+        _shipping, fees, status = CostBook.load(["g"], timezone.now()).for_groups(
+            ["g"],
+            tax_inclusion,
+        )
         return status, sum((fee.amount or 0 for fee in fees), Decimal(0))
 
     def test_each_state(self) -> None:

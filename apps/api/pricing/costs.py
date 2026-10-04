@@ -64,15 +64,6 @@ class CostBook:
         )
 
 
-def load_costs(
-    group_keys: list[str],
-    now: datetime,
-    tax_inclusion: str = "unknown",
-) -> tuple[tuple[ShippingFact, ...], tuple[FeeFact, ...], str]:
-    """Return the current shipping and fees of these groups, and what is known."""
-    return CostBook.load(group_keys, now).for_groups(group_keys, tax_inclusion)
-
-
 def _current_costs(
     group_keys: list[str],
     now: datetime,

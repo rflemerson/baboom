@@ -110,11 +110,9 @@ offers that a successful crawl no longer sees.
 - Ranking reads `OfferScenarioProjection` rows (one per linked offer and
   published public policy) through `pricing.selectors.projected_prices`, passed
   to `core.selectors.public_catalog_products` as its price source; expiry is
-  checked at read time. `?scenario=<policy key>` always reads projections;
-  the default ranking reads them only for countries in
-  `PRICING_PROJECTION_COUNTRIES`; every request ranks one market
-  (`?country=`, `?currency=`, default BR/BRL)
-  (the cutover switch), and legacy current prices otherwise. A finished crawl
+  checked at read time. `?scenario=<policy key>` picks the policy (default:
+  the `is_default` one); every request ranks one market (`?country=`,
+  `?currency=`, default BR/BRL). There is no legacy price path. A finished crawl
   (`offers.signals.offers_observed`) and a promotion change
   (`promotions.signals.revision_changed`) enqueue `refresh_projections`
   after commit; an hourly beat entry refreshes everything.
@@ -171,15 +169,16 @@ offers that a successful crawl no longer sees.
 
 - Load/translate facts in `pricing/facts.py`, cost versions in `pricing/costs.py`,
   and shared quote/projection inputs in `pricing/context.py`.
-- Keep shared limit capabilities and normalized condition traversal in pure
-  `pricing_contracts`; promotions must not import pricing services.
+- What a promotion may declare (`EFFECT_SPECS`, condition traversal) lives in
+  pure `promotions.rules`; it is the only app module `pricing/domain` may
+  import, and it imports nothing. Promotions never import pricing.
 - Scraper price restrictions are closed/validated and survive observation
   persistence. Non-unit amounts/restricted contexts remain explicit limitations.
 - Projections persist the selected route URL/ID and comparison objective;
   `core` price sources provide both `amount` and `comparison_amount`, plus
   `pricing_details`. Keep displayed checkout amounts separate from ranking.
-- Migrations 0006–0007 need a disposable projection rebuild. Preview with
-  `rebuild_pricing_projections`, write only with `--apply` in an authorized
-  environment. Never treat this as a production backfill authorization.
+- Unreleased migrations are squashed: new apps start at `0001`. Rebuild
+  projections with `rebuild_pricing_projections` (preview) and `--apply` only
+  in an authorized environment.
 - See `docs/pricing-audit.md` for outstanding second-review requirements. These
   are internal work, not missing connector credentials.

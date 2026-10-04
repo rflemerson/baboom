@@ -8,7 +8,7 @@ from decimal import Decimal
 from http import HTTPStatus
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from commerce.models import Currency, Market
@@ -165,27 +165,14 @@ class RankingTests(TwoProductCatalog, TestCase):
 
         assert {item["name"]: item["price"] for item in items}["B"] is None
 
-    def test_legacy_ranking_stays_until_the_cutover(self) -> None:
-        """Without a scenario and with the switch off, legacy prices rank."""
-        ProjectionService().refresh()
-
-        payload = self._page()
-
-        assert payload["scenario"]["source"] == "legacy"
-
-    @override_settings(PRICING_PROJECTION_COUNTRIES=["BR"])
-    def test_the_cutover_switch_reads_the_default_policy(self) -> None:
-        """With the switch on, the default ranking reads projections."""
+    def test_the_default_ranking_reads_the_default_policy(self) -> None:
+        """Without a scenario, the default policy's projections rank."""
         self._promote_b("30")
         ProjectionService().refresh()
 
         payload = self._page()
 
-        assert payload["scenario"] == {
-            "key": "listed",
-            "version": 1,
-            "source": "projection",
-        }
+        assert payload["scenario"] == {"key": "listed", "version": 1}
         assert payload["items"][0]["name"] == "B"
 
     def test_an_unknown_scenario_is_refused(self) -> None:
@@ -275,12 +262,6 @@ class MarketIsolationTests(MexicanMarket, TestCase):
 
 class CacheTests(TwoProductCatalog, TestCase):
     """R13: no cache outlives the earliest expiry of a price it shows."""
-
-    def test_legacy_prices_keep_the_long_cache(self) -> None:
-        """Nothing expires; the configured TTLs apply."""
-        response = self.client.get(URL)
-
-        assert "stale-while-revalidate=86400" in response["Cache-Control"]
 
     def test_projected_prices_cap_the_edge_and_serve_nothing_stale(self) -> None:
         """Promotions can be suspended at any time."""

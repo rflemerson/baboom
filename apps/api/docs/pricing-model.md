@@ -237,11 +237,10 @@ Tables:
 | `QuoteLine` | `quote`, `offer`, `quantity`, merchandise and allocated amounts | Queryable per offer without parsing snapshots |
 | `ShippingQuote` | group fingerprint, seller account, destination (country, subdivision, postal code hash), modality, packages (typed), amount, currency, estimate, source, `observed_at`, `expires_at`, included benefits | Quantity, seller, value and modality are part of the quote, not just offer + postcode range |
 | `TaxFeeQuote` | group fingerprint, component kind, base, amount, inclusion, source | Taxes already in a price are never added again |
-| `CurrencyConversionQuote` | pair, rate, source, `observed_at`, `valid_until`, spread and fee (unknown allowed) | Conversion for display never changes what the seller charges |
 | `OfferScenarioProjection` | `offer`, `market`, `policy_revision`, `currency`, `amount`, `status`, `observation`, `fingerprint`, `computed_at`, `expires_at` | Ranked and paginated in the database, before pagination |
 | `FeaturedOfferObservation` | `listing_variant`, `offer`, `observed_at`, `batch` | A buy box is an observation |
 
-`ShippingQuote`, `TaxFeeQuote` and `CurrencyConversionQuote` are observations
+`ShippingQuote` and `TaxFeeQuote` are observations
 or adapter results; the project does not build a world tax calculator.
 
 ## Engine (`pricing.domain`)
@@ -306,14 +305,13 @@ fixtures, labelled as such.
 
 `pricing.facts` owns ORM fact loading and translation; `pricing.costs` resolves
 current shipping alternatives and charge versions; `pricing.context` assembles
-inputs shared by quotes and projections. `PricingService` remains the public
-facade. `domain/base_prices.py` and `domain/scopes.py` isolate base selection and
+inputs shared by quotes and projections. `PricingService` evaluates contextual quotes. `domain/base_prices.py` and `domain/scopes.py` isolate base selection and
 qualification/benefit reach from engine orchestration.
 
-`pricing_contracts` is a pure package below promotions and pricing. Its
-`EffectSpec` registry is the single source of cap/application-limit support and
-their publication/runtime validation. It is currently a limit registry, not a
-complete matrix of target, basis, stage and parameter combinations. Condition
+`promotions.rules` is a pure module below promotion publication and the
+engine. Its `EffectSpec` registry states, per effect kind, the stages,
+targets, bases, allocations, cap and application limit its handler applies;
+publication refuses anything else and the engine marks it unsupported. Condition
 leaf traversal is shared for normalized documents; Pydantic schema validation
 still walks its typed representation separately.
 

@@ -50,11 +50,6 @@ CANONICAL: dict[Dimension, str] = {
 DIMENSIONLESS: frozenset[str] = frozenset({"-", "IU", "%"})
 
 
-def is_convertible(unit: str) -> bool:
-    """Return whether a unit maps onto a dimension the catalog can convert."""
-    return unit in UNITS
-
-
 def convert(value: Decimal, from_unit: str, to_unit: str) -> Decimal | None:
     """Convert between two units of the same dimension.
 
@@ -75,8 +70,3 @@ def to_canonical(value: Decimal, unit: str) -> Decimal | None:
     if spec is None:
         return None
     return convert(value, unit, CANONICAL[spec.dimension])
-
-
-def unit_choices() -> list[tuple[str, str]]:
-    """Return the selectable units, convertible ones first."""
-    return [(unit, unit) for unit in (*UNITS, *sorted(DIMENSIONLESS))]

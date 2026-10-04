@@ -15,7 +15,6 @@ from django.db.models import (
     F,
     FloatField,
     IntegerField,
-    JSONField,
     OuterRef,
     Q,
     QuerySet,
@@ -25,63 +24,13 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, Coalesce, NullIf
 
-from commerce.models import Market
-from offers.models import Offer, StockStatus
-
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
 # A price source returns, for the outer product, its priced offers cheapest
 # first, each with ``amount``, ``url`` and ``payment_method``. The catalog does
-# not know where prices come from: legacy current prices, or a pricing policy.
+# not know which pricing policy produced them.
 PriceSource = Callable[[], QuerySet]
-
-
-def _cheapest_offer_subquery() -> QuerySet[Offer]:
-    """Return the offers a buyer can take now for the outer product, cheapest first.
-
-    Every offer linked to a product sells a flavor its one table prints, so
-    they compete: the product shows the best current price among those listed
-    and in stock. A product with none keeps its row, without a price. The
-    ordering is stable so the price and the link come from the same offer.
-    """
-    return (
-        Offer.objects.filter(
-            product_store__product=OuterRef("pk"),
-            current_price__isnull=False,
-            delisted_at__isnull=True,
-            current_stock_status__in=StockStatus.purchasable(),
-        )
-        .annotate(
-            amount=F("current_price"),
-            comparison_amount=F("current_price"),
-            pricing_details=Value({}, output_field=JSONField()),
-            payment_method=Value(""),
-            offer_id=F("pk"),
-            expires_at=Value(None, output_field=DateTimeField()),
-            link_fixes=Coalesce(
-                F("seller_account__is_channel_owner"),
-                Value(value=True),
-            ),
-        )
-        .order_by("current_price", "pk")
-    )
-
-
-def legacy_prices(country: str, currency: str) -> PriceSource:
-    """Return legacy current prices, limited to stores of one market.
-
-    A store whose market is known in another country or currency never
-    competes; a store with no market yet is the catalog's original market.
-    """
-    foreign = Market.objects.exclude(country=country, currency_id=currency).values(
-        "namespace",
-    )
-
-    def source() -> QuerySet:
-        return _cheapest_offer_subquery().exclude(store_slug__in=foreign)
-
-    return source
 
 
 def catalog_active(slug: str | None = None) -> Active | None:
@@ -93,10 +42,10 @@ def catalog_active(slug: str | None = None) -> Active | None:
 def _annotate_catalog_base_fields(
     queryset: QuerySet[Product],
     active: Active | None,
-    price_source: PriceSource | None = None,
+    price_source: PriceSource,
 ) -> QuerySet[Product]:
     """Annotate catalog fields loaded directly from subqueries."""
-    cheapest = (price_source or _cheapest_offer_subquery)()
+    cheapest = price_source()
 
     fraction = (
         Value(None, output_field=DecimalField(max_digits=12, decimal_places=8))
@@ -190,8 +139,8 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
 
 
 def public_catalog_products_with_stats(
+    price_source: PriceSource,
     active_slug: str | None = None,
-    price_source: PriceSource | None = None,
 ) -> QuerySet[Product]:
     """Return public catalog products annotated with catalog-facing metrics.
 
@@ -314,17 +263,14 @@ def _apply_catalog_sorting(
 
 
 def public_catalog_products(
+    price_source: PriceSource,
     filters: CatalogProductsFilters | None = None,
-    price_source: PriceSource | None = None,
 ) -> QuerySet[Product]:
-    """Return the public catalog queryset with filters and sorting applied.
-
-    Without a price source, a product is priced by its legacy current prices.
-    """
+    """Return the public catalog queryset with filters and sorting applied."""
     resolved_filters = filters or CatalogProductsFilters()
     queryset = public_catalog_products_with_stats(
-        resolved_filters.active,
         price_source,
+        resolved_filters.active,
     ).filter(is_published=True)
     queryset = _apply_catalog_search(queryset, resolved_filters)
     queryset = _apply_catalog_brand_filter(queryset, resolved_filters)

@@ -65,7 +65,7 @@ describe('useCatalogQuery', () => {
       json: vi.fn().mockResolvedValue({
         active: null,
         massUnit: 'g',
-        scenario: { key: 'cash', version: 1, source: 'projection' },
+        scenario: { key: 'cash', version: 1 },
         pageInfo: {
           currentPage: 1,
           perPage: 12,

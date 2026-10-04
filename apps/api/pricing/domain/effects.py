@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 
-from pricing_contracts.effects import SUPPORTED_EFFECTS, unsupported_settings
+from promotions.rules.effects import SUPPORTED_EFFECTS, unsupported_settings
 
 from .money import ZERO, allocate, percent_of, round_money
 from .types import (

@@ -19,11 +19,10 @@ from django.utils import timezone
 
 from commerce.models import Market
 from offers.models import OfferPriceObservation
-from pricing_contracts.conditions import leaves
 from promotions.models import PromotionRevision
+from promotions.rules.conditions import leaves
 
 from .context import Terms, assemble_inputs
-from .costs import load_costs
 from .domain.conditions import (
     DESTINATION_FACT,
     ConditionInput,
@@ -35,14 +34,11 @@ from .domain.types import (
     CartLine,
     Claim,
     Destination,
-    FeeFact,
     PricingResult,
     PurchaseContext,
-    ShippingFact,
     Tri,
 )
 from .models import (
-    CurrencyConversionQuote,
     PricingPolicyRevision,
     PricingQuote,
     QuoteLine,
@@ -150,7 +146,7 @@ class PricingService:
                 allocated_discount=discounts.get(line.offer_id, Decimal(0)),
             )
             for line in result.lines
-            if line.offer_id in inputs_offers(inputs)
+            if line.offer_id in {offer.id for offer in inputs.offers}
         )
         return quote
 
@@ -176,20 +172,6 @@ def group_fingerprint(
         )
     text = ";".join(parts) + "@" + place
     return hashlib.sha256(text.encode()).hexdigest()
-
-
-def quoted_costs(
-    group_keys: list[str],
-    now: datetime,
-) -> tuple[tuple[ShippingFact, ...], tuple[FeeFact, ...]]:
-    """Resolve replacements before comparing simultaneously executable quotes."""
-    shipping, fees, _status = load_costs(group_keys, now)
-    return shipping, fees
-
-
-def inputs_offers(inputs: Inputs) -> set[int]:
-    """Return the ids of the offers an evaluation was given."""
-    return {offer.id for offer in inputs.offers}
 
 
 def _discounts_by_offer(result: PricingResult) -> dict[int, Decimal]:
@@ -304,38 +286,3 @@ class DisplayAmount:
     rate_id: int
     rate: Decimal
     spread_known: bool
-
-
-def convert_for_display(
-    amount: Decimal,
-    source: str,
-    target: str,
-    now: datetime,
-) -> DisplayAmount | None:
-    """Convert an amount for display with a valid rate, or return None.
-
-    The seller still charges ``amount`` in ``source``. Without a rate valid at
-    ``now`` there is no converted amount; a spread or fee left unknown stays
-    unknown and is reported, not assumed zero.
-    """
-    if source == target:
-        return None
-    rate = (
-        CurrencyConversionQuote.objects.filter(
-            base_id=source,
-            quote_id=target,
-            observed_at__lte=now,
-            valid_until__gt=now,
-        )
-        .order_by("-observed_at")
-        .first()
-    )
-    if rate is None:
-        return None
-    return DisplayAmount(
-        amount=amount * rate.rate,
-        currency=target,
-        rate_id=rate.pk,
-        rate=rate.rate,
-        spread_known=rate.spread is not None,
-    )

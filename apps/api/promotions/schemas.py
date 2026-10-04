@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
-from pricing_contracts.effects import CAPPED_EFFECTS, LIMITED_EFFECTS
+from .rules.effects import CAPPED_EFFECTS, LIMITED_EFFECTS
 
 MAX_DEPTH = 5
 MAX_NODES = 50

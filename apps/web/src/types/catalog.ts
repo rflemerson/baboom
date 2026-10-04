@@ -65,7 +65,6 @@ export interface CatalogActive {
 export interface CatalogScenario {
   key: string
   version: number | null
-  source: 'legacy' | 'projection'
 }
 
 export interface CatalogMarket {

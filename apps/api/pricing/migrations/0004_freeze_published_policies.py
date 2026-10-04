@@ -61,6 +61,6 @@ def _remove(apps, schema_editor):
 class Migration(migrations.Migration):
     """Install the policy freeze trigger."""
 
-    dependencies = (("pricing", "0010_shipping_order_value"),)
+    dependencies = (("pricing", "0003_hourly_projection_refresh"),)
 
     operations = (migrations.RunPython(_install, _remove),)

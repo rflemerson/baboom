@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from common.testing import raised
 from offers.models import Evidence, Offer
+from pricing.costs import CostBook
 from pricing.domain.engine import evaluate
 from pricing.domain.types import (
     CartLine,
@@ -26,7 +27,7 @@ from pricing.models import (
     TaxFeeQuote,
 )
 from pricing.projections import ProjectionService
-from pricing.services import FactLoader, PricingService, QuoteRequest, quoted_costs
+from pricing.services import FactLoader, PricingService, QuoteRequest
 from pricing.tests.domain.builders import (
     NOW,
     context,
@@ -154,12 +155,12 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
             **common, amount=5, observed_at=NOW - timedelta(minutes=1)
         )
         TaxFeeQuote.objects.create(**common, amount=7, observed_at=NOW)
-        _shipping, fees = quoted_costs(["synthetic-group"], NOW)
+        _shipping, fees, _status = _costs()
         assert sum(fee.amount for fee in fees) == Decimal(7)
         TaxFeeQuote.objects.create(
             **common, amount=5, observed_at=NOW, charge_key="second"
         )
-        _shipping, fees = quoted_costs(["synthetic-group"], NOW)
+        _shipping, fees, _status = _costs()
         assert sum(fee.amount for fee in fees) == Decimal(12)
 
     def test_shipping_replacements_and_executable_quotes(self) -> None:
@@ -179,12 +180,12 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
             observed_at=NOW - timedelta(minutes=1),
         )
         ShippingQuote.objects.create(**common, amount=20, observed_at=NOW)
-        shipping, _fees = quoted_costs(["synthetic-group"], NOW)
+        shipping, _fees, _status = _costs()
         assert shipping[0].amount == Decimal(20)
         older.external_quote_id = "guaranteed-synthetic-quote"
         older.execution_guaranteed = True
         older.save()
-        shipping, _fees = quoted_costs(["synthetic-group"], NOW)
+        shipping, _fees, _status = _costs()
         assert shipping[0].amount == Decimal(12)
 
     def test_adapter_restrictions_reach_observations_and_engine(self) -> None:
@@ -415,3 +416,11 @@ class CouponScenarioTests(TwoProductCatalog, TestCase):
         assert OfferScenarioProjection.objects.get(
             policy=policy_row, offer=self.offers["B"], alternative="coupon"
         ).comparison_amount == Decimal(90)
+
+
+def _costs() -> tuple[tuple[object, ...], tuple[object, ...], str]:
+    """Read the synthetic group's current costs."""
+    return CostBook.load(["synthetic-group"], NOW).for_groups(
+        ["synthetic-group"],
+        "unknown",
+    )

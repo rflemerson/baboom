@@ -88,20 +88,6 @@ class Promotion(BaseModel):
         """Return the title."""
         return self.title
 
-    @property
-    def active_revision(self) -> PromotionRevision | None:
-        """Return the latest revision in force: executable or informative."""
-        return (
-            self.revisions.filter(
-                status__in=(
-                    PromotionRevision.Status.EXECUTABLE,
-                    PromotionRevision.Status.INFORMATIVE,
-                ),
-            )
-            .order_by("-number")
-            .first()
-        )
-
 
 class PromotionRevision(BaseModel):
     """One version of a promotion's terms.
@@ -329,11 +315,6 @@ class ActivationCode(RevisionOwned):
         if self.kind == self.Kind.PERSONAL_CODE:
             return str(self.get_kind_display())
         return f"{self.get_kind_display()} {self.code}".strip()
-
-    @property
-    def is_private(self) -> bool:
-        """Personal codes never reach public projections."""
-        return self.kind == self.Kind.PERSONAL_CODE
 
     def owning_revision(self) -> PromotionRevision:
         """Return the revision."""

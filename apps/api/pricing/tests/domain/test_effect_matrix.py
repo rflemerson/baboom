@@ -19,8 +19,8 @@ from pricing.tests.domain.builders import (
     price,
     revision,
 )
-from pricing_contracts.effects import EFFECT_SPECS, unsupported_settings
 from promotions import schemas
+from promotions.rules.effects import EFFECT_SPECS, unsupported_settings
 
 
 class MatrixTests(SimpleTestCase):

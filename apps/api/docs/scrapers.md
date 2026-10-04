@@ -49,15 +49,6 @@ no spider fetches or stores product-page HTML.
 - A product page that cannot be read marks the crawl incomplete and falls back
   to the listing's single unit, so its price does not freeze.
 
-## VTEX GraphQL
-
-- Used by stores configured with `VtexGraphqlSpider`.
-- Endpoint: `/_v/segment/graphql/v1`
-- Uses persisted queries through `extensions`.
-- Variables are JSON-encoded, Base64-encoded, then embedded in `extensions`.
-- Pagination uses `from` and `to`.
-- Product list: `data.products.products`.
-
 ## VTEX Legacy
 
 - Used by Black Skull, Max Titanium, and Probiotica.
@@ -71,13 +62,5 @@ no spider fetches or stores product-page HTML.
 - `commertialOffer.Installments` gives one total per payment system and count;
   the payment group maps to a method (`instantPaymentPaymentGroup` is Pix), and
   an unknown group keeps its name with no method.
-
-## Feed
-
-- `FeedSpider` reads a paged JSON feed (`{"listings": [...], "next": url}`);
-  the format is documented in `scrapers/normalizers/feed.py`.
-- A store or marketplace on a feed is configuration: slug, name, feed URL and
-  market. Offers are `<variant>@<seller>`; the store's own offers
-  `<variant>@owner`.
 
 All scraper rows should be skipped when URL or price cannot be parsed.

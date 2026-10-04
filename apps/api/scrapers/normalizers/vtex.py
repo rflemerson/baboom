@@ -1,4 +1,4 @@
-"""VTEX product payload normalization shared by Search and GraphQL spiders."""
+"""VTEX catalog search payload normalization."""
 
 from __future__ import annotations
 
@@ -67,10 +67,6 @@ class VtexNormalizer:
         rewards="none",
         selectable_route="variant",
     )
-
-    def __init__(self, *, context_platform: str = "vtex_legacy") -> None:
-        """Keep the source-context envelope used by the calling VTEX API."""
-        self.context_platform = context_platform
 
     def normalize(
         self,
@@ -268,26 +264,17 @@ class VtexNormalizer:
         return options
 
     def _build_product_context(self, item: dict) -> str:
-        """Build the source context envelope for either VTEX API."""
-        if self.context_platform == "vtex_graphql":
-            product = {
-                "productId": item.get("productId"),
-                "productName": item.get("productName"),
-                "brand": item.get("brand"),
-                "linkText": item.get("linkText"),
-                "clusterHighlights": item.get("clusterHighlights") or {},
-            }
-        else:
-            product = {
-                "productId": item.get("productId"),
-                "productName": item.get("productName"),
-                "brand": item.get("brand"),
-                "linkText": item.get("linkText"),
-                "categories": item.get("categories") or [],
-                "categoryId": item.get("categoryId"),
-            }
+        """Build the source context envelope of a search product."""
+        product = {
+            "productId": item.get("productId"),
+            "productName": item.get("productName"),
+            "brand": item.get("brand"),
+            "linkText": item.get("linkText"),
+            "categories": item.get("categories") or [],
+            "categoryId": item.get("categoryId"),
+        }
         payload = {
-            "platform": self.context_platform,
+            "platform": "vtex_legacy",
             "product": product,
             "items": item.get("items") or [],
         }

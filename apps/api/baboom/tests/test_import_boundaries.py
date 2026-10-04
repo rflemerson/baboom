@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _imports(package: str) -> dict[str, set[str]]:
-    """Return the top-level packages each module of a package imports."""
+    """Return the absolute modules each module of a package imports."""
     found: dict[str, set[str]] = {}
     for path in (ROOT / package).rglob("*.py"):
         if "migrations" in path.parts or "tests" in path.parts:
@@ -20,9 +20,9 @@ def _imports(package: str) -> dict[str, set[str]]:
         names: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                names.update(alias.name.split(".")[0] for alias in node.names)
+                names.update(alias.name for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-                names.add(node.module.split(".")[0])
+                names.add(node.module)
         found[str(path.relative_to(ROOT))] = names
     return found
 
@@ -32,11 +32,23 @@ def _violations(
     forbidden: set[str],
     allowed_paths: tuple[str, ...] = (),
 ) -> list[str]:
-    return [
-        f"{module} imports {sorted(names & forbidden)}"
-        for module, names in _imports(package).items()
-        if names & forbidden and not module.startswith(allowed_paths)
-    ]
+    """List imports of forbidden top-level packages, except pure promotion rules."""
+    found = []
+    for module, names in _imports(package).items():
+        if module.startswith(allowed_paths):
+            continue
+        bad = sorted(
+            name
+            for name in names
+            if name.split(".")[0] in forbidden and not name.startswith(RULES)
+        )
+        if bad:
+            found.append(f"{module} imports {bad}")
+    return found
+
+
+# The one module of an app any layer may import: it imports nothing back.
+RULES = "promotions.rules"
 
 
 APPS = {
@@ -47,7 +59,6 @@ APPS = {
     "promotions",
     "pricing",
     "scrapers",
-    "pricing_contracts",
 }
 
 
@@ -77,14 +88,14 @@ class ImportBoundaryTests(SimpleTestCase):
         assert _violations("promotions", {"pricing", "scrapers"}) == []
 
     def test_the_pricing_engine_imports_no_framework_or_app(self) -> None:
-        """The engine is pure: no Django, no database, no app."""
-        forbidden = {"django", "pydantic", *(APPS - {"pricing_contracts"})}
+        """The engine is pure: no Django, no database, no app but promotion rules."""
+        forbidden = {"django", "pydantic", *APPS}
         assert _violations("pricing/domain", forbidden) == []
 
-    def test_shared_contracts_import_no_framework_or_domain_app(self) -> None:
-        """Keep shared metadata below both promotion publication and pricing."""
-        forbidden = {"django", "pydantic", *(APPS - {"pricing_contracts"})}
-        assert _violations("pricing_contracts", forbidden) == []
+    def test_promotion_rules_import_nothing(self) -> None:
+        """Rules stay pure, so the engine may read them; any import breaks that."""
+        forbidden = {"django", "pydantic", *APPS}
+        assert _violations("promotions/rules", forbidden) == []
 
     def test_normalizers_never_import_django_models(self) -> None:
         """A normalizer is payload in, DTO out."""

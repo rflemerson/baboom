@@ -10,6 +10,7 @@ from django.test import TestCase, override_settings
 
 from core.models import Brand, NutritionFacts, Product, ProductNutrition, Store
 from core.tests.helpers import _link_offer
+from pricing.projections import ProjectionService
 
 
 class PublicEndpointSecurityTests(TestCase):
@@ -22,7 +23,7 @@ class PublicEndpointSecurityTests(TestCase):
 
         assert response.status_code == HTTPStatus.OK
         assert "public" in response["Cache-Control"]
-        assert "s-maxage=21600" in response["Cache-Control"]
+        assert "s-maxage=600" in response["Cache-Control"]
         assert payload["pageInfo"]["totalCount"] == 0
 
     def test_healthz_without_api_key(self) -> None:
@@ -72,6 +73,7 @@ class PublicCatalogPayloadTests(TestCase):
             product_link="https://blackskull.example/whey?skuId=1014",
             price=119.90,
         )
+        ProjectionService().refresh()
 
         (item,) = json.loads(self.client.get("/api/catalog/products/").content)["items"]
 

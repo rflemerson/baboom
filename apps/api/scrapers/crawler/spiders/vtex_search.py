@@ -31,7 +31,7 @@ class VtexSearchSpider(CatalogSpider):
     STORE_SLUG = ""
     BASE_URL = ""
     API_TREE = ""
-    normalizer = VtexNormalizer(context_platform="vtex_legacy")
+    normalizer = VtexNormalizer()
     FALLBACK_CATEGORIES: tuple[str, ...] = ()
 
     def category_discovery_request(self) -> Request:

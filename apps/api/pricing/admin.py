@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from django.contrib import admin
 
 from .models import (
-    CurrencyConversionQuote,
     OfferScenarioProjection,
     PricingPolicyRevision,
     PricingQuote,
@@ -83,10 +82,3 @@ class TaxFeeQuoteAdmin(ReadOnlyAdmin):
     """Quoted taxes and fees."""
 
     list_display = ("__str__", "inclusion", "observed_at")
-
-
-@admin.register(CurrencyConversionQuote)
-class CurrencyConversionQuoteAdmin(admin.ModelAdmin):
-    """Display rates; a curator may record one with its source."""
-
-    list_display = ("__str__", "source", "observed_at", "valid_until")

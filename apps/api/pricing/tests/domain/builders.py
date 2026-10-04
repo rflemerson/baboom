@@ -18,7 +18,7 @@ from pricing.domain.types import (
     RevisionRule,
     ScopeRule,
 )
-from pricing_contracts.effects import EFFECT_SPECS
+from promotions.rules.effects import EFFECT_SPECS
 
 NOW = datetime(2026, 10, 3, 15, 0, tzinfo=UTC)
 MARKET = 1
