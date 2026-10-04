@@ -21,6 +21,8 @@ from .types import (
 
 if TYPE_CHECKING:
     from .application import Outcome
+    from .types import RevisionRule
+from .candidates import static_refusal
 from .charges import fee_total
 from .inputs import Inputs, fingerprint
 from .routes import chosen_routes
@@ -90,7 +92,7 @@ def build_result(
         policy_key=policy.key,
         policy_version=policy.version,
         evaluated_at=context.now,
-        expires_at=_expiry(inputs, outcome),
+        expires_at=_expiry(inputs, selected, outcome),
         optimization_status=status,
     )
 
@@ -120,39 +122,55 @@ def _schedule(
     ]
 
 
-def _expiry(inputs: Inputs, outcome: Outcome) -> datetime | None:
+def _expiry(
+    inputs: Inputs,
+    selected: list[SelectedPrice],
+    outcome: Outcome,
+) -> datetime | None:
+    """Return when this alternative stops holding: only what it used counts."""
+    context = inputs.context
+    chosen = {price.observation_id for price in selected}
     moments = [
-        revision.ends_at
-        for revision in inputs.revisions
-        if revision.id in outcome.applied and revision.ends_at is not None
-    ]
-    moments += [
         price.fresh_until
         for price in inputs.prices
-        if price.fresh_until is not None and price.fresh_until > inputs.context.now
+        if price.id in chosen and price.fresh_until is not None
     ]
+    moments += outcome.quote_expiries
+    if inputs.fees_status in {"included_in_prices", "consulted"}:
+        moments += [fee.expires_at for fee in inputs.fees if fee.expires_at is not None]
     for revision in inputs.revisions:
-        if revision.starts_at is not None and revision.starts_at > inputs.context.now:
+        if revision.id in outcome.applied:
+            if revision.ends_at is not None:
+                moments.append(revision.ends_at)
+        elif (
+            not inputs.policy.apply_benefits
+            or (revision.ends_at is not None and revision.ends_at <= context.now)
+            or static_refusal(revision, inputs, outcome.lines) is not None
+        ):
+            continue
+        elif revision.starts_at is not None and revision.starts_at > context.now:
             moments.append(revision.starts_at)
-        for leaf in leaves(revision.conditions.get("root")):
-            if leaf.get("kind") != "calendar":
-                continue
-            local = inputs.context.now.astimezone(ZoneInfo(revision.timezone))
-            for offset in (0, 1):
-                day = local.date() + timedelta(days=offset)
-                for boundary in ("00:00", leaf.get("start_time"), leaf.get("end_time")):
-                    if boundary:
-                        moment = datetime.combine(
-                            day, time.fromisoformat(str(boundary)), local.tzinfo
-                        )
-                        if moment > inputs.context.now:
-                            moments.append(moment)
-    moments += [
-        fact.expires_at
-        for fact in (*inputs.shipping, *inputs.fees)
-        if fact.expires_at is not None
-    ]
+        moments += _calendar_boundaries(revision, context.now)
     return min(moments) if moments else None
+
+
+def _calendar_boundaries(revision: RevisionRule, now: datetime) -> list[datetime]:
+    """Return the next moments a revision's calendar conditions change."""
+    boundaries: list[datetime] = []
+    for leaf in leaves(revision.conditions.get("root")):
+        if leaf.get("kind") != "calendar":
+            continue
+        local = now.astimezone(ZoneInfo(revision.timezone))
+        for offset in (0, 1):
+            day = local.date() + timedelta(days=offset)
+            for boundary in ("00:00", leaf.get("start_time"), leaf.get("end_time")):
+                if boundary:
+                    moment = datetime.combine(
+                        day, time.fromisoformat(str(boundary)), local.tzinfo
+                    )
+                    if moment > now:
+                        boundaries.append(moment)
+    return boundaries
 
 
 def _unique(decisions: list[Decision]) -> list[Decision]:

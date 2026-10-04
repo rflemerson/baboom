@@ -160,11 +160,25 @@ class RankingTests(TwoProductCatalog, TestCase):
         assert first["name"] == "B"
         assert first["externalLink"] == "https://store.example/B"
 
-    def test_an_expired_promotion_leaves_the_ranking_at_read_time(self) -> None:
-        """Expiry is checked when reading, even if a refresh is late."""
-        self._promote_b("30", ends_at=timezone.now() + timedelta(minutes=5))
-        ProjectionService().refresh()
-        later = timezone.now() + timedelta(minutes=10)
+    def test_an_expired_promotion_falls_back_to_the_base_price(self) -> None:
+        """B read after its promotion ended costs R$ 120, with no new refresh."""
+        moment = timezone.now()
+        self._promote_b("30", ends_at=moment + timedelta(minutes=1))
+        ProjectionService().refresh(now=moment)
+        later = moment + timedelta(minutes=2)
+
+        with patch("core.rest.views.timezone.now", return_value=later):
+            items = self._page(scenario="best")["items"]
+
+        prices = {item["name"]: Decimal(item["price"]) for item in items}
+        assert prices["B"] == Decimal("120.00")
+        assert prices["A"] == Decimal("100.00")
+
+    def test_a_price_past_its_freshness_still_leaves_the_ranking(self) -> None:
+        """Without a valid alternative the offer has no price."""
+        moment = timezone.now()
+        ProjectionService().refresh(now=moment)
+        later = moment + timedelta(hours=73)
 
         with patch("core.rest.views.timezone.now", return_value=later):
             items = self._page(scenario="best")["items"]

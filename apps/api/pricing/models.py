@@ -28,6 +28,10 @@ MONEY = {"max_digits": 19, "decimal_places": 6}
 
 
 DEFAULT_FRESHNESS_HOURS = 72
+# Stored alternatives that are not an exact set of benefits: the winner, and
+# the store's price with no promotion at all.
+BEST = "best"
+BASE = "base"
 OBJECTIVES = frozenset({"items_payable", "total_payable", "estimated_net_cost"})
 
 
@@ -470,9 +474,10 @@ class OfferScenarioProjection(BaseModel):
         max_length=40,
         default="best",
         help_text=_(
-            "'best' is the winning combination; 'coupon', 'cashback' and "
-            "'cashback+coupon' are the best combinations using those benefits, "
-            "kept so a filter never hides a valid option.",
+            "'best' is the winning combination; 'none', 'coupon', 'cashback' and "
+            "'cashback+coupon' are the best combinations using exactly those "
+            "benefits; 'base' is the price with no promotion. All are kept so "
+            "a filter or an expired promotion never hides a valid option.",
         ),
     )
     comparison_amount = models.DecimalField(null=True, blank=True, **MONEY)

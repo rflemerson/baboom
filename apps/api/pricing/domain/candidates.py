@@ -47,7 +47,7 @@ def candidate_revisions(
                 Decision(subject, DecisionStatus.INELIGIBLE, "scenario applies none"),
             )
             continue
-        reason = _static_refusal(revision, inputs, lines)
+        reason = static_refusal(revision, inputs, lines)
         if reason is not None:
             status, text = reason
             decisions.append(Decision(subject, status, text))
@@ -79,7 +79,7 @@ def candidate_revisions(
     return kept
 
 
-def _static_refusal(
+def static_refusal(
     revision: RevisionRule,
     inputs: Inputs,
     lines: list[LineState],

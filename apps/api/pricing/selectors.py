@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from django.db.models import F, OuterRef, Q, Value
+from django.db.models import Case, F, OuterRef, Q, Value, When
 from django.db.models.functions import Coalesce, NullIf
 
-from .models import OfferScenarioProjection, PricingPolicyRevision
+from .models import BASE, BEST, OfferScenarioProjection, PricingPolicyRevision
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -36,10 +36,11 @@ class BenefitFilter:
 
         Projections keep the best price per exact set of benefits, so
         requiring or excluding one reads the same offer's best price with
-        what remains allowed; the cheapest fitting alternative then wins.
+        what remains allowed; the cheapest fitting alternative that is still
+        valid wins. Without a filter every alternative fits.
         """
         if self.uses_coupon is None and self.has_cashback is None:
-            return {"alternative": "best"}
+            return {}
         names = []
         for coupon in _choices(wanted=self.uses_coupon):
             for cashback in _choices(wanted=self.has_cashback):
@@ -47,6 +48,8 @@ class BenefitFilter:
                     n for n, on in (("cashback", cashback), ("coupon", coupon)) if on
                 ]
                 names.append("+".join(used) or "none")
+        if self.uses_coupon is not True and self.has_cashback is not True:
+            names.append(BASE)
         return {"alternative__in": names}
 
 
@@ -92,7 +95,11 @@ def projected_prices(
                 link_fixes=F("link_fixes_seller"),
                 pricing_details=F("explanation"),
             )
-            .order_by("comparison_amount", "offer_id")
+            .order_by(
+                "comparison_amount",
+                "offer_id",
+                Case(When(alternative=BEST, then=0), default=1),
+            )
         )
 
     return source

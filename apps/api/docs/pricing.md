@@ -89,10 +89,15 @@ subquery, before selecting a product's best linked offer and paginating. Use
 calculated winner for that policy; they are not claims that every campaign is
 applicable.
 
-The implementation still stores one winning projection per offer/policy. It
-DOES NOT yet preserve all relevant benefit alternatives within a policy. A
-coupon-only filter can therefore miss a losing coupon combination of the same
-offer. This limitation must be closed before claiming the complete alternative
-query contract requested by the second review. Delivered and net objectives
-also require contextual cost quotes; unavailable quotes produce no comparison
-amount, not a fallback to the default ranking.
+Each offer keeps, per policy, the winner (`best`), the best price for every
+exact set of coupon and cashback (`none`, `coupon`, `cashback`,
+`cashback+coupon`) and `base`, the price with no promotion at all (stored only
+when `none` applied one). A filter reads the cheapest stored alternative that
+fits it and has not expired; without a filter every alternative fits, so a
+winner whose promotion ended falls back to a valid alternative at read time
+without waiting for the worker. A result's `expires_at` depends only on what
+its own alternative used: the chosen base prices, the end of the applied
+revisions, the shipping and fee quotes counted, and the start of a revision the
+alternative could still use (never, when the policy applies no benefits).
+Delivered and net objectives also require contextual cost quotes; unavailable
+quotes produce no comparison amount, not a fallback to the default ranking.

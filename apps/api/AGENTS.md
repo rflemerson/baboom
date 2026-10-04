@@ -110,7 +110,10 @@ offers that a successful crawl no longer sees.
 - Ranking reads `OfferScenarioProjection` rows (one per linked offer and
   published public policy) through `pricing.selectors.projected_prices`, passed
   to `core.selectors.public_catalog_products` as its price source; expiry is
-  checked at read time. `?scenario=<policy key>` picks the policy (default:
+  checked at read time. Each offer keeps the winner (`best`), the best price per
+  exact set of coupon and cashback, and `base` (no promotion); the default read
+  takes the cheapest still valid, so an ended promotion falls back to a price
+  without waiting for the worker. `?scenario=<policy key>` picks the policy (default:
   the `is_default` one); every request ranks one market (`?country=`,
   `?currency=`, default BR/BRL). Until `PRICING_PROJECTION_COUNTRIES` names a market (temporary
   launch switch), its catalog reads `core.selectors.current_prices` instead.

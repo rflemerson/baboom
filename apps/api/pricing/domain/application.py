@@ -25,6 +25,7 @@ from .types import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from datetime import datetime
 
     from .inputs import Inputs
     from .types import (
@@ -49,6 +50,7 @@ class Outcome:
     shipping: Decimal | None = None
     shipping_known: bool = False
     schedule_rates: tuple[Decimal, ...] = ()
+    quote_expiries: list[datetime] = field(default_factory=list)
     routes: dict[int, RouteFact] = field(default_factory=dict)
     tracking_programs: dict[int, set[int]] = field(default_factory=dict)
 
@@ -180,6 +182,7 @@ def _shipping(inputs: Inputs, outcome: Outcome) -> None:
         context.minor_unit,
     )
     amounts = []
+    expiries = []
     for key in keys:
         quotes = [
             quote
@@ -202,9 +205,14 @@ def _shipping(inputs: Inputs, outcome: Outcome) -> None:
                 else f"shipping quote for group {key}",
             )
             outcome.shipping, outcome.shipping_known = None, False
+            outcome.quote_expiries = []
             return
-        amounts.append(min(quote.amount for quote in holding))
+        cheapest = min(holding, key=lambda quote: quote.amount)
+        amounts.append(cheapest.amount)
+        if cheapest.expires_at is not None:
+            expiries.append(cheapest.expires_at)
     outcome.shipping, outcome.shipping_known = sum(amounts, ZERO), True
+    outcome.quote_expiries = expiries
 
 
 def unapplied_decisions(

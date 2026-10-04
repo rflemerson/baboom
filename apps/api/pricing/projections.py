@@ -8,7 +8,7 @@ loaded once per refresh, not per offer.
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -24,7 +24,7 @@ from .domain.engine import evaluate
 from .domain.types import CartLine, PurchaseContext
 from .facts import LEGACY_PRICE_ID, FactLoader, Facts
 from .groups import group_fingerprint, one_group
-from .models import OfferScenarioProjection, PricingPolicyRevision
+from .models import BASE, BEST, OfferScenarioProjection, PricingPolicyRevision
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -54,24 +54,28 @@ class _Batch:
     costs: CostBook
     codes: frozenset[str]
 
-    def signatures(self) -> list[frozenset[str] | None]:
-        """Return the winner, then each exact set of benefits the policy allows.
+    def alternatives(self) -> list[str]:
+        """Name the winner, each exact set of coupon and cashback, and the base.
 
         Every subset is kept, the empty one included, so a filter that
         requires or excludes a benefit finds the same offer's best price
-        with exactly the benefits it allows.
+        with exactly the benefits it allows. ``base`` is the store's price
+        with no promotion at all: the price a read falls back to when the
+        winner's promotion ended before the worker repriced the offer.
         """
         if not self.policy.apply_benefits:
-            return [None]
+            return [BEST]
         names = []
         if self.codes:
             names.append("coupon")
         if self.policy.allow_rewards:
             names.append("cashback")
-        subsets: list[frozenset[str] | None] = [None]
-        for size in range(len(names) + 1):
-            subsets += [frozenset(c) for c in itertools.combinations(names, size)]
-        return subsets
+        subsets = [
+            _alternative(frozenset(chosen))
+            for size in range(len(names) + 1)
+            for chosen in itertools.combinations(names, size)
+        ]
+        return [BEST, *subsets, BASE]
 
 
 class ProjectionService:
@@ -170,29 +174,42 @@ class ProjectionService:
     def _projections(
         self, offer_id: int, batch: _Batch
     ) -> list[OfferScenarioProjection]:
-        """Project the winner and the best price with each exact set of benefits.
+        """Project the winner, each exact set of benefits and the base price.
 
-        An alternative that cannot be met is not stored.
+        An alternative that cannot be met is not stored; neither is a base
+        price equal to the ``none`` alternative, which applied no promotion.
         """
-        rows = []
-        for benefits in batch.signatures():
-            row = self._projection(offer_id, batch, benefits)
-            if (
-                benefits is not None
-                and row.status != OfferScenarioProjection.Status.PRICED
-            ):
+        rows: list[OfferScenarioProjection] = []
+        for alternative in batch.alternatives():
+            row = self._projection(offer_id, batch, alternative)
+            if alternative != BEST and row.status != row.Status.PRICED:
+                continue
+            if alternative == BASE and not self._promoted(rows):
                 continue
             rows.append(row)
         return rows
+
+    @staticmethod
+    def _promoted(rows: list[OfferScenarioProjection]) -> bool:
+        """Tell whether the ``none`` alternative applied a promotion."""
+        return any(
+            row.alternative == "none" and (row.explanation or {}).get("applied")
+            for row in rows
+        )
 
     def _projection(
         self,
         offer_id: int,
         batch: _Batch,
-        benefits: frozenset[str] | None,
+        alternative: str,
     ) -> OfferScenarioProjection:
         """Evaluate one offer alone and describe the result for the ranking."""
-        facts, policy = batch.facts, batch.policy
+        facts = batch.facts
+        policy = (
+            replace(batch.policy, apply_benefits=False)
+            if alternative == BASE
+            else batch.policy
+        )
         offer = facts.offers[offer_id]
         market = batch.markets[offer.market_id]
         context = PurchaseContext(
@@ -207,14 +224,14 @@ class ProjectionService:
         terms = Terms(
             costs=batch.costs,
             tax_inclusion=market.tax_inclusion,
-            benefits=benefits,
+            benefits=_benefits(alternative),
         )
-        result = evaluate(terms.inputs(facts, batch.policy, context))
+        result = evaluate(terms.inputs(facts, policy, context))
         applied = [r for r in facts.revisions if r.id in result.applied_revisions]
         route = result.purchase_routes[0] if result.purchase_routes else None
         return OfferScenarioProjection(
             offer_id=offer_id,
-            alternative=_alternative(benefits),
+            alternative=alternative,
             policy=batch.policy_row,
             market=market,
             currency_id=market.currency_id,
@@ -360,8 +377,15 @@ class ProjectionService:
         }
 
 
-def _alternative(benefits: frozenset[str] | None) -> str:
-    """Name a stored alternative: "best", "none", or its benefits joined."""
-    if benefits is None:
-        return "best"
+def _alternative(benefits: frozenset[str]) -> str:
+    """Name an exact set of benefits: "none", or its names joined."""
     return "+".join(sorted(benefits)) or "none"
+
+
+def _benefits(alternative: str) -> frozenset[str] | None:
+    """Return the exact benefits a stored alternative asks the engine for."""
+    if alternative == BEST:
+        return None
+    if alternative in {"none", BASE}:
+        return frozenset()
+    return frozenset(alternative.split("+"))
