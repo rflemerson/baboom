@@ -98,3 +98,47 @@ Still pending, not invented:
   its regulation link redirects to the regulations index. Max Titanium's tiers
   (4%, 5%, 8%) appear only on a third-party coupon site.
 - **Fixed-amount coupon with a minimum or cap** on an official page.
+
+## Local second-review evidence and remaining scope
+
+Synthetic acceptance coverage is in `pricing/tests/test_second_review.py`:
+adapter restrictions through persistence and engine, selected route through
+REST, tracking compatibility across two programs, fee replacement/independent
+charges, shipping replacement/guaranteed old quotes, shipping expiry, fixed
+per-line application limit, public coupon ranking before pagination, and
+explicit net versus payable optimization.
+
+The following requested work remains internal and must not be described as
+blocked by external access: complete effect/parameter capability audit; retained
+benefit alternatives within each policy; campaign/public-applicability/potential
+benefit distinctions; full dependency invalidation for all price, stock, costs,
+policy and catalog-attribute writes; value-dependent shipping fingerprints;
+policy PostgreSQL immutability protection; dedicated PostgreSQL concurrent
+refresh and legacy migration tests; promotion prefiltering and pair-construction
+work budgets; proportional query/scale measurements; precision of every public
+currency (the existing catalog cast remains two decimal places). The API's
+projected HTTP TTL remains bounded by result expiry with no stale revalidation.
+Route edits invalidate projections immediately and schedule recomputation after
+commit, including program compatibility edits.
+
+No Amazon/Mercado Livre integration, deployment, production backfill or ranking
+activation was performed. The synthetic fixtures make no claim about real store
+benefits or production capacity. CI has not been run by this local task.
+
+Final local verification of the implemented diff:
+
+- Full SQLite suite: 583 tests, passed, one PostgreSQL-only test skipped.
+- Full isolated PostgreSQL 18 suite: 583 tests, passed, no skips.
+- Updated import boundaries: seven tests passed separately after adding the
+  shared-contract package purity check.
+- `makemigrations --check --dry-run`: no model/migration drift.
+- Workspace `prek run --all-files`: passed, including Vue formatting, lint,
+  type checking and unit tests. New untracked Python modules were also checked
+  explicitly with `prek run --files` and all API hooks passed.
+- No CI, frontend browser E2E, dedicated concurrency stress test or production
+  measurement was executed. The PostgreSQL test container was created only for
+  this task and removed after verification; existing local services were left
+  untouched.
+
+These passing checks validate the implemented diff. They do not establish that
+all outstanding acceptance requirements above have been completed.

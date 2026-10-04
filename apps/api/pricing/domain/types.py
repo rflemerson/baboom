@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
 
-ENGINE_VERSION = "1.0.0"
+ENGINE_VERSION = "1.1.0"
 
 
 class Tri(StrEnum):
@@ -105,6 +105,7 @@ class RouteFact:
     fixes_variant: bool = False
     fixes_seller: bool = False
     compatible_programs: frozenset[int] = frozenset()
+    instructions: str = ""
 
 
 @dataclass(frozen=True)
@@ -118,6 +119,14 @@ class ShippingFact:
     estimate_days: int | None = None
     included_benefits: tuple[str, ...] = ()
 
+    id: int | None = None
+    source: str = ""
+    observed_at: datetime | None = None
+    expires_at: datetime | None = None
+    # The order value the carrier priced, when shipping depends on it; the
+    # quote holds only for a cart of exactly that value.
+    order_value: Decimal | None = None
+
 
 @dataclass(frozen=True)
 class FeeFact:
@@ -129,8 +138,12 @@ class FeeFact:
     currency: str
     included_in_price: bool = False
 
+    # Rules
 
-# Rules
+    id: int | None = None
+    source: str = ""
+    observed_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -216,11 +229,13 @@ class Policy:
     key: str
     version: int
     scenario: str
+    objective: str = "items_payable"
     accepted_semantics: frozenset[str] = frozenset({"known", "legacy_unknown"})
     accepted_evidence: frozenset[str] = frozenset({"observed_in_catalog"})
     cash_methods: frozenset[str] = frozenset({"pix", "boleto"})
     include_unknown_payment: bool = True
     allow_codes: bool = False
+    auto_public_codes: bool = False
     allow_private_codes: bool = False
     allow_rewards: bool = False
     allow_conditions: frozenset[str] = frozenset({"min_amount", "min_quantity"})
@@ -352,6 +367,8 @@ class ChosenRoute:
     url: str | None
     fixes_seller: bool
     reason: str
+    fixes_variant: bool = False
+    instructions: str = ""
 
 
 @dataclass(frozen=True)

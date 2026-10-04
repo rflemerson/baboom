@@ -39,7 +39,16 @@ def _violations(
     ]
 
 
-APPS = {"common", "commerce", "offers", "core", "promotions", "pricing", "scrapers"}
+APPS = {
+    "common",
+    "commerce",
+    "offers",
+    "core",
+    "promotions",
+    "pricing",
+    "scrapers",
+    "pricing_contracts",
+}
 
 
 class ImportBoundaryTests(SimpleTestCase):
@@ -69,8 +78,13 @@ class ImportBoundaryTests(SimpleTestCase):
 
     def test_the_pricing_engine_imports_no_framework_or_app(self) -> None:
         """The engine is pure: no Django, no database, no app."""
-        forbidden = {"django", "pydantic", *APPS}
+        forbidden = {"django", "pydantic", *(APPS - {"pricing_contracts"})}
         assert _violations("pricing/domain", forbidden) == []
+
+    def test_shared_contracts_import_no_framework_or_domain_app(self) -> None:
+        """Keep shared metadata below both promotion publication and pricing."""
+        forbidden = {"django", "pydantic", *(APPS - {"pricing_contracts"})}
+        assert _violations("pricing_contracts", forbidden) == []
 
     def test_normalizers_never_import_django_models(self) -> None:
         """A normalizer is payload in, DTO out."""

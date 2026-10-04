@@ -11,6 +11,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from commerce.models import Currency, Market
 from commerce.services import CommerceIdentityService, MarketRef, SellerRef
 from core.models import Brand, Product, ProductStore, Store
 from offers.models import Evidence, Offer, StockStatus
@@ -201,11 +202,11 @@ class RankingTests(TwoProductCatalog, TestCase):
         ):
             self._promote_b("10")
 
-        delay.assert_called_with(None)
+        delay.assert_called_with(offer_ids=None)
 
 
-class MarketIsolationTests(TwoProductCatalog, TestCase):
-    """R05: two markets and two currencies in one database never compete."""
+class MexicanMarket(TwoProductCatalog):
+    """Product B's store moved to Mexico, priced in pesos."""
 
     def setUp(self) -> None:
         """Move product B's store to Mexico, priced in pesos."""
@@ -233,6 +234,10 @@ class MarketIsolationTests(TwoProductCatalog, TestCase):
 
     def _items(self, **params: str) -> dict:
         return json.loads(self.client.get(URL, {"sort_by": "price", **params}).content)
+
+
+class MarketIsolationTests(MexicanMarket, TestCase):
+    """R05: two markets and two currencies in one database never compete."""
 
     def test_projections_are_stored_in_their_own_currency(self) -> None:
         """Projection B is MXN in Mexico; A is BRL in Brazil."""
@@ -321,3 +326,21 @@ class LinkSellerTests(TwoProductCatalog, TestCase):
                 items = json.loads(self.client.get(URL, params).content)["items"]
                 flags = {item["name"]: item["linkSelectsSeller"] for item in items}
                 assert flags == {"A": True, "B": False}
+
+
+class CurrencyPrecisionTests(MexicanMarket, TestCase):
+    """Prices are serialized in their currency's minor unit."""
+
+    def test_a_currency_without_cents_has_no_decimals(self) -> None:
+        """Chilean pesos: CLP 1990, not 1990.00."""
+        Market.objects.filter(pk=self.mexico.pk).update(
+            currency=Currency.objects.get(code="CLP"),
+            country="CL",
+        )
+        Offer.objects.filter(pk=self.offers["B"].pk).update(current_price=Decimal(1990))
+        ProjectionService().refresh()
+
+        payload = self._items(scenario="listed", country="CL", currency="CLP")
+        prices = {item["name"]: item["price"] for item in payload["items"]}
+
+        assert prices["B"] == "1990"

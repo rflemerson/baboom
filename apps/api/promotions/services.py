@@ -17,6 +17,8 @@ from django.db import transaction
 from django.utils import timezone
 from pydantic import ValidationError as SchemaError
 
+from pricing_contracts.effects import REWARD_EFFECTS, unsupported_settings
+
 from .models import (
     ActivationCode,
     CompatibilityRule,
@@ -26,9 +28,7 @@ from .models import (
     RewardTerms,
 )
 from .schemas import (
-    CAPPED_EFFECTS,
     EFFECT_PARAMS,
-    LIMITED_EFFECTS,
     MONETARY_EFFECTS,
     ORDERING,
     ChannelIn,
@@ -63,8 +63,6 @@ NEW_CUSTOMER_ISSUERS = {
     "seller": "commerce.SellerAccount",
     "program": "commerce.Program",
 }
-# Effects whose computation needs reward terms.
-REWARD_EFFECTS = frozenset({"cashback", "points"})
 
 
 @dataclass(frozen=True)
@@ -143,15 +141,12 @@ class PromotionService:
                 schema.model_validate(effect.parameters or {})
             except SchemaError as error:
                 errors.append(f"Effect {effect}: {error.errors()[0]['msg']}")
-            if effect.kind in REWARD_EFFECTS and effect.stage != "reward":
-                errors.append(f"Effect {effect}: a reward applies at the reward stage.")
-            if effect.kind not in REWARD_EFFECTS and effect.stage == "reward":
-                errors.append(f"Effect {effect}: only rewards use the reward stage.")
-            if effect.kind == "shipping_discount" and effect.target != "shipping":
-                errors.append(f"Effect {effect}: a shipping discount targets shipping.")
             if effect.kind in MONETARY_EFFECTS and not revision.currency_id:
                 errors.append(f"Effect {effect}: a fixed value needs a currency.")
-            errors.extend(_unsupported_limits(effect))
+            errors.extend(
+                f"Effect {effect}: {problem}."
+                for problem in unsupported_settings(effect)
+            )
         return errors
 
     @staticmethod
@@ -372,20 +367,6 @@ _REWARD_FIELDS = (
     "redemption_minimum",
     "cancellation_terms",
 )
-
-
-def _unsupported_limits(effect: PromotionEffect) -> list[str]:
-    """Refuse a cap, a limit or a basis the engine does not apply to this kind."""
-    errors: list[str] = []
-    if effect.cap is not None and effect.kind not in CAPPED_EFFECTS:
-        errors.append(f"Effect {effect}: this kind takes no cap.")
-    if effect.max_applications is not None and effect.kind not in LIMITED_EFFECTS:
-        errors.append(f"Effect {effect}: this kind takes no application limit.")
-    if (effect.basis == "component") != (effect.kind == "shipping_discount"):
-        errors.append(
-            f"Effect {effect}: only shipping discounts use the component basis."
-        )
-    return errors
 
 
 def _has_cycle(graph: dict[int, set[int]]) -> bool:

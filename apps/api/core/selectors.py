@@ -15,6 +15,7 @@ from django.db.models import (
     F,
     FloatField,
     IntegerField,
+    JSONField,
     OuterRef,
     Q,
     QuerySet,
@@ -53,6 +54,8 @@ def _cheapest_offer_subquery() -> QuerySet[Offer]:
         )
         .annotate(
             amount=F("current_price"),
+            comparison_amount=F("current_price"),
+            pricing_details=Value({}, output_field=JSONField()),
             payment_method=Value(""),
             offer_id=F("pk"),
             expires_at=Value(None, output_field=DateTimeField()),
@@ -120,11 +123,14 @@ def _annotate_catalog_base_fields(
     )
 
     return queryset.annotate(
-        # Projections keep the source's precision; the catalog shows cents.
-        price=Cast(
-            Subquery(cheapest.values("amount")[:1]),
-            output_field=DecimalField(max_digits=19, decimal_places=2),
+        # Projections keep the source's precision; the API rounds to the
+        # currency's own minor unit when it serializes.
+        price=Subquery(
+            cheapest.values("amount")[:1],
+            output_field=DecimalField(max_digits=19, decimal_places=6),
         ),
+        comparison_price=Subquery(cheapest.values("comparison_amount")[:1]),
+        pricing_details=Subquery(cheapest.values("pricing_details")[:1]),
         external_link=Subquery(
             cheapest.values("url")[:1],
             output_field=URLField(),
@@ -299,7 +305,7 @@ def _apply_catalog_sorting(
         if filters.sort_dir in {"asc", "desc"}
         else DEFAULT_CATALOG_SORT_DIR
     )
-    ordering = F(sort_by)
+    ordering = F("comparison_price" if sort_by == "price" else sort_by)
     stable_fallback = ["brand__name", "name", "pk", "nutrition_profile_id"]
 
     if sort_dir == "desc":

@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import ClassVar, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Keep Decimal in runtime globals: Pydantic resolves this annotation at import time.
 _PYDANTIC_RUNTIME_TYPES = (Decimal,)
@@ -90,6 +90,17 @@ class MarketInput(BaseModel):
     tax_inclusion: Literal["included", "excluded", "unknown"] = "unknown"
 
 
+class PriceContextInput(BaseModel):
+    """Closed observation restrictions; absent dimensions remain unknown."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    program_id: int | None = Field(default=None, ge=1)
+    country: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    subdivision: str | None = None
+    postal_code: str | None = None
+    subscription: bool | None = None
+
+
 class PriceInput(BaseModel):
     """One value a source states for a unit, with what it means.
 
@@ -97,6 +108,21 @@ class PriceInput(BaseModel):
     payment whose method the source does not name; ``method`` names it in
     ``payment_method`` (a code such as ``pix``, ``credit_card``, ``boleto``).
     """
+
+    model_config = ConfigDict(extra="forbid")
+    quantity_min: int = Field(default=1, ge=1)
+    quantity_max: int | None = Field(default=None, ge=1)
+    amount_basis: Literal["unit", "line", "order"] = "unit"
+    currency: str = Field(default="", pattern=r"^([A-Z]{3})?$")
+    context: PriceContextInput = Field(default_factory=PriceContextInput)
+
+    @model_validator(mode="after")
+    def valid_quantity_range(self) -> PriceInput:
+        """Reject an impossible quantity interval."""
+        if self.quantity_max is not None and self.quantity_max < self.quantity_min:
+            msg = "quantity_max must be at least quantity_min"
+            raise ValueError(msg)
+        return self
 
     role: Literal["payable", "reference"]
     amount: Decimal

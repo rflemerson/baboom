@@ -78,11 +78,25 @@ class PricingPolicyRevision(BaseModel):
         if self.pk:
             stored = type(self).objects.filter(pk=self.pk).first()
             if stored is not None and stored.published_at is not None:
-                frozen = ("key", "number", "market_id", "scenario", "rules")
-                if any(getattr(stored, f) != getattr(self, f) for f in frozen):
+                changed = [
+                    field.attname
+                    for field in self._meta.concrete_fields
+                    if field.attname not in self.MUTABLE_WHEN_PUBLISHED
+                    and getattr(stored, field.attname) != getattr(self, field.attname)
+                ]
+                if changed:
                     msg = "A published policy cannot change; publish a new number."
                     raise ValueError(msg)
         super().save(*args, **kwargs)
+
+    MUTABLE_WHEN_PUBLISHED = frozenset({"is_default", "updated_at"})
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Refuse to delete a published policy; its quotes refer to it."""
+        if self.published_at is not None:
+            msg = "A published policy is kept; publish a new number instead."
+            raise ValueError(msg)
+        return super().delete(*args, **kwargs)
 
 
 class PricingQuote(BaseModel):
@@ -210,6 +224,24 @@ class ShippingQuote(BaseModel):
     subdivision = models.CharField(_("Subdivision"), max_length=10, blank=True)
     postal_code_hash = models.CharField(_("Postal Code Hash"), max_length=64)
     modality = models.CharField(_("Modality"), max_length=100, blank=True)
+    external_quote_id = models.CharField(
+        _("External Quote ID"),
+        max_length=200,
+        blank=True,
+        help_text=_("The carrier's id for this quote, when it can be booked by id."),
+    )
+    execution_guaranteed = models.BooleanField(
+        _("Execution guaranteed"),
+        default=False,
+        help_text=_("The source honours this quote by id until it expires."),
+    )
+    order_value = models.DecimalField(
+        _("Order Value"),
+        null=True,
+        blank=True,
+        help_text=_("The order value priced, when shipping depends on it."),
+        **MONEY,
+    )
     packages = models.JSONField(_("Packages"), default=list, blank=True)
     amount = models.DecimalField(_("Amount"), null=True, blank=True, **MONEY)
     currency = models.ForeignKey(
@@ -252,6 +284,20 @@ class TaxFeeQuote(BaseModel):
 
     group_fingerprint = models.CharField(_("Group Fingerprint"), max_length=64)
     kind = models.CharField(_("Kind"), max_length=50)
+    charge_key = models.CharField(
+        _("Charge Key"),
+        max_length=200,
+        blank=True,
+        help_text=_("Tells two charges of one kind apart; rereadings share it."),
+    )
+    covers_all_charges = models.BooleanField(
+        _("Covers every charge"),
+        default=False,
+        help_text=_(
+            "The source answered for every charge of the group in this reading; "
+            "a row of kind 'none' and amount 0 confirms there is none.",
+        ),
+    )
     base = models.DecimalField(_("Base"), null=True, blank=True, **MONEY)
     amount = models.DecimalField(_("Amount"), null=True, blank=True, **MONEY)
     currency = models.ForeignKey(
@@ -383,6 +429,26 @@ class OfferScenarioProjection(BaseModel):
         related_name="projections",
         verbose_name=_("Observation"),
     )
+    alternative = models.CharField(
+        _("Alternative"),
+        max_length=40,
+        default="best",
+        help_text=_(
+            "'best' is the winning combination; 'coupon', 'cashback' and "
+            "'cashback+coupon' are the best combinations using those benefits, "
+            "kept so a filter never hides a valid option.",
+        ),
+    )
+    comparison_amount = models.DecimalField(null=True, blank=True, **MONEY)
+    objective = models.CharField(max_length=30, default="items_payable")
+    total_payable = models.DecimalField(null=True, blank=True, **MONEY)
+    estimated_net_cost = models.DecimalField(null=True, blank=True, **MONEY)
+    monetary_reward = models.DecimalField(null=True, blank=True, **MONEY)
+    uses_coupon = models.BooleanField(default=False, db_index=True)
+    has_cashback = models.BooleanField(default=False, db_index=True)
+    selected_route_id = models.PositiveBigIntegerField(null=True, blank=True)
+    resolved_url = models.URLField(max_length=2000, blank=True)
+    link_fixes_variant = models.BooleanField(default=False)
     explanation = models.JSONField(_("Explanation"), default=dict, blank=True)
     link_fixes_seller = models.BooleanField(
         _("Link opens this seller"),
@@ -400,8 +466,8 @@ class OfferScenarioProjection(BaseModel):
         verbose_name_plural = _("Offer Scenario Projections")
         constraints = (
             models.UniqueConstraint(
-                fields=("offer", "policy"),
-                name="one_projection_per_offer_policy",
+                fields=("offer", "policy", "alternative"),
+                name="one_projection_per_offer_policy_alternative",
             ),
             models.CheckConstraint(
                 condition=Q(status="priced", amount__isnull=False)

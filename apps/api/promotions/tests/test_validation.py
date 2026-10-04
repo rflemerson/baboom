@@ -72,9 +72,9 @@ class ValidationTests(TestCase):
 
         errors = self._errors()
 
-        assert "only rewards use the reward stage" in errors
-        assert "a reward applies at the reward stage" in errors
-        assert "targets shipping" in errors
+        assert "percentage takes stage" in errors
+        assert "cashback takes stage" in errors
+        assert "shipping_discount takes target" in errors
 
     def test_limits_the_engine_would_ignore_are_refused(self) -> None:
         """A capped gift, a limited percentage, a component basis elsewhere."""
@@ -98,7 +98,7 @@ class ValidationTests(TestCase):
 
         assert "takes no application limit" in errors
         assert "takes no cap" in errors
-        assert "component basis" in errors
+        assert "percentage takes basis" in errors
 
     def test_ordering_problems(self) -> None:
         """A malformed edge, or one naming a missing effect."""

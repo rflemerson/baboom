@@ -15,12 +15,14 @@ from django.utils import timezone
 from commerce.models import Program
 from common.testing import raised
 from offers.models import Offer, PriceObservation, StockStatus
+from pricing.costs import load_costs
 from pricing.domain.types import CartLine, Claim
 from pricing.models import (
     CurrencyConversionQuote,
     PricingPolicyRevision,
     PricingQuote,
     ShippingQuote,
+    TaxFeeQuote,
 )
 from pricing.services import (
     PricingService,
@@ -352,4 +354,39 @@ class StoredCostTests(TestCase):
         result = PricingService().evaluate(request)
 
         assert result.total_payable is None
-        assert "taxes and fees not consulted" in result.missing_context
+        assert "whether prices include taxes is unknown" in result.missing_context
+
+
+class FeeStatusTests(TestCase):
+    """A04: what is known about taxes and fees, in five distinct states."""
+
+    def _fee(self, **values: object) -> TaxFeeQuote:
+        base = {
+            "group_fingerprint": "g",
+            "kind": "service",
+            "currency_id": "BRL",
+            "inclusion": "excluded",
+            "source": "synthetic",
+            "expires_at": timezone.now() + timedelta(hours=1),
+        }
+        return TaxFeeQuote.objects.create(**{**base, **values})
+
+    def _status(self, tax_inclusion: str) -> tuple[str, Decimal]:
+        _shipping, fees, status = load_costs(["g"], timezone.now(), tax_inclusion)
+        return status, sum((fee.amount or 0 for fee in fees), Decimal(0))
+
+    def test_each_state(self) -> None:
+        """Included, not consulted, unknown, partial, then complete."""
+        assert self._status("included")[0] == "included_in_prices"
+        assert self._status("excluded")[0] == "not_consulted"
+        assert self._status("unknown")[0] == "inclusion_unknown"
+        self._fee(amount=5)
+        assert self._status("excluded")[0] == "partial"
+        self._fee(amount=3, charge_key="other", covers_all_charges=True)
+        assert self._status("excluded") == ("consulted", Decimal(8))
+
+    def test_a_confirmed_absence_of_fees_is_zero(self) -> None:
+        """A reading that covered everything and found nothing."""
+        self._fee(kind="none", amount=0, covers_all_charges=True)
+
+        assert self._status("excluded") == ("consulted", Decimal(0))

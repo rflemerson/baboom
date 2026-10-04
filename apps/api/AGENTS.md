@@ -166,3 +166,20 @@ offers that a successful crawl no longer sees.
 - Run `prek run --all-files` for substantial changes and review hook edits.
 - Do not commit secrets or Django `SECRET_KEY` values.
 - Keep production host, TLS and cookie settings explicit.
+
+## Pricing second-review changes
+
+- Load/translate facts in `pricing/facts.py`, cost versions in `pricing/costs.py`,
+  and shared quote/projection inputs in `pricing/context.py`.
+- Keep shared limit capabilities and normalized condition traversal in pure
+  `pricing_contracts`; promotions must not import pricing services.
+- Scraper price restrictions are closed/validated and survive observation
+  persistence. Non-unit amounts/restricted contexts remain explicit limitations.
+- Projections persist the selected route URL/ID and comparison objective;
+  `core` price sources provide both `amount` and `comparison_amount`, plus
+  `pricing_details`. Keep displayed checkout amounts separate from ranking.
+- Migrations 0006–0007 need a disposable projection rebuild. Preview with
+  `rebuild_pricing_projections`, write only with `--apply` in an authorized
+  environment. Never treat this as a production backfill authorization.
+- See `docs/pricing-audit.md` for outstanding second-review requirements. These
+  are internal work, not missing connector credentials.

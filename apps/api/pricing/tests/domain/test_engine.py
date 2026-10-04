@@ -884,3 +884,19 @@ class CostsAndGroupsTests(SimpleTestCase):
 
         assert result.merchandise_total == Decimal("200.00")
         assert DecisionStatus.UNSUPPORTED in _statuses(result)["revision 1"]
+
+
+class OrderValueShippingTests(SimpleTestCase):
+    """A06: shipping priced for one order value does not hold for another."""
+
+    def test_a_discount_that_changes_the_order_value_drops_the_quote(self) -> None:
+        """Quoted for R$ 100; a coupon brings the cart to R$ 90: shipping unknown."""
+        quote = ShippingFact("all", Decimal(10), "BRL", order_value=Decimal(100))
+        promo = revision(1, effect("fixed_amount", params={"amount": "10"}))
+
+        unchanged = evaluate(inputs(shipping=(quote,)))
+        discounted = evaluate(inputs(shipping=(quote,), revisions=(promo,)))
+
+        assert unchanged.shipping_total == Decimal("10.00")
+        assert discounted.shipping_total is None
+        assert any("order of 100" in item for item in discounted.missing_context)

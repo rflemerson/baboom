@@ -301,3 +301,31 @@ evaluator. No `if store_slug ==` exists in the engine, selectors or money
 rules. Configuration never executes code. Amazon and Mercado Livre adapters
 need authorized access; until then they exist only as synthetic contract
 fixtures, labelled as such.
+
+## Local second-review implementation
+
+`pricing.facts` owns ORM fact loading and translation; `pricing.costs` resolves
+current shipping alternatives and charge versions; `pricing.context` assembles
+inputs shared by quotes and projections. `PricingService` remains the public
+facade. `domain/base_prices.py` and `domain/scopes.py` isolate base selection and
+qualification/benefit reach from engine orchestration.
+
+`pricing_contracts` is a pure package below promotions and pricing. Its
+`EffectSpec` registry is the single source of cap/application-limit support and
+their publication/runtime validation. It is currently a limit registry, not a
+complete matrix of target, basis, stage and parameter combinations. Condition
+leaf traversal is shared for normalized documents; Pydantic schema validation
+still walks its typed representation separately.
+
+Scraper `PriceInput` rejects unknown keys and validates quantity ranges, amount
+basis, currency and a closed observation context. Unit, line and order bases
+survive ingestion; the current engine explicitly refuses non-unit bases and
+reports restricted contexts as unknown. Extra observation dimensions require
+an intentional contract change, rather than silent dropping.
+
+A charge version is identified by group, source, kind, currency and `charge_key`.
+An empty charge key preserves the legacy same-charge identity; two independent
+charges must use different keys. Shipping versions use group, seller, source,
+modality and currency. Old versions remain candidates only with a nonempty
+external quote ID and `execution_guaranteed=True`. Expired replacements do not
+revive older unguaranteed observations. Future observations are excluded.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 
@@ -41,3 +42,26 @@ class PolicyFreezeTests(TestCase):
         policy.rules = {"allow_codes": False}
 
         raised(policy.save, ValueError)
+
+
+class PolicyTriggerTests(TestCase):
+    """Below the ORM, PostgreSQL refuses to rewrite a published policy."""
+
+    def test_raw_updates_and_deletes_are_refused(self) -> None:
+        """Only is_default may move once published."""
+        if connection.vendor != "postgresql":
+            self.skipTest("Triggers exist on PostgreSQL only.")
+        policy = PricingPolicyRevision.objects.get(key="listed", number=1)
+        PricingPolicyRevision.objects.filter(pk=policy.pk).update(is_default=False)
+
+        raised(
+            lambda: PricingPolicyRevision.objects.filter(pk=policy.pk).update(
+                rules={"allow_codes": True},
+            ),
+            Exception,
+        )
+        raised(
+            lambda: PricingPolicyRevision.objects.filter(pk=policy.pk).delete(),
+            Exception,
+        )
+        raised(policy.delete, ValueError)

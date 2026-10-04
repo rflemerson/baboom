@@ -19,17 +19,47 @@ from pricing.tests.domain.builders import (
     price,
     revision,
 )
+from pricing_contracts.effects import EFFECT_SPECS, unsupported_settings
 from promotions import schemas
 
 
 class MatrixTests(SimpleTestCase):
-    """The validator and the engine agree on every limit."""
+    """One registry decides; every allowed setting computes, every other is refused."""
 
-    def test_both_sides_list_the_same_kinds(self) -> None:
-        """A limit is honoured by the engine exactly where publication allows it."""
-        assert effects.CAPPED_EFFECTS == schemas.CAPPED_EFFECTS
-        assert effects.LIMITED_EFFECTS == schemas.LIMITED_EFFECTS
-        assert frozenset(schemas.EFFECT_PARAMS) == effects.SUPPORTED_EFFECTS
+    def test_every_kind_has_a_handler_and_a_parameter_schema(self) -> None:
+        """No kind is publishable without a handler, nor computable without a spec."""
+        assert set(effects.HANDLERS) == set(EFFECT_SPECS)
+        assert set(schemas.EFFECT_PARAMS) == set(EFFECT_SPECS)
+
+    def test_each_allowed_setting_is_supported_and_each_other_refused(self) -> None:
+        """The engine and publication read the same answer for every setting."""
+        values = {
+            "stage": ("catalog", "order", "payment", "shipping", "reward"),
+            "target": ("item", "line", "group", "order", "shipping"),
+            "basis": (
+                "initial",
+                "current",
+                "eligible_subtotal",
+                "order_total",
+                "component",
+            ),
+            "allocation": ("per_unit", "per_line", "once", "prorated"),
+        }
+        allowed_of = {
+            "stage": "stages",
+            "target": "targets",
+            "basis": "bases",
+            "allocation": "allocations",
+        }
+        for kind, spec in EFFECT_SPECS.items():
+            base = effect(kind)
+            assert unsupported_settings(base) == [], (kind, unsupported_settings(base))
+            for name, options in values.items():
+                for value in options:
+                    rule = replace(base, **{name: value})
+                    allowed = value in getattr(spec, allowed_of[name])
+                    with self.subTest(kind=kind, setting=name, value=value):
+                        assert (unsupported_settings(rule) == []) is allowed
 
     def test_an_ignored_limit_makes_the_revision_unsupported(self) -> None:
         """A gift with a cap is not silently uncapped."""
@@ -38,6 +68,17 @@ class MatrixTests(SimpleTestCase):
         result = evaluate(inputs(revisions=(promo,)))
 
         assert DecisionStatus.UNSUPPORTED in {d.status for d in result.decisions}
+
+    def test_an_application_limit_only_where_the_allocation_counts(self) -> None:
+        """A fixed amount once has no application to limit."""
+        rule = effect(
+            "fixed_amount",
+            allocation="once",
+            params={"amount": "10"},
+            max_applications=1,
+        )
+
+        assert unsupported_settings(rule)
 
 
 class ReviewCalculationTests(SimpleTestCase):
@@ -90,3 +131,36 @@ class ReviewCalculationTests(SimpleTestCase):
                 data = inputs(prices=universal, policy=policy(scenario))
                 data = replace(data, context=replace(data.context, payment=payment))
                 assert evaluate(data).merchandise_total == total
+
+
+class SubscriptionConsistencyTests(SimpleTestCase):
+    """The schedule agrees with the discount the cart applied."""
+
+    def test_a_capped_first_delivery_matches_the_merchandise(self) -> None:
+        """20% capped at R$ 5: R$ 95 now, recurring 10% capped at R$ 5 too."""
+        plan = revision(
+            1,
+            effect(
+                "subscription",
+                params={
+                    "interval_days": 30,
+                    "first_delivery_rate": "20",
+                    "recurring_rate": "10",
+                    "minimum_deliveries": 2,
+                },
+                cap=Decimal(5),
+            ),
+        )
+        result = evaluate(
+            inputs(
+                revisions=(plan,),
+                context=context(subscription=True),
+                policy=policy(allow_conditions=frozenset({"subscription"})),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("95.00")
+        assert [p.amount for p in result.payment_schedule] == [
+            Decimal("95.00"),
+            Decimal("95.00"),
+        ]

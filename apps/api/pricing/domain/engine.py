@@ -12,9 +12,15 @@ import hashlib
 import itertools
 import json
 from dataclasses import dataclass, field, fields, is_dataclass, replace
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
+from pricing_contracts.conditions import leaves
+from pricing_contracts.effects import REWARD_EFFECTS
+
+from .base_prices import select_prices
 from .conditions import Amounts, ConditionInput
 from .conditions import evaluate as evaluate_conditions
 from .effects import (
@@ -23,9 +29,10 @@ from .effects import (
     Environment,
     LineState,
     apply_effect,
-    unsupported_limits,
+    unsupported_settings,
 )
 from .money import ZERO, allocate, round_money
+from .scopes import qualifies, targets
 from .types import (
     ENGINE_VERSION,
     CartLine,
@@ -42,7 +49,6 @@ from .types import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from datetime import datetime
 
     from .types import (
         CompatibilityFact,
@@ -57,7 +63,7 @@ if TYPE_CHECKING:
     )
 
 CLAIM_LEAVES = frozenset({"new_customer", "program_member", "subscription"})
-REWARD_KINDS = frozenset({"cashback", "points"})
+REWARD_KINDS = REWARD_EFFECTS
 
 
 @dataclass(frozen=True)
@@ -72,10 +78,16 @@ class Inputs:
     shipping: tuple[ShippingFact, ...] = ()
     fees: tuple[FeeFact, ...] = ()
     routes: tuple[RouteFact, ...] = ()
-    # "included_in_prices": the market's prices carry every tax; "consulted":
-    # ``fees`` lists every charge a source quoted; "not_consulted": nobody
-    # asked, so taxes and fees are unknown, not zero.
+    # "included_in_prices": the market's prices carry every tax, so only fees
+    # quoted on top are added; "consulted": a source answered for every
+    # charge, so ``fees`` is complete (possibly empty); "partial": some
+    # charges were read, not all; "not_consulted": nobody asked;
+    # "inclusion_unknown": not even whether prices include taxes is known.
+    # Only the first two give a known total.
     fees_status: str = "not_consulted"
+    # Benefits the chosen combination must use: "coupon", "cashback". Empty
+    # asks for the best combination whatever it uses.
+    requirement: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -94,6 +106,7 @@ class _Outcome:
     shipping_known: bool = False
     schedule_rates: tuple[Decimal, ...] = ()
     routes: dict[int, RouteFact] = field(default_factory=dict)
+    tracking_programs: dict[int, set[int]] = field(default_factory=dict)
 
 
 def evaluate(inputs: Inputs) -> PricingResult:
@@ -104,7 +117,7 @@ def evaluate(inputs: Inputs) -> PricingResult:
     assumptions: list[str] = []
     offers = {offer.id: offer for offer in inputs.offers}
 
-    selected = _select_prices(inputs, offers, decisions, missing)
+    selected = select_prices(inputs, offers, decisions, missing)
     if selected is None:
         return _empty(inputs, decisions, missing, assumptions)
 
@@ -122,14 +135,23 @@ def evaluate(inputs: Inputs) -> PricingResult:
         outcome = _apply(inputs, lines, subset)
         if len(subset) == 1:
             alone[subset[0].id] = outcome
+        if not _meets(inputs, outcome):
+            continue
         key = (
-            _comparable_total(outcome),
+            _objective_amount(inputs, outcome),
             -_money_rewards(outcome),
             -len(outcome.applied),
         )
         if best_key is None or key < best_key:
             best, best_key = outcome, key
-    if best is None:  # pragma: no cover - the empty subset always exists
+    if best is None:
+        decisions.append(
+            Decision(
+                "scenario",
+                DecisionStatus.INELIGIBLE,
+                f"no combination uses {sorted(inputs.requirement)}",
+            ),
+        )
         return _empty(inputs, decisions, missing, assumptions)
     decisions += _unapplied(candidates, best, alone)
     best.decisions[:0] = decisions
@@ -139,179 +161,6 @@ def evaluate(inputs: Inputs) -> PricingResult:
 
 
 # Base prices
-
-
-def _select_prices(
-    inputs: Inputs,
-    offers: dict[int, OfferFact],
-    decisions: list[Decision],
-    missing: list[str],
-) -> list[SelectedPrice] | None:
-    """Choose one base price per line, or report why the scenario has none."""
-    chosen: list[SelectedPrice] = []
-    for line in inputs.context.lines:
-        refusal = _offer_refusal(offers.get(line.offer_id), line.offer_id, inputs)
-        if refusal is not None:
-            decisions.append(refusal)
-            return None
-        price = _base_price(inputs, line, decisions)
-        if price is None:
-            missing.append(
-                f"price of offer {line.offer_id} for {inputs.policy.scenario}"
-            )
-            return None
-        chosen.append(price)
-    return chosen
-
-
-def _offer_refusal(
-    offer: OfferFact | None,
-    offer_id: int,
-    inputs: Inputs,
-) -> Decision | None:
-    """Return why an offer cannot be priced in this context, or None."""
-    subject = f"offer {offer_id}"
-    if offer is None:
-        return Decision(subject, DecisionStatus.UNKNOWN, "offer not given")
-    checks = (
-        (
-            not offer.access_available,
-            DecisionStatus.ACCESS_UNAVAILABLE,
-            "source unavailable",
-        ),
-        (not offer.purchasable, DecisionStatus.INELIGIBLE, "not purchasable"),
-        (
-            offer.market_id != inputs.context.market_id,
-            DecisionStatus.INELIGIBLE,
-            "another market",
-        ),
-    )
-    return next(
-        (Decision(subject, status, text) for failed, status, text in checks if failed),
-        None,
-    )
-
-
-PUBLIC_STAGES = frozenset({"catalog", "product_page"})
-
-
-def _restriction(price: PriceFact, quantity: int) -> tuple[DecisionStatus, str] | None:
-    """Return why an observed price cannot be one unit's public price here.
-
-    A price for a quantity range, a line or an order, a cart or checkout
-    stage, or any observed context (membership, destination, programme) the
-    engine cannot match yet is never applied as a universal unit price.
-    """
-    if quantity < price.quantity_min or (
-        price.quantity_max is not None and quantity > price.quantity_max
-    ):
-        return DecisionStatus.INELIGIBLE, "quantity outside the price's range"
-    if price.amount_basis != "unit":
-        return DecisionStatus.UNSUPPORTED, f"price is per {price.amount_basis}"
-    if price.capture_stage not in PUBLIC_STAGES:
-        return DecisionStatus.UNKNOWN, f"price quoted at the {price.capture_stage}"
-    if price.context:
-        keys = sorted(key for key, _value in price.context)
-        return DecisionStatus.UNKNOWN, f"price restricted to context {keys}"
-    return None
-
-
-def _base_price(
-    inputs: Inputs,
-    line: CartLine,
-    decisions: list[Decision],
-) -> SelectedPrice | None:
-    context, policy = inputs.context, inputs.policy
-    offer_id = line.offer_id
-    usable: list[PriceFact] = []
-    for price in inputs.prices:
-        if price.offer_id != offer_id or price.role != "payable":
-            continue
-        if price.currency != context.currency:
-            continue
-        if price.semantics not in policy.accepted_semantics:
-            continue
-        if price.evidence_level not in policy.accepted_evidence:
-            continue
-        if price.fresh_until is not None and price.fresh_until <= context.now:
-            decisions.append(
-                Decision(
-                    f"price {price.id}", DecisionStatus.STALE, "past its freshness"
-                ),
-            )
-            continue
-        restriction = _restriction(price, line.quantity)
-        if restriction is not None:
-            decisions.append(Decision(f"price {price.id}", *restriction))
-            continue
-        if _fits_scenario(price, inputs):
-            usable.append(price)
-    if not usable:
-        return None
-    price = min(usable, key=lambda item: (item.amount, item.id))
-    return SelectedPrice(
-        offer_id=offer_id,
-        observation_id=price.id,
-        amount=price.amount,
-        payment_method=price.payment_method,
-        payment_scope=price.payment_scope,
-        installment_count=price.installment_count,
-        already_included=price.included_adjustments,
-    )
-
-
-def _single_payment(price: PriceFact) -> bool:
-    """Tell whether a price is one payment, with no installment plan."""
-    return price.installment_count in (None, 1)
-
-
-def _unstated(price: PriceFact) -> bool:
-    """Tell whether a price states no payment and no installments."""
-    return price.payment_scope == "unknown" and price.installment_count is None
-
-
-def _universal(price: PriceFact) -> bool:
-    """Tell whether a price holds for any payment method, paid at once."""
-    return price.payment_scope == "any" and _single_payment(price)
-
-
-def _fits_listed(price: PriceFact, _inputs: Inputs) -> bool:
-    """Accept the store's price: unstated, or stated valid for any method."""
-    return _unstated(price) or _universal(price)
-
-
-def _fits_cash(price: PriceFact, inputs: Inputs) -> bool:
-    """Accept a price paid at once: cash, a cash method, any method, or unstated."""
-    policy = inputs.policy
-    if price.payment_scope == "cash" or _universal(price):
-        return True
-    if price.payment_scope == "method":
-        return _single_payment(price) and price.payment_method in policy.cash_methods
-    return _unstated(price) and policy.include_unknown_payment
-
-
-def _fits_payment(price: PriceFact, inputs: Inputs) -> bool:
-    """Accept the chosen method and count, or a single payment any method takes."""
-    payment = inputs.context.payment
-    if payment is None:
-        return False
-    if price.payment_scope == "method":
-        count = price.installment_count or 1
-        return price.payment_method == payment.method and count == payment.installments
-    if payment.installments != 1:
-        return False
-    return _universal(price) or (
-        _unstated(price) and inputs.policy.include_unknown_payment
-    )
-
-
-SCENARIOS = {"listed": _fits_listed, "cash": _fits_cash, "payment": _fits_payment}
-
-
-def _fits_scenario(price: PriceFact, inputs: Inputs) -> bool:
-    """Tell whether an observation is a base the scenario may use."""
-    fits = SCENARIOS.get(inputs.policy.scenario)
-    return fits is not None and fits(price, inputs)
 
 
 # Candidate revisions
@@ -387,7 +236,7 @@ def _status_refusal(
     unsupported = [e.kind for e in revision.effects if e.kind not in SUPPORTED_EFFECTS]
     if unsupported:
         return DecisionStatus.UNSUPPORTED, f"effects {unsupported} not computed"
-    limits = [problem for e in revision.effects for problem in unsupported_limits(e)]
+    limits = [problem for e in revision.effects for problem in unsupported_settings(e)]
     if limits:
         return DecisionStatus.UNSUPPORTED, "; ".join(limits)
     return None
@@ -431,15 +280,8 @@ def _per_group(revision: RevisionRule) -> bool:
     )
 
 
-def _leaves(node: object) -> list[object]:
-    if not isinstance(node, dict):
-        return []
-    for key in ("all", "any"):
-        if key in node:
-            return [leaf for child in node[key] for leaf in _leaves(child)]
-    if "not" in node:
-        return _leaves(node["not"])
-    return [node]
+def _leaves(node: object) -> list[dict]:
+    return list(leaves(node))
 
 
 def _reach_refusal(
@@ -458,7 +300,7 @@ def _reach_refusal(
             DecisionStatus.UNSUPPORTED,
             "order-level terms across several checkout groups",
         )
-    if not any(_targets(revision, line.offer) for line in lines):
+    if not any(targets(revision, line.offer) for line in lines):
         return DecisionStatus.INELIGIBLE, "targets none of these offers"
     if _payment_already_included(revision, lines):
         return DecisionStatus.CONFLICT, "payment discount already in the price"
@@ -466,14 +308,7 @@ def _reach_refusal(
 
 
 def _leaf_kinds(node: object) -> set[str]:
-    if not isinstance(node, dict):
-        return set()
-    for key in ("all", "any"):
-        if key in node:
-            return set().union(*(_leaf_kinds(child) for child in node[key]))
-    if "not" in node:
-        return _leaf_kinds(node["not"])
-    return {str(node.get("kind"))}
+    return {str(leaf.get("kind")) for leaf in leaves(node)}
 
 
 def _payment_already_included(revision: RevisionRule, lines: list[LineState]) -> bool:
@@ -481,64 +316,10 @@ def _payment_already_included(revision: RevisionRule, lines: list[LineState]) ->
     payment_effects = [e for e in revision.effects if e.stage == "payment"]
     if not payment_effects:
         return False
-    targeted = [line for line in lines if _targets(revision, line.offer)]
+    targeted = [line for line in lines if targets(revision, line.offer)]
     return bool(targeted) and all(
         "payment_discount" in line.price.already_included for line in targeted
     )
-
-
-def _matches(
-    scope_kind: str, ref_id: int | None, external: str, offer: OfferFact
-) -> bool:
-    values = {
-        "offer": offer.id,
-        "listing": offer.listing_id,
-        "listing_variant": offer.listing_variant_id,
-        "seller_account": offer.seller_id,
-        "market": offer.market_id,
-        "channel": offer.channel_id,
-        "product": offer.product_id,
-        "brand": offer.brand_id,
-        "merchant": offer.merchant_id,
-    }
-    if scope_kind == "category":
-        return ref_id in offer.category_ids
-    if scope_kind == "external_category":
-        return external in offer.external_categories
-    return values.get(scope_kind) == ref_id and ref_id is not None
-
-
-def _in_role(revision: RevisionRule, role: str, offer: OfferFact) -> bool | None:
-    """Whether an offer is in a role's scope; None when the role names nothing."""
-    rows = [scope for scope in revision.scopes if scope.role == role]
-    if not rows:
-        return None
-    for scope in rows:
-        if scope.mode == "exclude" and _matches(
-            scope.kind, scope.ref_id, scope.external_ref, offer
-        ):
-            return False
-    includes = [scope for scope in rows if scope.mode == "include"]
-    if not includes:
-        return True
-    by_kind: dict[str, bool] = {}
-    for scope in includes:
-        hit = _matches(scope.kind, scope.ref_id, scope.external_ref, offer)
-        by_kind[scope.kind] = by_kind.get(scope.kind, False) or hit
-    if any(scope.combine == "intersection" for scope in includes):
-        return all(by_kind.values())
-    return any(by_kind.values())
-
-
-def _targets(revision: RevisionRule, offer: OfferFact) -> bool:
-    """Whether the revision's benefit reaches an offer."""
-    return bool(_in_role(revision, "target", offer))
-
-
-def _qualifies(revision: RevisionRule, offer: OfferFact) -> bool:
-    """Whether an offer counts toward the revision's conditions."""
-    explicit = _in_role(revision, "qualification", offer)
-    return _targets(revision, offer) if explicit is None else explicit
 
 
 # Combinations
@@ -665,7 +446,7 @@ def _apply(
     outcome = _Outcome(lines=lines)
     env = Environment(
         context,
-        _targets,
+        targets,
         inputs.policy.assume_full_caps,
         inputs.routes,
     )
@@ -674,6 +455,8 @@ def _apply(
     checkpoints: dict[str, dict[int, Decimal]] = {}
     held: dict[int, Tri] = {}
     for stage in STAGES:
+        if stage == "shipping":
+            _match_order_value(inputs, outcome)
         for revision, effect in _ordered(subset, stage):
             if revision.id not in held:
                 held[revision.id] = _check(
@@ -742,7 +525,7 @@ def _check(
             quantity=sum(line.quantity for line in lines),
         )
 
-    qualifying = [line for line in outcome.lines if _qualifies(revision, line.offer)]
+    qualifying = [line for line in outcome.lines if qualifies(revision, line.offer)]
     data = ConditionInput(
         context=inputs.context,
         revision=revision,
@@ -764,11 +547,38 @@ def _check(
     return result.value
 
 
+def _match_order_value(inputs: Inputs, outcome: _Outcome) -> None:
+    """Drop shipping quoted for another order value than the cart now has.
+
+    A carrier that prices by order value quoted one cart; after discounts
+    the cart may be worth another amount, and that quote no longer holds.
+    """
+    if not outcome.shipping_known:
+        return
+    value = round_money(
+        sum((line.current for line in outcome.lines), ZERO),
+        inputs.context.minor_unit,
+    )
+    for quote in inputs.shipping:
+        if quote.order_value is not None and quote.order_value != value:
+            outcome.missing.append(
+                f"shipping quoted for an order of {quote.order_value}, not {value}",
+            )
+            outcome.shipping, outcome.shipping_known = None, False
+            return
+
+
 def _shipping(inputs: Inputs, outcome: _Outcome) -> None:
     """Read the known shipping of every checkout group, or mark it unknown."""
     groups = inputs.context.groups or ()
     keys = [group.key for group in groups] or ["all"]
-    quotes = {quote.group_key: quote for quote in inputs.shipping}
+    quotes = {
+        quote.group_key: quote
+        for quote in inputs.shipping
+        if quote.currency == inputs.context.currency
+        and (quote.observed_at is None or quote.observed_at <= inputs.context.now)
+        and (quote.expires_at is None or quote.expires_at > inputs.context.now)
+    }
     amounts = []
     for key in keys:
         quote = quotes.get(key)
@@ -817,6 +627,54 @@ def _money_rewards(outcome: _Outcome) -> Decimal:
         ),
         ZERO,
     )
+
+
+def _uses_coupon(inputs: Inputs, outcome: _Outcome) -> bool:
+    """Tell whether an applied revision was activated by a code in the context."""
+    codes = inputs.context.codes
+    return any(
+        code in codes
+        for revision in inputs.revisions
+        if revision.id in outcome.applied
+        for _kind, code in revision.codes
+        if code
+    )
+
+
+def _has_cashback(outcome: _Outcome) -> bool:
+    """Tell whether the combination earns a money reward of known amount."""
+    return any(
+        reward.credited_as == "money" and reward.amount is not None
+        for reward in outcome.rewards
+    )
+
+
+def _meets(inputs: Inputs, outcome: _Outcome) -> bool:
+    """Tell whether a combination uses every benefit the request requires."""
+    checks = {
+        "coupon": lambda: _uses_coupon(inputs, outcome),
+        "cashback": lambda: _has_cashback(outcome),
+    }
+    return all(checks[name]() for name in inputs.requirement)
+
+
+def _objective_amount(inputs: Inputs, outcome: _Outcome) -> Decimal:
+    """Use the same explicit comparison criterion as the projection selector."""
+    merchandise = sum((line.current for line in outcome.lines), ZERO)
+    if inputs.policy.objective == "items_payable":
+        return merchandise
+    fees, _missing = _fees(inputs)
+    if not outcome.shipping_known or outcome.shipping is None or fees is None:
+        return Decimal("Infinity")
+    total = merchandise + outcome.shipping + fees
+    if inputs.policy.objective == "total_payable":
+        return total
+    if inputs.policy.objective == "estimated_net_cost":
+        if not inputs.policy.net_cost_counts_money_rewards:
+            return Decimal("Infinity")
+        return total - _money_rewards(outcome)
+    msg = f"Unknown comparison objective: {inputs.policy.objective}"
+    raise ValueError(msg)
 
 
 def _comparable_total(outcome: _Outcome) -> Decimal:
@@ -934,6 +792,8 @@ def _routes(
                 url=route.url if route else None,
                 fixes_seller=fixes_seller,
                 reason=reason,
+                fixes_variant=bool(route and route.fixes_variant),
+                instructions=route.instructions if route else "",
             ),
         )
         if not fixes_seller:
@@ -965,8 +825,13 @@ def _fees(inputs: Inputs) -> tuple[Decimal | None, list[str]]:
     No fee is zero only when the market's prices include taxes or a source
     was consulted; otherwise taxes and fees are unknown.
     """
-    if inputs.fees_status == "not_consulted" and not inputs.fees:
-        return None, ["taxes and fees not consulted"]
+    unknown = {
+        "not_consulted": "taxes and fees not consulted",
+        "partial": "taxes and fees consultation partial",
+        "inclusion_unknown": "whether prices include taxes is unknown",
+    }
+    if inputs.fees_status in unknown:
+        return None, [unknown[inputs.fees_status]]
     total = ZERO
     missing: list[str] = []
     for fee in inputs.fees:
@@ -1018,6 +883,27 @@ def _expiry(inputs: Inputs, outcome: _Outcome) -> datetime | None:
         price.fresh_until
         for price in inputs.prices
         if price.fresh_until is not None and price.fresh_until > inputs.context.now
+    ]
+    for revision in inputs.revisions:
+        if revision.starts_at is not None and revision.starts_at > inputs.context.now:
+            moments.append(revision.starts_at)
+        for leaf in leaves(revision.conditions.get("root")):
+            if leaf.get("kind") != "calendar":
+                continue
+            local = inputs.context.now.astimezone(ZoneInfo(revision.timezone))
+            for offset in (0, 1):
+                day = local.date() + timedelta(days=offset)
+                for boundary in ("00:00", leaf.get("start_time"), leaf.get("end_time")):
+                    if boundary:
+                        moment = datetime.combine(
+                            day, time.fromisoformat(str(boundary)), local.tzinfo
+                        )
+                        if moment > inputs.context.now:
+                            moments.append(moment)
+    moments += [
+        fact.expires_at
+        for fact in (*inputs.shipping, *inputs.fees)
+        if fact.expires_at is not None
     ]
     return min(moments) if moments else None
 

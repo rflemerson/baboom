@@ -49,6 +49,9 @@ class PriceRecord:
     composition: str = "unknown"
     included_adjustments: tuple[dict[str, str], ...] = ()
     quantity_min: int = 1
+    quantity_max: int | None = None
+    amount_basis: str = "unit"
+    currency: str = ""
     context: dict[str, object] = field(default_factory=dict)
 
     def condition_key(self) -> str:
@@ -63,6 +66,9 @@ class PriceRecord:
             "installment_count": self.installment_count,
             "capture_stage": self.capture_stage,
             "quantity_min": self.quantity_min,
+            "quantity_max": self.quantity_max,
+            "amount_basis": self.amount_basis,
+            "currency": self.currency,
             "context": self.context,
         }
         canonical = json.dumps(dimensions, sort_keys=True, default=str)
@@ -215,7 +221,7 @@ class ObservationService:
             listing_variant=subject.listing_variant,
             batch=batch,
             amount=price.amount,
-            currency_id=batch.market.currency_id,
+            currency_id=price.currency or batch.market.currency_id,
             role=price.role,
             capture_stage=price.capture_stage,
             evidence_level=price.evidence_level,
@@ -227,6 +233,8 @@ class ObservationService:
             installment_amount=price.installment_amount,
             interest=price.interest,
             quantity_min=price.quantity_min,
+            quantity_max=price.quantity_max,
+            amount_basis=price.amount_basis,
             condition_key=key,
             context=price.context,
             source_field=price.source_field,

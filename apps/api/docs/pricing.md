@@ -63,3 +63,36 @@ would have lost or cost.
 | Context, cart lines, groups and results as typed structures | Personal data never persisted outside a fingerprinted quote | Tables for every context: personal data at rest |
 | Projections per offer, market, policy and currency | Ranking before pagination | Re-pricing the first page in Python: not a global ranking |
 | Shipping, tax and conversion as observed quotes | No invented calculator | A world tax and freight engine |
+
+## Second-review changes (local, October 2026)
+
+The engine's explicit `Policy.objective` is `items_payable` (default),
+`total_payable`, or `estimated_net_cost`. The last objective requires
+`net_cost_counts_money_rewards=True`; points and restricted credit are not
+monetary rewards. Unknown delivered costs cannot win as zero. Projections store
+both the item amount and comparison amount. Catalog price ordering uses the
+comparison amount while the displayed `price` remains the item amount.
+
+A public policy can set `allow_codes=True, auto_public_codes=True`. This supplies
+published public codes to the evaluation context; it never supplies personal
+codes, membership, subscription or first-purchase claims. Applied public codes
+are returned under `pricingDetails.public_codes`. This is backend preparation:
+no new Vue filters have been added. The existing card follows `externalLink`,
+which now uses the selected route URL. `pricingDetails.routes` retains the route
+ID, variant guarantee and activation instructions.
+
+Backend query composition supports
+`projected_prices(policy, now, country="BR", currency="BRL",
+benefits=BenefitFilter(uses_coupon=True))`. This predicate runs in the price
+subquery, before selecting a product's best linked offer and paginating. Use
+`has_cashback=True` for a calculated monetary reward. These flags describe the
+calculated winner for that policy; they are not claims that every campaign is
+applicable.
+
+The implementation still stores one winning projection per offer/policy. It
+DOES NOT yet preserve all relevant benefit alternatives within a policy. A
+coupon-only filter can therefore miss a losing coupon combination of the same
+offer. This limitation must be closed before claiming the complete alternative
+query contract requested by the second review. Delivered and net objectives
+also require contextual cost quotes; unavailable quotes produce no comparison
+amount, not a fallback to the default ranking.

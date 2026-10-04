@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from core.models import Product, ProductNutrition
 
 CATALOG_PER_PAGE_CHOICES = {12, 24, 48}
-CENTS = Decimal("0.01")
 CATALOG_DEFAULT_PER_PAGE = 12
 
 
@@ -98,11 +97,11 @@ def _decimal_to_str(value: Decimal | None) -> str | None:
     return str(value)
 
 
-def _money_to_str(value: Decimal | None) -> str | None:
-    """Serialize a price in cents, whatever precision its source kept."""
+def _money_to_str(value: Decimal | None, minor_unit: int) -> str | None:
+    """Serialize an amount in its currency's precision: cents, yen, fils."""
     if value is None:
         return None
-    return str(Decimal(value).quantize(CENTS))
+    return str(Decimal(value).quantize(Decimal(1).scaleb(-minor_unit)))
 
 
 def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
@@ -122,7 +121,7 @@ def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
 def _serialize_catalog_product(
     product: Product,
     profiles: dict[int, ProductNutrition],
-    currency: str,
+    currency: Currency,
 ) -> dict[str, Any]:
     """Serialize the public catalog product shape used by the frontend."""
     profile = profiles.get(product.nutrition_profile_id)
@@ -140,12 +139,17 @@ def _serialize_catalog_product(
         ),
         "packagingDisplay": product.get_packaging_display(),
         "netMass": _decimal_to_str(product.net_mass),
-        "price": _money_to_str(product.price),
-        "currency": currency if product.price is not None else None,
+        "price": _money_to_str(product.price, currency.minor_unit),
+        "currency": currency.code if product.price is not None else None,
         "pricePerActive": _decimal_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
         "totalActive": _decimal_to_str(product.total_active),
         "externalLink": product.external_link,
+        "pricingDetails": product.pricing_details,
+        "comparisonAmount": _money_to_str(
+            product.comparison_price,
+            currency.minor_unit,
+        ),
         "paymentMethod": product.payment_method or None,
         "linkSelectsSeller": product.link_selects_seller,
         "brand": {"name": product.brand.name},
@@ -221,6 +225,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
         else legacy_prices(country, currency)
     )
     queryset = public_catalog_products(query_filters, price_source)
+    currency_row = Currency.objects.get(code=currency)
     active = catalog_active(query_filters.active)
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page)
@@ -249,7 +254,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
                 "hasNextPage": page_obj.has_next(),
             },
             "items": [
-                _serialize_catalog_product(product, profiles, currency)
+                _serialize_catalog_product(product, profiles, currency_row)
                 for product in page_obj.object_list
             ],
         },

@@ -304,6 +304,11 @@ class ScraperService:
                 evidence_level=price.evidence_level,
                 composition=price.composition,
                 included_adjustments=tuple(price.included_adjustments),
+                quantity_min=price.quantity_min,
+                quantity_max=price.quantity_max,
+                amount_basis=price.amount_basis,
+                currency=price.currency,
+                context=price.context.model_dump(exclude_none=True),
             )
             for price in offer.prices
         )

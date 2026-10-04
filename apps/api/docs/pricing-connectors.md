@@ -56,3 +56,13 @@ When access exists, each becomes a normalizer (or a feed produced from the
 official API) with real fixtures; the engine, promotions and ranking stay
 unchanged. URLs that select a seller are used only where the connector shows
 the mechanism works; otherwise a route reports `fixes_seller=False`.
+
+## Restriction handoff
+
+A synthetic adapter may emit `PriceInput` with `quantity_min`, `quantity_max`,
+`amount_basis`, `currency`, capture/evidence stage, included adjustments and
+`context` containing program/destination/subscription restrictions. Unknown
+keys are rejected. Restricted order/line values remain historical observations,
+with unsupported/unknown pricing decisions until a matching calculation exists.
+Shipping source guarantees require `external_quote_id` and
+`execution_guaranteed`; a future expiration alone is not a booking guarantee.

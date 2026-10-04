@@ -125,3 +125,45 @@ acceptance tests beside the code it concerns:
   (choosing "Paid at once" requests `scenario=cash` and shows the method,
   the currency and the seller warning). CI does not run E2E; run them
   locally with `npx playwright test`.
+
+## Local second-review migrations 0006–0011
+
+| Migration | Change |
+| --- | --- |
+| 0006 | projection link fields (seller/variant fixed, resolved URL, route) |
+| 0007 | projection comparison amount, objective, coupon/cashback flags |
+| 0008 | `TaxFeeQuote.covers_all_charges`; one fee read no longer proves the total |
+| 0009 | projection `alternative` (best, coupon, cashback, cashback+coupon); unique per offer, policy, alternative |
+| 0010 | `ShippingQuote.order_value`; a quote applies only to the order value it was read for |
+| 0011 | PostgreSQL trigger freezing published policy revisions (only `is_default` may change; delete refused) |
+
+All migrations add fields without modifying historical price observations,
+quotes, commercial IDs or published promotion revisions. No production migration
+or backfill was run by this task. Existing projection rows have no comparison
+amount or alternative after 0007/0009 and require rebuilding before enabling projection reads.
+
+Preview the disposable rebuild with:
+
+```sh
+python manage.py migrate --plan
+python manage.py rebuild_pricing_projections
+```
+
+After reviewing the preview, in an authorized environment:
+
+```sh
+python manage.py migrate
+python manage.py rebuild_pricing_projections --apply
+```
+
+The rebuild is repeatable. It locks offer rows, preserves projections computed
+at a later requested moment and never changes price history or published rules.
+The preview reports scope only, not identity reconciliation ambiguities; no
+identity reconciliation is performed by this command.
+
+For rollback, turn off projection cutover and stop consumers requesting the new
+policies, restore the previous application release, and reverse the
+pricing migrations to 0005 if needed (0011 drops its trigger on reverse). New disposable projection fields are lost;
+historical quotes/observations remain. New engine 1.1.0 snapshots require schema
+version 1 and that exact engine version for replay. Old engine snapshots must
+be replayed with their original engine, not silently upgraded.

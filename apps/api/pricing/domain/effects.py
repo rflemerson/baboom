@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 
+from pricing_contracts.effects import SUPPORTED_EFFECTS, unsupported_settings
+
 from .money import ZERO, allocate, percent_of, round_money
 from .types import (
     Adjustment,
@@ -35,46 +37,8 @@ if TYPE_CHECKING:
     )
 
 STAGES = ("catalog", "order", "payment", "shipping", "reward")
-SUPPORTED_EFFECTS = frozenset(
-    {
-        "percentage",
-        "fixed_amount",
-        "fixed_price",
-        "shipping_discount",
-        "cashback",
-        "points",
-        "gift",
-        "multibuy",
-        "tiered",
-        "subscription",
-    },
-)
 
-
-# What each handler honours. The promotion validator holds the same lists;
-# a test keeps the two equal.
-CAPPED_EFFECTS = frozenset(
-    {
-        "percentage",
-        "fixed_amount",
-        "fixed_price",
-        "shipping_discount",
-        "multibuy",
-        "tiered",
-        "subscription",
-    },
-)
-LIMITED_EFFECTS = frozenset({"fixed_amount", "multibuy"})
-
-
-def unsupported_limits(effect: EffectRule) -> list[str]:
-    """Return the limits an effect sets that its handler would not apply."""
-    problems: list[str] = []
-    if effect.cap is not None and effect.kind not in CAPPED_EFFECTS:
-        problems.append(f"{effect.kind} takes no cap")
-    if effect.max_applications is not None and effect.kind not in LIMITED_EFFECTS:
-        problems.append(f"{effect.kind} takes no application limit")
-    return problems
+__all__ = ["SUPPORTED_EFFECTS", "unsupported_settings"]
 
 
 @dataclass
@@ -125,6 +89,7 @@ class Outcome(Protocol):
     shipping_known: bool
     schedule_rates: tuple[Decimal, ...]
     routes: dict[int, RouteFact]
+    tracking_programs: dict[int, set[int]]
 
 
 @dataclass(frozen=True)
@@ -267,14 +232,26 @@ def _percentage(step: _Step) -> None:
 def _fixed_amount(step: _Step) -> None:
     amount = step.decimal("amount") or ZERO
     allocation = step.effect.allocation
-    if allocation == "per_unit":
-        units = sum(line.quantity for line in step.targets)
-        if step.effect.max_applications is not None:
-            units = min(units, step.effect.max_applications)
-        amount *= units
-    elif allocation == "per_line":
-        amount *= len(step.targets)
-    _discount(step, amount, _basis(step))
+    if allocation not in {"per_unit", "per_line"}:
+        _discount(step, amount, _basis(step))
+        return
+    remaining = step.effect.max_applications
+    wanted = []
+    for line in step.targets:
+        count = line.quantity if allocation == "per_unit" else 1
+        if remaining is not None:
+            count = min(count, remaining)
+            remaining -= count
+        wanted.append(min(amount * count, line.current))
+    total = sum(wanted, ZERO)
+    if step.effect.cap is not None:
+        total = min(total, step.effect.cap)
+    total = round_money(total, step.minor)
+    shares = allocate(total, wanted, step.minor)
+    for line, share in zip(step.targets, shares, strict=True):
+        line.current -= share
+    if total:
+        _record(step, _basis(step) + total, total, shares)
 
 
 def _fixed_price(step: _Step) -> None:
@@ -405,10 +382,22 @@ def _subscription(step: _Step) -> None:
     first_rate = step.decimal("first_delivery_rate")
     recurring_rate = step.decimal("recurring_rate")
     base = sum((line.current for line in step.targets), ZERO)
-    first = base - percent_of(base, first_rate) if first_rate else base
-    recurring = base - percent_of(base, recurring_rate) if recurring_rate else base
-    _discount(step, base - first, base)
-    step.outcome.schedule_rates = (first, *([recurring] * (deliveries - 1)))
+    applied_before = len(step.outcome.adjustments)
+    _discount(step, percent_of(base, first_rate) if first_rate else ZERO, base)
+    first_discount = sum(
+        (a.amount for a in step.outcome.adjustments[applied_before:]),
+        ZERO,
+    )
+    recurring_discount = percent_of(base, recurring_rate) if recurring_rate else ZERO
+    if step.effect.cap is not None:
+        recurring_discount = min(recurring_discount, step.effect.cap)
+    recurring = round_money(base - recurring_discount, step.minor)
+    # The first delivery is what the cart charges; later ones the same
+    # basis less their own (capped) discount.
+    step.outcome.schedule_rates = (
+        base - first_discount,
+        *([recurring] * (deliveries - 1)),
+    )
     step.outcome.assumptions.append(
         f"subscription of {deliveries} deliveries every "
         f"{step.params.get('interval_days')} days at today's price",
@@ -512,16 +501,24 @@ def _tracked(step: _Step, terms: RewardTermsFact) -> bool:
     """
     chosen: dict[int, RouteFact] = {}
     for line in step.targets:
+        required = set(step.outcome.tracking_programs.get(line.offer.id, set()))
+        if terms.program_id is not None:
+            required.add(terms.program_id)
         route = next(
             (
                 route
-                for route in step.env.routes
-                if route.offer_id == line.offer.id
+                for route in sorted(step.env.routes, key=lambda item: item.id)
+                if terms.program_id is not None
+                and route.offer_id == line.offer.id
                 and route.kind == "cashback_activation"
-                and (
-                    terms.program_id is None
-                    or route.program_id == terms.program_id
-                    or terms.program_id in route.compatible_programs
+                and required
+                <= (
+                    route.compatible_programs
+                    | (
+                        frozenset({route.program_id})
+                        if route.program_id is not None
+                        else frozenset()
+                    )
                 )
             ),
             None,
@@ -538,6 +535,11 @@ def _tracked(step: _Step, terms: RewardTermsFact) -> bool:
             return False
         chosen[line.offer.id] = route
     step.outcome.routes.update(chosen)
+    if terms.program_id is not None:
+        for offer_id in chosen:
+            step.outcome.tracking_programs.setdefault(offer_id, set()).add(
+                terms.program_id
+            )
     return True
 
 

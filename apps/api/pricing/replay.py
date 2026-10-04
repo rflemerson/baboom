@@ -86,4 +86,10 @@ def inputs_from_snapshot(snapshot: dict[str, object]) -> Inputs:
 
 def replay(quote: PricingQuote) -> PricingResult:
     """Evaluate a kept quote again, from its snapshot alone."""
+    if quote.snapshot.get("schema_version") != 1:
+        msg = "Unsupported snapshot version; use its original engine"
+        raise ValueError(msg)
+    if quote.engine_version != domain_types.ENGINE_VERSION:
+        msg = "Replay requires the original engine version"
+        raise ValueError(msg)
     return evaluate(inputs_from_snapshot(quote.snapshot))

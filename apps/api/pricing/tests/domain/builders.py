@@ -18,6 +18,7 @@ from pricing.domain.types import (
     RevisionRule,
     ScopeRule,
 )
+from pricing_contracts.effects import EFFECT_SPECS
 
 NOW = datetime(2026, 10, 3, 15, 0, tzinfo=UTC)
 MARKET = 1
@@ -48,13 +49,24 @@ def price(offer_id: int, amount: str, **kwargs: object) -> PriceFact:
     )
 
 
+def _preferred(allowed: frozenset[str], *choices: str) -> str:
+    return next((choice for choice in choices if choice in allowed), min(allowed))
+
+
 def effect(kind: str, position: int = 1, **kwargs: object) -> EffectRule:
-    """Build an order-stage effect over the eligible subtotal, prorated."""
+    """Build an effect with the settings its handler applies, unless stated."""
+    spec = EFFECT_SPECS.get(kind)
     defaults: dict[str, object] = {
-        "stage": "order",
-        "basis": "eligible_subtotal",
-        "target": "order",
-        "allocation": "prorated",
+        "stage": _preferred(spec.stages, "order") if spec else "order",
+        "basis": (
+            _preferred(spec.bases, "eligible_subtotal", "current")
+            if spec
+            else "current"
+        ),
+        "target": _preferred(spec.targets, "order") if spec else "order",
+        "allocation": (
+            _preferred(spec.allocations, "prorated", "per_unit") if spec else "prorated"
+        ),
         "params": {},
     }
     defaults.update(kwargs)
