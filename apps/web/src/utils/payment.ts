@@ -15,8 +15,17 @@ export function paymentMethodLabel(code: string | null | undefined): string | nu
   return PAYMENT_METHOD_LABELS[code] ?? code
 }
 
-/** Label a total price with the payment it assumes, when there is one. */
-export function totalPriceLabel(code: string | null | undefined): string {
+/**
+ * Label a total price with the payment it assumes: the named method, or "at
+ * once" when the cash scenario priced it without the store naming the method.
+ */
+export function totalPriceLabel(
+  code: string | null | undefined,
+  scenarioKey: string | null = null,
+): string {
   const method = paymentMethodLabel(code)
-  return method ? `Total price (${method})` : 'Total price'
+  if (method) {
+    return `Total price (${method})`
+  }
+  return scenarioKey === 'cash' ? 'Total price (at once)' : 'Total price'
 }

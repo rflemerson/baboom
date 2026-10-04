@@ -14,6 +14,7 @@ describe('CatalogView', () => {
     vi.mocked(useCatalogQuery).mockReturnValue({
       active: computed(() => ({ slug: 'protein', name: 'Protein' })),
       massUnit: computed(() => 'g'),
+      scenarioKey: computed(() => null),
       error: computed(() => null),
       loading: computed(() => false),
       pageInfo: computed(() => ({

@@ -181,6 +181,19 @@ class FactLoader:
         latest: dict[tuple[int, str], OfferPriceObservation] = {}
         for row in rows:
             latest.setdefault((row.offer_id, row.condition_key), row)
+        # Migrated history says nothing a typed read did not say better: once
+        # an offer has typed observations, its legacy rows stop competing.
+        typed_offers = {
+            row.offer_id
+            for row in latest.values()
+            if row.semantics != OfferPriceObservation.Semantics.LEGACY_UNKNOWN
+        }
+        latest = {
+            key: row
+            for key, row in latest.items()
+            if row.offer_id not in typed_offers
+            or row.semantics != OfferPriceObservation.Semantics.LEGACY_UNKNOWN
+        }
         facts = [
             PriceFact(
                 id=row.pk,

@@ -91,8 +91,9 @@ def _annotate_catalog_base_fields(
     )
 
     return queryset.annotate(
-        price=Subquery(
-            cheapest.values("amount")[:1],
+        # Projections keep the source's precision; the catalog shows cents.
+        price=Cast(
+            Subquery(cheapest.values("amount")[:1]),
             output_field=DecimalField(max_digits=19, decimal_places=2),
         ),
         external_link=Subquery(

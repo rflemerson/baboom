@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -20,11 +21,10 @@ from core.services import AlertSubscriptionService
 from pricing.selectors import projected_prices, public_policy
 
 if TYPE_CHECKING:
-    from decimal import Decimal
-
     from core.models import Product, ProductNutrition
 
 CATALOG_PER_PAGE_CHOICES = {12, 24, 48}
+CENTS = Decimal("0.01")
 CATALOG_DEFAULT_PER_PAGE = 12
 
 
@@ -94,6 +94,13 @@ def _decimal_to_str(value: Decimal | None) -> str | None:
     return str(value)
 
 
+def _money_to_str(value: Decimal | None) -> str | None:
+    """Serialize a price in cents, whatever precision its source kept."""
+    if value is None:
+        return None
+    return str(Decimal(value).quantize(CENTS))
+
+
 def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
     """Index the prefetched profiles of a page by their own id.
 
@@ -128,7 +135,7 @@ def _serialize_catalog_product(
         ),
         "packagingDisplay": product.get_packaging_display(),
         "netMass": _decimal_to_str(product.net_mass),
-        "price": _decimal_to_str(product.price),
+        "price": _money_to_str(product.price),
         "pricePerActive": _decimal_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
         "totalActive": _decimal_to_str(product.total_active),

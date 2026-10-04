@@ -5,13 +5,15 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 from pathlib import Path
 
+from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
 from common.testing import raised
-from offers.models import Offer, StockStatus
+from offers.models import Offer, PriceObservation, StockStatus
 from pricing.domain.types import CartLine, Claim
 from pricing.models import (
     CurrencyConversionQuote,
@@ -192,3 +194,20 @@ class ConversionTests(TestCase):
         assert shown is not None
         assert shown.amount == Decimal("18.00")
         assert not shown.spread_known
+
+
+class LegacyAndTypedTests(TestCase):
+    """Once an offer has typed observations, its legacy history stops counting."""
+
+    def test_an_old_legacy_price_never_undercuts_a_typed_one(self) -> None:
+        """A lower price from the migrated history is not today's price."""
+        offer = _ingest_max_titanium()
+        call_command("backfill_legacy_price_observations", "--apply", stdout=StringIO())
+        PriceObservation.objects.create(offer=offer, price=Decimal("50.00"))
+        call_command("backfill_legacy_price_observations", "--apply", stdout=StringIO())
+
+        result = PricingService().evaluate(
+            QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed")),
+        )
+
+        assert result.merchandise_total == Decimal("99.00")
