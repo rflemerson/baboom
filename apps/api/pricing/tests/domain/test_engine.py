@@ -16,6 +16,7 @@ from pricing.domain.types import (
     Claim,
     CompatibilityFact,
     DecisionStatus,
+    Destination,
     FeeFact,
     OptimizationStatus,
     PaymentChoice,
@@ -737,3 +738,67 @@ class TotalsTests(SimpleTestCase):
 
         assert first == again
         assert fingerprint(later) != first.input_fingerprint
+
+
+class GlobalTests(SimpleTestCase):
+    """SYNTHETIC: currencies, destinations and markets beyond Brazil."""
+
+    def test_a_currency_without_cents_rounds_to_units(self) -> None:
+        """10% off CLP 9,990 is CLP 999, charged as CLP 8,991."""
+        promo = revision(1, effect("percentage", params={"rate": "10"}), currency="CLP")
+        result = evaluate(
+            inputs(
+                prices=(price(1, "9990", currency="CLP"),),
+                revisions=(promo,),
+                context=replace(context(), currency="CLP", minor_unit=0),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal(8991)
+        assert result.adjustments[0].amount == Decimal(999)
+
+    def test_an_alphanumeric_postal_code_matches_its_prefix(self) -> None:
+        """No Brazilian eight-digit rule: SW1A 1AA is inside SW1."""
+        london = revision(
+            1,
+            effect("percentage", params={"rate": "10"}),
+            conditions={
+                "root": {
+                    "kind": "destination",
+                    "country": "GB",
+                    "postal_prefixes": ["SW1"],
+                },
+            },
+        )
+        allowed = policy(allow_conditions=frozenset({"destination"}))
+
+        inside = evaluate(
+            inputs(
+                revisions=(london,),
+                policy=allowed,
+                context=context(destination=Destination("GB", postal_code="SW1A 1AA")),
+            ),
+        )
+        unknown = evaluate(
+            inputs(
+                revisions=(london,),
+                policy=allowed,
+                context=context(destination=Destination("GB")),
+            ),
+        )
+
+        assert inside.merchandise_total == Decimal("90.00")
+        assert unknown.merchandise_total == Decimal("100.00")
+        assert DecisionStatus.UNKNOWN in _statuses(unknown)["revision 1"]
+
+    def test_a_price_in_another_currency_is_never_compared(self) -> None:
+        """USD 30 is not BRL 30."""
+        result = evaluate(inputs(prices=(price(1, "30.00", currency="USD"),)))
+
+        assert result.merchandise_total is None
+
+    def test_an_offer_of_another_market_is_refused(self) -> None:
+        """A ranking is per market."""
+        result = evaluate(inputs(offers=(replace(offer(), market_id=2),)))
+
+        assert DecisionStatus.INELIGIBLE in _statuses(result)["offer 1"]

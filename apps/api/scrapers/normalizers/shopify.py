@@ -6,6 +6,7 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
+from ..capabilities import AdapterCapabilities
 from ..contracts import (
     PriceInput,
     ScrapedOfferInput,
@@ -28,6 +29,16 @@ class ShopifyNormalizer:
     """Normalize Shopify products into one offer per variant."""
 
     provider = "shopify"
+    capabilities = AdapterCapabilities(
+        version="2",
+        variants="complete",
+        sellers="channel_owner_only",
+        payment_prices="none",
+        cart_quote="none",
+        destination_delivery="none",
+        rewards="none",
+        selectable_route="variant",
+    )
 
     def __init__(
         self,

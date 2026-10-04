@@ -72,4 +72,12 @@ no spider fetches or stores product-page HTML.
   the payment group maps to a method (`instantPaymentPaymentGroup` is Pix), and
   an unknown group keeps its name with no method.
 
+## Feed
+
+- `FeedSpider` reads a paged JSON feed (`{"listings": [...], "next": url}`);
+  the format is documented in `scrapers/normalizers/feed.py`.
+- A store or marketplace on a feed is configuration: slug, name, feed URL and
+  market. Offers are `<variant>@<seller>`; the store's own offers
+  `<variant>@owner`.
+
 All scraper rows should be skipped when URL or price cannot be parsed.

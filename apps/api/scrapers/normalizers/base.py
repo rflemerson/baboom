@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    from ..capabilities import AdapterCapabilities
     from ..contracts import ScrapedProductInput
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ class ProductNormalizer(Protocol):
     """Convert one raw store product into a persistence-ready product."""
 
     provider: str
+    capabilities: AdapterCapabilities
 
     def normalize(
         self,

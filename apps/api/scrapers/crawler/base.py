@@ -10,10 +10,13 @@ from urllib.parse import urlencode
 
 from scrapy import Request, Spider
 
+from ..capabilities import PROVIDER_LIMITS
 from ..contracts import MarketInput, ScrapedProductInput
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
+
+    from scrapy.settings import Settings
 
     from ..normalizers.base import ProductNormalizer
 
@@ -39,6 +42,14 @@ class CatalogSpider(Spider):
     MARKET_COUNTRY = "BR"
     MARKET_CURRENCY = "BRL"
     MARKET_TIMEZONE = "America/Sao_Paulo"
+
+    @classmethod
+    def update_settings(cls, settings: Settings) -> None:
+        """Apply the provider's limits, shared by every store on the platform."""
+        super().update_settings(settings)
+        provider = getattr(getattr(cls, "normalizer", None), "provider", "")
+        for name, value in PROVIDER_LIMITS.get(provider, {}).items():
+            settings.set(name, value, priority="spider")
 
     def __init__(
         self, categories: list[str] | str | None = None, **kwargs: object
@@ -179,7 +190,12 @@ class CatalogSpider(Spider):
 
     def with_market(self, product: ScrapedProductInput) -> ScrapedProductInput:
         """Attach the declared market to a normalized page."""
-        return product.model_copy(update={"market": self.market_input()})
+        return product.model_copy(
+            update={
+                "market": self.market_input(),
+                "adapter_version": self.normalizer.capabilities.version,
+            },
+        )
 
     def product_id(self, raw: dict) -> str:
         """Return the platform product identifier used for cross-category dedupe."""

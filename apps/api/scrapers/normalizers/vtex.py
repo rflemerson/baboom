@@ -6,6 +6,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, NamedTuple
 
+from ..capabilities import AdapterCapabilities
 from ..contracts import (
     PriceInput,
     ScrapedOfferInput,
@@ -56,6 +57,16 @@ class VtexNormalizer:
     """
 
     provider = "vtex"
+    capabilities = AdapterCapabilities(
+        version="2",
+        variants="complete",
+        sellers="named",
+        payment_prices="complete",
+        cart_quote="none",
+        destination_delivery="none",
+        rewards="none",
+        selectable_route="variant",
+    )
 
     def __init__(self, *, context_platform: str = "vtex_legacy") -> None:
         """Keep the source-context envelope used by the calling VTEX API."""

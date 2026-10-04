@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Any, NamedTuple
 
+from ..capabilities import AdapterCapabilities
 from ..contracts import (
     PriceInput,
     ScrapedOfferInput,
@@ -50,6 +51,16 @@ class NuvemshopNormalizer:
     """
 
     provider = "nuvemshop"
+    capabilities = AdapterCapabilities(
+        version="2",
+        variants="complete",
+        sellers="channel_owner_only",
+        payment_prices="partial",
+        cart_quote="none",
+        destination_delivery="none",
+        rewards="none",
+        selectable_route="variant",
+    )
 
     def page_url(self, listing: dict) -> str:
         """Return the product page a listing entry points to, without a query."""

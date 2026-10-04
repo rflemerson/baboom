@@ -7,6 +7,7 @@ stores crawled today are integration samples, not its definition.
 
 - [Model](./pricing-model.md): every entity, its kind, fields and guarantees.
 - [Migration](./pricing-migration.md): deliveries, data migration, known gaps.
+- [Connectors](./pricing-connectors.md): adapters, onboarding, marketplace access.
 - [Audit](./pricing-audit.md): what each sampled store published on
   2026-10-03, with fixtures.
 

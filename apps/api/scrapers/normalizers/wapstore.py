@@ -6,6 +6,7 @@ import json
 import logging
 from typing import NamedTuple
 
+from ..capabilities import AdapterCapabilities
 from ..contracts import (
     PriceInput,
     ScrapedOfferInput,
@@ -54,6 +55,16 @@ class WapStoreNormalizer:
     """
 
     provider = "wapstore"
+    capabilities = AdapterCapabilities(
+        version="2",
+        variants="complete",
+        sellers="channel_owner_only",
+        payment_prices="partial",
+        cart_quote="none",
+        destination_delivery="none",
+        rewards="none",
+        selectable_route="page_only",
+    )
 
     def normalize(
         self,
