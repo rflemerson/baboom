@@ -116,8 +116,13 @@ offers that a successful crawl no longer sees.
   launch switch), its catalog reads `core.selectors.current_prices` instead.
   Public policies: `normal` (store price, no benefits, default) and `best`
   (best price paid now; falls back to normal).
-- `pricing.invalidation.Repricing` decides what a change reaches and
-  schedules `refresh_projections` after commit. Crawls and promotions announce
+- `pricing.invalidation.Repricing` decides what a change reaches: it first
+  expires rows the change may have made wrong (a moved route's old and new
+  offers; prices a changed promotion gave), then gathers the offers of one
+  transaction into a single `refresh_projections` after commit. `pre_save`
+  receivers keep the replaced row so its old targets are repriced too.
+  Category moves through treebeard's `move()` skip `save()` and wait for the
+  hourly refresh. Crawls and promotions announce
   themselves with their own signals (`offers_observed`, `revision_changed`;
   a promotion reprices only the offers its target scopes name). Admin-edited
   rows of other apps (`ProductStore`, `Product`, `PurchaseRoute`) use model
