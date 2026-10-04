@@ -120,7 +120,10 @@ def _annotate_catalog_base_fields(
             cheapest.values("amount")[:1],
             output_field=DecimalField(max_digits=19, decimal_places=6),
         ),
-        comparison_price=Subquery(cheapest.values("comparison_amount")[:1]),
+        comparison_price=Subquery(
+            cheapest.values("comparison_amount")[:1],
+            output_field=DecimalField(max_digits=19, decimal_places=6),
+        ),
         pricing_details=Subquery(cheapest.values("pricing_details")[:1]),
         external_link=Subquery(
             cheapest.values("url")[:1],
@@ -173,8 +176,10 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
             output_field=DecimalField(max_digits=5, decimal_places=1),
         ),
     ).annotate(
+        # The ranking, the price filters and the price per active all use the
+        # value the policy compares; ``price`` is what the buyer is charged.
         price_per_active=ExpressionWrapper(
-            F("price") / Cast(total_active_safe, output_field=FloatField()),
+            F("comparison_price") / Cast(total_active_safe, output_field=FloatField()),
             output_field=DecimalField(max_digits=20, decimal_places=10),
         ),
     )
@@ -260,8 +265,8 @@ def _apply_catalog_numeric_filters(
 ) -> QuerySet[Product]:
     """Apply numeric range filters to annotated catalog metrics."""
     numeric_filters = (
-        ("price__gte", filters.price_min),
-        ("price__lte", filters.price_max),
+        ("comparison_price__gte", filters.price_min),
+        ("comparison_price__lte", filters.price_max),
         (
             "price_per_active__gte",
             filters.price_per_active_min,

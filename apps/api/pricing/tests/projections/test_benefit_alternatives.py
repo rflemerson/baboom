@@ -12,6 +12,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 
+from core.dtos import CatalogProductsFilters
 from core.models import Product, ProductStore
 from core.selectors import public_catalog_products
 from offers.models import Evidence, Offer, StockStatus
@@ -157,6 +158,35 @@ class ObjectiveTests(BenefitCatalog, TestCase):
         assert a_net.amount == Decimal(100)
         assert a_net.monetary_reward == Decimal(20)
         assert a_net.estimated_net_cost == Decimal(80)
+
+    def test_filters_and_price_per_active_use_the_compared_value(self) -> None:
+        """A charged R$ 100, compared at R$ 80: kept under a R$ 90 maximum."""
+        self._publish(
+            self.offers["A"],
+            "cashback",
+            {},
+            reward_rate=Decimal(20),
+        )
+        net = self._policy(
+            "net",
+            allow_rewards=True,
+            net_cost_counts_money_rewards=True,
+            objective="estimated_net_cost",
+        )
+        self._free_shipping()
+        ProjectionService().refresh()
+        source = projected_prices(
+            net,
+            timezone.now(),
+            country="BR",
+            currency="BRL",
+        )
+
+        rows = public_catalog_products(source, CatalogProductsFilters(price_max=90))
+        row = rows.get(name="A")
+
+        assert row.price == Decimal(100)
+        assert row.comparison_price == Decimal(80)
 
     def _ranking_after_refresh(
         self,
