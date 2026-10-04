@@ -109,3 +109,19 @@ acceptance tests beside the code it concerns:
 | R04 observation restrictions lost; R05 currencies compared nominally; R13 caches outliving prices | `b1d7fcf` |
 | R06 tracked cashback without a route; R07 Pix applied twice in mixed carts; R09 multibuy ignoring its cap; R12 `any` payment unused | `3a2bd32` |
 | R08 snapshots that could not replay; R10 exponential combination search; R11 priceless quotes raising | `655e1f0` |
+
+### Activation gate, verified 2026-10-04
+
+- Backend suite on SQLite and PostgreSQL (572 tests; the freeze triggers run
+  on PostgreSQL), including the review's reproductions and
+  `pricing/tests/test_migration_path.py`: legacy history and a third-party
+  VTEX seller through both backfills, a new crawl that collides, projections
+  and the shadow gate.
+- A local copy of production (523 published products), migrated and
+  backfilled: `compare_pricing_shadow --policy listed --country BR
+  --currency BRL` reports 523 equal, comparing amount, offer, seller,
+  variant and link.
+- Vue unit tests, and Playwright E2E including `e2e/scenario.spec.ts`
+  (choosing "Paid at once" requests `scenario=cash` and shows the method,
+  the currency and the seller warning). CI does not run E2E; run them
+  locally with `npx playwright test`.

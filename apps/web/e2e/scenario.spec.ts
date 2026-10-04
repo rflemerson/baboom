@@ -1,0 +1,63 @@
+import { expect, test, type Route } from '@playwright/test'
+
+const PAGE_INFO = {
+  currentPage: 1,
+  perPage: 12,
+  totalPages: 1,
+  totalCount: 1,
+  hasPreviousPage: false,
+  hasNextPage: false,
+}
+
+function product(price: string, paymentMethod: string | null, linkSelectsSeller: boolean) {
+  return {
+    id: 1,
+    name: 'Soy Protein Natural 1 kg',
+    packagingDisplay: 'Refill Package',
+    netMass: '1000',
+    price,
+    currency: 'BRL',
+    paymentMethod,
+    linkSelectsSeller,
+    pricePerActive: '0.10',
+    concentration: '86.7',
+    totalActive: '866.67',
+    externalLink: 'https://example.com/soy',
+    brand: { name: 'Growth Supplements' },
+    category: { name: 'Soja' },
+    tags: [],
+  }
+}
+
+test('choosing the cash scenario ranks by the price paid at once', async ({ page }) => {
+  const scenarios: Array<string | null> = []
+  await page.route('**/api/catalog/products/**', async (route: Route) => {
+    const url = new URL(route.request().url())
+    const scenario = url.searchParams.get('scenario')
+    scenarios.push(scenario)
+    const cash = scenario === 'cash'
+    await route.fulfill({
+      json: {
+        active: { slug: 'protein', name: 'Protein' },
+        massUnit: 'g',
+        market: { country: 'BR', currency: 'BRL' },
+        scenario: cash
+          ? { key: 'cash', version: 1, source: 'projection' }
+          : { key: 'listed', version: null, source: 'legacy' },
+        pageInfo: PAGE_INFO,
+        items: [cash ? product('89.90', 'pix', false) : product('99.88', null, true)],
+      },
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByText('BRL 99.88')).toBeVisible()
+  await expect(page.getByText('Total price', { exact: true })).toBeVisible()
+
+  await page.getByLabel('Price the catalog compares').selectOption('cash')
+
+  await expect(page.getByText('BRL 89.90')).toBeVisible()
+  await expect(page.getByText('Total price (Pix)')).toBeVisible()
+  await expect(page.getByText("may open another seller's offer")).toBeVisible()
+  expect(scenarios).toContain('cash')
+})
