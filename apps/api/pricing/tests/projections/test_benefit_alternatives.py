@@ -304,3 +304,41 @@ class PersonalBenefitTests(BenefitCatalog, TestCase):
     def policy_for_public(self) -> PricingPolicyRevision:
         """Return the seeded public policy, which counts no buyer claim."""
         return PricingPolicyRevision.objects.get(key="best", number=1)
+
+
+class ExclusionTests(BenefitCatalog, TestCase):
+    """Excluding a benefit reads the same offer's price without it."""
+
+    def test_excluding_the_coupon_keeps_the_same_offers_plain_price(self) -> None:
+        """A at R$ 100 with a R$ 10 coupon: without coupons, A is R$ 100."""
+        self._publish(self.offers["A"], "fixed_amount", {"amount": "10"}, code="SYN10")
+        policy = self._policy("coupons", allow_codes=True, auto_public_codes=True)
+        ProjectionService().refresh()
+
+        default = dict(self._ranking(policy))
+        without = dict(self._ranking(policy, BenefitFilter(uses_coupon=False)))
+
+        assert default["A"] == Decimal(90)
+        assert without["A"] == Decimal(100)
+
+    def test_cashback_without_coupon_reads_its_own_alternative(self) -> None:
+        """Cashback required, coupon excluded: the cashback-only price."""
+        self._publish(self.offers["A"], "fixed_amount", {"amount": "10"}, code="SYN10")
+        self._publish(self.offers["A"], "cashback", {}, reward_rate=Decimal(5))
+        policy = self._policy(
+            "both",
+            allow_codes=True,
+            auto_public_codes=True,
+            allow_rewards=True,
+        )
+        ProjectionService().refresh()
+
+        ranking = dict(
+            self._ranking(
+                policy,
+                BenefitFilter(uses_coupon=False, has_cashback=True),
+            ),
+        )
+
+        assert ranking["A"] == Decimal(100)
+        assert ranking["B"] is None

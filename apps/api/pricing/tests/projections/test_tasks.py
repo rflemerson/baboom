@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from common.testing import raised
-from pricing.models import PricingPolicyRevision
+from pricing.models import OfferScenarioProjection, PricingPolicyRevision
 from pricing.tasks import refresh_projections
 from pricing.tests.projections.test_projections import TwoProductCatalog
 
@@ -18,10 +18,12 @@ class RefreshTaskTests(TwoProductCatalog, TestCase):
     def test_refresh_by_store_and_for_all(self) -> None:
         """Two offers of one store, two seeded policies."""
         policies = PricingPolicyRevision.objects.count()
+        winners = OfferScenarioProjection.objects.filter(alternative="best")
 
-        assert refresh_projections("store") == len(self.offers) * policies
+        written = refresh_projections("store")
+        assert winners.count() == len(self.offers) * policies
         assert refresh_projections("elsewhere") == 0
-        assert refresh_projections() == len(self.offers) * policies
+        assert refresh_projections() == written
 
 
 class PolicyFreezeTests(TestCase):

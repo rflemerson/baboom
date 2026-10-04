@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class Terms:
-    """What a caller adds to the facts: tax regime, benefit filter, preloaded costs."""
+    """What a caller adds to the facts: tax regime, exact benefits, preloaded costs."""
 
     tax_inclusion: str = "unknown"
-    requirement: frozenset[str] = frozenset()
+    benefits: frozenset[str] | None = None
     costs: CostBook | None = None
 
     def inputs(
@@ -56,5 +56,5 @@ class Terms:
             shipping=shipping,
             fees=fees,
             fees_status=fees_status,
-            requirement=self.requirement,
+            benefits=self.benefits,
         )

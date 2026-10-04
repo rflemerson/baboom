@@ -85,9 +85,10 @@ class Inputs:
     # "inclusion_unknown": not even whether prices include taxes is known.
     # Only the first two give a known total.
     fees_status: str = "not_consulted"
-    # Benefits the chosen combination must use: "coupon", "cashback". Empty
-    # asks for the best combination whatever it uses.
-    requirement: frozenset[str] = frozenset()
+    # The exact benefits the chosen combination uses, of "coupon" and
+    # "cashback": an empty set asks for neither. None takes the best
+    # combination whatever it uses.
+    benefits: frozenset[str] | None = None
 
 
 @dataclass
@@ -133,7 +134,7 @@ def evaluate(inputs: Inputs) -> PricingResult:
             Decision(
                 "scenario",
                 DecisionStatus.INELIGIBLE,
-                f"no combination uses {sorted(inputs.requirement)}",
+                f"no combination uses exactly {sorted(inputs.benefits or ())}",
             ),
         )
         return _empty(inputs, decisions, missing, assumptions)
@@ -689,12 +690,18 @@ def _has_cashback(outcome: _Outcome) -> bool:
 
 
 def _meets(inputs: Inputs, outcome: _Outcome) -> bool:
-    """Tell whether a combination uses every benefit the request requires."""
-    checks = {
-        "coupon": lambda: _uses_coupon(inputs, outcome),
-        "cashback": lambda: _has_cashback(outcome),
+    """Tell whether a combination uses exactly the benefits requested."""
+    if inputs.benefits is None:
+        return True
+    used = {
+        name
+        for name, present in (
+            ("coupon", _uses_coupon(inputs, outcome)),
+            ("cashback", _has_cashback(outcome)),
+        )
+        if present
     }
-    return all(checks[name]() for name in inputs.requirement)
+    return used == inputs.benefits
 
 
 def _objective_amount(inputs: Inputs, outcome: _Outcome) -> Decimal:

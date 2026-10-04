@@ -110,13 +110,13 @@ class RankingTests(TwoProductCatalog, TestCase):
 
     def test_refresh_projects_every_linked_offer_under_every_policy(self) -> None:
         """Two offers, two seeded public policies."""
-        written = ProjectionService().refresh()
+        ProjectionService().refresh()
 
-        assert written == len(self.offers) * PricingPolicyRevision.objects.count()
-        projection = OfferScenarioProjection.objects.get(
-            offer=self.offers["A"],
-            policy__key="best",
+        winners = OfferScenarioProjection.objects.filter(alternative="best")
+        assert (
+            winners.count() == len(self.offers) * PricingPolicyRevision.objects.count()
         )
+        projection = winners.get(offer=self.offers["A"], policy__key="best")
         assert projection.amount == Decimal("100.00")
         assert projection.status == "priced"
 

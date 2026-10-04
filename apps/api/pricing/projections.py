@@ -7,6 +7,7 @@ loaded once per refresh, not per offer.
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -53,18 +54,24 @@ class _Batch:
     costs: CostBook
     codes: frozenset[str]
 
-    def requirements(self) -> list[frozenset[str]]:
-        """Return the winner, then each benefit and their union the policy allows."""
-        benefits = []
+    def signatures(self) -> list[frozenset[str] | None]:
+        """Return the winner, then each exact set of benefits the policy allows.
+
+        Every subset is kept, the empty one included, so a filter that
+        requires or excludes a benefit finds the same offer's best price
+        with exactly the benefits it allows.
+        """
+        if not self.policy.apply_benefits:
+            return [None]
+        names = []
         if self.codes:
-            benefits.append("coupon")
+            names.append("coupon")
         if self.policy.allow_rewards:
-            benefits.append("cashback")
-        requirements = [frozenset()]
-        requirements += [frozenset({name}) for name in benefits]
-        if len(benefits) > 1:
-            requirements.append(frozenset(benefits))
-        return requirements
+            names.append("cashback")
+        subsets: list[frozenset[str] | None] = [None]
+        for size in range(len(names) + 1):
+            subsets += [frozenset(c) for c in itertools.combinations(names, size)]
+        return subsets
 
 
 class ProjectionService:
@@ -166,16 +173,17 @@ class ProjectionService:
     def _projections(
         self, offer_id: int, batch: _Batch
     ) -> list[OfferScenarioProjection]:
-        """Project the winner and the best alternative using each benefit.
+        """Project the winner and the best price with each exact set of benefits.
 
-        A buyer filtering for a coupon or cashback sees the best combination
-        that uses it, even where a combination without it wins by default.
         An alternative that cannot be met is not stored.
         """
         rows = []
-        for requirement in batch.requirements():
-            row = self._projection(offer_id, batch, requirement)
-            if requirement and row.status != OfferScenarioProjection.Status.PRICED:
+        for benefits in batch.signatures():
+            row = self._projection(offer_id, batch, benefits)
+            if (
+                benefits is not None
+                and row.status != OfferScenarioProjection.Status.PRICED
+            ):
                 continue
             rows.append(row)
         return rows
@@ -184,7 +192,7 @@ class ProjectionService:
         self,
         offer_id: int,
         batch: _Batch,
-        requirement: frozenset[str],
+        benefits: frozenset[str] | None,
     ) -> OfferScenarioProjection:
         """Evaluate one offer alone and describe the result for the ranking."""
         facts, policy = batch.facts, batch.policy
@@ -201,7 +209,7 @@ class ProjectionService:
         result = evaluate(
             Terms(
                 tax_inclusion=market.tax_inclusion,
-                requirement=requirement,
+                benefits=benefits,
                 costs=batch.costs,
             ).inputs(
                 facts,
@@ -216,7 +224,7 @@ class ProjectionService:
         route = result.purchase_routes[0] if result.purchase_routes else None
         return OfferScenarioProjection(
             offer_id=offer_id,
-            alternative="+".join(sorted(requirement)) or "best",
+            alternative=_alternative(benefits),
             policy=batch.policy_row,
             market=market,
             currency_id=market.currency_id,
@@ -360,3 +368,10 @@ class ProjectionService:
                 for p in result.selected_prices
             ],
         }
+
+
+def _alternative(benefits: frozenset[str] | None) -> str:
+    """Name a stored alternative: "best", "none", or its benefits joined."""
+    if benefits is None:
+        return "best"
+    return "+".join(sorted(benefits)) or "none"

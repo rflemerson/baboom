@@ -32,26 +32,27 @@ class BenefitFilter:
     has_cashback: bool | None = None
 
     def lookups(self) -> dict[str, object]:
-        """Choose the projected alternative, then exclude what must be absent.
+        """Choose the stored alternatives whose exact benefits fit the filter.
 
-        Requiring a benefit reads the best alternative that uses it, so an
-        offer whose winner skips the coupon is still found with it.
-        Excluding a benefit keeps only alternatives that do not use it.
+        Projections keep the best price per exact set of benefits, so
+        requiring or excluding one reads the same offer's best price with
+        what remains allowed; the cheapest fitting alternative then wins.
         """
-        required = sorted(
-            name
-            for name, wanted in (
-                ("cashback", self.has_cashback),
-                ("coupon", self.uses_coupon),
-            )
-            if wanted
-        )
-        lookups: dict[str, object] = {"alternative": "+".join(required) or "best"}
-        if self.uses_coupon is False:
-            lookups["uses_coupon"] = False
-        if self.has_cashback is False:
-            lookups["has_cashback"] = False
-        return lookups
+        if self.uses_coupon is None and self.has_cashback is None:
+            return {"alternative": "best"}
+        names = []
+        for coupon in _choices(wanted=self.uses_coupon):
+            for cashback in _choices(wanted=self.has_cashback):
+                used = [
+                    n for n, on in (("cashback", cashback), ("coupon", coupon)) if on
+                ]
+                names.append("+".join(used) or "none")
+        return {"alternative__in": names}
+
+
+def _choices(*, wanted: bool | None) -> tuple[bool, ...]:
+    """Return the presence values a filter on one benefit allows."""
+    return (False, True) if wanted is None else (wanted,)
 
 
 DEFAULT_BENEFITS = BenefitFilter()
