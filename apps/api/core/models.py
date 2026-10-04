@@ -12,12 +12,13 @@ from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
-from treebeard.mp_tree import MP_Node
+from treebeard.mp_tree import MP_Node, MP_NodeManager
 
 from common.models import BaseModel
 from offers.models import fold
 
 from . import units
+from .events import category_moved
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -244,8 +245,19 @@ class Tag(MP_Node, BaseModel):
         return self.name
 
 
+class CategoryManager(MP_NodeManager):
+    """Announce a move: treebeard moves nodes without saving them."""
+
+    def move(self, node: Category, target: Category, pos: str | None = None) -> None:
+        """Move a category and its descendants, then tell who prices by them."""
+        super().move(node, target, pos)
+        category_moved.send(sender=Category, category_id=node.pk)
+
+
 class Category(MP_Node, BaseModel):
     """Hierarchical category model."""
+
+    objects = CategoryManager()
 
     name = models.CharField(
         _("Name"),

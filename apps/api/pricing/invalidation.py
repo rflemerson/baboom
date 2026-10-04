@@ -114,6 +114,18 @@ class Repricing:
         )
         self.offers(reached)
 
+    def eligibility(self, offer_ids: list[int]) -> None:
+        """Expire what these offers' promotions gave, then reprice them.
+
+        For a change that may take a promotion away from an offer (another
+        product, brand or category, a moved category): the rows that applied
+        a revision stop serving at once; the others never relied on one.
+        """
+        OfferScenarioProjection.objects.filter(offer_id__in=offer_ids).exclude(
+            explanation__applied=[],
+        ).update(expires_at=timezone.now())
+        self.offers(offer_ids)
+
     def route(self, route: PurchaseRoute, before: PurchaseRoute | None) -> None:
         """Expire the offers a route served and serves: never serve its old link."""
         ids = set(self._route_offers(route))

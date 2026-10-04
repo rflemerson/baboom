@@ -130,8 +130,11 @@ offers that a successful crawl no longer sees.
   offers; prices a changed promotion gave), then gathers the offers of one
   transaction into a single `refresh_projections` after commit. `pre_save`
   receivers keep the replaced row so its old targets are repriced too.
-  Category moves through treebeard's `move()` skip `save()` and wait for the
-  hourly refresh. Crawls and promotions announce
+  A change that may take a promotion away (an offer linked to another product,
+  a product's brand or category, a category moved with treebeard's manager
+  `move()`, which `core.models.CategoryManager` announces with
+  `core.events.category_moved`) expires the rows that applied a revision at
+  once. Crawls and promotions announce
   themselves with their own signals (`offers_observed`, `revision_changed`;
   a promotion reprices only the offers its target scopes name). Admin-edited
   rows of other apps (`ProductStore`, `Product`, `PurchaseRoute`) use model
