@@ -105,7 +105,11 @@ offers that a successful crawl no longer sees.
   method adds each of the policy's cash methods (so "20% off with Pix" applies
   on the full price), an unstated price allows only "any method", where
   method conditions stay unknown. The chosen payment is in the result. Bases,
-  payments and combinations share one budget (`max_combinations`).
+  payments and combinations share one budget (`max_combinations`), and
+  at most 64 promotions are compared pairwise. A result is `bounded` when any
+  part of the search was cut, with or without a price ("not found in the
+  budget"); `complete` with no price means no eligible alternative exists. The
+  projection stores it (`optimization_status`) and REST shows `optimizationStatus`.
 - `pricing.services.PricingService` is the only bridge between the ORM and the
   engine: `FactLoader` reads offers, the standing observation of each price
   condition (a complete read withdraws what it no longer states), and the

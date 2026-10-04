@@ -19,7 +19,7 @@ from django.utils.translation import gettext_lazy as _
 
 from common.models import BaseModel
 
-from .domain.types import Policy
+from .domain.types import OptimizationStatus, Policy
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -481,6 +481,17 @@ class OfferScenarioProjection(BaseModel):
         ),
     )
     comparison_amount = models.DecimalField(null=True, blank=True, **MONEY)
+    optimization_status = models.CharField(
+        _("Optimization status"),
+        max_length=10,
+        choices=[(status.value, status.value) for status in OptimizationStatus],
+        default=OptimizationStatus.COMPLETE,
+        help_text=_(
+            "'bounded' when the search stopped before covering every base price, "
+            "payment and combination of promotions: the amount may not be the "
+            "cheapest, or an alternative may exist that was not found.",
+        ),
+    )
     objective = models.CharField(max_length=30, default="items_payable")
     total_payable = models.DecimalField(null=True, blank=True, **MONEY)
     estimated_net_cost = models.DecimalField(null=True, blank=True, **MONEY)

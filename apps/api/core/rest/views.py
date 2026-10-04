@@ -179,6 +179,7 @@ def _serialize_catalog_product(
             currency.minor_unit,
         ),
         "paymentMethod": product.payment_method or None,
+        "optimizationStatus": product.price_search_status or None,
         "linkSelectsSeller": product.link_selects_seller,
         "brand": {"name": product.brand.name},
         "category": {"name": product.category.name} if product.category else None,

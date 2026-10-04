@@ -48,6 +48,7 @@ class Migration(migrations.Migration):
                 ('payment_method', models.CharField(blank=True, max_length=50, verbose_name='Payment Method')),
                 ('alternative', models.CharField(default='best', help_text="'best' is the winning combination; 'none', 'coupon', 'cashback' and 'cashback+coupon' are the best combinations using exactly those benefits; 'base' is the price with no promotion. All are kept so a filter or an expired promotion never hides a valid option.", max_length=40, verbose_name='Alternative')),
                 ('comparison_amount', models.DecimalField(blank=True, decimal_places=6, max_digits=19, null=True)),
+                ('optimization_status', models.CharField(choices=[('complete', 'complete'), ('bounded', 'bounded')], default='complete', help_text="'bounded' when the search stopped before covering every base price, payment and combination of promotions: the amount may not be the cheapest, or an alternative may exist that was not found.", max_length=10, verbose_name='Optimization status')),
                 ('objective', models.CharField(default='items_payable', max_length=30)),
                 ('total_payable', models.DecimalField(blank=True, decimal_places=6, max_digits=19, null=True)),
                 ('estimated_net_cost', models.DecimalField(blank=True, decimal_places=6, max_digits=19, null=True)),

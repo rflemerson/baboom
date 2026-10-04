@@ -32,8 +32,8 @@ from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
 # A price source returns, for the outer product, its priced offers cheapest
-# first, each with ``amount``, ``url`` and ``payment_method``. The catalog does
-# not know which pricing policy produced them.
+# first, each with ``amount``, ``url``, ``payment_method`` and ``search_status``.
+# The catalog does not know which pricing policy produced them.
 PriceSource = Callable[[], QuerySet]
 
 
@@ -64,6 +64,7 @@ def current_prices(country: str, currency: str) -> PriceSource:
                 payment_method=Value(""),
                 offer_id=F("pk"),
                 expires_at=Value(None, output_field=DateTimeField()),
+                search_status=Value(""),
                 link_fixes=Coalesce(
                     F("seller_account__is_channel_owner"),
                     Value(value=True),
@@ -140,6 +141,10 @@ def _annotate_catalog_base_fields(
         price_expires_at=Subquery(
             cheapest.values("expires_at")[:1],
             output_field=DateTimeField(),
+        ),
+        price_search_status=Subquery(
+            cheapest.values("search_status")[:1],
+            output_field=CharField(),
         ),
         link_selects_seller=Subquery(
             cheapest.values("link_fixes")[:1],

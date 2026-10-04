@@ -19,6 +19,11 @@ if TYPE_CHECKING:
     )
 
 
+# How many promotions are compared pairwise (one check per pair). Beyond it
+# the first ones by id are searched and the result is bounded.
+MAX_CANDIDATES = 64
+
+
 def _names(rule: CompatibilityFact, other: RevisionRule) -> bool:
     """Tell whether a compatibility rule is about another revision."""
     if rule.other_kind == "promotion":

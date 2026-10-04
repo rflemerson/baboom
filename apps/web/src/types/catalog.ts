@@ -50,6 +50,7 @@ export interface CatalogProduct {
     currency: string
   } | null
   routeInstructions?: string | null
+  optimizationStatus?: 'complete' | 'bounded' | null
   currency?: string | null
   linkSelectsSeller?: boolean | null
   brand: {

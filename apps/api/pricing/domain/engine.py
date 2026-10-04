@@ -43,7 +43,7 @@ from .application import (
 )
 from .candidates import candidate_revisions
 from .results import build_result, empty_result
-from .search import combinations
+from .search import MAX_CANDIDATES, combinations
 
 
 def evaluate(inputs: Inputs) -> PricingResult:
@@ -131,9 +131,18 @@ def _best_for_base(
         LineState.start(line, offers[line.offer_id], price)
         for line, price in zip(scoped.context.lines, selected, strict=True)
     ]
-    candidates = candidate_revisions(scoped, lines, decisions)
+    eligible = candidate_revisions(scoped, lines, decisions)
+    candidates = eligible[:MAX_CANDIDATES]
+    decisions += [
+        Decision(
+            f"revision {revision.id}",
+            DecisionStatus.NOT_CHOSEN,
+            "beyond the number of promotions compared",
+        )
+        for revision in eligible[MAX_CANDIDATES:]
+    ]
     subsets, status = combinations(candidates, decisions, assumptions, budget)
-    cut = status is OptimizationStatus.BOUNDED
+    cut = status is OptimizationStatus.BOUNDED or len(candidates) < len(eligible)
     best: Outcome | None = None
     best_key: tuple[Decimal, Decimal, int, Decimal] | None = None
     alone: dict[int, Outcome] = {}

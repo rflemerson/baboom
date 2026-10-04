@@ -253,6 +253,7 @@ class ProjectionService:
                 else None
             ),
             comparison_amount=self._comparison(result, policy.objective),
+            optimization_status=result.optimization_status,
             objective=policy.objective,
             total_payable=result.total_payable,
             estimated_net_cost=result.estimated_net_cost,

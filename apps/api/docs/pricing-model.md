@@ -237,7 +237,7 @@ Tables:
 | `QuoteLine` | `quote`, `offer`, `quantity`, merchandise and allocated amounts | Queryable per offer without parsing snapshots |
 | `ShippingQuote` | group fingerprint, seller account, destination (country, subdivision, postal code hash), modality, packages (typed), amount, currency, estimate, source, `observed_at`, `expires_at`, included benefits | Quantity, seller, value and modality are part of the quote, not just offer + postcode range |
 | `TaxFeeQuote` | group fingerprint, component kind, base, amount, inclusion, source | Taxes already in a price are never added again |
-| `OfferScenarioProjection` | `offer`, `market`, `policy_revision`, `currency`, `amount`, `status`, `observation`, `fingerprint`, `computed_at`, `expires_at` | Ranked and paginated in the database, before pagination |
+| `OfferScenarioProjection` | `offer`, `market`, `policy_revision`, `currency`, `amount`, `status`, `optimization_status`, `observation`, `fingerprint`, `computed_at`, `expires_at` | Ranked and paginated in the database, before pagination |
 | `FeaturedOfferObservation` | `listing_variant`, `offer`, `observed_at`, `batch` | A buy box is an observation |
 
 `ShippingQuote` and `TaxFeeQuote` are observations
