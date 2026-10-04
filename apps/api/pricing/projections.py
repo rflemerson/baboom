@@ -229,6 +229,14 @@ class ProjectionService:
         result = evaluate(terms.inputs(facts, policy, context))
         applied = [r for r in facts.revisions if r.id in result.applied_revisions]
         route = result.purchase_routes[0] if result.purchase_routes else None
+        reward = sum(
+            (
+                item.amount
+                for item in result.deferred_rewards
+                if item.credited_as == "money" and item.amount is not None
+            ),
+            Decimal(0),
+        )
         return OfferScenarioProjection(
             offer_id=offer_id,
             alternative=alternative,
@@ -248,14 +256,7 @@ class ProjectionService:
             objective=policy.objective,
             total_payable=result.total_payable,
             estimated_net_cost=result.estimated_net_cost,
-            monetary_reward=sum(
-                (
-                    reward.amount
-                    for reward in result.deferred_rewards
-                    if reward.credited_as == "money" and reward.amount is not None
-                ),
-                Decimal(0),
-            ),
+            monetary_reward=reward,
             uses_coupon=any(
                 code in batch.codes for r in applied for _kind, code in r.codes
             ),
@@ -269,6 +270,7 @@ class ProjectionService:
             explanation={
                 **self._explanation(result),
                 "objective": policy.objective,
+                "cashback": str(reward) if reward else None,
                 "public_codes": sorted(
                     {
                         code

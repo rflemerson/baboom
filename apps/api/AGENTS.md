@@ -156,7 +156,9 @@ offers that a successful crawl no longer sees.
 - `scrapers/management/commands/cutover_offer_identities.py` is an explicit,
   preview-first legacy-identity transition. It never runs on deployment;
   operators must review ambiguous mappings before opting into archival.
-- Public catalog and alerts: REST.
+- Public catalog and alerts: REST. Each product states what the shown price
+  needs: `couponCodes`, `paymentMethod`, `cashback` (shown apart, never taken
+  off `price`) and `routeInstructions`, read from the projection's explanation.
 - Scrapers retain `ScrapedPage` metadata and the store's own product context;
   humans curate the catalog through Django admin.
 - Nothing here fetches or stores product-page HTML. Reading a product page is

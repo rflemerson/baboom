@@ -59,3 +59,33 @@ test('choosing the best price ranks by the price paid now', async ({ page }) => 
   await expect(page.getByText("may open another seller's offer")).toBeVisible()
   expect(scenarios).toContain('best')
 })
+
+test('the best price with a coupon says which coupon to use', async ({ page }) => {
+  await page.route('**/api/catalog/products/**', async (route: Route) => {
+    await route.fulfill({
+      json: {
+        active: { slug: 'protein', name: 'Protein' },
+        massUnit: 'g',
+        market: { country: 'BR', currency: 'BRL' },
+        scenario: { key: 'best', version: 1 },
+        pageInfo: PAGE_INFO,
+        items: [
+          {
+            ...product('79.90', 'pix', true),
+            couponCodes: ['SYNTH20'],
+            cashback: { amount: '8.00', currency: 'BRL' },
+            routeInstructions: null,
+          },
+        ],
+      },
+    })
+  })
+
+  await page.goto('/')
+  await page.getByLabel('Price the catalog compares').selectOption('best')
+
+  await expect(page.getByText('Use o cupom SYNTH20')).toBeVisible()
+  await expect(page.getByText('Pagando com Pix')).toBeVisible()
+  await expect(page.getByText('+ BRL 8.00 de cashback')).toBeVisible()
+  await expect(page.getByText('BRL 79.90')).toBeVisible()
+})

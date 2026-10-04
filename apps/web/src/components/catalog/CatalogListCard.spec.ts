@@ -36,4 +36,51 @@ describe('CatalogListCard', () => {
       'https://example.com/whey-isolado',
     )
   })
+
+  it('tells what to do to get the shown price', () => {
+    const wrapper = mount(CatalogListCard, {
+      props: {
+        product: {
+          id: 4,
+          name: 'Whey 900g',
+          packagingDisplay: 'Refill Package',
+          price: '80.00',
+          currency: 'BRL',
+          paymentMethod: 'pix',
+          couponCodes: ['SYNTH20'],
+          cashback: { amount: '15.00', currency: 'BRL' },
+          routeInstructions: 'Open the link before adding to the cart.',
+          brand: { name: 'x' },
+          tags: [],
+        },
+      },
+    })
+
+    const notes = wrapper.get('[data-testid="price-notes"]').text()
+    expect(notes).toContain('Use o cupom SYNTH20')
+    expect(notes).toContain('Pagando com Pix')
+    expect(notes).toContain('+ BRL 15.00 de cashback')
+    expect(notes).toContain('Open the link before adding to the cart.')
+    expect(wrapper.text()).toContain('BRL 80.00')
+  })
+
+  it('shows no price notes when the price needs nothing', () => {
+    const wrapper = mount(CatalogListCard, {
+      props: {
+        product: {
+          id: 5,
+          name: 'Whey',
+          packagingDisplay: 'Refill Package',
+          price: '80.00',
+          couponCodes: [],
+          cashback: null,
+          routeInstructions: null,
+          brand: { name: 'x' },
+          tags: [],
+        },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="price-notes"]').exists()).toBe(false)
+  })
 })

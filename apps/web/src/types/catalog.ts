@@ -44,6 +44,12 @@ export interface CatalogProduct {
   totalActive?: string | null
   externalLink?: string | null
   paymentMethod?: string | null
+  couponCodes?: string[]
+  cashback?: {
+    amount: string
+    currency: string
+  } | null
+  routeInstructions?: string | null
   currency?: string | null
   linkSelectsSeller?: boolean | null
   brand: {

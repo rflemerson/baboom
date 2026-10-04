@@ -5,6 +5,7 @@ import type { CatalogProduct } from '@/types/catalog'
 import BaseMetricCard from '@/components/ui/BaseMetricCard.vue'
 import { formatDecimal, formatMoney } from '@/utils/number'
 import { totalPriceLabel } from '@/utils/payment'
+import CatalogPriceNotes from './CatalogPriceNotes.vue'
 
 defineProps<{
   product: CatalogProduct
@@ -60,6 +61,8 @@ defineProps<{
         :value="formatDecimal(product.totalActive)"
       />
     </div>
+
+    <CatalogPriceNotes :product="product" />
 
     <BaseMetricCard
       class="mt-3 rounded-3xl"

@@ -118,6 +118,33 @@ def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
     }
 
 
+def _pricing_terms(details: object, currency: Currency) -> dict[str, Any]:
+    """Name what the buyer needs to execute the shown price.
+
+    The coupon codes the price requires, the monetary cashback of the same
+    alternative (shown apart, never taken off the price) and the route's
+    activation instruction.
+    """
+    found = details if isinstance(details, dict) else {}
+    cashback = found.get("cashback")
+    routes = found.get("routes") or []
+    return {
+        "couponCodes": [str(code) for code in found.get("public_codes") or []],
+        "cashback": (
+            {
+                "amount": _money_to_str(Decimal(str(cashback)), currency.minor_unit),
+                "currency": currency.code,
+            }
+            if cashback
+            else None
+        ),
+        "routeInstructions": next(
+            (route["instructions"] for route in routes if route.get("instructions")),
+            None,
+        ),
+    }
+
+
 def _serialize_catalog_product(
     product: Product,
     profiles: dict[int, ProductNutrition],
@@ -146,6 +173,7 @@ def _serialize_catalog_product(
         "totalActive": _decimal_to_str(product.total_active),
         "externalLink": product.external_link,
         "pricingDetails": product.pricing_details,
+        **_pricing_terms(product.pricing_details, currency),
         "comparisonAmount": _money_to_str(
             product.comparison_price,
             currency.minor_unit,
