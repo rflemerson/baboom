@@ -140,6 +140,37 @@ class VtexObservationTests(TestCase):
         assert wallet.payment_scope == PaymentScope.METHOD
         assert wallet.payment_label_raw == "Carteira X à vista"
 
+    def _without_pix(self) -> list[dict]:
+        sellers = copy.deepcopy(self.sellers)
+        offer = sellers[0]["commertialOffer"]
+        offer["Installments"] = [
+            entry
+            for entry in offer["Installments"]
+            if entry["PaymentSystemName"] != "Pix"
+        ]
+        return sellers
+
+    def test_a_complete_read_without_pix_withdraws_it(self) -> None:
+        """Absence is evidence only in a complete read of payment prices."""
+        spider = MaxTitaniumSpider()
+        _save(spider, spider.process_raw_product(_vtex_raw(self._without_pix()), "w"))
+
+        pix = OfferPriceObservation.objects.get(payment_method__code="pix")
+        assert pix.withdrawn_at is not None
+
+    def test_a_repeated_read_confirms_the_standing_value(self) -> None:
+        """Nothing is appended; the row is confirmed later."""
+        before = OfferPriceObservation.objects.get(
+            source_field="commertialOffer.Price",
+        ).confirmed_at
+
+        spider = MaxTitaniumSpider()
+        _save(spider, spider.process_raw_product(_vtex_raw(self.sellers), "w"))
+
+        after = OfferPriceObservation.objects.get(source_field="commertialOffer.Price")
+        assert after.confirmed_at > before
+        assert after.withdrawn_at is None
+
     def test_the_page_records_its_coverage(self) -> None:
         """Variants, sellers and offers were all read."""
         statuses = dict(

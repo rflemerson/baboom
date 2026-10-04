@@ -10,6 +10,7 @@ INSTALLED_APPS += [
     "offers",
     "core",
     "promotions",
+    "pricing",
     "scrapers",
     "mcp_server",
 ]

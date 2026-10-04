@@ -13,7 +13,13 @@ from django.utils import timezone
 
 from commerce.services import CommerceIdentityService, MarketRef, SellerRef
 from offers.models import DelistReason, Offer, StockStatus
-from offers.observations import CoverageRecord, ObservationService, PriceRecord
+from offers.observations import (
+    CoverageRecord,
+    ObservationService,
+    PriceRead,
+    PriceRecord,
+    PriceSubject,
+)
 from offers.services import (
     ListingRef,
     OfferIdentityRef,
@@ -189,7 +195,13 @@ class ScraperService:
                     offer,
                     market,
                 )
-                ScraperService._observe(observations, batch, observation.offer, offer)
+                ScraperService._observe(
+                    observations,
+                    batch,
+                    observation.offer,
+                    offer,
+                    complete=product.is_complete("payment_prices"),
+                )
                 if offer.featured:
                     observations.record_featured(batch, variant, observation.offer)
             item, _created = ScraperService._upsert_scraped_item(
@@ -225,30 +237,33 @@ class ScraperService:
         batch: ObservationBatch,
         offer_row: Offer,
         offer: ScrapedOfferInput,
+        *,
+        complete: bool,
     ) -> None:
         """Append the offer's typed prices and its stock reading."""
+        prices = tuple(
+            PriceRecord(
+                role=price.role,
+                amount=price.amount,
+                source_field=price.source_field,
+                payment_scope=price.payment_scope,
+                payment_method=price.payment_method,
+                payment_label_raw=price.payment_label_raw,
+                payment_provider_raw=price.payment_provider_raw,
+                installment_count=price.installment_count,
+                installment_amount=price.installment_amount,
+                interest=price.interest,
+                capture_stage=price.capture_stage,
+                evidence_level=price.evidence_level,
+                composition=price.composition,
+                included_adjustments=tuple(price.included_adjustments),
+            )
+            for price in offer.prices
+        )
         observations.record_prices(
             batch,
-            [
-                PriceRecord(
-                    role=price.role,
-                    amount=price.amount,
-                    source_field=price.source_field,
-                    payment_scope=price.payment_scope,
-                    payment_method=price.payment_method,
-                    payment_label_raw=price.payment_label_raw,
-                    payment_provider_raw=price.payment_provider_raw,
-                    installment_count=price.installment_count,
-                    installment_amount=price.installment_amount,
-                    interest=price.interest,
-                    capture_stage=price.capture_stage,
-                    evidence_level=price.evidence_level,
-                    composition=price.composition,
-                    included_adjustments=tuple(price.included_adjustments),
-                )
-                for price in offer.prices
-            ],
-            offer=offer_row,
+            PriceSubject(offer=offer_row, listing_variant=None),
+            PriceRead(prices=prices, complete=complete),
         )
         observations.record_availability(
             batch,

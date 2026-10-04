@@ -80,7 +80,16 @@ class CoverageRecord:
 
 
 @dataclass(frozen=True)
-class _Subject:
+class PriceRead:
+    """The prices one read stated for a subject, and whether it read them all."""
+
+    prices: tuple[PriceRecord, ...]
+    complete: bool = False
+    observed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class PriceSubject:
     """An offer, or a variant whose price names no seller."""
 
     offer: Offer | None
@@ -141,38 +150,62 @@ class ObservationService:
     def record_prices(
         self,
         batch: ObservationBatch,
-        prices: list[PriceRecord],
-        *,
-        offer: Offer | None = None,
-        listing_variant: ListingVariant | None = None,
-        observed_at: datetime | None = None,
+        subject: PriceSubject,
+        read: PriceRead,
     ) -> int:
-        """Append each price whose condition changed amount; return how many."""
-        moment = observed_at or timezone.now()
-        subject = _Subject(offer, listing_variant)
+        """Append each price whose condition changed amount; return how many.
+
+        A repeated value only confirms the row that stated it. When the read
+        covered every payment price (``complete``), a condition it no longer
+        states is withdrawn; a partial read withdraws nothing.
+        """
+        moment = read.observed_at or timezone.now()
+        current = self._current(subject)
         rows: list[OfferPriceObservation] = []
-        for price in prices:
+        confirmed: list[int] = []
+        seen: set[str] = set()
+        for price in read.prices:
             key = price.condition_key()
-            latest = (
-                OfferPriceObservation.objects.filter(
-                    subject.filter(), condition_key=key
-                )
-                .order_by("-observed_at", "-pk")
-                .values_list("amount", flat=True)
-                .first()
-            )
-            if latest is not None and latest == price.amount:
+            seen.add(key)
+            latest = current.get(key)
+            if latest is not None and latest[1] == price.amount:
+                confirmed.append(latest[0])
                 continue
             rows.append(self._row(price, key, batch, subject, moment))
         OfferPriceObservation.objects.bulk_create(rows)
+        OfferPriceObservation.objects.filter(pk__in=confirmed).update(
+            confirmed_at=moment,
+        )
+        if read.complete:
+            gone = [pk for key, (pk, _amount) in current.items() if key not in seen]
+            OfferPriceObservation.objects.filter(pk__in=gone).update(
+                withdrawn_at=moment,
+            )
         return len(rows)
+
+    @staticmethod
+    def _current(subject: PriceSubject) -> dict[str, tuple[int, Decimal]]:
+        """Return the latest standing row of each condition: key -> (pk, amount)."""
+        latest: dict[str, tuple[int, Decimal, bool]] = {}
+        rows = (
+            OfferPriceObservation.objects.filter(subject.filter())
+            .order_by("condition_key", "-observed_at", "-pk")
+            .values_list("condition_key", "pk", "amount", "withdrawn_at")
+        )
+        for key, pk, amount, withdrawn in rows:
+            latest.setdefault(key, (pk, amount, withdrawn is not None))
+        return {
+            key: (pk, amount)
+            for key, (pk, amount, withdrawn) in latest.items()
+            if not withdrawn
+        }
 
     def _row(
         self,
         price: PriceRecord,
         key: str,
         batch: ObservationBatch,
-        subject: _Subject,
+        subject: PriceSubject,
         moment: datetime,
     ) -> OfferPriceObservation:
         """Build one observation row of a price."""
@@ -201,6 +234,7 @@ class ObservationService:
             included_adjustments=list(price.included_adjustments),
             observed_at=moment,
             recorded_at=timezone.now(),
+            confirmed_at=moment,
         )
 
     def _method(self, market: Market, code: str) -> PaymentMethod | None:

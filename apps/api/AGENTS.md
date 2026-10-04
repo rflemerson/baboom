@@ -100,6 +100,13 @@ offers that a successful crawl no longer sees.
   scenario counts, applies every compatible combination stage by stage and
   returns the cheapest, with a decision for every candidate. Unknown is never
   zero; rewards never lower what is paid.
+- `pricing.services.PricingService` is the only bridge between the ORM and the
+  engine: `FactLoader` reads offers, the standing observation of each price
+  condition (a complete read withdraws what it no longer states), and the
+  revision in force of each promotion; `quote()` keeps a `PricingQuote` whose
+  snapshot reproduces the result, with buyer codes and postal codes hashed.
+  Policies (`PricingPolicyRevision`) are frozen once published; `listed` and
+  `cash` v1 are seeded.
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

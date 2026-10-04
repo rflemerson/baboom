@@ -389,6 +389,17 @@ class OfferPriceObservation(BaseModel):
     )
     observed_at = models.DateTimeField(_("Observed At"), default=timezone.now)
     recorded_at = models.DateTimeField(_("Recorded At"), default=timezone.now)
+    confirmed_at = models.DateTimeField(
+        _("Confirmed At"),
+        default=timezone.now,
+        help_text=_("The last read that stated this value."),
+    )
+    withdrawn_at = models.DateTimeField(
+        _("Withdrawn At"),
+        null=True,
+        blank=True,
+        help_text=_("The first complete read that no longer stated this condition."),
+    )
     valid_until = models.DateTimeField(_("Valid Until"), null=True, blank=True)
     fresh_until = models.DateTimeField(_("Fresh Until"), null=True, blank=True)
     composition = models.CharField(

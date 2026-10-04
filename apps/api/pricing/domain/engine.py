@@ -871,18 +871,18 @@ def _empty(
     )
 
 
-def _canonical(value: object) -> object:
+def canonical(value: object) -> object:
     """Turn inputs into JSON-ready data with a stable order."""
     if is_dataclass(value) and not isinstance(value, type):
-        return {f.name: _canonical(getattr(value, f.name)) for f in fields(value)}
+        return {f.name: canonical(getattr(value, f.name)) for f in fields(value)}
     if isinstance(value, dict):
         return {
-            str(key): _canonical(item) for key, item in sorted(value.items(), key=str)
+            str(key): canonical(item) for key, item in sorted(value.items(), key=str)
         }
     if isinstance(value, (frozenset, set)):
-        return sorted((_canonical(item) for item in value), key=str)
+        return sorted((canonical(item) for item in value), key=str)
     if isinstance(value, (list, tuple)):
-        return [_canonical(item) for item in value]
+        return [canonical(item) for item in value]
     if isinstance(value, Decimal):
         return str(value)
     return value if isinstance(value, (int, str, bool, type(None))) else str(value)
@@ -890,8 +890,8 @@ def _canonical(value: object) -> object:
 
 def fingerprint(inputs: Inputs) -> str:
     """Hash everything an evaluation read, including ``now``."""
-    canonical = json.dumps(_canonical(inputs), sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    text = json.dumps(canonical(inputs), sort_keys=True, default=str)
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
-__all__ = ["CartLine", "Inputs", "evaluate", "fingerprint"]
+__all__ = ["CartLine", "Inputs", "canonical", "evaluate", "fingerprint"]
