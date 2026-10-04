@@ -168,22 +168,28 @@ def _check(
 
 
 def _shipping(inputs: Inputs, outcome: Outcome) -> None:
-    """Take each group's cheapest quote that holds for the cart as it is now.
+    """Take each group's cheapest quote that holds for the group as it is now.
 
     A quote must be current, in the cart's currency and, when the carrier
-    priced by order value, quoted for the cart's current value. Called before
-    the stages and again at the shipping stage, after discounts changed it.
+    priced by order value, quoted for the value of that group's lines. Called
+    before the stages and again at the shipping stage, after discounts changed
+    them.
     """
     context = inputs.context
     groups = context.groups or ()
-    keys = [group.key for group in groups] or ["all"]
-    value = round_money(
-        sum((line.current for line in outcome.lines), ZERO),
-        context.minor_unit,
-    )
+    scopes = [(group.key, group.offer_ids) for group in groups] or [("all", None)]
     amounts = []
     expiries = []
-    for key in keys:
+    for key, offer_ids in scopes:
+        group_lines = [
+            line
+            for line in outcome.lines
+            if offer_ids is None or line.offer.id in offer_ids
+        ]
+        value = round_money(
+            sum((line.current for line in group_lines), ZERO),
+            context.minor_unit,
+        )
         quotes = [
             quote
             for quote in inputs.shipping
