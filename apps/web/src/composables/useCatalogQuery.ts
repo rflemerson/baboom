@@ -38,6 +38,7 @@ function buildCatalogUrl(variables: CatalogProductsVariables) {
   appendOptionalParam(params, 'concentration_max', filters.concentrationMax)
   appendOptionalParam(params, 'sort_by', filters.sortBy)
   appendOptionalParam(params, 'sort_dir', filters.sortDir)
+  appendOptionalParam(params, 'scenario', filters.scenario)
 
   const queryString = params.toString()
   return queryString ? `${catalogApiUrl}?${queryString}` : catalogApiUrl

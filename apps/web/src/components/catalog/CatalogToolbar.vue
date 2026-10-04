@@ -21,6 +21,8 @@ type SortOption = {
 const props = defineProps<{
   advancedFiltersActive?: boolean
   perPage: number
+  scenario: string
+  scenarioOptions: readonly SortOption[]
   search: string
   sortBy: string
   sortDir: string
@@ -33,6 +35,7 @@ const emit = defineEmits<{
   openFilters: []
   'update:viewMode': [value: CatalogViewMode]
   'update:perPage': [value: number]
+  'update:scenario': [value: string]
   'update:search': [value: string]
   'update:sortBy': [value: string]
   'toggle:sortDir': []
@@ -78,6 +81,11 @@ function onSearchInput(event: Event) {
   emit('update:search', target.value)
 }
 
+function onScenarioChange(event: Event) {
+  const target = event.target as HTMLSelectElement
+  emit('update:scenario', target.value)
+}
+
 function onSortByChange(event: Event) {
   const target = event.target as HTMLSelectElement
   emit('update:sortBy', target.value)
@@ -88,7 +96,7 @@ function onSortByChange(event: Event) {
   <section class="app-toolbar mb-6 rounded-2xl p-3 sm:mb-8 sm:p-4">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div
-        class="grid flex-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]"
+        class="grid flex-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
       >
         <label class="flex flex-col gap-2 sm:col-span-2 xl:col-span-1">
           <span class="app-section-title">Search</span>
@@ -105,6 +113,20 @@ function onSortByChange(event: Event) {
               @input="onSearchInput"
             />
           </div>
+        </label>
+
+        <label class="flex flex-col gap-2">
+          <span class="app-section-title">Price shown</span>
+          <select
+            :value="scenario"
+            aria-label="Price the catalog compares"
+            class="app-select rounded-xl px-4 py-2.5 text-sm sm:py-3"
+            @change="onScenarioChange"
+          >
+            <option v-for="option in scenarioOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
         </label>
 
         <label class="flex flex-col gap-2">

@@ -17,11 +17,26 @@ describe('useCatalogFilters', () => {
         priceMin: null,
         pricePerActiveMax: null,
         pricePerActiveMin: null,
+        scenario: null,
         search: null,
         sortBy: 'price_per_active',
         sortDir: 'asc',
       },
     })
+  })
+
+  it('asks for a pricing scenario and resets the page', () => {
+    const { page, setPage, setScenario, variables } = useCatalogFilters()
+    setPage(3)
+
+    setScenario('cash')
+
+    expect(variables.value.filters?.scenario).toBe('cash')
+    expect(page.value).toBe(1)
+
+    setScenario('')
+
+    expect(variables.value.filters?.scenario).toBeNull()
   })
 
   it('resets the page when filters change', () => {

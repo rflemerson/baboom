@@ -107,6 +107,15 @@ offers that a successful crawl no longer sees.
   snapshot reproduces the result, with buyer codes and postal codes hashed.
   Policies (`PricingPolicyRevision`) are frozen once published; `listed` and
   `cash` v1 are seeded.
+- Ranking reads `OfferScenarioProjection` rows (one per linked offer and
+  published public policy) through `pricing.selectors.projected_prices`, passed
+  to `core.selectors.public_catalog_products` as its price source; expiry is
+  checked at read time. `?scenario=<policy key>` always reads projections;
+  the default ranking reads them only with `PRICING_READ_PROJECTIONS=true`
+  (the cutover switch), and legacy current prices otherwise. A finished crawl
+  (`offers.signals.offers_observed`) and a promotion change
+  (`promotions.signals.revision_changed`) enqueue `refresh_projections`
+  after commit; an hourly beat entry refreshes everything.
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

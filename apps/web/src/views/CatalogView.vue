@@ -14,6 +14,8 @@ const {
   concentrationMax,
   concentrationMin,
   perPage,
+  scenario,
+  scenarioOptions,
   priceMax,
   priceMin,
   pricePerActiveMax,
@@ -24,6 +26,7 @@ const {
   setConcentrationMin,
   setPage,
   setPerPage,
+  setScenario,
   setPriceMax,
   setPriceMin,
   setPricePerActiveMax,
@@ -81,6 +84,8 @@ function applyAdvancedFilters(payload: {
       <CatalogToolbar
         :advanced-filters-active="advancedFiltersActive"
         :per-page="perPage"
+        :scenario="scenario"
+        :scenario-options="scenarioOptions"
         :search="search"
         :sort-by="sortBy"
         :sort-dir="sortDir"
@@ -90,6 +95,7 @@ function applyAdvancedFilters(payload: {
         @open-filters="filtersOpen = true"
         @toggle:sort-dir="toggleSortDirection"
         @update:per-page="setPerPage"
+        @update:scenario="setScenario"
         @update:search="setSearch"
         @update:sort-by="setSortBy"
         @update:view-mode="setViewMode"

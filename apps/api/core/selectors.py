@@ -1,7 +1,12 @@
 """Selectors for public catalog querysets and annotations."""
 
+from __future__ import annotations
+
+from collections.abc import Callable
+
 from django.conf import settings
 from django.db.models import (
+    CharField,
     DecimalField,
     Exists,
     ExpressionWrapper,
@@ -21,6 +26,11 @@ from offers.models import Offer, StockStatus
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
+# A price source returns, for the outer product, its priced offers cheapest
+# first, each with ``amount``, ``url`` and ``payment_method``. The catalog does
+# not know where prices come from: legacy current prices, or a pricing policy.
+PriceSource = Callable[[], QuerySet]
+
 
 def _cheapest_offer_subquery() -> QuerySet[Offer]:
     """Return the offers a buyer can take now for the outer product, cheapest first.
@@ -30,12 +40,16 @@ def _cheapest_offer_subquery() -> QuerySet[Offer]:
     and in stock. A product with none keeps its row, without a price. The
     ordering is stable so the price and the link come from the same offer.
     """
-    return Offer.objects.filter(
-        product_store__product=OuterRef("pk"),
-        current_price__isnull=False,
-        delisted_at__isnull=True,
-        current_stock_status__in=StockStatus.purchasable(),
-    ).order_by("current_price", "pk")
+    return (
+        Offer.objects.filter(
+            product_store__product=OuterRef("pk"),
+            current_price__isnull=False,
+            delisted_at__isnull=True,
+            current_stock_status__in=StockStatus.purchasable(),
+        )
+        .annotate(amount=F("current_price"), payment_method=Value(""))
+        .order_by("current_price", "pk")
+    )
 
 
 def catalog_active(slug: str | None = None) -> Active | None:
@@ -47,9 +61,10 @@ def catalog_active(slug: str | None = None) -> Active | None:
 def _annotate_catalog_base_fields(
     queryset: QuerySet[Product],
     active: Active | None,
+    price_source: PriceSource | None = None,
 ) -> QuerySet[Product]:
     """Annotate catalog fields loaded directly from subqueries."""
-    cheapest = _cheapest_offer_subquery()
+    cheapest = (price_source or _cheapest_offer_subquery)()
 
     fraction = (
         Value(None, output_field=DecimalField(max_digits=12, decimal_places=8))
@@ -77,12 +92,16 @@ def _annotate_catalog_base_fields(
 
     return queryset.annotate(
         price=Subquery(
-            cheapest.values("current_price")[:1],
-            output_field=DecimalField(max_digits=10, decimal_places=2),
+            cheapest.values("amount")[:1],
+            output_field=DecimalField(max_digits=19, decimal_places=2),
         ),
         external_link=Subquery(
             cheapest.values("url")[:1],
             output_field=URLField(),
+        ),
+        payment_method=Subquery(
+            cheapest.values("payment_method")[:1],
+            output_field=CharField(),
         ),
         fraction=fraction,
         combo_total_active=combo_total_active,
@@ -124,6 +143,7 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
 
 def public_catalog_products_with_stats(
     active_slug: str | None = None,
+    price_source: PriceSource | None = None,
 ) -> QuerySet[Product]:
     """Return public catalog products annotated with catalog-facing metrics.
 
@@ -139,7 +159,11 @@ def public_catalog_products_with_stats(
         )
     )
     return _annotate_catalog_metrics(
-        _annotate_catalog_base_fields(queryset, catalog_active(active_slug)),
+        _annotate_catalog_base_fields(
+            queryset,
+            catalog_active(active_slug),
+            price_source,
+        ),
     )
 
 
@@ -243,12 +267,17 @@ def _apply_catalog_sorting(
 
 def public_catalog_products(
     filters: CatalogProductsFilters | None = None,
+    price_source: PriceSource | None = None,
 ) -> QuerySet[Product]:
-    """Return the public catalog queryset with filters and sorting applied."""
+    """Return the public catalog queryset with filters and sorting applied.
+
+    Without a price source, a product is priced by its legacy current prices.
+    """
     resolved_filters = filters or CatalogProductsFilters()
-    queryset = public_catalog_products_with_stats(resolved_filters.active).filter(
-        is_published=True,
-    )
+    queryset = public_catalog_products_with_stats(
+        resolved_filters.active,
+        price_source,
+    ).filter(is_published=True)
     queryset = _apply_catalog_search(queryset, resolved_filters)
     queryset = _apply_catalog_brand_filter(queryset, resolved_filters)
     queryset = _apply_catalog_numeric_filters(queryset, resolved_filters)

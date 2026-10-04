@@ -9,6 +9,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponseBadRequest, JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
@@ -16,6 +17,7 @@ from core import units
 from core.dtos import CatalogProductsFilters
 from core.selectors import catalog_active, public_catalog_products
 from core.services import AlertSubscriptionService
+from pricing.selectors import projected_prices, public_policy
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -131,6 +133,7 @@ def _serialize_catalog_product(
         "concentration": _decimal_to_str(product.concentration),
         "totalActive": _decimal_to_str(product.total_active),
         "externalLink": product.external_link,
+        "paymentMethod": product.payment_method or None,
         "brand": {"name": product.brand.name},
         "category": {"name": product.category.name} if product.category else None,
         "tags": [{"name": tag.name} for tag in product.tags.all()],
@@ -157,7 +160,16 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     except ValueError:
         return HttpResponseBadRequest("Invalid catalog query parameter.")
 
-    queryset = public_catalog_products(query_filters)
+    scenario = _optional_str(request.GET.get("scenario"))
+    policy = (
+        public_policy(scenario)
+        if scenario or settings.PRICING_READ_PROJECTIONS
+        else None
+    )
+    if scenario and policy is None:
+        return HttpResponseBadRequest("Unknown pricing scenario.")
+    price_source = projected_prices(policy, timezone.now()) if policy else None
+    queryset = public_catalog_products(query_filters, price_source)
     active = catalog_active(query_filters.active)
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page)
@@ -166,6 +178,11 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
         {
             "active": ({"slug": active.slug, "name": active.name} if active else None),
             "massUnit": units.MASS_UNIT,
+            "scenario": (
+                {"key": policy.key, "version": policy.number, "source": "projection"}
+                if policy
+                else {"key": "listed", "version": None, "source": "legacy"}
+            ),
             "pageInfo": {
                 "currentPage": page_obj.number,
                 "perPage": per_page,

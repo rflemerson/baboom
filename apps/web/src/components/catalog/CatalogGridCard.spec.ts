@@ -30,5 +30,26 @@ describe('CatalogGridCard', () => {
     expect(wrapper.text()).toContain('Whey')
     expect(wrapper.text()).toContain('Isolado')
     expect(wrapper.text()).toContain('86.6% concentration')
+    expect(wrapper.text()).toContain('Total price')
+    expect(wrapper.text()).not.toContain('Total price (')
+  })
+
+  it('names the payment method behind the price', () => {
+    const wrapper = mount(CatalogGridCard, {
+      props: {
+        product: {
+          id: 2,
+          name: 'Whey 900g',
+          packagingDisplay: 'Refill Package',
+          price: '96.03',
+          paymentMethod: 'pix',
+          brand: { name: 'max-titanium' },
+          tags: [],
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('Total price (Pix)')
+    expect(wrapper.text()).toContain('96.03')
   })
 })

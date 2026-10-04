@@ -12,6 +12,8 @@ from celery._state import get_current_task
 from celery.utils.log import get_task_logger
 from django.utils import timezone
 
+from offers.signals import offers_observed
+
 from .crawler.run import crawl
 from .models import ScraperRun
 from .services import ScraperService
@@ -107,6 +109,16 @@ def _delist_unseen_offers(stats: dict[str, object], run: ScraperRun) -> int:
     if not store_slug or stats.get("scraper/catalog_complete") is not True:
         return 0
     return ScraperService.delist_unseen_offers(store_slug, run.started_at)
+
+
+def _settle_successful_run(stats: dict[str, object], run: ScraperRun) -> int:
+    """Delist what a complete run no longer saw, and announce the new readings."""
+    delisted = _delist_unseen_offers(stats, run)
+    offers_observed.send(
+        sender=ScraperRun,
+        store_slug=str(stats.get("scraper/store_slug") or ""),
+    )
+    return delisted
 
 
 def run_spider_monitor(spider_name: str, label: str) -> str:
@@ -206,7 +218,7 @@ def run_spider_monitor(spider_name: str, label: str) -> str:
         logger.error(message)
         raise EmptyMonitorRunError(message)
 
-    delisted = _delist_unseen_offers(stats, run)
+    delisted = _settle_successful_run(stats, run)
     message = (
         f"{label} Monitor: Saved/Updated {items_count} items, "
         f"delisted {delisted}.{stats_summary}"

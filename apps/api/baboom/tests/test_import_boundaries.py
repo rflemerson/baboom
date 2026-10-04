@@ -27,11 +27,15 @@ def _imports(package: str) -> dict[str, set[str]]:
     return found
 
 
-def _violations(package: str, forbidden: set[str]) -> list[str]:
+def _violations(
+    package: str,
+    forbidden: set[str],
+    allowed_paths: tuple[str, ...] = (),
+) -> list[str]:
     return [
         f"{module} imports {sorted(names & forbidden)}"
         for module, names in _imports(package).items()
-        if names & forbidden
+        if names & forbidden and not module.startswith(allowed_paths)
     ]
 
 
@@ -51,8 +55,13 @@ class ImportBoundaryTests(SimpleTestCase):
         assert _violations("offers", APPS - allowed) == []
 
     def test_core_never_imports_promotions_or_pricing(self) -> None:
-        """The catalog does not know the commercial rules that price it."""
-        assert _violations("core", {"promotions", "pricing", "scrapers"}) == []
+        """The catalog does not know the rules that price it; its REST view composes.
+
+        The public view chooses the price source; models and selectors only
+        take one as a parameter.
+        """
+        forbidden = {"promotions", "pricing", "scrapers"}
+        assert _violations("core", forbidden, allowed_paths=("core/rest/",)) == []
 
     def test_promotions_import_no_pricing_or_scrapers(self) -> None:
         """Curated rules sit below the engine and above the facts."""

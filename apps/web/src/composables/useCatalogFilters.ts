@@ -9,6 +9,13 @@ export const CATALOG_SORT_OPTIONS = [
   { label: 'Concentration', value: 'concentration' },
 ] as const
 
+// The price a ranking compares. The empty value is the store's default price;
+// a scenario only changes which observed price counts, never invents one.
+export const CATALOG_SCENARIO_OPTIONS = [
+  { label: 'Store price', value: '' },
+  { label: 'Paid at once (Pix, boleto)', value: 'cash' },
+] as const
+
 export const CATALOG_SEARCH_DEBOUNCE_MS = 250
 
 const DEFAULT_CATALOG_PRODUCTS_VARIABLES: CatalogProductsVariables = {
@@ -25,6 +32,7 @@ const DEFAULT_CATALOG_PRODUCTS_VARIABLES: CatalogProductsVariables = {
     concentrationMax: null,
     sortBy: 'price_per_active',
     sortDir: 'asc',
+    scenario: null,
   },
 }
 
@@ -44,6 +52,7 @@ export function useCatalogFilters() {
   const sortDir = ref(defaultFilters?.sortDir ?? 'asc')
   const page = ref(defaultFilters?.page ?? 1)
   const perPage = ref(defaultFilters?.perPage ?? 12)
+  const scenario = ref(defaultFilters?.scenario ?? '')
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
   watch(
@@ -80,6 +89,7 @@ export function useCatalogFilters() {
       concentrationMax: concentrationMax.value,
       sortBy: sortBy.value,
       sortDir: sortDir.value,
+      scenario: scenario.value || null,
     },
   }))
 
@@ -135,6 +145,11 @@ export function useCatalogFilters() {
     page.value = 1
   }
 
+  function setScenario(value: string) {
+    scenario.value = value
+    page.value = 1
+  }
+
   function setPerPage(value: number) {
     perPage.value = value
     page.value = 1
@@ -157,6 +172,7 @@ export function useCatalogFilters() {
     sortDir.value = defaultFilters?.sortDir ?? 'asc'
     page.value = defaultFilters?.page ?? 1
     perPage.value = defaultFilters?.perPage ?? 12
+    scenario.value = defaultFilters?.scenario ?? ''
   }
 
   return {
@@ -170,6 +186,8 @@ export function useCatalogFilters() {
     priceMin,
     pricePerActiveMax,
     pricePerActiveMin,
+    scenario,
+    scenarioOptions: CATALOG_SCENARIO_OPTIONS,
     search,
     setBrand,
     setConcentrationMax,
@@ -180,6 +198,7 @@ export function useCatalogFilters() {
     setPriceMin,
     setPricePerActiveMax,
     setPricePerActiveMin,
+    setScenario,
     setSearch,
     setSortBy,
     sortBy,

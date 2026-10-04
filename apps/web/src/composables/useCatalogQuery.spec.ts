@@ -58,4 +58,30 @@ describe('useCatalogQuery', () => {
     expect(active.value?.slug).toBe('protein')
     expect(massUnit.value).toBe('g')
   })
+
+  it('sends the chosen pricing scenario', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        active: null,
+        massUnit: 'g',
+        scenario: { key: 'cash', version: 1, source: 'projection' },
+        pageInfo: {
+          currentPage: 1,
+          perPage: 12,
+          totalPages: 0,
+          totalCount: 0,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        },
+        items: [],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { loading } = useCatalogQuery({ filters: { page: 1, scenario: 'cash' } })
+
+    await vi.waitFor(() => expect(loading.value).toBe(false))
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('scenario=cash')
+  })
 })

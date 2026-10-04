@@ -66,6 +66,10 @@
   has `nutritionProfile: null` and no nutritional metrics.
 - `price` and `externalLink` come from the cheapest listed, purchasable offer
   linked to the product, which sells one of the flavors its table lists.
+  `?scenario=cash` ranks by the price paid at once instead, from pricing
+  projections; `scenario` in the response names the policy and whether the
+  price came from projections or legacy current prices, and `paymentMethod`
+  names the method behind an item's price when there is one.
 
 ## Scraped evidence
 

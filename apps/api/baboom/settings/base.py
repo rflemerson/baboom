@@ -59,6 +59,11 @@ DATABASES = {
 
 CATALOG_DEFAULT_ACTIVE_SLUG = env.str("CATALOG_DEFAULT_ACTIVE_SLUG", "protein")
 
+# Cutover switch: when true, the default catalog ranking reads the pricing
+# projections of the default policy instead of legacy current prices. A
+# requested scenario (?scenario=cash) always reads projections.
+PRICING_READ_PROJECTIONS = env.bool("PRICING_READ_PROJECTIONS", default=False)
+
 CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS = env.int(
     "CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS",
     default=300,

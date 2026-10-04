@@ -37,6 +37,7 @@ from .schemas import (
     SellerIn,
     leaves,
 )
+from .signals import revision_changed
 
 if TYPE_CHECKING:
     from django.db.models import Model
@@ -261,6 +262,7 @@ class PromotionService:
             updated_at=locked.published_at,
         )
         revision.refresh_from_db()
+        revision_changed.send(sender=PromotionRevision, revision_id=revision.pk)
         return PublishResult(published=True, errors=())
 
     @staticmethod
@@ -275,6 +277,7 @@ class PromotionService:
             updated_at=timezone.now(),
         )
         revision.refresh_from_db()
+        revision_changed.send(sender=PromotionRevision, revision_id=revision.pk)
 
     @transaction.atomic
     def revise(self, promotion: Promotion) -> PromotionRevision:
