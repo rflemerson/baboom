@@ -35,6 +35,10 @@ BASE = "base"
 OBJECTIVES = frozenset({"items_payable", "total_payable", "estimated_net_cost"})
 
 
+def _objective(value: object) -> bool:
+    return isinstance(value, str) and value in OBJECTIVES
+
+
 def _flag(value: object) -> bool:
     return isinstance(value, bool)
 
@@ -48,7 +52,7 @@ def _positive(value: object) -> bool:
 
 
 RULES: dict[str, tuple[Callable[[object], bool], str]] = {
-    "objective": (lambda value: value in OBJECTIVES, f"one of {sorted(OBJECTIVES)}"),
+    "objective": (_objective, f"one of {sorted(OBJECTIVES)}"),
     "apply_benefits": (_flag, "true or false"),
     "accepted_semantics": (_names, "a list of names"),
     "accepted_evidence": (_names, "a list of names"),
