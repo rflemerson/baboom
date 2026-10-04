@@ -93,11 +93,8 @@ export function useCatalogQuery(variables: MaybeRefOrGetter<CatalogProductsVaria
 
   const massUnit = computed(() => result.value?.massUnit ?? 'g')
 
-  const scenarioKey = computed(() => result.value?.scenario?.key ?? null)
-
   return {
     active,
-    scenarioKey,
     massUnit,
     error,
     loading,

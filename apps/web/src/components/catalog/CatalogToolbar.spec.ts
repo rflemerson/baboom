@@ -21,7 +21,7 @@ describe('CatalogToolbar', () => {
     })
 
     await wrapper.get('input[type="search"]').setValue('whey')
-    await wrapper.findAll('select')[0]?.setValue('cash')
+    await wrapper.findAll('select')[0]?.setValue('best')
     await wrapper.findAll('select')[1]?.setValue('price')
     await wrapper.findAll('select')[2]?.setValue('24')
 
@@ -31,7 +31,7 @@ describe('CatalogToolbar', () => {
     await wrapper.get('[data-test="clear-filters"]').trigger('click')
 
     expect(wrapper.emitted('update:search')?.[0]).toEqual(['whey'])
-    expect(wrapper.emitted('update:scenario')?.[0]).toEqual(['cash'])
+    expect(wrapper.emitted('update:scenario')?.[0]).toEqual(['best'])
     expect(wrapper.emitted('update:sortBy')?.[0]).toEqual(['price'])
     expect(wrapper.emitted('update:perPage')?.[0]).toEqual([24])
     expect(wrapper.emitted('openFilters')).toHaveLength(1)

@@ -138,6 +138,74 @@ class BasePriceTests(SimpleTestCase):
         assert DecisionStatus.ACCESS_UNAVAILABLE in _statuses(result)["offer 1"]
 
 
+class BaseChoiceTests(SimpleTestCase):
+    """The base price is chosen together with the promotions, not before."""
+
+    def test_a_dearer_base_that_takes_the_discount_can_win(self) -> None:
+        """R$ 100 with 20% off by Pix beats R$ 90 that already includes Pix."""
+        pix_promo = revision(
+            7, effect("percentage", stage="payment", params={"rate": "20"})
+        )
+        result = evaluate(
+            inputs(
+                prices=(
+                    price(1, "100.00", payment_scope="any", installment_count=1),
+                    price(
+                        1,
+                        "90.00",
+                        payment_scope="method",
+                        payment_method="pix",
+                        installment_count=1,
+                        included_adjustments=PIX_DISCOUNT,
+                    ),
+                ),
+                revisions=(pix_promo,),
+                policy=policy("cash"),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("80.00")
+
+    def test_the_normal_price_applies_no_promotion(self) -> None:
+        """The store's own price stays R$ 100 under a 10% automatic discount."""
+        result = evaluate(
+            inputs(
+                revisions=(revision(7, effect("percentage", params={"rate": "10"})),),
+                policy=policy("listed", apply_benefits=False),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("100.00")
+        assert DecisionStatus.INELIGIBLE in _statuses(result)["revision 7"]
+
+    def test_the_best_price_without_benefits_is_the_normal_price(self) -> None:
+        """No promotion applies: the best price is still the store's price."""
+        result = evaluate(inputs(policy=policy("best")))
+
+        assert result.merchandise_total == Decimal("100.00")
+
+    def test_the_best_price_takes_a_cheaper_pix_price(self) -> None:
+        """A Pix price below the store's price is the best price."""
+        result = evaluate(
+            inputs(
+                prices=(
+                    price(1, "100.00"),
+                    price(
+                        1,
+                        "95.00",
+                        payment_scope="method",
+                        payment_method="pix",
+                        installment_count=1,
+                    ),
+                ),
+                policy=policy("best"),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("95.00")
+        assert result.selected_prices[0].payment_method == "pix"
+
+
 class DiscountTests(SimpleTestCase):
     """Effects, bases, caps and allocation."""
 

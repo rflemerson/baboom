@@ -303,4 +303,4 @@ class PersonalBenefitTests(BenefitCatalog, TestCase):
 
     def policy_for_public(self) -> PricingPolicyRevision:
         """Return the seeded public policy, which counts no buyer claim."""
-        return PricingPolicyRevision.objects.get(key="listed", number=1)
+        return PricingPolicyRevision.objects.get(key="best", number=1)

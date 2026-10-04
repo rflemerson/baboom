@@ -230,6 +230,8 @@ class Policy:
     version: int
     scenario: str
     objective: str = "items_payable"
+    # False: the store's own price, with no promotion, code or reward applied.
+    apply_benefits: bool = True
     accepted_semantics: frozenset[str] = frozenset({"known", "legacy_unknown"})
     accepted_evidence: frozenset[str] = frozenset({"observed_in_catalog"})
     cash_methods: frozenset[str] = frozenset({"pix", "boleto"})

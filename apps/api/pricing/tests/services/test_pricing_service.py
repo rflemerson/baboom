@@ -58,8 +58,30 @@ def _ingest_max_titanium() -> Offer:
     return Offer.objects.get()
 
 
+SCENARIO_RULES: dict[str, dict[str, object]] = {
+    "listed": {"accepted_semantics": ["known", "legacy_unknown"]},
+    "cash": {
+        "accepted_semantics": ["known"],
+        "cash_methods": ["pix", "boleto"],
+        "include_unknown_payment": False,
+    },
+}
+
+
 def _policy(key: str) -> PricingPolicyRevision:
-    return PricingPolicyRevision.objects.get(key=key, number=1)
+    """Return a seeded public policy, or a published one for a bare scenario."""
+    if key not in SCENARIO_RULES:
+        return PricingPolicyRevision.objects.get(key=key, number=1)
+    policy, _created = PricingPolicyRevision.objects.get_or_create(
+        key=f"scenario-{key}",
+        number=1,
+        defaults={
+            "scenario": key,
+            "rules": {"freshness_hours": 72, **SCENARIO_RULES[key]},
+            "published_at": timezone.now(),
+        },
+    )
+    return policy
 
 
 class ScenarioTests(TestCase):

@@ -51,7 +51,7 @@ class PolicyTriggerTests(TestCase):
         """Only is_default may move once published."""
         if connection.vendor != "postgresql":
             self.skipTest("Triggers exist on PostgreSQL only.")
-        policy = PricingPolicyRevision.objects.get(key="listed", number=1)
+        policy = PricingPolicyRevision.objects.get(key="best", number=1)
         PricingPolicyRevision.objects.filter(pk=policy.pk).update(is_default=False)
 
         raised(

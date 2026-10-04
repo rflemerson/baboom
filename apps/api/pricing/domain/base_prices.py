@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 from typing import TYPE_CHECKING
 
 from .types import Decision, DecisionStatus, SelectedPrice
@@ -11,27 +12,52 @@ if TYPE_CHECKING:
     from .types import CartLine, OfferFact, PriceFact
 
 
-def select_prices(
+# How many base-price combinations one evaluation tries. A single offer has
+# a handful of prices; a large cart keeps only each line's cheapest beyond it.
+MAX_BASE_CHOICES = 16
+
+
+def price_options(
     inputs: Inputs,
     offers: dict[int, OfferFact],
     decisions: list[Decision],
     missing: list[str],
-) -> list[SelectedPrice] | None:
-    """Choose one base price per line, or report why the scenario has none."""
-    chosen: list[SelectedPrice] = []
+) -> list[list[SelectedPrice]] | None:
+    """Return every usable base price per line, or report why there is none.
+
+    Promotions are applied later to each choice: a dearer base price that
+    still accepts a payment discount may end cheaper than one that already
+    includes it, so no option is dropped here for being more expensive.
+    """
+    options: list[list[SelectedPrice]] = []
     for line in inputs.context.lines:
         refusal = _offer_refusal(offers.get(line.offer_id), line.offer_id, inputs)
         if refusal is not None:
             decisions.append(refusal)
             return None
-        price = _base_price(inputs, line, decisions)
-        if price is None:
+        line_options = _base_options(inputs, line, decisions)
+        if not line_options:
             missing.append(
                 f"price of offer {line.offer_id} for {inputs.policy.scenario}"
             )
             return None
-        chosen.append(price)
-    return chosen
+        options.append(line_options)
+    return options
+
+
+def base_choices(
+    options: list[list[SelectedPrice]],
+) -> tuple[list[tuple[SelectedPrice, ...]], bool]:
+    """Return the base-price combinations to evaluate, and whether bounded.
+
+    Beyond ``MAX_BASE_CHOICES`` each line keeps only its cheapest option.
+    """
+    total = 1
+    for line_options in options:
+        total *= len(line_options)
+    if total <= MAX_BASE_CHOICES:
+        return list(itertools.product(*options)), False
+    return [tuple(line_options[0] for line_options in options)], True
 
 
 def _offer_refusal(
@@ -86,11 +112,11 @@ def _restriction(price: PriceFact, quantity: int) -> tuple[DecisionStatus, str] 
     return None
 
 
-def _base_price(
+def _base_options(
     inputs: Inputs,
     line: CartLine,
     decisions: list[Decision],
-) -> SelectedPrice | None:
+) -> list[SelectedPrice]:
     context, policy = inputs.context, inputs.policy
     offer_id = line.offer_id
     usable: list[PriceFact] = []
@@ -116,18 +142,30 @@ def _base_price(
             continue
         if _fits_scenario(price, inputs):
             usable.append(price)
-    if not usable:
-        return None
-    price = min(usable, key=lambda item: (item.amount, item.id))
-    return SelectedPrice(
-        offer_id=offer_id,
-        observation_id=price.id,
-        amount=price.amount,
-        payment_method=price.payment_method,
-        payment_scope=price.payment_scope,
-        installment_count=price.installment_count,
-        already_included=price.included_adjustments,
-    )
+    # Of prices that accept the same benefits, only the cheapest can win.
+    cheapest: dict[tuple[object, ...], PriceFact] = {}
+    for price in sorted(usable, key=lambda item: (item.amount, item.id)):
+        cheapest.setdefault(
+            (
+                price.payment_scope,
+                price.payment_method,
+                price.installment_count,
+                frozenset(price.included_adjustments),
+            ),
+            price,
+        )
+    return [
+        SelectedPrice(
+            offer_id=offer_id,
+            observation_id=price.id,
+            amount=price.amount,
+            payment_method=price.payment_method,
+            payment_scope=price.payment_scope,
+            installment_count=price.installment_count,
+            already_included=price.included_adjustments,
+        )
+        for price in cheapest.values()
+    ]
 
 
 def _single_payment(price: PriceFact) -> bool:
@@ -175,7 +213,17 @@ def _fits_payment(price: PriceFact, inputs: Inputs) -> bool:
     )
 
 
-SCENARIOS = {"listed": _fits_listed, "cash": _fits_cash, "payment": _fits_payment}
+def _fits_best(price: PriceFact, inputs: Inputs) -> bool:
+    """Accept the store's price and every price paid at once: the buyer picks."""
+    return _fits_listed(price, inputs) or _fits_cash(price, inputs)
+
+
+SCENARIOS = {
+    "listed": _fits_listed,
+    "best": _fits_best,
+    "cash": _fits_cash,
+    "payment": _fits_payment,
+}
 
 
 def _fits_scenario(price: PriceFact, inputs: Inputs) -> bool:

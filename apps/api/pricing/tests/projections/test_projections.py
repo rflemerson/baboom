@@ -114,28 +114,33 @@ class RankingTests(TwoProductCatalog, TestCase):
         assert written == len(self.offers) * PricingPolicyRevision.objects.count()
         projection = OfferScenarioProjection.objects.get(
             offer=self.offers["A"],
-            policy__key="listed",
+            policy__key="best",
         )
         assert projection.amount == Decimal("100.00")
         assert projection.status == "priced"
 
-    def test_cash_scenario_has_no_price_without_a_cash_observation(self) -> None:
-        """A legacy price says nothing about cash; it is not relabelled."""
+    def test_the_normal_price_ignores_promotions(self) -> None:
+        """B stays R$ 120 under the normal price; the best price is R$ 84."""
+        self._promote_b("30")
         ProjectionService().refresh()
 
-        projection = OfferScenarioProjection.objects.get(
-            offer=self.offers["A"],
-            policy__key="cash",
+        normal, best = (
+            OfferScenarioProjection.objects.get(
+                offer=self.offers["B"],
+                policy__key=key,
+                alternative="best",
+            )
+            for key in ("normal", "best")
         )
-        assert projection.status == "no_price"
-        assert projection.amount is None
+        assert normal.amount == Decimal("120.00")
+        assert best.amount == Decimal("84.00")
 
     def test_a_promoted_offer_wins_before_pagination(self) -> None:
         """B at R$ 120 with 30% off (R$ 84) ranks above A at R$ 100."""
         self._promote_b("30")
         ProjectionService().refresh()
 
-        items = self._page(scenario="listed", per_page="12")["items"]
+        items = self._page(scenario="best", per_page="12")["items"]
 
         assert [item["name"] for item in items] == ["B", "A"]
         assert Decimal(items[0]["price"]) == Decimal("84.00")
@@ -147,7 +152,7 @@ class RankingTests(TwoProductCatalog, TestCase):
 
         response = self.client.get(
             URL,
-            {"scenario": "listed", "per_page": "12", "sort_by": "price"},
+            {"scenario": "best", "per_page": "12", "sort_by": "price"},
         )
         first = json.loads(response.content)["items"][0]
 
@@ -161,19 +166,19 @@ class RankingTests(TwoProductCatalog, TestCase):
         later = timezone.now() + timedelta(minutes=10)
 
         with patch("core.rest.views.timezone.now", return_value=later):
-            items = self._page(scenario="listed")["items"]
+            items = self._page(scenario="best")["items"]
 
         assert {item["name"]: item["price"] for item in items}["B"] is None
 
     def test_the_default_ranking_reads_the_default_policy(self) -> None:
-        """Without a scenario, the default policy's projections rank."""
+        """Without a scenario, the normal price ranks: B's promotion is ignored."""
         self._promote_b("30")
         ProjectionService().refresh()
 
         payload = self._page()
 
-        assert payload["scenario"] == {"key": "listed", "version": 1}
-        assert payload["items"][0]["name"] == "B"
+        assert payload["scenario"] == {"key": "normal", "version": 1}
+        assert payload["items"][0]["name"] == "A"
 
     def test_an_unknown_scenario_is_refused(self) -> None:
         """A typo is not silently the default."""
@@ -218,7 +223,7 @@ class MarketIsolationTests(MexicanMarket, TestCase):
 
     def test_projections_are_stored_in_their_own_currency(self) -> None:
         """Projection B is MXN in Mexico; A is BRL in Brazil."""
-        rows = OfferScenarioProjection.objects.filter(policy__key="listed")
+        rows = OfferScenarioProjection.objects.filter(policy__key="best")
 
         assert {(row.offer_id, row.currency_id) for row in rows} == {
             (self.offers["A"].pk, "BRL"),
@@ -227,7 +232,7 @@ class MarketIsolationTests(MexicanMarket, TestCase):
 
     def test_the_brazilian_catalog_never_shows_a_peso_price(self) -> None:
         """MXN 1 does not undercut BRL 100, with projections or legacy."""
-        for params in ({"scenario": "listed"}, {}):
+        for params in ({"scenario": "best"}, {}):
             with self.subTest(params):
                 payload = self._items(**params)
                 prices = {item["name"]: item["price"] for item in payload["items"]}
@@ -236,7 +241,7 @@ class MarketIsolationTests(MexicanMarket, TestCase):
 
     def test_the_mexican_catalog_shows_pesos(self) -> None:
         """Each market ranks in its own currency, and says which."""
-        payload = self._items(scenario="listed", country="MX", currency="MXN")
+        payload = self._items(scenario="best", country="MX", currency="MXN")
         prices = {
             item["name"]: (item["price"], item["currency"]) for item in payload["items"]
         }
@@ -257,7 +262,7 @@ class CacheTests(TwoProductCatalog, TestCase):
         """Promotions can be suspended at any time."""
         ProjectionService().refresh()
 
-        response = self.client.get(URL, {"scenario": "listed"})
+        response = self.client.get(URL, {"scenario": "best"})
 
         assert "s-maxage=600" in response["Cache-Control"]
         assert "stale-while-revalidate=0" in response["Cache-Control"]
@@ -267,7 +272,7 @@ class CacheTests(TwoProductCatalog, TestCase):
         self._promote_b("30", ends_at=timezone.now() + timedelta(minutes=5))
         ProjectionService().refresh()
 
-        response = self.client.get(URL, {"scenario": "listed"})
+        response = self.client.get(URL, {"scenario": "best"})
         directives = dict(
             part.strip().split("=")
             for part in response["Cache-Control"].split(",")
@@ -292,7 +297,7 @@ class LinkSellerTests(TwoProductCatalog, TestCase):
         Offer.objects.filter(pk=self.offers["B"].pk).update(seller_account=third)
         ProjectionService().refresh()
 
-        for params in ({}, {"scenario": "listed"}):
+        for params in ({}, {"scenario": "best"}):
             with self.subTest(params):
                 items = json.loads(self.client.get(URL, params).content)["items"]
                 flags = {item["name"]: item["linkSelectsSeller"] for item in items}
@@ -311,7 +316,7 @@ class CurrencyPrecisionTests(MexicanMarket, TestCase):
         Offer.objects.filter(pk=self.offers["B"].pk).update(current_price=Decimal(1990))
         ProjectionService().refresh()
 
-        payload = self._items(scenario="listed", country="CL", currency="CLP")
+        payload = self._items(scenario="best", country="CL", currency="CLP")
         prices = {item["name"]: item["price"] for item in payload["items"]}
 
         assert prices["B"] == "1990"

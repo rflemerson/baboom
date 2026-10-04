@@ -17,7 +17,6 @@ const emit = defineEmits<{
 const props = defineProps<{
   activeName?: string
   massUnit?: string
-  scenarioKey?: string | null
   filtersActive?: boolean
   pageInfo: CatalogPageInfo | null
   products: CatalogProduct[]
@@ -124,7 +123,6 @@ const loadingPlaceholders = computed(() =>
       :product="product"
       :active-name="activeName"
       :mass-unit="massUnit"
-      :scenario-key="scenarioKey"
     />
   </section>
 

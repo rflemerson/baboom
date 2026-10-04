@@ -29,9 +29,9 @@ describe('useCatalogFilters', () => {
     const { page, setPage, setScenario, variables } = useCatalogFilters()
     setPage(3)
 
-    setScenario('cash')
+    setScenario('best')
 
-    expect(variables.value.filters?.scenario).toBe('cash')
+    expect(variables.value.filters?.scenario).toBe('best')
     expect(page.value).toBe(1)
 
     setScenario('')

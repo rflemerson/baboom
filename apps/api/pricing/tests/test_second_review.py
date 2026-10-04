@@ -137,7 +137,7 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
                 instructions="Synthetic seller selection",
             )
         ProjectionService().refresh()
-        payload = self.client.get(URL, {"scenario": "listed"}).json()
+        payload = self.client.get(URL, {"scenario": "best"}).json()
         item = next(row for row in payload["items"] if row["name"] == "B")
         assert item["externalLink"] == route_url
         assert item["linkSelectsSeller"]
@@ -229,7 +229,7 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
         )
         ScraperService.save_product_snapshot(payload)
         restricted = Offer.objects.get(external_id="restricted")
-        policy_row = PricingPolicyRevision.objects.get(key="listed")
+        policy_row = PricingPolicyRevision.objects.get(key="best")
         facts = FactLoader().load([restricted.pk], policy_row)
         assert facts.prices[0].quantity_min == MIN_QUANTITY
         assert facts.prices[0].amount_basis == "order"
@@ -392,7 +392,7 @@ class CouponScenarioTests(TwoProductCatalog, TestCase):
         standard = self.client.get(
             URL,
             {
-                "scenario": "listed",
+                "scenario": "normal",
                 "sort_by": "price",
                 "sort_dir": "asc",
                 "per_page": 1,

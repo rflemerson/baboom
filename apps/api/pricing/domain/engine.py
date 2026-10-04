@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 from promotions.rules.conditions import leaves
 from promotions.rules.effects import REWARD_EFFECTS
 
-from .base_prices import select_prices
+from .base_prices import base_choices, price_options
 from .conditions import Amounts, ConditionInput
 from .conditions import evaluate as evaluate_conditions
 from .effects import (
@@ -117,20 +117,64 @@ def evaluate(inputs: Inputs) -> PricingResult:
     assumptions: list[str] = []
     offers = {offer.id: offer for offer in inputs.offers}
 
-    selected = select_prices(inputs, offers, decisions, missing)
-    if selected is None:
+    options = price_options(inputs, offers, decisions, missing)
+    if options is None:
         return _empty(inputs, decisions, missing, assumptions)
+    choices, bounded = base_choices(options)
+    if bounded:
+        assumptions.append("base prices limited to each line's cheapest")
 
+    best: _Choice | None = None
+    for selected in choices:
+        choice = _best_for_base(inputs, offers, list(selected))
+        if choice is not None and (best is None or choice.key < best.key):
+            best = choice
+    if best is None:
+        decisions.append(
+            Decision(
+                "scenario",
+                DecisionStatus.INELIGIBLE,
+                f"no combination uses {sorted(inputs.requirement)}",
+            ),
+        )
+        return _empty(inputs, decisions, missing, assumptions)
+    outcome = best.outcome
+    outcome.decisions[:0] = [*decisions, *best.decisions]
+    outcome.missing[:0] = missing
+    outcome.assumptions[:0] = [*assumptions, *best.assumptions]
+    return _result(inputs, best.selected, outcome, best.status)
+
+
+@dataclass
+class _Choice:
+    """The best combination of promotions for one choice of base prices."""
+
+    key: tuple[Decimal, Decimal, int, Decimal]
+    selected: list[SelectedPrice]
+    outcome: _Outcome
+    status: OptimizationStatus
+    decisions: list[Decision]
+    assumptions: list[str]
+
+
+def _best_for_base(
+    inputs: Inputs,
+    offers: dict[int, OfferFact],
+    selected: list[SelectedPrice],
+) -> _Choice | None:
+    """Apply every allowed combination of promotions to these base prices."""
+    decisions: list[Decision] = []
+    assumptions: list[str] = []
     lines = [
         LineState.start(line, offers[line.offer_id], price)
-        for line, price in zip(context.lines, selected, strict=True)
+        for line, price in zip(inputs.context.lines, selected, strict=True)
     ]
     candidates = _candidates(inputs, lines, decisions)
-    subsets, status = _combinations(candidates, policy, decisions, assumptions)
-
+    subsets, status = _combinations(candidates, inputs.policy, decisions, assumptions)
     best: _Outcome | None = None
-    best_key: tuple[Decimal, Decimal, int] | None = None
+    best_key: tuple[Decimal, Decimal, int, Decimal] | None = None
     alone: dict[int, _Outcome] = {}
+    base = sum((price.amount for price in selected), ZERO)
     for subset in subsets:
         outcome = _apply(inputs, lines, subset)
         if len(subset) == 1:
@@ -141,23 +185,14 @@ def evaluate(inputs: Inputs) -> PricingResult:
             _objective_amount(inputs, outcome),
             -_money_rewards(outcome),
             -len(outcome.applied),
+            base,
         )
         if best_key is None or key < best_key:
             best, best_key = outcome, key
-    if best is None:
-        decisions.append(
-            Decision(
-                "scenario",
-                DecisionStatus.INELIGIBLE,
-                f"no combination uses {sorted(inputs.requirement)}",
-            ),
-        )
-        return _empty(inputs, decisions, missing, assumptions)
+    if best is None or best_key is None:
+        return None
     decisions += _unapplied(candidates, best, alone)
-    best.decisions[:0] = decisions
-    best.missing[:0] = missing
-    best.assumptions[:0] = assumptions
-    return _result(inputs, selected, best, status)
+    return _Choice(best_key, selected, best, status, decisions, assumptions)
 
 
 # Base prices
@@ -176,6 +211,11 @@ def _candidates(
     kept: list[RevisionRule] = []
     for revision in sorted(inputs.revisions, key=lambda item: item.id):
         subject = f"revision {revision.id}"
+        if not policy.apply_benefits:
+            decisions.append(
+                Decision(subject, DecisionStatus.INELIGIBLE, "scenario applies none"),
+            )
+            continue
         reason = _static_refusal(revision, inputs, lines)
         if reason is not None:
             status, text = reason

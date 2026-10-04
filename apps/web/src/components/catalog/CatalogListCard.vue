@@ -10,7 +10,6 @@ defineProps<{
   product: CatalogProduct
   activeName?: string
   massUnit?: string
-  scenarioKey?: string | null
 }>()
 </script>
 
@@ -57,7 +56,7 @@ defineProps<{
         <div class="grid grid-cols-2 gap-3">
           <BaseMetricCard
             compact
-            :label="totalPriceLabel(product.paymentMethod, scenarioKey)"
+            :label="totalPriceLabel(product.paymentMethod)"
             :value="formatMoney(product.price, product.currency)"
           />
           <BaseMetricCard

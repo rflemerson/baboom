@@ -137,7 +137,7 @@ class MigrationPathTests(TestCase):
         # Projections price each linked offer at what the crawl read.
         ProjectionService().refresh()
         projected = OfferScenarioProjection.objects.filter(
-            policy__key="listed",
+            policy__key="best",
             alternative="best",
         ).select_related("offer")
         assert {row.offer for row in projected} == {self.own, self.third}

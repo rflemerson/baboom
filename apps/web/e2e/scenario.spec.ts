@@ -29,23 +29,21 @@ function product(price: string, paymentMethod: string | null, linkSelectsSeller:
   }
 }
 
-test('choosing the cash scenario ranks by the price paid at once', async ({ page }) => {
+test('choosing the best price ranks by the price paid now', async ({ page }) => {
   const scenarios: Array<string | null> = []
   await page.route('**/api/catalog/products/**', async (route: Route) => {
     const url = new URL(route.request().url())
     const scenario = url.searchParams.get('scenario')
     scenarios.push(scenario)
-    const cash = scenario === 'cash'
+    const best = scenario === 'best'
     await route.fulfill({
       json: {
         active: { slug: 'protein', name: 'Protein' },
         massUnit: 'g',
         market: { country: 'BR', currency: 'BRL' },
-        scenario: cash
-          ? { key: 'cash', version: 1, source: 'projection' }
-          : { key: 'listed', version: null, source: 'legacy' },
+        scenario: best ? { key: 'best', version: 1 } : { key: 'normal', version: 1 },
         pageInfo: PAGE_INFO,
-        items: [cash ? product('89.90', 'pix', false) : product('99.88', null, true)],
+        items: [best ? product('89.90', 'pix', false) : product('99.88', null, true)],
       },
     })
   })
@@ -54,10 +52,10 @@ test('choosing the cash scenario ranks by the price paid at once', async ({ page
   await expect(page.getByText('BRL 99.88')).toBeVisible()
   await expect(page.getByText('Total price', { exact: true })).toBeVisible()
 
-  await page.getByLabel('Price the catalog compares').selectOption('cash')
+  await page.getByLabel('Price the catalog compares').selectOption('best')
 
   await expect(page.getByText('BRL 89.90')).toBeVisible()
   await expect(page.getByText('Total price (Pix)')).toBeVisible()
   await expect(page.getByText("may open another seller's offer")).toBeVisible()
-  expect(scenarios).toContain('cash')
+  expect(scenarios).toContain('best')
 })

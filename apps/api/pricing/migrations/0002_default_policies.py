@@ -1,26 +1,30 @@
-"""Publish the first public policies: the store's price, and paid at once."""
+"""Publish the public policies: the store's normal price, and the best price now."""
 
 from django.db import migrations
 from django.utils import timezone
 
 POLICIES = (
     (
-        "listed",
+        "normal",
         "listed",
         True,
         {
+            "apply_benefits": False,
             "accepted_semantics": ["known", "legacy_unknown"],
             "freshness_hours": 72,
         },
     ),
     (
-        "cash",
-        "cash",
+        "best",
+        "best",
         False,
         {
-            "accepted_semantics": ["known"],
+            "accepted_semantics": ["known", "legacy_unknown"],
             "cash_methods": ["pix", "boleto"],
-            "include_unknown_payment": False,
+            "allow_codes": True,
+            "auto_public_codes": True,
+            "allow_rewards": True,
+            "objective": "items_payable",
             "freshness_hours": 72,
         },
     ),

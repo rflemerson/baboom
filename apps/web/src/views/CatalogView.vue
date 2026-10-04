@@ -39,8 +39,7 @@ const {
   toggleSortDirection,
   variables,
 } = useCatalogFilters()
-const { active, error, loading, massUnit, pageInfo, products, refetch, scenarioKey } =
-  useCatalogQuery(variables)
+const { active, error, loading, massUnit, pageInfo, products, refetch } = useCatalogQuery(variables)
 const { setViewMode, viewMode } = useCatalogViewMode()
 const filtersOpen = ref(false)
 
@@ -106,7 +105,6 @@ function applyAdvancedFilters(payload: {
         :filters-active="filtersActive"
         :page-info="pageInfo"
         :products="products"
-        :scenario-key="scenarioKey"
         :active-name="active?.name"
         :mass-unit="massUnit"
         :loading="loading"

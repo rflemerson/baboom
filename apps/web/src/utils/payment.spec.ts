@@ -16,11 +16,10 @@ describe('payment labels', () => {
 
   it('labels a total with its payment method', () => {
     expect(totalPriceLabel('pix')).toBe('Total price (Pix)')
-    expect(totalPriceLabel('pix', 'cash')).toBe('Total price (Pix)')
+    expect(totalPriceLabel('pix')).toBe('Total price (Pix)')
   })
 
   it('says "at once" for an unnamed method in the cash scenario', () => {
-    expect(totalPriceLabel(null, 'cash')).toBe('Total price (at once)')
-    expect(totalPriceLabel(null, 'listed')).toBe('Total price')
+    expect(totalPriceLabel(null)).toBe('Total price')
   })
 })

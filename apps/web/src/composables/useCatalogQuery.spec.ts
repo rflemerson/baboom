@@ -65,7 +65,7 @@ describe('useCatalogQuery', () => {
       json: vi.fn().mockResolvedValue({
         active: null,
         massUnit: 'g',
-        scenario: { key: 'cash', version: 1 },
+        scenario: { key: 'best', version: 1 },
         pageInfo: {
           currentPage: 1,
           perPage: 12,
@@ -79,9 +79,9 @@ describe('useCatalogQuery', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { loading } = useCatalogQuery({ filters: { page: 1, scenario: 'cash' } })
+    const { loading } = useCatalogQuery({ filters: { page: 1, scenario: 'best' } })
 
     await vi.waitFor(() => expect(loading.value).toBe(false))
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('scenario=cash')
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('scenario=best')
   })
 })

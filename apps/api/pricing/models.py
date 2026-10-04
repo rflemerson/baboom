@@ -25,6 +25,7 @@ MONEY = {"max_digits": 19, "decimal_places": 6}
 DEFAULT_FRESHNESS_HOURS = 72
 POLICY_FIELDS = (
     "objective",
+    "apply_benefits",
     "accepted_semantics",
     "accepted_evidence",
     "cash_methods",

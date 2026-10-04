@@ -9,11 +9,12 @@ export const CATALOG_SORT_OPTIONS = [
   { label: 'Concentration', value: 'concentration' },
 ] as const
 
-// The price a ranking compares. The empty value is the store's default price;
-// a scenario only changes which observed price counts, never invents one.
+// The price a ranking compares. The empty value is the store's normal price;
+// the best price adds every public promotion, code and cash price, and falls
+// back to the normal price when none applies.
 export const CATALOG_SCENARIO_OPTIONS = [
-  { label: 'Store price', value: '' },
-  { label: 'Paid at once (Pix, boleto)', value: 'cash' },
+  { label: 'Normal price', value: '' },
+  { label: 'Best price', value: 'best' },
 ] as const
 
 export const CATALOG_SEARCH_DEBOUNCE_MS = 250

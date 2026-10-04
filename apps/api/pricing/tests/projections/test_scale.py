@@ -53,7 +53,7 @@ class ScaleTests(TwoProductCatalog, TestCase):
 
     def test_loading_facts_issues_a_fixed_number_of_queries(self) -> None:
         """Ten offers and fifty offers cost the same round trips."""
-        policy = PricingPolicyRevision.objects.get(key="listed", number=1)
+        policy = PricingPolicyRevision.objects.get(key="best", number=1)
         few = self._add(10)
         many = few + self._add(40)
 
