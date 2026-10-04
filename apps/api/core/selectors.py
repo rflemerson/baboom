@@ -15,6 +15,7 @@ from django.db.models import (
     F,
     FloatField,
     IntegerField,
+    JSONField,
     OuterRef,
     Q,
     QuerySet,
@@ -24,6 +25,9 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, Coalesce, NullIf
 
+from commerce.models import Market
+from offers.models import Offer, StockStatus
+
 from .dtos import CatalogProductsFilters
 from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
 
@@ -31,6 +35,44 @@ from .models import Active, ComboActive, Product, ProductActive, ProductNutritio
 # first, each with ``amount``, ``url`` and ``payment_method``. The catalog does
 # not know which pricing policy produced them.
 PriceSource = Callable[[], QuerySet]
+
+
+def current_prices(country: str, currency: str) -> PriceSource:
+    """Return each offer's last read price, for markets not switched to pricing.
+
+    Temporary: serves the catalog until ``PRICING_PROJECTION_COUNTRIES`` names
+    the market, and goes with that setting once every market reads
+    projections. A store of another known market never competes.
+    """
+    foreign = Market.objects.exclude(country=country, currency_id=currency).values(
+        "namespace",
+    )
+
+    def source() -> QuerySet:
+        return (
+            Offer.objects.filter(
+                product_store__product=OuterRef("pk"),
+                current_price__isnull=False,
+                delisted_at__isnull=True,
+                current_stock_status__in=StockStatus.purchasable(),
+            )
+            .exclude(store_slug__in=foreign)
+            .annotate(
+                amount=F("current_price"),
+                comparison_amount=F("current_price"),
+                pricing_details=Value({}, output_field=JSONField()),
+                payment_method=Value(""),
+                offer_id=F("pk"),
+                expires_at=Value(None, output_field=DateTimeField()),
+                link_fixes=Coalesce(
+                    F("seller_account__is_channel_owner"),
+                    Value(value=True),
+                ),
+            )
+            .order_by("current_price", "pk")
+        )
+
+    return source
 
 
 def catalog_active(slug: str | None = None) -> Active | None:

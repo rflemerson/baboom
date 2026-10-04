@@ -111,7 +111,6 @@ class _Outcome:
 
 def evaluate(inputs: Inputs) -> PricingResult:
     """Return the scenario's result for these inputs and this ``now``."""
-    context, policy = inputs.context, inputs.policy
     decisions: list[Decision] = []
     missing: list[str] = []
     assumptions: list[str] = []

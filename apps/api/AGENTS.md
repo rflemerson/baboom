@@ -112,7 +112,10 @@ offers that a successful crawl no longer sees.
   to `core.selectors.public_catalog_products` as its price source; expiry is
   checked at read time. `?scenario=<policy key>` picks the policy (default:
   the `is_default` one); every request ranks one market (`?country=`,
-  `?currency=`, default BR/BRL). There is no legacy price path.
+  `?currency=`, default BR/BRL). Until `PRICING_PROJECTION_COUNTRIES` names a market (temporary
+  launch switch), its catalog reads `core.selectors.current_prices` instead.
+  Public policies: `normal` (store price, no benefits, default) and `best`
+  (best price paid now; falls back to normal).
 - `pricing.invalidation.Repricing` decides what a change reaches and
   schedules `refresh_projections` after commit. Crawls and promotions announce
   themselves with their own signals (`offers_observed`, `revision_changed`;

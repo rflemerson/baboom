@@ -8,7 +8,7 @@ from decimal import Decimal
 from http import HTTPStatus
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from commerce.models import Currency, Market
@@ -33,6 +33,7 @@ class TwoProductCatalog:
 
     def setUp(self) -> None:
         """Product A at R$ 100, product B at R$ 120, one store."""
+        self.enterContext(override_settings(PRICING_PROJECTION_COUNTRIES=["BR", "MX"]))
         self.market = CommerceIdentityService.market(
             MarketRef(
                 namespace="store",

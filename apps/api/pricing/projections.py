@@ -334,6 +334,11 @@ class ProjectionService:
                 for a in result.adjustments
             ],
             "missing": list(result.missing_context),
+            "refusals": [
+                f"{decision.subject}: {decision.status} ({decision.reason})"
+                for decision in result.decisions
+                if decision.subject.startswith(("price", "offer", "scenario"))
+            ],
             "route_limitations": list(result.route_limitations),
             "routes": [
                 {

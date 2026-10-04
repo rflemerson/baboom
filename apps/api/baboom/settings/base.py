@@ -67,6 +67,11 @@ CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS = env.int(
     "CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS",
     default=300,
 )
+# Temporary launch switch: markets whose catalog reads pricing projections.
+# Others keep each offer's last read price until their coverage is checked
+# (manage.py pricing_coverage). Removed once every market is switched.
+PRICING_PROJECTION_COUNTRIES = env.list("PRICING_PROJECTION_COUNTRIES", default=[])
+
 # Prices change with promotions; the CDN keeps a page at most this long.
 CATALOG_PRODUCTS_EDGE_CACHE_SECONDS = env.int(
     "CATALOG_PRODUCTS_EDGE_CACHE_SECONDS",

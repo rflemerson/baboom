@@ -70,24 +70,33 @@ and per-dimension coverage replaced the single `complete_unit_list` flag.
 
 ## Cutover runbook
 
-Production runs `767150b`: none of the pricing apps exist there, so there is
-no switch and no shadow period. The deploy is the cutover; rollback is the
-previous release (the new apps' tables stay, unused).
+Production runs `767150b`, before every pricing app. The deploy changes no
+price a buyer sees: a market reads projections only once
+`PRICING_PROJECTION_COUNTRIES` names it; until then the catalog shows each
+offer's last read price (`core.selectors.current_prices`).
 
-1. **Deploy** the code. Migrations create `commerce`, `promotions` and
-   `pricing`, add identity columns to `offers`, `core` and `scrapers`, seed the
-   reference data and policies, and install the freeze triggers.
-2. **Identity:** `manage.py backfill_commercial_identity`, read the preview
-   (offers without a seller are listed for review), then run it with
-   `--apply`.
-3. **History:** `manage.py backfill_legacy_price_observations`, then with
-   `--apply`. Legacy prices become `legacy_unknown`, nothing more.
-4. **Projections:** `manage.py rebuild_pricing_projections --apply`. Only
-   prices confirmed within a policy's freshness are priced; the first crawl
-   after the deploy prices the rest.
-5. **After the first full crawl:** delete the three one-off commands above
-   and the `Offer.current_price` / `PriceObservation` writes in their own
-   change.
+1. **Deploy.** Migrations create `commerce`, `promotions` and `pricing`, add
+   identity columns to `offers`, `core` and `scrapers`, seed the reference
+   data and the `normal` and `best` policies, and install the freeze
+   triggers. Check `CATALOG_PRODUCTS_EDGE_CACHE_SECONDS` in the environment:
+   it caps how long the CDN keeps a page of prices (default 600).
+2. **Identity:** `manage.py backfill_commercial_identity`, read the preview,
+   then `--apply`.
+3. **History:** `manage.py backfill_legacy_price_observations`, then
+   `--apply`. Legacy prices become `legacy_unknown` and keep their age.
+4. **Projections:** `manage.py rebuild_pricing_projections --apply`.
+5. **Coverage:** `manage.py pricing_coverage --country BR --currency BRL
+   --details` lists, per policy, products priced today that projections
+   leave without a price, by store and reason (stale, unavailable, no
+   projection). Wait for full crawls of the stores it names and repeat.
+6. **Switch:** add the country to `PRICING_PROJECTION_COUNTRIES`. Rollback is
+   removing it.
+7. **After every market is switched and stable:** remove the setting and
+   `current_prices`, then the legacy writes (`Offer.current_price`,
+   `PriceObservation`) once ingestion updates offers and stock without them.
+   The two backfills go after the recovery period;
+   `rebuild_pricing_projections` and `pricing_coverage` stay as operational
+   tools.
 
 ## External review, 2026-10-04
 
