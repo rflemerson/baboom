@@ -27,7 +27,8 @@ from .domain.conditions import (
     leaf_key,
 )
 from .domain.conditions import evaluate as evaluate_conditions
-from .domain.engine import Inputs, canonical, evaluate, fingerprint
+from .domain.engine import evaluate
+from .domain.inputs import Inputs, canonical, fingerprint
 from .domain.types import (
     CartLine,
     Claim,

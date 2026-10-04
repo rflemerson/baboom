@@ -11,8 +11,6 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 
-from promotions.rules.effects import SUPPORTED_EFFECTS, unsupported_settings
-
 from .money import ZERO, allocate, percent_of, round_money
 from .types import (
     Adjustment,
@@ -37,8 +35,6 @@ if TYPE_CHECKING:
     )
 
 STAGES = ("catalog", "order", "payment", "shipping", "reward")
-
-__all__ = ["SUPPORTED_EFFECTS", "unsupported_settings"]
 
 
 @dataclass

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .domain.engine import Inputs
+from .domain.inputs import Inputs
 
 if TYPE_CHECKING:
     from .costs import CostBook

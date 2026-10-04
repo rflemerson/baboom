@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from itertools import count
 
-from pricing.domain.engine import Inputs
+from pricing.domain.inputs import Inputs
 from pricing.domain.types import (
     CartLine,
     EffectRule,

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from .types import Decision, DecisionStatus, SelectedPrice
 
 if TYPE_CHECKING:
-    from .engine import Inputs
+    from .inputs import Inputs
     from .types import CartLine, OfferFact, PriceFact
 
 

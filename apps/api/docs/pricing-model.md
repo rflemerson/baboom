@@ -303,10 +303,25 @@ fixtures, labelled as such.
 
 ## Local second-review implementation
 
-`pricing.facts` owns ORM fact loading and translation; `pricing.costs` resolves
-current shipping alternatives and charge versions; `pricing.context` assembles
-inputs shared by quotes and projections. `PricingService` evaluates contextual quotes. `domain/base_prices.py` and `domain/scopes.py` isolate base selection and
-qualification/benefit reach from engine orchestration.
+`pricing.facts` loads ORM rows as facts, indexed per offer; `pricing.costs`
+keeps every current shipping quote and charge per group; `pricing.context`
+assembles inputs from facts and costs already loaded; `pricing.groups` names
+checkout groups and keyed tokens. `PricingService` evaluates contextual
+quotes, `ProjectionService` public projections, `pricing.invalidation` what
+a change reaches.
+
+The pure engine (`pricing/domain`) is split by responsibility:
+
+| Module | Responsibility |
+| --- | --- |
+| `engine.py` | `evaluate`: base choices times promotion combinations |
+| `inputs.py` | `Inputs`, canonical form, fingerprint |
+| `base_prices.py` | usable base prices per line and scenario |
+| `candidates.py` | revisions that may apply, and why others do not |
+| `search.py` | compatibility and bounded combination search |
+| `application.py` | applying a combination stage by stage; objective; benefits used |
+| `routes.py`, `charges.py`, `results.py` | routes, fee totals, the result |
+| `effects.py`, `conditions.py`, `scopes.py`, `money.py`, `types.py` | effect handlers, conditions, reach, rounding, contracts |
 
 `promotions.rules` is a pure module below promotion publication and the
 engine. Its `EffectSpec` registry states, per effect kind, the stages,

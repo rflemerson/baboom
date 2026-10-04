@@ -25,7 +25,7 @@ from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.services import PromotionService
 
 if TYPE_CHECKING:
-    from pricing.domain.engine import Inputs
+    from pricing.domain.inputs import Inputs
 
 PROMOTIONS = 30
 

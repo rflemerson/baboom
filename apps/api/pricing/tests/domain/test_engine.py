@@ -8,7 +8,8 @@ from decimal import Decimal
 
 from django.test import SimpleTestCase
 
-from pricing.domain.engine import evaluate, fingerprint
+from pricing.domain.engine import evaluate
+from pricing.domain.inputs import fingerprint
 from pricing.domain.money import allocate
 from pricing.domain.types import (
     CartLine,

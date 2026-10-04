@@ -15,9 +15,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, ClassVar, Union, get_args, get_origin, get_type_hints
 
-from .domain import engine
+from .domain import inputs as domain_inputs
 from .domain import types as domain_types
-from .domain.engine import Inputs, evaluate
+from .domain.engine import evaluate
+from .domain.inputs import Inputs, canonical
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 
 NAMESPACE: dict[str, object] = {
     **vars(domain_types),
-    **vars(engine),
+    **vars(domain_inputs),
     "Decimal": Decimal,
     "datetime": datetime,
 }
@@ -73,7 +74,7 @@ class QuoteReplay:
         except KeyError, TypeError, ValueError:
             return ReplayCheck("invalid_snapshot")
         kept = dict(quote.snapshot.get("result") or {})
-        again = engine.canonical(result)
+        again = canonical(result)
         if not isinstance(again, dict):  # pragma: no cover - result is a dataclass
             return ReplayCheck("invalid_snapshot")
         for name in ("input_fingerprint",):
