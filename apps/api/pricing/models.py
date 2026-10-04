@@ -168,8 +168,18 @@ class QuoteLine(BaseModel):
         verbose_name=_("Offer"),
     )
     quantity = models.PositiveIntegerField(_("Quantity"))
-    base_amount = models.DecimalField(_("Base Amount"), **MONEY)
-    allocated_discount = models.DecimalField(_("Allocated Discount"), **MONEY)
+    base_amount = models.DecimalField(
+        _("Base Amount"),
+        null=True,
+        blank=True,
+        help_text=_("Empty when the line had no price in the scenario."),
+        **MONEY,
+    )
+    allocated_discount = models.DecimalField(
+        _("Allocated Discount"),
+        default=0,
+        **MONEY,
+    )
 
     class Meta:
         """Meta options."""

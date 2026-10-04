@@ -531,26 +531,21 @@ def _combinations(
     decisions: list[Decision],
     assumptions: list[str],
 ) -> tuple[list[tuple[RevisionRule, ...]], OptimizationStatus]:
-    """Return every pairwise-compatible subset, up to the policy's bound."""
+    """Return the pairwise-compatible subsets, within a budget of visited nodes.
+
+    The search grows a subset only with candidates compatible with every
+    member, so incompatible promotions cost one node each instead of an
+    exponential enumeration. ``max_combinations`` bounds the nodes visited;
+    when the search stops early the result says ``bounded``.
+    """
     store_pairs: list[tuple[int, int]] = []
-    compatible: dict[tuple[int, int], bool] = {}
-    for first, second in itertools.combinations(candidates, 2):
-        ok, chooser = _compatible(first, second)
-        compatible[(first.id, second.id)] = ok
-        if not ok and chooser == "store_imposed":
-            store_pairs.append((first.id, second.id))
-    subsets: list[tuple[RevisionRule, ...]] = []
-    status = OptimizationStatus.COMPLETE
-    for size in range(len(candidates) + 1):
-        for subset in itertools.combinations(candidates, size):
-            if len(subsets) >= policy.max_combinations:
-                status = OptimizationStatus.BOUNDED
-                break
-            pairs = itertools.combinations(subset, 2)
-            if all(compatible[(a.id, b.id)] for a, b in pairs):
-                subsets.append(subset)
-    if store_pairs:
-        subsets = _store_choice(subsets, store_pairs, assumptions)
+    neighbours: dict[int, set[int]] = {index: set() for index in range(len(candidates))}
+    for i, j in itertools.combinations(range(len(candidates)), 2):
+        ok, chooser = _compatible(candidates[i], candidates[j])
+        if ok:
+            neighbours[i].add(j)
+        elif chooser == "store_imposed":
+            store_pairs.append((candidates[i].id, candidates[j].id))
     for first_id, second_id in store_pairs:
         decisions.append(
             Decision(
@@ -559,25 +554,57 @@ def _combinations(
                 "the store chooses one",
             ),
         )
-    return subsets, status
+    dropped = _store_choice(store_pairs, assumptions)
+    allowed = {i for i, c in enumerate(candidates) if c.id not in dropped}
+    search = _Search(candidates, neighbours, policy.max_combinations)
+    search.grow((), allowed)
+    status = (
+        OptimizationStatus.BOUNDED if search.stopped else OptimizationStatus.COMPLETE
+    )
+    return search.subsets, status
+
+
+@dataclass
+class _Search:
+    """A depth-first search over compatible subsets, with a node budget."""
+
+    candidates: list[RevisionRule]
+    neighbours: dict[int, set[int]]
+    budget: int
+    subsets: list[tuple[RevisionRule, ...]] = field(default_factory=lambda: [()])
+    visited: int = 1
+    stopped: bool = False
+
+    def grow(self, members: tuple[int, ...], options: set[int]) -> None:
+        """Extend a subset with each option compatible with all its members."""
+        for index in sorted(options):
+            if members and index < members[-1]:
+                continue
+            if self.visited >= self.budget:
+                self.stopped = True
+                return
+            self.visited += 1
+            subset = (*members, index)
+            self.subsets.append(tuple(self.candidates[i] for i in subset))
+            self.grow(subset, options & self.neighbours[index])
+            if self.stopped:
+                return
 
 
 def _store_choice(
-    subsets: list[tuple[RevisionRule, ...]],
     store_pairs: list[tuple[int, int]],
     assumptions: list[str],
-) -> list[tuple[RevisionRule, ...]]:
-    """When the store picks between two, keep only subsets with the earlier one.
+) -> set[int]:
+    """Return the revisions dropped where the store picks between two.
 
     The store's choice is not known; the revision published first is assumed,
     and the assumption is reported.
     """
-    dropped = {max(pair) for pair in store_pairs}
     assumptions.extend(
         f"the store's choice between revisions {a} and {b} assumed to be {min(a, b)}"
         for a, b in store_pairs
     )
-    return [s for s in subsets if not {r.id for r in s} & dropped]
+    return {max(pair) for pair in store_pairs}
 
 
 # Application

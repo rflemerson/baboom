@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import time
 from decimal import Decimal
@@ -140,7 +141,21 @@ def _seller(leaf: dict, data: ConditionInput) -> Evaluation:
     return _all_offers(set(leaf["seller_account_ids"]), "seller_id", data)
 
 
+def leaf_key(leaf: dict) -> str:
+    """Name a condition leaf by its canonical content."""
+    return json.dumps(leaf, sort_keys=True, default=str)
+
+
+DESTINATION_FACT = "destination_fact"
+
+
 def _destination(leaf: dict, data: ConditionInput) -> Evaluation:
+    # A protected snapshot keeps the outcome of each destination leaf as a
+    # fact, evaluated with the real destination before it was hidden.
+    key = leaf_key(leaf)
+    for claim in data.context.claims:
+        if claim.kind == DESTINATION_FACT and claim.issuer == key:
+            return _tri(holds=claim.value, reason="destination outside")
     destination = data.context.destination
     if destination is None:
         return _unknown("destination not given")

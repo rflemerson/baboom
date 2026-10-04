@@ -8,11 +8,13 @@ with the snapshot that reproduces the result.
 from __future__ import annotations
 
 import hashlib
+import hmac
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -22,9 +24,17 @@ from core.models import ProductStore
 from offers.models import Offer, OfferPriceObservation, StockStatus
 from promotions.models import PromotionRevision, PurchaseRoute
 
-from .domain.engine import Inputs, canonical, evaluate
+from .domain.conditions import (
+    DESTINATION_FACT,
+    Amounts,
+    ConditionInput,
+    leaf_key,
+)
+from .domain.conditions import evaluate as evaluate_conditions
+from .domain.engine import Inputs, canonical, evaluate, fingerprint
 from .domain.types import (
     CartLine,
+    Claim,
     CompatibilityFact,
     EffectRule,
     OfferFact,
@@ -36,6 +46,7 @@ from .domain.types import (
     RewardTermsFact,
     RouteFact,
     ScopeRule,
+    Tri,
 )
 from .models import (
     CurrencyConversionQuote,
@@ -49,6 +60,13 @@ if TYPE_CHECKING:
     from datetime import datetime
 
 LEGACY_PRICE_ID = 0
+EMPTY_AMOUNTS = Amounts(
+    before_discounts=Decimal(0),
+    after_item_discounts=Decimal(0),
+    after_order_discounts=Decimal(0),
+    shipping=None,
+    quantity=0,
+)
 DEFAULT_FRESHNESS_HOURS = 72
 POLICY_FIELDS = (
     "accepted_semantics",
@@ -465,6 +483,7 @@ class PricingService:
         """Evaluate and keep a quote whose snapshot reproduces the result."""
         inputs = self.inputs(request, now)
         result = evaluate(inputs)
+        protected = _private_safe(inputs)
         quote = PricingQuote.objects.create(
             policy=request.policy,
             market_id=inputs.context.market_id,
@@ -472,8 +491,9 @@ class PricingService:
             input_fingerprint=result.input_fingerprint,
             engine_version=result.engine_version,
             snapshot={
-                "inputs": canonical(_private_safe(inputs)),
+                "inputs": canonical(protected),
                 "result": canonical(result),
+                "protected_fingerprint": fingerprint(protected),
             },
             merchandise_total=result.merchandise_total,
             total_payable=result.total_payable,
@@ -489,17 +509,28 @@ class PricingService:
             ),
         )
         discounts = _discounts_by_offer(result)
+        selected = {price.offer_id: price for price in result.selected_prices}
         QuoteLine.objects.bulk_create(
             QuoteLine(
                 quote=quote,
-                offer_id=selected.offer_id,
+                offer_id=line.offer_id,
                 quantity=line.quantity,
-                base_amount=selected.amount,
-                allocated_discount=discounts.get(selected.offer_id, Decimal(0)),
+                base_amount=(
+                    selected[line.offer_id].amount
+                    if line.offer_id in selected
+                    else None
+                ),
+                allocated_discount=discounts.get(line.offer_id, Decimal(0)),
             )
-            for line, selected in zip(result.lines, result.selected_prices, strict=True)
+            for line in result.lines
+            if line.offer_id in inputs_offers(inputs)
         )
         return quote
+
+
+def inputs_offers(inputs: Inputs) -> set[int]:
+    """Return the ids of the offers an evaluation was given."""
+    return {offer.id for offer in inputs.offers}
 
 
 def _discounts_by_offer(result: PricingResult) -> dict[int, Decimal]:
@@ -511,33 +542,89 @@ def _discounts_by_offer(result: PricingResult) -> dict[int, Decimal]:
 
 
 def _private_safe(inputs: Inputs) -> Inputs:
-    """Hash the postal code and codes a quote would otherwise keep in clear."""
+    """Return inputs a quote may keep, which still reproduce its result.
+
+    Codes become the same keyed token on both sides, so a code a buyer
+    entered still matches the code a revision names, and neither is stored
+    in clear. The postal code is replaced by a token after every destination
+    leaf was evaluated with it; those outcomes travel as facts with their
+    provenance, so a replay reaches the same decision without the address.
+    """
     context = inputs.context
+    facts = tuple(_destination_facts(inputs))
     destination = context.destination
     if destination is not None and destination.postal_code:
-        digest = hashlib.sha256(destination.postal_code.encode()).hexdigest()
-        destination = replace(destination, postal_code=f"sha256:{digest}")
-    codes = frozenset(_hashed(code) for code in context.codes)
+        destination = replace(destination, postal_code=_token(destination.postal_code))
     revisions = tuple(
         replace(
             revision,
             codes=tuple(
-                (kind, _hashed(code) if kind == "personal_code" else code)
-                for kind, code in revision.codes
+                (kind, _token(code) if code else code) for kind, code in revision.codes
             ),
         )
         for revision in inputs.revisions
     )
     return replace(
         inputs,
-        context=replace(context, destination=destination, codes=codes),
+        context=replace(
+            context,
+            destination=destination,
+            codes=frozenset(_token(code) for code in context.codes),
+            claims=(*context.claims, *facts),
+        ),
         revisions=revisions,
     )
 
 
-def _hashed(value: str) -> str:
-    """Return a value a snapshot may keep without revealing it."""
-    return f"sha256:{hashlib.sha256(value.encode()).hexdigest()}"
+def _destination_facts(inputs: Inputs) -> list[Claim]:
+    """Evaluate every destination leaf with the real destination, as facts."""
+    facts: dict[str, Claim] = {}
+    for revision in inputs.revisions:
+        for leaf in _leaves_of_kind(revision.conditions.get("root"), "destination"):
+            outcome = evaluate_conditions(
+                {"root": leaf},
+                ConditionInput(
+                    context=inputs.context,
+                    revision=revision,
+                    offers=inputs.offers,
+                    qualifying=EMPTY_AMOUNTS,
+                    order=EMPTY_AMOUNTS,
+                ),
+            ).value
+            if outcome is not Tri.UNKNOWN:
+                key = leaf_key(leaf)
+                facts[key] = Claim(
+                    kind=DESTINATION_FACT,
+                    issuer=key,
+                    value=outcome is Tri.TRUE,
+                    provenance="evaluated_before_protection",
+                )
+    return list(facts.values())
+
+
+def _leaves_of_kind(node: object, kind: str) -> list[dict]:
+    if not isinstance(node, dict):
+        return []
+    for combinator in ("all", "any"):
+        if combinator in node:
+            return [
+                leaf
+                for child in node[combinator]
+                for leaf in _leaves_of_kind(child, kind)
+            ]
+    if "not" in node:
+        return _leaves_of_kind(node["not"], kind)
+    return [node] if node.get("kind") == kind else []
+
+
+def _token(value: str) -> str:
+    """Return a keyed token for a private value: equal values, equal tokens."""
+    digest = hmac.new(
+        settings.SECRET_KEY.encode(),
+        value.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"token:{digest}"
 
 
 __all__ = ["FactLoader", "PricingService", "QuoteRequest", "policy_from"]

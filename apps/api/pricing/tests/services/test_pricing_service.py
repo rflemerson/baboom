@@ -165,7 +165,7 @@ class QuoteTests(TestCase):
         codes = quote.snapshot["inputs"]["context"]["codes"]
         assert quote.merchandise_total == Decimal("79.20")
         assert codes
-        assert all(code.startswith("sha256:") for code in codes)
+        assert all(code.startswith("token:") for code in codes)
         assert quote.revisions.get() == self.revision
         assert quote.lines.get().allocated_discount == Decimal("19.80")
         assert quote.snapshot["result"]["input_fingerprint"] == quote.input_fingerprint
@@ -278,3 +278,23 @@ class StoredRouteTests(TestCase):
         assert without.deferred_rewards == ()
         assert with_route.deferred_rewards[0].amount == Decimal("9.90")
         assert with_route.purchase_routes[0].url == "https://cashback.example/go"
+
+
+class PricelessQuoteTests(TestCase):
+    """R11: a scenario without a price is a quote, not an exception."""
+
+    def test_an_unavailable_offer_is_quoted_without_a_price(self) -> None:
+        """The quote keeps the line, with no base amount."""
+        offer = _ingest_max_titanium()
+        Offer.objects.filter(pk=offer.pk).update(
+            current_stock_status=StockStatus.OUT_OF_STOCK,
+        )
+
+        quote = PricingService().quote(
+            QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed")),
+        )
+
+        assert quote.total_payable is None
+        line = quote.lines.get()
+        assert line.base_amount is None
+        assert line.allocated_discount == 0
