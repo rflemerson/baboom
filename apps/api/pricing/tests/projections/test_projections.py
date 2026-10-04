@@ -185,6 +185,15 @@ class RankingTests(TwoProductCatalog, TestCase):
 
         assert {item["name"]: item["price"] for item in items}["B"] is None
 
+    def test_the_best_policy_counts_payment_and_calendar_conditions(self) -> None:
+        """Public conditions count; personal ones (membership, new customer) do not."""
+        allowed = PricingPolicyRevision.objects.get(key="best").as_policy()
+
+        assert {"payment_method", "calendar"} <= allowed.allow_conditions
+        assert not {"new_customer", "program_member", "subscription"} & (
+            allowed.allow_conditions
+        )
+
     def test_the_default_ranking_reads_the_default_policy(self) -> None:
         """Without a scenario, the normal price ranks: B's promotion is ignored."""
         self._promote_b("30")

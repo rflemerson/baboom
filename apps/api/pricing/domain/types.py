@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
 
-ENGINE_VERSION = "1.1.0"
+ENGINE_VERSION = "1.2.0"
 
 
 class Tri(StrEnum):
@@ -403,6 +403,7 @@ class PricingResult:
     currency: str
     lines: tuple[CartLine, ...]
     selected_prices: tuple[SelectedPrice, ...]
+    payment: PaymentChoice | None
     merchandise_total: Decimal | None
     shipping_total: Decimal | None
     tax_fee_total: Decimal | None

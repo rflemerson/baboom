@@ -15,7 +15,6 @@ from .types import (
 if TYPE_CHECKING:
     from .types import (
         CompatibilityFact,
-        Policy,
         RevisionRule,
     )
 
@@ -47,15 +46,15 @@ def _compatible(first: RevisionRule, second: RevisionRule) -> tuple[bool, str]:
 
 def combinations(
     candidates: list[RevisionRule],
-    policy: Policy,
     decisions: list[Decision],
     assumptions: list[str],
+    budget: int,
 ) -> tuple[list[tuple[RevisionRule, ...]], OptimizationStatus]:
     """Return the pairwise-compatible subsets, within a budget of visited nodes.
 
     The search grows a subset only with candidates compatible with every
     member, so incompatible promotions cost one node each instead of an
-    exponential enumeration. ``max_combinations`` bounds the nodes visited;
+    exponential enumeration. ``budget`` bounds the nodes visited;
     when the search stops early the result says ``bounded``.
     """
     store_pairs: list[tuple[int, int]] = []
@@ -76,7 +75,7 @@ def combinations(
         )
     dropped = _store_choice(store_pairs, assumptions)
     allowed = {i for i, c in enumerate(candidates) if c.id not in dropped}
-    search = _Search(candidates, neighbours, policy.max_combinations)
+    search = _Search(candidates, neighbours, budget)
     search.grow((), allowed)
     status = (
         OptimizationStatus.BOUNDED if search.stopped else OptimizationStatus.COMPLETE

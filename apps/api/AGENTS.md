@@ -99,14 +99,20 @@ offers that a successful crawl no longer sees.
   scenario (listed, cash, payment), keeps the executable revisions the
   scenario counts, applies every compatible combination stage by stage and
   returns the cheapest, with a decision for every candidate. Unknown is never
-  zero; rewards never lower what is paid.
+  zero; rewards never lower what is paid. In the `best` scenario with no
+  payment in the context, the search also enumerates how to pay
+  (`domain/payments.py`): a price of one method fixes it, a price of any
+  method adds each of the policy's cash methods (so "20% off with Pix" applies
+  on the full price), an unstated price allows only "any method", where
+  method conditions stay unknown. The chosen payment is in the result. Bases,
+  payments and combinations share one budget (`max_combinations`).
 - `pricing.services.PricingService` is the only bridge between the ORM and the
   engine: `FactLoader` reads offers, the standing observation of each price
   condition (a complete read withdraws what it no longer states), and the
   revision in force of each promotion; `quote()` keeps a `PricingQuote` whose
   snapshot reproduces the result, with buyer codes and postal codes hashed.
-  Policies (`PricingPolicyRevision`) are frozen once published; `listed` and
-  `cash` v1 are seeded.
+  Policies (`PricingPolicyRevision`) are frozen once published; `normal` and
+  `best` v1 are seeded.
 - Ranking reads `OfferScenarioProjection` rows (one per linked offer and
   published public policy) through `pricing.selectors.projected_prices`, passed
   to `core.selectors.public_catalog_products` as its price source; expiry is

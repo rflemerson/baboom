@@ -237,11 +237,7 @@ class ProjectionService:
             currency_id=market.currency_id,
             amount=result.merchandise_total,
             status=self._status(result, purchasable=offer.purchasable),
-            payment_method=(
-                result.selected_prices[0].payment_method
-                if result.selected_prices
-                else ""
-            ),
+            payment_method=result.payment.method if result.payment else "",
             observation_id=(
                 result.selected_prices[0].observation_id
                 if result.selected_prices

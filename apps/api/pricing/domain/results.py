@@ -21,7 +21,7 @@ from .types import (
 
 if TYPE_CHECKING:
     from .application import Outcome
-    from .types import RevisionRule
+    from .types import PaymentChoice, RevisionRule
 from .candidates import static_refusal
 from .charges import fee_total
 from .inputs import Inputs, fingerprint
@@ -31,6 +31,7 @@ from .routes import chosen_routes
 def build_result(
     inputs: Inputs,
     selected: list[SelectedPrice],
+    payment: PaymentChoice | None,
     outcome: Outcome,
     status: OptimizationStatus,
 ) -> PricingResult:
@@ -53,7 +54,9 @@ def build_result(
         if shipping is not None and fees is not None
         else None
     )
-    schedule = _schedule(inputs, outcome, total if total is not None else merchandise)
+    schedule = _schedule(
+        inputs, outcome, payment, total if total is not None else merchandise
+    )
     due_now = schedule[0].amount if schedule and total is not None else None
     money_rewards = [
         reward.amount
@@ -71,6 +74,7 @@ def build_result(
         currency=context.currency,
         lines=context.lines,
         selected_prices=tuple(selected),
+        payment=payment,
         merchandise_total=merchandise,
         shipping_total=shipping,
         tax_fee_total=fees,
@@ -100,10 +104,10 @@ def build_result(
 def _schedule(
     inputs: Inputs,
     outcome: Outcome,
+    payment: PaymentChoice | None,
     total: Decimal,
 ) -> list[ScheduledPayment]:
     """Split the total into the chosen installments, or one payment."""
-    payment = inputs.context.payment
     minor = inputs.context.minor_unit
     if outcome.schedule_rates:
         return [
@@ -189,14 +193,20 @@ def empty_result(
     decisions: list[Decision],
     missing: list[str],
     assumptions: list[str],
+    status: OptimizationStatus,
 ) -> PricingResult:
-    """Return a result with no price: every total unknown, every reason kept."""
+    """Return a result with no price: every total unknown, every reason kept.
+
+    ``status`` is ``complete`` only when no eligible alternative exists;
+    ``bounded`` when the search stopped before covering every alternative.
+    """
     context, policy = inputs.context, inputs.policy
     return PricingResult(
         scenario=policy.scenario,
         currency=context.currency,
         lines=context.lines,
         selected_prices=(),
+        payment=None,
         merchandise_total=None,
         shipping_total=None,
         tax_fee_total=None,
@@ -219,5 +229,5 @@ def empty_result(
         policy_version=policy.version,
         evaluated_at=context.now,
         expires_at=None,
-        optimization_status=OptimizationStatus.COMPLETE,
+        optimization_status=status,
     )
