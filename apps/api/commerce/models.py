@@ -119,6 +119,17 @@ class Market(BaseModel):
         default="curated",
         help_text=_("How country and currency are known."),
     )
+    tax_inclusion = models.CharField(
+        _("Taxes in prices"),
+        max_length=8,
+        choices=[
+            ("included", _("Prices include every tax")),
+            ("excluded", _("Taxes are charged on top")),
+            ("unknown", _("Unknown")),
+        ],
+        default="unknown",
+        help_text=_("Whether a shelf price already carries the market's taxes."),
+    )
 
     class Meta:
         """Meta options."""

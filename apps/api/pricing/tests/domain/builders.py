@@ -103,5 +103,6 @@ def inputs(**kwargs: object) -> Inputs:
         prices=(price(1, "100.00"),),
         revisions=(),
         policy=policy(),
+        fees_status="included_in_prices",
     )
     return replace(base, **kwargs)

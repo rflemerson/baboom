@@ -25,6 +25,7 @@ class MarketRef:
     currency: str
     timezone: str
     provenance: str = "source_contract"
+    tax_inclusion: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,9 @@ class CommerceIdentityService:
         """
         existing = Market.objects.filter(namespace=ref.namespace).first()
         if existing is not None:
+            if existing.tax_inclusion == "unknown" and ref.tax_inclusion != "unknown":
+                existing.tax_inclusion = ref.tax_inclusion
+                existing.save(update_fields=["tax_inclusion", "updated_at"])
             return existing
         channel, _created = Channel.objects.get_or_create(
             name=ref.channel_name,
@@ -66,6 +70,7 @@ class CommerceIdentityService:
             timezone=ref.timezone,
             namespace=ref.namespace,
             provenance=ref.provenance,
+            tax_inclusion=ref.tax_inclusion,
         )
 
     @staticmethod

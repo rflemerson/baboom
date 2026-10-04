@@ -63,6 +63,7 @@ def market_ref(declared: MarketInput) -> MarketRef:
         country=declared.country,
         currency=declared.currency,
         timezone=declared.timezone,
+        tax_inclusion=declared.tax_inclusion,
     )
 
 

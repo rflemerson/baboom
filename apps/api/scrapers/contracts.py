@@ -87,6 +87,7 @@ class MarketInput(BaseModel):
     country: str
     currency: str
     timezone: str
+    tax_inclusion: Literal["included", "excluded", "unknown"] = "unknown"
 
 
 class PriceInput(BaseModel):

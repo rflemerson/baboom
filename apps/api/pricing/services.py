@@ -34,9 +34,12 @@ from .domain.conditions import evaluate as evaluate_conditions
 from .domain.engine import Inputs, canonical, evaluate, fingerprint
 from .domain.types import (
     CartLine,
+    CheckoutGroup,
     Claim,
     CompatibilityFact,
+    Destination,
     EffectRule,
+    FeeFact,
     OfferFact,
     Policy,
     PriceFact,
@@ -46,6 +49,7 @@ from .domain.types import (
     RewardTermsFact,
     RouteFact,
     ScopeRule,
+    ShippingFact,
     Tri,
 )
 from .models import (
@@ -53,6 +57,8 @@ from .models import (
     PricingPolicyRevision,
     PricingQuote,
     QuoteLine,
+    ShippingQuote,
+    TaxFeeQuote,
 )
 
 if TYPE_CHECKING:
@@ -463,6 +469,21 @@ class PricingService:
             lines=request.lines,
             **extra,
         )
+        if not context.groups:
+            # One checkout of every line, named like the shipping quotes are.
+            context = replace(
+                context,
+                groups=(
+                    CheckoutGroup(
+                        key=group_fingerprint(request.lines, context.destination),
+                        offer_ids=frozenset(line.offer_id for line in request.lines),
+                    ),
+                ),
+            )
+        shipping, fees = quoted_costs(
+            [group.key for group in context.groups],
+            moment,
+        )
         return Inputs(
             context=context,
             offers=tuple(facts.offers.values()),
@@ -470,6 +491,13 @@ class PricingService:
             revisions=facts.revisions,
             policy=policy_from(request.policy),
             routes=facts.routes,
+            shipping=shipping,
+            fees=fees,
+            fees_status=(
+                "included_in_prices"
+                if market.tax_inclusion == "included"
+                else ("consulted" if fees else "not_consulted")
+            ),
         )
 
     def evaluate(
@@ -526,6 +554,67 @@ class PricingService:
             if line.offer_id in inputs_offers(inputs)
         )
         return quote
+
+
+def group_fingerprint(
+    lines: tuple[CartLine, ...],
+    destination: Destination | None,
+) -> str:
+    """Name a checkout group by its lines and destination, never in clear.
+
+    Shipping depends on what is shipped and where: quantity and offers are
+    part of the key, the postal code only as a keyed token.
+    """
+    parts = sorted(f"{line.offer_id}x{line.quantity}" for line in lines)
+    place = ""
+    if destination is not None:
+        place = "|".join(
+            (
+                destination.country,
+                destination.subdivision,
+                _token(destination.postal_code) if destination.postal_code else "",
+            ),
+        )
+    text = ";".join(parts) + "@" + place
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def quoted_costs(
+    group_keys: list[str],
+    now: datetime,
+) -> tuple[tuple[ShippingFact, ...], tuple[FeeFact, ...]]:
+    """Return the shipping and fees quoted for these groups, still valid."""
+    shipping = tuple(
+        ShippingFact(
+            group_key=quote.group_fingerprint,
+            amount=quote.amount,
+            currency=quote.currency_id,
+            modality=quote.modality,
+            estimate_days=quote.estimate_days,
+            included_benefits=tuple(quote.included_benefits or ()),
+        )
+        for quote in ShippingQuote.objects.filter(
+            group_fingerprint__in=group_keys,
+            expires_at__gt=now,
+        ).order_by("group_fingerprint", "amount", "-observed_at")
+    )
+    cheapest: dict[str, ShippingFact] = {}
+    for fact in shipping:
+        cheapest.setdefault(fact.group_key, fact)
+    fees = tuple(
+        FeeFact(
+            group_key=quote.group_fingerprint,
+            kind=quote.kind,
+            amount=quote.amount,
+            currency=quote.currency_id,
+            included_in_price=quote.inclusion == "included",
+        )
+        for quote in TaxFeeQuote.objects.filter(
+            group_fingerprint__in=group_keys,
+            expires_at__gt=now,
+        )
+    )
+    return tuple(cheapest.values()), fees
 
 
 def inputs_offers(inputs: Inputs) -> set[int]:

@@ -111,11 +111,18 @@ offers that a successful crawl no longer sees.
   published public policy) through `pricing.selectors.projected_prices`, passed
   to `core.selectors.public_catalog_products` as its price source; expiry is
   checked at read time. `?scenario=<policy key>` always reads projections;
-  the default ranking reads them only with `PRICING_READ_PROJECTIONS=true`
+  the default ranking reads them only for countries in
+  `PRICING_PROJECTION_COUNTRIES`; every request ranks one market
+  (`?country=`, `?currency=`, default BR/BRL)
   (the cutover switch), and legacy current prices otherwise. A finished crawl
   (`offers.signals.offers_observed`) and a promotion change
   (`promotions.signals.revision_changed`) enqueue `refresh_projections`
   after commit; an hourly beat entry refreshes everything.
+- The engine also receives purchase routes (a tracked cashback needs an
+  activation route per line), quoted shipping and taxes (`fees_status`:
+  included in prices, consulted, or not consulted, which is unknown), and
+  refuses order-level terms across several checkout groups as unsupported.
+  `pricing.replay` re-evaluates a kept quote from its snapshot alone.
 - `backfill_commercial_identity` previews, and with `--apply` writes, the
   identity of offers captured before it existed; sellers come only from the
   captured context, and the rest are listed for review.

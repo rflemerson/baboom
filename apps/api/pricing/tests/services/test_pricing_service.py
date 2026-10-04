@@ -20,8 +20,14 @@ from pricing.models import (
     CurrencyConversionQuote,
     PricingPolicyRevision,
     PricingQuote,
+    ShippingQuote,
 )
-from pricing.services import PricingService, QuoteRequest, convert_for_display
+from pricing.services import (
+    PricingService,
+    QuoteRequest,
+    convert_for_display,
+    group_fingerprint,
+)
 from promotions.models import (
     PromotionEffect,
     PromotionScope,
@@ -298,3 +304,52 @@ class PricelessQuoteTests(TestCase):
         line = quote.lines.get()
         assert line.base_amount is None
         assert line.allocated_discount == 0
+
+
+class StoredCostTests(TestCase):
+    """Quoted shipping and taxes stored in the database reach the total."""
+
+    def test_a_stored_shipping_quote_completes_the_total(self) -> None:
+        """Brazilian prices include taxes; a valid shipping quote adds R$ 12."""
+        offer = _ingest_max_titanium()
+        request = QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed"))
+        without = PricingService().evaluate(request)
+        ShippingQuote.objects.create(
+            group_fingerprint=group_fingerprint(request.lines, None),
+            seller_account=offer.seller_account,
+            country="BR",
+            postal_code_hash="",
+            amount=Decimal("12.00"),
+            currency_id="BRL",
+            source="test",
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        with_shipping = PricingService().evaluate(request)
+
+        assert without.total_payable is None
+        assert with_shipping.shipping_total == Decimal("12.00")
+        assert with_shipping.total_payable == Decimal("111.00")
+
+    def test_a_market_of_unknown_taxes_has_no_total(self) -> None:
+        """Without the market's tax fact, taxes are unknown, not zero."""
+        offer = _ingest_max_titanium()
+        market = offer.listing_variant.listing.market
+        market.tax_inclusion = "unknown"
+        market.save()
+        request = QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed"))
+        ShippingQuote.objects.create(
+            group_fingerprint=group_fingerprint(request.lines, None),
+            seller_account=offer.seller_account,
+            country="BR",
+            postal_code_hash="",
+            amount=Decimal("12.00"),
+            currency_id="BRL",
+            source="test",
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        result = PricingService().evaluate(request)
+
+        assert result.total_payable is None
+        assert "taxes and fees not consulted" in result.missing_context

@@ -58,7 +58,7 @@ erDiagram
 | --- | --- | --- | --- |
 | `Currency` | table | `code` (ISO 4217), `minor_unit` | Precision per currency, never assumed two places |
 | `Channel` | table | `kind` (independent_store, marketplace, app), `name`, `adapter` | One engine for stores and marketplaces |
-| `Market` | table | `channel`, `country` (ISO 3166-1), `currency`, `timezone`, `namespace` | Same external id in two markets never collides |
+| `Market` | table | `channel`, `country` (ISO 3166-1), `currency`, `timezone`, `namespace`, `tax_inclusion` | Same external id in two markets never collides; taxes are zero only where prices include them |
 | `SellerAccount` | table | `market`, `external_id` (nullable), `name_raw`, `is_channel_owner`, `resolution` (resolved, unresolved) | A seller is an id inside a market, never a name; an unresolved seller is explicit |
 | `Merchant` | table | `name` | Optional curated grouping |
 | `MerchantBinding` | table | `merchant`, `seller_account`, `evidence`, `verified_at` | Accounts are joined only by a curated, evidenced binding |

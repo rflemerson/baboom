@@ -15,10 +15,10 @@ what works, what was tested and what is still pending.
 | 3 | `ObservationBatch`, `CollectionCoverage`, `Evidence`, `OfferPriceObservation`, `AvailabilityObservation`; the scraper contract carries several prices, Decimal from parse to row; VTEX keeps every seller; coverage replaces `complete_unit_list` | Done. The audit fixtures produce typed observations; a cash price records the discount it includes; 403/429 never delist; run `backfill_legacy_price_observations` after the identity backfill |
 | 4 | `promotions` with immutable revisions, scopes, conditions, effects, reward terms, compatibility, codes, evidence and routes; `PromotionService` for admin and MCP | Done. PRIMEIRACOMPRA is registered and published through the admin JSON API (the MCP surface); a published revision is frozen in the models and by PostgreSQL triggers; a new revision leaves the old hash intact |
 | 5 | `pricing.domain`: every mechanic listed in the model, the condition tree, stages and precedence, allocation, rewards | Done. `pricing/tests/domain/test_engine.py` runs the matrix offline, including the research's full example (R$ 114.60, net R$ 109.47) |
-| 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `CurrencyConversionQuote`, `PricingQuote` | Done. Quotes keep a snapshot and the revisions and observations they read; shipping, tax and conversion are quoted facts; an unknown shipping or fee leaves the total unknown; a complete read withdraws a price condition it no longer states |
-| 7 | `PricingPolicyRevision`, `OfferScenarioProjection`, invalidation, REST, Vue | Done. Projections per offer and policy, refreshed after crawls and promotion changes and hourly; ranking and pagination in the database; `?scenario=cash` in the API and a "Price shown" selector in Vue; the default stays legacy until `PRICING_READ_PROJECTIONS` |
+| 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `CurrencyConversionQuote`, `PricingQuote` | Done for single-checkout purchases. Quotes replay from their snapshot alone (`pricing.replay`), with codes and postal codes as keyed tokens; stored shipping and tax quotes reach the engine; taxes are unknown unless the market's prices include them or a source was consulted. **Pending:** no adapter writes `ShippingQuote` or `TaxFeeQuote` yet (the VTEX cart simulation is a pilot, not enabled), and order-level terms across several checkout groups are reported `unsupported` instead of evaluated per group |
+| 7 | `PricingPolicyRevision`, `OfferScenarioProjection`, invalidation, REST, Vue | Done. Projections per offer, policy and market; ranking and pagination in the database, one country and currency per request; `?scenario=cash` in the API and a "Price shown" selector in Vue; caches bounded by the earliest expiry; the link limitation of third-party sellers shown; the default stays legacy per country until listed in `PRICING_PROJECTION_COUNTRIES` |
 | 8 | Current adapters on the new contract; Amazon and Mercado Livre per authorized access; onboarding procedure; quota-aware scheduling | Done for what access allows: capabilities per adapter, provider limits, a configuration-only feed adapter proven by synthetic marketplace tests, and the onboarding procedure. Amazon and Mercado Livre wait for authorized access (see connectors) |
-| 9 | Shadow run, comparison, activation per market and policy, rollback, removal of compatibility fields | Code done: `compare_pricing_shadow`, the `PRICING_READ_PROJECTIONS` switch and the runbook below. Activation and the removal of compatibility fields wait for a production shadow run |
+| 9 | Shadow run, comparison, activation per market and policy, rollback, removal of compatibility fields | Code done: `compare_pricing_shadow` per market (amount, offer, seller, variant, link), the per-country switch and the runbook below. Activation and the removal of compatibility fields wait for a production shadow run |
 
 ## Moving today's data
 
@@ -82,14 +82,30 @@ Each step is reversible until the last one. Nothing here deletes a fact.
 4. **Projections:** `manage.py shell -c "from pricing.tasks import
    refresh_projections; print(refresh_projections())"`, or wait for the next
    crawl or the hourly refresh.
-5. **Shadow:** `manage.py compare_pricing_shadow --policy listed`. With no
+5. **Shadow:** `manage.py compare_pricing_shadow --policy listed --country BR
+   --currency BRL`. With no
    promotion published, both sources must agree; every difference is read,
    explained and fixed at its cause. `--strict` turns any difference into a
    failure, for a gate.
 6. **Scenarios first:** `?scenario=cash` is live from step 4 without changing
    the default ranking; check it against the stores' own pages.
-7. **Switch:** set `PRICING_READ_PROJECTIONS=true`. Rollback is setting it
+7. **Switch:** add the country to `PRICING_PROJECTION_COUNTRIES` (e.g.
+   `BR`). Rollback is removing it
    back to false: legacy prices are still written by every crawl.
 8. **Later, once production has run on projections without regressions:**
    stop writing `PriceObservation`, then remove `Offer.current_price` and the
    legacy selector in their own migrations.
+
+## External review, 2026-10-04
+
+An external review of `767150b..5038a46` found fourteen defects (R01-R14)
+where a guarantee did not cross every layer. All are fixed, each with the
+reviewer's reproduction in `pricing/tests/test_review_regressions.py` and
+acceptance tests beside the code it concerns:
+
+| Finding | Fixed by |
+| --- | --- |
+| R01 withdrawn price reappearing; R02 backfill refreshing old prices; R03 seller collision moving facts; R14 VTEX unknown stock read as available | `03d9c5d` |
+| R04 observation restrictions lost; R05 currencies compared nominally; R13 caches outliving prices | `b1d7fcf` |
+| R06 tracked cashback without a route; R07 Pix applied twice in mixed carts; R09 multibuy ignoring its cap; R12 `any` payment unused | `3a2bd32` |
+| R08 snapshots that could not replay; R10 exponential combination search; R11 priceless quotes raising | `655e1f0` |

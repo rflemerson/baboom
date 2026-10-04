@@ -848,3 +848,39 @@ class RestrictedPriceTests(SimpleTestCase):
         )
 
         assert result.merchandise_total == Decimal("100.00")
+
+
+class CostsAndGroupsTests(SimpleTestCase):
+    """Unconsulted taxes are unknown; order terms across groups are unsupported."""
+
+    def test_taxes_not_consulted_leave_the_total_unknown(self) -> None:
+        """An empty fee list is zero only when someone checked."""
+        shipping = (ShippingFact("all", Decimal("10.00"), "BRL"),)
+        unknown = evaluate(inputs(shipping=shipping, fees_status="not_consulted"))
+        consulted = evaluate(inputs(shipping=shipping, fees_status="consulted"))
+
+        assert unknown.total_payable is None
+        assert "taxes and fees not consulted" in unknown.missing_context
+        assert consulted.total_payable == Decimal("110.00")
+
+    def test_order_terms_across_checkout_groups_are_unsupported(self) -> None:
+        """A minimum per order is not applied to two separate checkouts."""
+        promo = revision(1, effect("percentage", params={"rate": "10"}))
+        result = evaluate(
+            inputs(
+                offers=(offer(1, seller=100), offer(2, seller=200)),
+                prices=(price(1, "100.00"), price(2, "100.00")),
+                revisions=(promo,),
+                context=context(
+                    CartLine(1),
+                    CartLine(2),
+                    groups=(
+                        CheckoutGroup("a", frozenset({1})),
+                        CheckoutGroup("b", frozenset({2})),
+                    ),
+                ),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("200.00")
+        assert DecisionStatus.UNSUPPORTED in _statuses(result)["revision 1"]

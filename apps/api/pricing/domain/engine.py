@@ -72,6 +72,10 @@ class Inputs:
     shipping: tuple[ShippingFact, ...] = ()
     fees: tuple[FeeFact, ...] = ()
     routes: tuple[RouteFact, ...] = ()
+    # "included_in_prices": the market's prices carry every tax; "consulted":
+    # ``fees`` lists every charge a source quoted; "not_consulted": nobody
+    # asked, so taxes and fees are unknown, not zero.
+    fees_status: str = "not_consulted"
 
 
 @dataclass
@@ -364,7 +368,7 @@ def _static_refusal(
     checks = (
         _status_refusal(revision, inputs),
         _terms_refusal(revision, inputs.policy),
-        _reach_refusal(revision, lines),
+        _reach_refusal(revision, lines, len(inputs.context.groups)),
     )
     return next((refusal for refusal in checks if refusal is not None), None)
 
@@ -409,11 +413,51 @@ def _terms_refusal(
     return None
 
 
+GROUP_TARGETS = frozenset({"order", "group"})
+GROUP_SCOPES = frozenset({"checkout_group", "seller"})
+
+
+def _per_group(revision: RevisionRule) -> bool:
+    """Tell whether a revision's terms depend on how lines are grouped."""
+    if any(
+        effect.target in GROUP_TARGETS or effect.basis == "order_total"
+        for effect in revision.effects
+    ):
+        return True
+    root = revision.conditions.get("root")
+    return any(
+        isinstance(leaf, dict) and leaf.get("scope") in GROUP_SCOPES
+        for leaf in _leaves(root)
+    )
+
+
+def _leaves(node: object) -> list[object]:
+    if not isinstance(node, dict):
+        return []
+    for key in ("all", "any"):
+        if key in node:
+            return [leaf for child in node[key] for leaf in _leaves(child)]
+    if "not" in node:
+        return _leaves(node["not"])
+    return [node]
+
+
 def _reach_refusal(
     revision: RevisionRule,
     lines: list[LineState],
+    groups: int = 1,
 ) -> tuple[DecisionStatus, str] | None:
-    """Refuse a revision that reaches no line, or repeats an included discount."""
+    """Refuse a revision that reaches no line, or repeats an included discount.
+
+    With several checkout groups, terms that depend on the order or group
+    are not evaluated per group yet: they are unsupported, never applied to
+    the whole cart as if it were one order.
+    """
+    if groups > 1 and _per_group(revision):
+        return (
+            DecisionStatus.UNSUPPORTED,
+            "order-level terms across several checkout groups",
+        )
     if not any(_targets(revision, line.offer) for line in lines):
         return DecisionStatus.INELIGIBLE, "targets none of these offers"
     if _payment_already_included(revision, lines):
@@ -916,7 +960,13 @@ def _curated_route(inputs: Inputs, offer_id: int) -> RouteFact | None:
 
 
 def _fees(inputs: Inputs) -> tuple[Decimal | None, list[str]]:
-    """Sum fees not already in prices; an unknown fee leaves the sum unknown."""
+    """Sum fees not already in prices; an unknown fee leaves the sum unknown.
+
+    No fee is zero only when the market's prices include taxes or a source
+    was consulted; otherwise taxes and fees are unknown.
+    """
+    if inputs.fees_status == "not_consulted" and not inputs.fees:
+        return None, ["taxes and fees not consulted"]
     total = ZERO
     missing: list[str] = []
     for fee in inputs.fees:

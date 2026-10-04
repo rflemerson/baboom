@@ -42,6 +42,9 @@ class CatalogSpider(Spider):
     MARKET_COUNTRY = "BR"
     MARKET_CURRENCY = "BRL"
     MARKET_TIMEZONE = "America/Sao_Paulo"
+    # Brazilian consumer prices carry their taxes by law; a store selling
+    # elsewhere declares what holds there.
+    MARKET_TAX_INCLUSION = "included"
 
     @classmethod
     def update_settings(cls, settings: Settings) -> None:
@@ -186,6 +189,7 @@ class CatalogSpider(Spider):
             country=self.MARKET_COUNTRY,
             currency=self.MARKET_CURRENCY,
             timezone=self.MARKET_TIMEZONE,
+            tax_inclusion=self.MARKET_TAX_INCLUSION,
         )
 
     def with_market(self, product: ScrapedProductInput) -> ScrapedProductInput:

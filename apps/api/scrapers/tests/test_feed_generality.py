@@ -28,6 +28,7 @@ class SyntheticMarketplaceMX(FeedSpider):
     MARKET_COUNTRY = "MX"
     MARKET_CURRENCY = "MXN"
     MARKET_TIMEZONE = "America/Mexico_City"
+    MARKET_TAX_INCLUSION = "unknown"
     FEED_URL = "https://feed.example/mx"
 
 
