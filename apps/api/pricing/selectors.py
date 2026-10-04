@@ -31,14 +31,19 @@ class BenefitFilter:
     uses_coupon: bool | None = None
     has_cashback: bool | None = None
 
-    def lookups(self) -> dict[str, object]:
+    def lookups(self, *, applies_benefits: bool = True) -> dict[str, object]:
         """Choose the stored alternatives whose exact benefits fit the filter.
 
         Projections keep the best price per exact set of benefits, so
         requiring or excluding one reads the same offer's best price with
         what remains allowed; the cheapest fitting alternative that is still
-        valid wins. Without a filter every alternative fits.
+        valid wins. Without a filter every alternative fits. A policy that
+        applies no benefit stores only the store's price, which uses neither:
+        it fits unless the filter requires one.
         """
+        if not applies_benefits:
+            allowed = self.uses_coupon is not True and self.has_cashback is not True
+            return {} if allowed else {"alternative__in": []}
         if self.uses_coupon is None and self.has_cashback is None:
             return {}
         names = []
@@ -77,11 +82,12 @@ def projected_prices(
     Amounts of different currencies never compete. Ranking and pagination
     then run in the database.
     """
+    lookups = benefits.lookups(applies_benefits=policy.as_policy().apply_benefits)
 
     def source() -> QuerySet:
         return (
             OfferScenarioProjection.objects.filter(
-                **benefits.lookups(),
+                **lookups,
                 comparison_amount__isnull=False,
                 offer__product_store__product=OuterRef("pk"),
                 policy=policy,

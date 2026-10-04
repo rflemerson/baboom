@@ -99,5 +99,8 @@ without waiting for the worker. A result's `expires_at` depends only on what
 its own alternative used: the chosen base prices, the end of the applied
 revisions, the shipping and fee quotes counted, and the start of a revision the
 alternative could still use (never, when the policy applies no benefits).
+A policy that applies no benefit (`normal`) stores only the store's price; the
+selector treats it as using neither coupon nor cashback, so a filter that
+requires one finds nothing and any other filter reads that price.
 Delivered and net objectives also require contextual cost quotes; unavailable
 quotes produce no comparison amount, not a fallback to the default ranking.
