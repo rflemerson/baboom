@@ -8,8 +8,9 @@ from decimal import Decimal
 from django.test import SimpleTestCase
 
 from offers.models import StockStatus
-from scrapers.contracts import VariantOption
+from scrapers.contracts import StockReading, VariantOption
 from scrapers.crawler.spiders.vtex_search import VtexSearchSpider
+from scrapers.normalizers.vtex import VtexNormalizer
 from scrapers.stores.blackskull import BlackSkullSpider
 from scrapers.tests.helpers import (
     ScrapedJsonObject,
@@ -73,8 +74,8 @@ class VtexSpiderUnitTests(SimpleTestCase):
         assert result.offers[0].price is None
         assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
-    def test_normalizer_keeps_available_on_unknown_stock(self) -> None:
-        """Unknown stock should keep item available by default."""
+    def test_normalizer_reads_unreadable_stock_as_unknown(self) -> None:
+        """An unreadable quantity is unknown stock, never availability."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["AvailableQuantity"] = "x"
 
@@ -83,7 +84,7 @@ class VtexSpiderUnitTests(SimpleTestCase):
 
         payload = product.offers[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.UNKNOWN
 
     def test_parse_price_supports_common_formats(self) -> None:
         """Parses decimal strings and rejects invalid price."""
@@ -238,8 +239,8 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         assert result.offers[0].price is None
         assert result.offers[0].stock_status == StockStatus.OUT_OF_STOCK
 
-    def test_normalizer_keeps_available_on_unknown_stock(self) -> None:
-        """Unknown stock should keep item available by default."""
+    def test_normalizer_reads_unreadable_stock_as_unknown(self) -> None:
+        """An unreadable quantity is unknown stock, never availability."""
         item = dict(self.base_item)
         item["items"][0]["sellers"][0]["commertialOffer"]["AvailableQuantity"] = "x"
 
@@ -248,7 +249,7 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
 
         payload = product.offers[0]
         assert payload.stock_quantity is None
-        assert payload.stock_status == StockStatus.AVAILABLE
+        assert payload.stock_status == StockStatus.UNKNOWN
 
     def test_normalizer_builds_api_context(self) -> None:
         """The full source context travels with the normalized page."""
@@ -257,3 +258,45 @@ class BlackSkullSpiderUnitTests(SimpleTestCase):
         context = json.loads(product.api_context)
         assert context["platform"] == "vtex_legacy"
         assert "items" in context
+
+
+class VtexStockReadingTests(SimpleTestCase):
+    """R14: a missing stock reading is unknown, never available."""
+
+    def _status(self, commercial: dict) -> str:
+        product = VtexNormalizer().normalize(
+            {
+                "productId": "1",
+                "linkText": "x",
+                "items": [
+                    {
+                        "itemId": "10",
+                        "sellers": [{"sellerId": "1", "commertialOffer": commercial}],
+                    },
+                ],
+            },
+            store_slug="s",
+            base_url="https://example.com",
+            category="c",
+        )
+        assert product is not None
+        return product.offers[0].stock_status
+
+    def test_each_reading(self) -> None:
+        """Absent, explicit flag, zero, positive and no price."""
+        assert self._status({"Price": "100"}) == StockReading.UNKNOWN
+        assert self._status({"Price": "100", "IsAvailable": True}) == (
+            StockReading.AVAILABLE
+        )
+        assert self._status({"Price": "100", "IsAvailable": False}) == (
+            StockReading.OUT_OF_STOCK
+        )
+        assert self._status({"Price": "100", "AvailableQuantity": 0}) == (
+            StockReading.OUT_OF_STOCK
+        )
+        assert self._status({"Price": "100", "AvailableQuantity": 3}) == (
+            StockReading.AVAILABLE
+        )
+        assert self._status({"Price": 0, "AvailableQuantity": 3}) == (
+            StockReading.OUT_OF_STOCK
+        )

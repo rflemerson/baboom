@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
@@ -35,7 +36,7 @@ from .models import ScrapedItem, ScrapedPage
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from commerce.models import Market
+    from commerce.models import Market, SellerAccount
     from offers.models import ListingVariant, ObservationBatch
 
     from .contracts import (
@@ -63,6 +64,18 @@ def market_ref(declared: MarketInput) -> MarketRef:
         currency=declared.currency,
         timezone=declared.timezone,
     )
+
+
+@dataclass(frozen=True)
+class _PageRead:
+    """What every unit of one page shares while it is written."""
+
+    product: ScrapedProductInput
+    page: ScrapedPage
+    market: Market | None
+    observations: ObservationService
+    batch: ObservationBatch | None
+    seen_at: datetime
 
 
 class ScraperService:
@@ -122,27 +135,7 @@ class ScraperService:
     @transaction.atomic
     def save_product_snapshot(product: ScrapedProductInput) -> list[ScrapedItem]:
         """Persist one normalized page and all of its independently priced units."""
-        normalized_context = ScraperService._normalize_api_context_payload(
-            product.api_context,
-        )
-        page, _created = ScrapedPage.objects.get_or_create(
-            url=product.page_url,
-            defaults={
-                "store_slug": product.store_slug,
-                "api_context": normalized_context,
-            },
-        )
-
-        page_updates: list[str] = []
-        if page.store_slug != product.store_slug:
-            page.store_slug = product.store_slug
-            page_updates.append("store_slug")
-        if page.api_context != normalized_context:
-            page.api_context = normalized_context
-            page_updates.append("api_context")
-        if page_updates:
-            page.save(update_fields=page_updates)
-
+        page = ScraperService._sync_page(product)
         market = ScraperService._market(product)
         if market is not None and page.listing_id is None:
             page.listing = OfferIdentityService().listing(
@@ -151,73 +144,42 @@ class ScraperService:
             )
             page.save(update_fields=["listing", "updated_at"])
         observations = ObservationService()
-        batch = (
-            observations.open_batch(
-                market,
-                adapter=product.provider,
-                adapter_version=product.adapter_version,
-                request_context={"page_url": product.page_url},
-            )
-            if market is not None
-            else None
+        read = _PageRead(
+            product=product,
+            page=page,
+            market=market,
+            observations=observations,
+            batch=(
+                observations.open_batch(
+                    market,
+                    adapter=product.provider,
+                    adapter_version=product.adapter_version,
+                    request_context={"page_url": product.page_url},
+                )
+                if market is not None
+                else None
+            ),
+            seen_at=timezone.now(),
         )
 
         saved: list[ScrapedItem] = []
-        seen_at = timezone.now()
         seen_ids: set[str] = set()
-        for offer in product.offers:
-            data = ScrapedItemIngestionInput(
-                store_slug=product.store_slug,
-                external_id=offer.external_id,
-                page_url=product.page_url,
-                offer_url=offer.offer_url,
-                variant_context=offer.variant_context,
-                name=offer.name,
-                price=offer.price,
-                stock_quantity=offer.stock_quantity,
-                stock_status=offer.stock_status,
-                ean=offer.ean,
-                sku=offer.sku,
-                pid=product.provider_product_id,
-                category=product.category,
-            )
-            observation = ScraperService.record_offer_observation(data)
-            Offer.objects.filter(pk=observation.offer.pk).update(
-                last_seen_at=seen_at,
-                delisted_at=None,
-                delisted_reason="",
-                missed_runs=0,
-            )
-            if market is not None and batch is not None:
-                variant = ScraperService._bind_identity(
-                    observation.offer,
-                    product,
-                    offer,
-                    market,
-                )
-                ScraperService._observe(
-                    observations,
-                    batch,
-                    observation.offer,
-                    offer,
-                    complete=product.is_complete("payment_prices"),
-                )
-                if offer.featured:
-                    observations.record_featured(batch, variant, observation.offer)
-            item, _created = ScraperService._upsert_scraped_item(
-                observation,
-                page,
-                offer.variant_context,
-            )
+        for scraped in product.offers:
+            item, keys = ScraperService._save_unit(read, scraped)
             saved.append(item)
-            seen_ids.add(offer.external_id)
+            seen_ids.update(keys)
 
         if product.is_complete("offers") and seen_ids:
-            ScraperService._reconcile_absent_units(product, page, seen_ids, seen_at)
-        if batch is not None:
+            ScraperService._reconcile_absent_units(
+                product,
+                page,
+                seen_ids,
+                read.seen_at,
+            )
+        if read.batch is not None:
             partition = f"listing:{product.provider_product_id}"
             observations.close_batch(
-                batch,
+                read.batch,
                 [
                     CoverageRecord(
                         dimension=item.dimension,
@@ -228,8 +190,92 @@ class ScraperService:
                     for item in product.coverage
                 ],
             )
-
         return saved
+
+    @staticmethod
+    def _sync_page(product: ScrapedProductInput) -> ScrapedPage:
+        """Upsert the crawl evidence of a page."""
+        normalized_context = ScraperService._normalize_api_context_payload(
+            product.api_context,
+        )
+        page, _created = ScrapedPage.objects.get_or_create(
+            url=product.page_url,
+            defaults={
+                "store_slug": product.store_slug,
+                "api_context": normalized_context,
+            },
+        )
+        page_updates: list[str] = []
+        if page.store_slug != product.store_slug:
+            page.store_slug = product.store_slug
+            page_updates.append("store_slug")
+        if page.api_context != normalized_context:
+            page.api_context = normalized_context
+            page_updates.append("api_context")
+        if page_updates:
+            page.save(update_fields=page_updates)
+        return page
+
+    @staticmethod
+    def _save_unit(
+        read: _PageRead,
+        scraped: ScrapedOfferInput,
+    ) -> tuple[ScrapedItem, set[str]]:
+        """Write one unit's facts under its settled identity; return its seen keys."""
+        product = read.product
+        seller = ScraperService._seller(read.market, scraped)
+        offer = ScraperService._settle_identity(product, scraped, seller)
+        # A collided key's owner was not read; it is not evidence of absence.
+        keys = {offer.external_id, scraped.external_id}
+        data = ScrapedItemIngestionInput(
+            store_slug=product.store_slug,
+            external_id=offer.external_id,
+            page_url=product.page_url,
+            offer_url=offer.offer_url,
+            variant_context=offer.variant_context,
+            name=offer.name,
+            price=offer.price,
+            stock_quantity=offer.stock_quantity,
+            stock_status=offer.stock_status,
+            ean=offer.ean,
+            sku=offer.sku,
+            pid=product.provider_product_id,
+            category=product.category,
+        )
+        observation = ScraperService.record_offer_observation(data)
+        Offer.objects.filter(pk=observation.offer.pk).update(
+            last_seen_at=read.seen_at,
+            delisted_at=None,
+            delisted_reason="",
+            missed_runs=0,
+        )
+        if read.market is not None and read.batch is not None:
+            variant = ScraperService._bind_identity(
+                observation.offer,
+                product,
+                offer,
+                read.market,
+                seller,
+            )
+            ScraperService._observe(
+                read.observations,
+                read.batch,
+                observation.offer,
+                offer,
+                complete=product.is_complete("payment_prices"),
+            )
+            if offer.featured:
+                read.observations.record_featured(
+                    read.batch,
+                    variant,
+                    observation.offer,
+                )
+        item, _created = ScraperService._upsert_scraped_item(
+            observation,
+            read.page,
+            offer.variant_context,
+        )
+        return item, keys
 
     @staticmethod
     def _observe(
@@ -290,25 +336,66 @@ class ScraperService:
         )
 
     @staticmethod
+    def _seller(
+        market: Market | None, offer: ScrapedOfferInput
+    ) -> SellerAccount | None:
+        """Resolve the account a scraped offer names, before any fact is written."""
+        if market is None or offer.seller is None:
+            return None
+        return CommerceIdentityService.seller(
+            market,
+            SellerRef(
+                external_id=offer.seller.external_id,
+                name=offer.seller.name,
+                is_channel_owner=offer.seller.is_channel_owner,
+            ),
+        )
+
+    @staticmethod
+    def _settle_identity(
+        product: ScrapedProductInput,
+        offer: ScrapedOfferInput,
+        seller: SellerAccount | None,
+    ) -> ScrapedOfferInput:
+        """Keep facts with their seller when a key already belongs to another.
+
+        A legacy offer keyed by the SKU alone may belong to a seller other
+        than the one the source now names under that key. Writing the new
+        seller's price there would give it to the wrong seller, so the new
+        reading goes to its own offer, ``<key>@<seller>``, and the collision
+        is logged for a curator to move any catalog link.
+        """
+        if seller is None:
+            return offer
+        owner_id = (
+            Offer.objects.filter(
+                store_slug=product.store_slug,
+                external_id=offer.external_id,
+            )
+            .values_list("seller_account_id", flat=True)
+            .first()
+        )
+        if owner_id is None or owner_id == seller.pk:
+            return offer
+        key = "owner" if seller.is_channel_owner else seller.external_id
+        logger.warning(
+            "Seller collision on %s %s: kept as %s@%s",
+            product.store_slug,
+            offer.external_id,
+            offer.external_id,
+            key,
+        )
+        return offer.model_copy(update={"external_id": f"{offer.external_id}@{key}"})
+
+    @staticmethod
     def _bind_identity(
         offer_row: Offer,
         product: ScrapedProductInput,
         offer: ScrapedOfferInput,
         market: Market,
+        seller: SellerAccount | None,
     ) -> ListingVariant:
         """Place an offer under its listing, variant and seller account."""
-        seller = (
-            CommerceIdentityService.seller(
-                market,
-                SellerRef(
-                    external_id=offer.seller.external_id,
-                    name=offer.seller.name,
-                    is_channel_owner=offer.seller.is_channel_owner,
-                ),
-            )
-            if offer.seller is not None
-            else None
-        )
         context = offer.variant_context
         variant_id = context.provider_variant_id or offer.external_id
         seller_key = (

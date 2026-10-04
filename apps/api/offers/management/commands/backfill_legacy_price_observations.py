@@ -68,6 +68,9 @@ class Command(BaseCommand):
                         "semantics": OfferPriceObservation.Semantics.LEGACY_UNKNOWN,
                         "source_field": LEGACY_SOURCE_FIELD,
                         "recorded_at": row.created_at,
+                        # Confirmed when it was observed: a migration is not
+                        # a new reading of the store.
+                        "confirmed_at": row.observed_at,
                     },
                 )[1]
                 copied += int(_created)

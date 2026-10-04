@@ -191,11 +191,7 @@ class VtexNormalizer:
             name=sku_name or unit.product_name,
             price=price,
             stock_quantity=stock_quantity if price is not None else 0,
-            stock_status=(
-                StockReading.AVAILABLE
-                if price is not None and (stock_quantity is None or stock_quantity > 0)
-                else StockReading.OUT_OF_STOCK
-            ),
+            stock_status=_stock(price, stock_quantity, commercial.get("IsAvailable")),
             sku=item_id,
             ean=str(unit.sku.get("ean") or ""),
             seller=seller_input,
@@ -296,6 +292,25 @@ class VtexNormalizer:
             "items": item.get("items") or [],
         }
         return json.dumps(payload, ensure_ascii=False)
+
+
+def _stock(
+    price: Decimal | None,
+    quantity: int | None,
+    is_available: object,
+) -> StockReading:
+    """Read stock from the quantity, or from ``IsAvailable`` when it is absent.
+
+    No price is not for sale. Without a quantity, only an explicit
+    ``IsAvailable`` says anything; with neither, stock is unknown.
+    """
+    if price is None:
+        return StockReading.OUT_OF_STOCK
+    if quantity is not None:
+        return StockReading.AVAILABLE if quantity > 0 else StockReading.OUT_OF_STOCK
+    if isinstance(is_available, bool):
+        return StockReading.AVAILABLE if is_available else StockReading.OUT_OF_STOCK
+    return StockReading.UNKNOWN
 
 
 def _installment(entry: dict) -> PriceInput | None:

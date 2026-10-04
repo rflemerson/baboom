@@ -167,32 +167,35 @@ class FactLoader:
     def prices(ids: list[int], window: timedelta) -> tuple[PriceFact, ...]:
         """Return the standing observation of each condition of each offer.
 
-        An offer with no typed observation yet is priced by its legacy current
-        price, marked ``legacy_unknown``: its meaning was never recorded.
+        The newest row of a condition decides: if it was withdrawn, the
+        condition is gone, whatever older rows say. An offer with no
+        observation at all is priced by its legacy current price, marked
+        ``legacy_unknown``; an offer with any observation never falls back.
         """
         rows = (
-            OfferPriceObservation.objects.filter(
-                offer_id__in=ids,
-                withdrawn_at__isnull=True,
-            )
+            OfferPriceObservation.objects.filter(offer_id__in=ids)
             .select_related("payment_method")
             .order_by("offer_id", "condition_key", "-observed_at", "-pk")
         )
-        latest: dict[tuple[int, str], OfferPriceObservation] = {}
+        newest: dict[tuple[int, str], OfferPriceObservation] = {}
         for row in rows:
-            latest.setdefault((row.offer_id, row.condition_key), row)
+            newest.setdefault((row.offer_id, row.condition_key), row)
+        observed = {offer_id for offer_id, _key in newest}
         # Migrated history says nothing a typed read did not say better: once
         # an offer has typed observations, its legacy rows stop competing.
         typed_offers = {
             row.offer_id
-            for row in latest.values()
+            for row in newest.values()
             if row.semantics != OfferPriceObservation.Semantics.LEGACY_UNKNOWN
         }
         latest = {
             key: row
-            for key, row in latest.items()
-            if row.offer_id not in typed_offers
-            or row.semantics != OfferPriceObservation.Semantics.LEGACY_UNKNOWN
+            for key, row in newest.items()
+            if row.withdrawn_at is None
+            and (
+                row.offer_id not in typed_offers
+                or row.semantics != OfferPriceObservation.Semantics.LEGACY_UNKNOWN
+            )
         }
         facts = [
             PriceFact(
@@ -220,8 +223,7 @@ class FactLoader:
             )
             for row in latest.values()
         ]
-        typed = {fact.offer_id for fact in facts}
-        legacy = Offer.objects.filter(pk__in=set(ids) - typed).exclude(
+        legacy = Offer.objects.filter(pk__in=set(ids) - observed).exclude(
             current_price__isnull=True,
         )
         markets = {

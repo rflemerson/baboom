@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.test import TestCase
 
 from commerce.models import Market, SellerAccount
+from offers.models import Offer
 from scrapers.crawler.pipelines import CatalogPipeline
 from scrapers.models import ScrapedPage
 from scrapers.stores.blackskull import BlackSkullSpider
@@ -108,3 +110,36 @@ class IngestionIdentityTests(TestCase):
 
         assert Market.objects.count() == 1
         assert SellerAccount.objects.count() == 1
+
+
+class SellerCollisionTests(TestCase):
+    """R03: a key owned by another seller never receives this seller's facts."""
+
+    def test_a_collision_keeps_both_sellers_and_their_prices(self) -> None:
+        """The legacy third-party offer keeps its price; seller 1 gets its own."""
+        _ingest(BlackSkullSpider(), VTEX_PRODUCT)
+        legacy = Offer.objects.get(external_id="770")
+        third = SellerAccount.objects.get(external_id="acme")
+        Offer.objects.filter(pk=legacy.pk).update(
+            seller_account=third,
+            current_price=Decimal("250.00"),
+        )
+
+        with self.assertLogs("scrapers.services", "WARNING"):
+            _ingest(BlackSkullSpider(), VTEX_PRODUCT)
+
+        legacy.refresh_from_db()
+        moved = Offer.objects.get(external_id="770@owner")
+        assert legacy.current_price == Decimal("250.00")
+        assert legacy.seller_account == third
+        assert legacy.delisted_at is None
+        assert moved.current_price == Decimal("99.90")
+        assert moved.seller_account.is_channel_owner
+        assert moved.price_points.filter(source_field="commertialOffer.Price").exists()
+        assert (
+            not legacy.price_points.filter(amount=Decimal("99.9"))
+            .exclude(
+                observed_at__lt=moved.created_at,
+            )
+            .exists()
+        )
