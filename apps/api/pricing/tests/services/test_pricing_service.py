@@ -17,6 +17,7 @@ from common.testing import raised
 from offers.models import Offer, PriceObservation, StockStatus
 from pricing.costs import CostBook
 from pricing.domain.types import CartLine, Claim
+from pricing.groups import group_fingerprint
 from pricing.models import (
     PricingPolicyRevision,
     PricingQuote,
@@ -313,7 +314,7 @@ class StoredCostTests(TestCase):
         request = QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed"))
         without = PricingService().evaluate(request)
         ShippingQuote.objects.create(
-            group_fingerprint=PricingService.group_fingerprint(request.lines, None),
+            group_fingerprint=group_fingerprint(request.lines, None),
             seller_account=offer.seller_account,
             country="BR",
             postal_code_hash="",
@@ -337,7 +338,7 @@ class StoredCostTests(TestCase):
         market.save()
         request = QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed"))
         ShippingQuote.objects.create(
-            group_fingerprint=PricingService.group_fingerprint(request.lines, None),
+            group_fingerprint=group_fingerprint(request.lines, None),
             seller_account=offer.seller_account,
             country="BR",
             postal_code_hash="",

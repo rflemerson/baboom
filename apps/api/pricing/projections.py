@@ -23,8 +23,8 @@ from .costs import CostBook
 from .domain.engine import evaluate
 from .domain.types import CartLine, PurchaseContext
 from .facts import LEGACY_PRICE_ID, FactLoader, Facts
+from .groups import group_fingerprint, one_group
 from .models import OfferScenarioProjection, PricingPolicyRevision
-from .services import PricingService
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -102,10 +102,7 @@ class ProjectionService:
             markets=self._markets(ids),
             moment=moment,
             costs=CostBook.load(
-                [
-                    PricingService.group_fingerprint((CartLine(pk, 1),), None)
-                    for pk in ids
-                ],
+                [group_fingerprint((CartLine(pk, 1),), None) for pk in ids],
                 moment,
             ),
         )
@@ -204,22 +201,15 @@ class ProjectionService:
             currency=market.currency_id,
             minor_unit=market.currency.minor_unit,
             lines=(CartLine(offer_id, 1),),
+            groups=one_group((CartLine(offer_id, 1),), None),
             codes=batch.codes,
         )
-        result = evaluate(
-            Terms(
-                tax_inclusion=market.tax_inclusion,
-                benefits=benefits,
-                costs=batch.costs,
-            ).inputs(
-                facts,
-                batch.policy_row,
-                context,
-                group_key=PricingService.group_fingerprint(
-                    context.lines, context.destination
-                ),
-            ),
+        terms = Terms(
+            costs=batch.costs,
+            tax_inclusion=market.tax_inclusion,
+            benefits=benefits,
         )
+        result = evaluate(terms.inputs(facts, batch.policy, context))
         applied = [r for r in facts.revisions if r.id in result.applied_revisions]
         route = result.purchase_routes[0] if result.purchase_routes else None
         return OfferScenarioProjection(

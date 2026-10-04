@@ -8,6 +8,8 @@ database returns, not by round trips per offer.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from django.db import connection
 from django.test import TestCase
@@ -15,10 +17,17 @@ from django.test.utils import CaptureQueriesContext
 
 from core.models import Product, ProductStore
 from offers.models import Offer, StockStatus
+from pricing import projections
 from pricing.facts import FactLoader
 from pricing.models import PricingPolicyRevision
 from pricing.projections import ProjectionService
 from pricing.tests.projections.test_projections import TwoProductCatalog
+from promotions.services import PromotionService
+
+if TYPE_CHECKING:
+    from pricing.domain.engine import Inputs
+
+PROMOTIONS = 30
 
 
 class ScaleTests(TwoProductCatalog, TestCase):
@@ -71,3 +80,40 @@ class ScaleTests(TwoProductCatalog, TestCase):
         large = self._queries(lambda: ProjectionService().refresh(many))
 
         assert small == large, (small, large)
+
+
+class WorkTests(TwoProductCatalog, TestCase):
+    """Each evaluation reads only what reaches its offer."""
+
+    def test_an_offer_is_evaluated_only_with_the_promotions_reaching_it(
+        self,
+    ) -> None:
+        """Thirty promotions on B: A's evaluations receive none of them."""
+        for index in range(PROMOTIONS):
+            self._promote_b(str(index + 1))
+        seen: dict[int, int] = {}
+        real = projections.evaluate
+
+        def counting(inputs: Inputs) -> object:
+            (offer,) = inputs.offers
+            seen[offer.id] = max(seen.get(offer.id, 0), len(inputs.revisions))
+            return real(inputs)
+
+        with patch.object(projections, "evaluate", counting):
+            ProjectionService().refresh()
+
+        assert seen[self.offers["A"].pk] == 0
+        assert seen[self.offers["B"].pk] == PROMOTIONS
+
+    def test_old_revisions_never_leave_the_database(self) -> None:
+        """A promotion revised five times loads as one revision."""
+        revision = self._promote_b("10")
+        for _number in range(5):
+            draft = PromotionService().revise(revision.promotion)
+            with patch("pricing.invalidation.refresh_projections.delay"):
+                assert PromotionService().publish(draft, "executable").published
+            revision = draft
+
+        loaded = FactLoader.revisions()
+
+        assert [rule.id for rule in loaded] == [revision.pk]

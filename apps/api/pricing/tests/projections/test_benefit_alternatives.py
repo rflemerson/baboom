@@ -17,10 +17,10 @@ from core.models import Product, ProductStore
 from core.selectors import public_catalog_products
 from offers.models import Evidence, Offer, StockStatus
 from pricing.domain.types import CartLine
+from pricing.groups import group_fingerprint
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision, ShippingQuote
 from pricing.projections import ProjectionService
 from pricing.selectors import BenefitFilter, projected_prices
-from pricing.services import PricingService
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import (
     ActivationCode,
@@ -201,9 +201,7 @@ class ObjectiveTests(BenefitCatalog, TestCase):
         self.market.save()
         for offer in self.offers.values():
             ShippingQuote.objects.create(
-                group_fingerprint=PricingService.group_fingerprint(
-                    (CartLine(offer.pk, 1),), None
-                ),
+                group_fingerprint=group_fingerprint((CartLine(offer.pk, 1),), None),
                 seller_account=self.seller,
                 country="BR",
                 postal_code_hash="",

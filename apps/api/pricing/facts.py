@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from django.db.models import OuterRef, Q, Subquery
@@ -57,6 +58,42 @@ class Facts:
     prices: tuple[PriceFact, ...]
     revisions: tuple[RevisionRule, ...]
     routes: tuple[RouteFact, ...] = ()
+
+    def offers_of(self, ids: set[int]) -> tuple[OfferFact, ...]:
+        """Return the offers among these ids."""
+        return tuple(self.offers[pk] for pk in sorted(ids) if pk in self.offers)
+
+    def prices_of(self, ids: set[int]) -> tuple[PriceFact, ...]:
+        """Return these offers' prices, from an index built once."""
+        return tuple(p for pk in sorted(ids) for p in self._index[0].get(pk, ()))
+
+    def routes_of(self, ids: set[int]) -> tuple[RouteFact, ...]:
+        """Return these offers' routes, from an index built once."""
+        return tuple(r for pk in sorted(ids) for r in self._index[1].get(pk, ()))
+
+    def revisions_reaching(self, ids: set[int]) -> tuple[RevisionRule, ...]:
+        """Return the revisions whose benefit reaches one of these offers."""
+        if len(ids) == 1:
+            (pk,) = ids
+            if pk not in self._reach:
+                self._reach[pk] = reaching(self.revisions, self.offers_of(ids))
+            return self._reach[pk]
+        return reaching(self.revisions, self.offers_of(ids))
+
+    @cached_property
+    def _index(self) -> tuple[dict[int, list[PriceFact]], dict[int, list[RouteFact]]]:
+        prices: dict[int, list[PriceFact]] = {}
+        for price in self.prices:
+            prices.setdefault(price.offer_id, []).append(price)
+        routes: dict[int, list[RouteFact]] = {}
+        for route in self.routes:
+            routes.setdefault(route.offer_id, []).append(route)
+        return prices, routes
+
+    @cached_property
+    def _reach(self) -> dict[int, tuple[RevisionRule, ...]]:
+        """Revisions reaching each single offer, filled as offers are priced."""
+        return {}
 
 
 class FactLoader:
@@ -273,28 +310,35 @@ class FactLoader:
 
     @staticmethod
     def revisions() -> tuple[RevisionRule, ...]:
-        """Return the revision in force of every promotion, as engine rules."""
-        published = (
-            PromotionRevision.objects.filter(
-                status__in=(
-                    PromotionRevision.Status.EXECUTABLE,
-                    PromotionRevision.Status.INFORMATIVE,
-                    PromotionRevision.Status.SUSPENDED,
-                    PromotionRevision.Status.ARCHIVED,
-                ),
-            )
-            .order_by("promotion_id", "-number")
-            .prefetch_related(
-                "effects__reward_terms",
-                "scopes",
-                "codes",
-                "compatibility",
-            )
+        """Return the revision in force of every promotion, as engine rules.
+
+        Only each promotion's newest published revision is read, with its
+        relations; older versions never leave the database.
+        """
+        statuses = (
+            PromotionRevision.Status.EXECUTABLE,
+            PromotionRevision.Status.INFORMATIVE,
+            PromotionRevision.Status.SUSPENDED,
+            PromotionRevision.Status.ARCHIVED,
         )
-        newest: dict[int, PromotionRevision] = {}
-        for revision in published:
-            newest.setdefault(revision.promotion_id, revision)
-        return tuple(FactLoader._rule(revision) for revision in newest.values())
+        newest_id = (
+            PromotionRevision.objects.filter(
+                promotion=OuterRef("promotion"),
+                status__in=statuses,
+            )
+            .order_by("-number")
+            .values("pk")[:1]
+        )
+        newest = PromotionRevision.objects.filter(
+            status__in=statuses,
+            pk=Subquery(newest_id),
+        ).prefetch_related(
+            "effects__reward_terms",
+            "scopes",
+            "codes",
+            "compatibility",
+        )
+        return tuple(FactLoader._rule(revision) for revision in newest)
 
     @staticmethod
     def _category_lineage(categories: set[Category]) -> dict[int, frozenset[int]]:

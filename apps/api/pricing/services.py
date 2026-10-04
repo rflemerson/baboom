@@ -7,13 +7,10 @@ with the snapshot that reproduces the result.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -23,6 +20,7 @@ from promotions.models import PromotionRevision
 from promotions.rules.conditions import leaves
 
 from .context import Terms
+from .costs import CostBook
 from .domain.conditions import (
     DESTINATION_FACT,
     ConditionInput,
@@ -33,11 +31,11 @@ from .domain.engine import Inputs, canonical, evaluate, fingerprint
 from .domain.types import (
     CartLine,
     Claim,
-    Destination,
     PricingResult,
     PurchaseContext,
     Tri,
 )
+from .groups import one_group, token
 from .models import (
     PricingPolicyRevision,
     PricingQuote,
@@ -86,14 +84,14 @@ class PricingService:
             lines=request.lines,
             **extra,
         )
-        return Terms(tax_inclusion=market.tax_inclusion).inputs(
-            facts,
-            request.policy,
-            context,
-            group_key=PricingService.group_fingerprint(
-                request.lines, context.destination
-            ),
-        )
+        if not context.groups:
+            context = replace(
+                context,
+                groups=one_group(request.lines, context.destination),
+            )
+        costs = CostBook.load([group.key for group in context.groups], moment)
+        terms = Terms(costs=costs, tax_inclusion=market.tax_inclusion)
+        return terms.inputs(facts, request.policy.as_policy(), context)
 
     def evaluate(
         self, request: QuoteRequest, now: datetime | None = None
@@ -152,31 +150,6 @@ class PricingService:
         return quote
 
     @staticmethod
-    def group_fingerprint(
-        lines: tuple[CartLine, ...],
-        destination: Destination | None,
-    ) -> str:
-        """Name a checkout group by its lines and destination, never in clear.
-
-        Shipping depends on what is shipped and where: quantity and offers are
-        part of the key, the postal code only as a keyed token.
-        """
-        parts = sorted(f"{line.offer_id}x{line.quantity}" for line in lines)
-        place = ""
-        if destination is not None:
-            place = "|".join(
-                (
-                    destination.country,
-                    destination.subdivision,
-                    PricingService._token(destination.postal_code)
-                    if destination.postal_code
-                    else "",
-                ),
-            )
-        text = ";".join(parts) + "@" + place
-        return hashlib.sha256(text.encode()).hexdigest()
-
-    @staticmethod
     def _discounts_by_offer(result: PricingResult) -> dict[int, Decimal]:
         totals: dict[int, Decimal] = {}
         for adjustment in result.adjustments:
@@ -199,13 +172,13 @@ class PricingService:
         destination = context.destination
         if destination is not None and destination.postal_code:
             destination = replace(
-                destination, postal_code=PricingService._token(destination.postal_code)
+                destination, postal_code=token(destination.postal_code)
             )
         revisions = tuple(
             replace(
                 revision,
                 codes=tuple(
-                    (kind, PricingService._token(code) if code else code)
+                    (kind, token(code) if code else code)
                     for kind, code in revision.codes
                 ),
             )
@@ -216,7 +189,7 @@ class PricingService:
             context=replace(
                 context,
                 destination=destination,
-                codes=frozenset(PricingService._token(code) for code in context.codes),
+                codes=frozenset(token(code) for code in context.codes),
                 claims=(*context.claims, *facts),
             ),
             revisions=revisions,
@@ -226,9 +199,7 @@ class PricingService:
                     context=tuple(
                         (
                             key,
-                            PricingService._token(value)
-                            if key == "postal_code"
-                            else value,
+                            token(value) if key == "postal_code" else value,
                         )
                         for key, value in price.context
                     ),
@@ -268,13 +239,3 @@ class PricingService:
     @staticmethod
     def _leaves_of_kind(node: object, kind: str) -> list[dict]:
         return [leaf for leaf in leaves(node) if leaf.get("kind") == kind]
-
-    @staticmethod
-    def _token(value: str) -> str:
-        """Return a keyed token for a private value: equal values, equal tokens."""
-        digest = hmac.new(
-            settings.SECRET_KEY.encode(),
-            value.encode(),
-            hashlib.sha256,
-        ).hexdigest()
-        return f"token:{digest}"
