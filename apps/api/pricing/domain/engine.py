@@ -139,7 +139,7 @@ def _select_prices(
         if refusal is not None:
             decisions.append(refusal)
             return None
-        price = _base_price(inputs, line.offer_id, decisions)
+        price = _base_price(inputs, line, decisions)
         if price is None:
             missing.append(
                 f"price of offer {line.offer_id} for {inputs.policy.scenario}"
@@ -177,12 +177,37 @@ def _offer_refusal(
     )
 
 
+PUBLIC_STAGES = frozenset({"catalog", "product_page"})
+
+
+def _restriction(price: PriceFact, quantity: int) -> tuple[DecisionStatus, str] | None:
+    """Return why an observed price cannot be one unit's public price here.
+
+    A price for a quantity range, a line or an order, a cart or checkout
+    stage, or any observed context (membership, destination, programme) the
+    engine cannot match yet is never applied as a universal unit price.
+    """
+    if quantity < price.quantity_min or (
+        price.quantity_max is not None and quantity > price.quantity_max
+    ):
+        return DecisionStatus.INELIGIBLE, "quantity outside the price's range"
+    if price.amount_basis != "unit":
+        return DecisionStatus.UNSUPPORTED, f"price is per {price.amount_basis}"
+    if price.capture_stage not in PUBLIC_STAGES:
+        return DecisionStatus.UNKNOWN, f"price quoted at the {price.capture_stage}"
+    if price.context:
+        keys = sorted(key for key, _value in price.context)
+        return DecisionStatus.UNKNOWN, f"price restricted to context {keys}"
+    return None
+
+
 def _base_price(
     inputs: Inputs,
-    offer_id: int,
+    line: CartLine,
     decisions: list[Decision],
 ) -> SelectedPrice | None:
     context, policy = inputs.context, inputs.policy
+    offer_id = line.offer_id
     usable: list[PriceFact] = []
     for price in inputs.prices:
         if price.offer_id != offer_id or price.role != "payable":
@@ -199,6 +224,10 @@ def _base_price(
                     f"price {price.id}", DecisionStatus.STALE, "past its freshness"
                 ),
             )
+            continue
+        restriction = _restriction(price, line.quantity)
+        if restriction is not None:
+            decisions.append(Decision(f"price {price.id}", *restriction))
             continue
         if _fits_scenario(price, inputs):
             usable.append(price)

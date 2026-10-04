@@ -44,6 +44,7 @@ export interface CatalogProduct {
   totalActive?: string | null
   externalLink?: string | null
   paymentMethod?: string | null
+  currency?: string | null
   brand: {
     name: string
   }
@@ -66,9 +67,15 @@ export interface CatalogScenario {
   source: 'legacy' | 'projection'
 }
 
+export interface CatalogMarket {
+  country: string
+  currency: string
+}
+
 export interface CatalogProductsResponse {
   active: CatalogActive | null
   massUnit: string
+  market?: CatalogMarket
   scenario?: CatalogScenario
   pageInfo: CatalogPageInfo
   items: CatalogProduct[]

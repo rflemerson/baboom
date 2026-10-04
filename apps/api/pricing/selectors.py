@@ -25,12 +25,17 @@ def public_policy(key: str | None = None) -> PricingPolicyRevision | None:
 def projected_prices(
     policy: PricingPolicyRevision,
     now: datetime,
+    *,
+    country: str,
+    currency: str,
 ) -> Callable[[], QuerySet]:
-    """Return a price source over the projections of one policy.
+    """Return a price source over the projections of one policy in one market.
 
     The source yields, for the outer product, its offers priced under the
-    policy and not expired, cheapest first, with ``amount``, ``url`` and
-    ``payment_method``. Ranking and pagination then run in the database.
+    policy in this country and currency and not expired, cheapest first, with
+    ``amount``, ``url``, ``payment_method``, ``offer_id`` and ``expires_at``.
+    Amounts of different currencies never compete. Ranking and pagination
+    then run in the database.
     """
 
     def source() -> QuerySet:
@@ -39,6 +44,8 @@ def projected_prices(
                 offer__product_store__product=OuterRef("pk"),
                 policy=policy,
                 status=OfferScenarioProjection.Status.PRICED,
+                market__country=country,
+                currency_id=currency,
             )
             .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
             .annotate(url=F("offer__url"))

@@ -220,6 +220,11 @@ class FactLoader:
                 source_field=row.source_field,
                 observed_at=row.observed_at,
                 fresh_until=row.confirmed_at + window,
+                quantity_min=row.quantity_min,
+                quantity_max=row.quantity_max,
+                amount_basis=row.amount_basis,
+                capture_stage=row.capture_stage,
+                context=_context_pairs(row.context),
             )
             for row in latest.values()
         ]
@@ -271,6 +276,13 @@ class FactLoader:
         for revision in published:
             newest.setdefault(revision.promotion_id, revision)
         return tuple(_rule(revision) for revision in newest.values())
+
+
+def _context_pairs(context: object) -> tuple[tuple[str, str], ...]:
+    """Flatten an observation's context into sorted, hashable pairs."""
+    if not isinstance(context, dict):
+        return ()
+    return tuple(sorted((str(key), str(value)) for key, value in context.items()))
 
 
 def _rule(revision: PromotionRevision) -> RevisionRule:

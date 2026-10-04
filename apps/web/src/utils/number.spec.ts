@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDecimal } from './number'
+import { formatDecimal, formatMoney } from './number'
 
 describe('formatDecimal', () => {
   it('formats decimal strings with two fraction digits by default', () => {
@@ -11,5 +11,11 @@ describe('formatDecimal', () => {
     expect(formatDecimal(null)).toBe('-')
     expect(formatDecimal(undefined)).toBe('-')
     expect(formatDecimal('')).toBe('-')
+  })
+
+  it('prefixes the currency a price is charged in', () => {
+    expect(formatMoney('96.03', 'BRL')).toBe('BRL 96.03')
+    expect(formatMoney('96.03', null)).toBe('96.03')
+    expect(formatMoney(null, 'BRL')).toBe('-')
   })
 })

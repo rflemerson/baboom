@@ -9,7 +9,9 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
+from commerce.services import CommerceIdentityService, SellerRef
 from common.testing import raised
+from core.models import Product, ProductStore
 from offers.models import Offer, OfferPriceObservation
 from pricing.projections import ProjectionService
 from pricing.tests.projections.test_projections import TwoProductCatalog
@@ -57,3 +59,25 @@ class ShadowTests(TwoProductCatalog, TestCase):
 
         assert (Offer.objects.count(), OfferPriceObservation.objects.count()) == before
         assert Offer.objects.get(external_id="A").current_price == Decimal("100.00")
+
+    def test_a_different_seller_is_named(self) -> None:
+        """Same price, another seller's offer: the gate says so."""
+        other = CommerceIdentityService.seller(
+            self.market,
+            SellerRef(external_id="third", name="Third"),
+        )
+        twin = Offer.objects.create(
+            store_slug="store",
+            external_id="A2",
+            url="https://store.example/A",
+            current_price=Decimal("90.00"),
+            current_stock_status="A",
+            seller_account=other,
+        )
+        ProductStore.objects.create(product=Product.objects.get(name="A"), offer=twin)
+        ProjectionService().refresh()
+        Offer.objects.filter(pk=twin.pk).update(current_price=Decimal("200.00"))
+
+        output = self._run("--policy", "listed")
+
+        assert "seller: 1" in output

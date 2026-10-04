@@ -11,16 +11,20 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponseBadRequest, JsonResponse
 from django.utils import timezone
+from django.utils.http import http_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
+from commerce.models import Currency
 from core import units
 from core.dtos import CatalogProductsFilters
-from core.selectors import catalog_active, public_catalog_products
+from core.selectors import catalog_active, legacy_prices, public_catalog_products
 from core.services import AlertSubscriptionService
 from pricing.selectors import projected_prices, public_policy
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from core.models import Product, ProductNutrition
 
 CATALOG_PER_PAGE_CHOICES = {12, 24, 48}
@@ -118,6 +122,7 @@ def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
 def _serialize_catalog_product(
     product: Product,
     profiles: dict[int, ProductNutrition],
+    currency: str,
 ) -> dict[str, Any]:
     """Serialize the public catalog product shape used by the frontend."""
     profile = profiles.get(product.nutrition_profile_id)
@@ -136,6 +141,7 @@ def _serialize_catalog_product(
         "packagingDisplay": product.get_packaging_display(),
         "netMass": _decimal_to_str(product.net_mass),
         "price": _money_to_str(product.price),
+        "currency": currency if product.price is not None else None,
         "pricePerActive": _decimal_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
         "totalActive": _decimal_to_str(product.total_active),
@@ -147,44 +153,87 @@ def _serialize_catalog_product(
     }
 
 
-def _apply_catalog_cache_headers(response: JsonResponse) -> JsonResponse:
-    """Tell browsers and Cloudflare how long public catalog data can be cached."""
+def _apply_catalog_cache_headers(
+    response: JsonResponse,
+    *,
+    expires_at: datetime | None,
+    projected: bool,
+) -> JsonResponse:
+    """Tell browsers and the CDN how long this page of prices may be cached.
+
+    No cache may outlive the earliest expiry of a price on the page. Projected
+    prices follow promotions that can be suspended at any moment, so their
+    edge TTL is capped and no stale copy is served while revalidating.
+    """
     browser_ttl = max(int(settings.CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS), 0)
     edge_ttl = max(int(settings.CATALOG_PRODUCTS_EDGE_CACHE_SECONDS), 0)
+    stale = 86400
+    if projected:
+        edge_ttl = min(edge_ttl, max(int(settings.PRICING_EDGE_CACHE_SECONDS), 0))
+        stale = 0
+    if expires_at is not None:
+        remaining = max(int((expires_at - timezone.now()).total_seconds()), 0)
+        browser_ttl, edge_ttl, stale = (
+            min(browser_ttl, remaining),
+            min(edge_ttl, remaining),
+            0,
+        )
     response["Cache-Control"] = (
         f"public, max-age={browser_ttl}, s-maxage={edge_ttl}, "
-        "stale-while-revalidate=86400"
+        f"stale-while-revalidate={stale}"
     )
+    if expires_at is not None:
+        response["Expires"] = http_date(expires_at.timestamp())
     return response
+
+
+def _market_params(request: HttpRequest) -> tuple[str, str]:
+    """Return the requested market: a country and the currency it is priced in."""
+    country = (_optional_str(request.GET.get("country")) or "").upper()
+    currency = (_optional_str(request.GET.get("currency")) or "").upper()
+    country = country or settings.CATALOG_DEFAULT_COUNTRY
+    currency = currency or settings.CATALOG_DEFAULT_CURRENCY
+    if not Currency.objects.filter(code=currency).exists() or len(country) != len("BR"):
+        raise ValueError(country, currency)
+    return country, currency
 
 
 @require_GET
 def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequest:
-    """Return cacheable public catalog products for the frontend."""
+    """Return cacheable public catalog products for one market."""
     try:
         query_filters = _catalog_filters_from_request(request)
         page, per_page = _catalog_page_params(request)
+        country, currency = _market_params(request)
     except ValueError:
         return HttpResponseBadRequest("Invalid catalog query parameter.")
 
     scenario = _optional_str(request.GET.get("scenario"))
-    policy = (
-        public_policy(scenario)
-        if scenario or settings.PRICING_READ_PROJECTIONS
-        else None
-    )
+    reads_projections = country in settings.PRICING_PROJECTION_COUNTRIES
+    policy = public_policy(scenario) if scenario or reads_projections else None
     if scenario and policy is None:
         return HttpResponseBadRequest("Unknown pricing scenario.")
-    price_source = projected_prices(policy, timezone.now()) if policy else None
+    now = timezone.now()
+    price_source = (
+        projected_prices(policy, now, country=country, currency=currency)
+        if policy
+        else legacy_prices(country, currency)
+    )
     queryset = public_catalog_products(query_filters, price_source)
     active = catalog_active(query_filters.active)
     paginator = Paginator(queryset, per_page)
     page_obj = paginator.get_page(page)
     profiles = _profiles_by_id(page_obj.object_list)
+    expiries = [
+        product.price_expires_at
+        for product in page_obj.object_list
+        if product.price_expires_at is not None
+    ]
     response = JsonResponse(
         {
             "active": ({"slug": active.slug, "name": active.name} if active else None),
             "massUnit": units.MASS_UNIT,
+            "market": {"country": country, "currency": currency},
             "scenario": (
                 {"key": policy.key, "version": policy.number, "source": "projection"}
                 if policy
@@ -199,12 +248,16 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
                 "hasNextPage": page_obj.has_next(),
             },
             "items": [
-                _serialize_catalog_product(product, profiles)
+                _serialize_catalog_product(product, profiles, currency)
                 for product in page_obj.object_list
             ],
         },
     )
-    return _apply_catalog_cache_headers(response)
+    return _apply_catalog_cache_headers(
+        response,
+        expires_at=min(expiries) if expiries else None,
+        projected=policy is not None,
+    )
 
 
 @csrf_exempt

@@ -172,7 +172,7 @@ class RankingTests(TwoProductCatalog, TestCase):
 
         assert payload["scenario"]["source"] == "legacy"
 
-    @override_settings(PRICING_READ_PROJECTIONS=True)
+    @override_settings(PRICING_PROJECTION_COUNTRIES=["BR"])
     def test_the_cutover_switch_reads_the_default_policy(self) -> None:
         """With the switch on, the default ranking reads projections."""
         self._promote_b("30")
@@ -202,3 +202,103 @@ class RankingTests(TwoProductCatalog, TestCase):
             self._promote_b("10")
 
         delay.assert_called_with(None)
+
+
+class MarketIsolationTests(TwoProductCatalog, TestCase):
+    """R05: two markets and two currencies in one database never compete."""
+
+    def setUp(self) -> None:
+        """Move product B's store to Mexico, priced in pesos."""
+        super().setUp()
+        self.mexico = CommerceIdentityService.market(
+            MarketRef(
+                namespace="tienda",
+                channel_name="Tienda",
+                channel_kind="independent_store",
+                adapter="feed",
+                country="MX",
+                currency="MXN",
+                timezone="America/Mexico_City",
+            ),
+        )
+        seller = CommerceIdentityService.seller(
+            self.mexico, SellerRef(is_channel_owner=True)
+        )
+        Offer.objects.filter(pk=self.offers["B"].pk).update(
+            store_slug="tienda",
+            seller_account=seller,
+            current_price=Decimal("1.00"),
+        )
+        ProjectionService().refresh()
+
+    def _items(self, **params: str) -> dict:
+        return json.loads(self.client.get(URL, {"sort_by": "price", **params}).content)
+
+    def test_projections_are_stored_in_their_own_currency(self) -> None:
+        """Projection B is MXN in Mexico; A is BRL in Brazil."""
+        rows = OfferScenarioProjection.objects.filter(policy__key="listed")
+
+        assert {(row.offer_id, row.currency_id) for row in rows} == {
+            (self.offers["A"].pk, "BRL"),
+            (self.offers["B"].pk, "MXN"),
+        }
+
+    def test_the_brazilian_catalog_never_shows_a_peso_price(self) -> None:
+        """MXN 1 does not undercut BRL 100, with projections or legacy."""
+        for params in ({"scenario": "listed"}, {}):
+            with self.subTest(params):
+                payload = self._items(**params)
+                prices = {item["name"]: item["price"] for item in payload["items"]}
+                assert payload["market"] == {"country": "BR", "currency": "BRL"}
+                assert prices == {"A": "100.00", "B": None}
+
+    def test_the_mexican_catalog_shows_pesos(self) -> None:
+        """Each market ranks in its own currency, and says which."""
+        payload = self._items(scenario="listed", country="MX", currency="MXN")
+        prices = {
+            item["name"]: (item["price"], item["currency"]) for item in payload["items"]
+        }
+
+        assert prices == {"A": (None, None), "B": ("1.00", "MXN")}
+
+    def test_an_unknown_currency_is_refused(self) -> None:
+        """A typo is not silently another market."""
+        response = self.client.get(URL, {"currency": "XYZ"})
+
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+class CacheTests(TwoProductCatalog, TestCase):
+    """R13: no cache outlives the earliest expiry of a price it shows."""
+
+    def test_legacy_prices_keep_the_long_cache(self) -> None:
+        """Nothing expires; the configured TTLs apply."""
+        response = self.client.get(URL)
+
+        assert "stale-while-revalidate=86400" in response["Cache-Control"]
+
+    def test_projected_prices_cap_the_edge_and_serve_nothing_stale(self) -> None:
+        """Promotions can be suspended at any time."""
+        ProjectionService().refresh()
+
+        response = self.client.get(URL, {"scenario": "listed"})
+
+        assert "s-maxage=600" in response["Cache-Control"]
+        assert "stale-while-revalidate=0" in response["Cache-Control"]
+
+    def test_an_expiring_promotion_bounds_every_cache(self) -> None:
+        """A promotion ending in five minutes: at most five minutes anywhere."""
+        self._promote_b("30", ends_at=timezone.now() + timedelta(minutes=5))
+        ProjectionService().refresh()
+
+        response = self.client.get(URL, {"scenario": "listed"})
+        directives = dict(
+            part.strip().split("=")
+            for part in response["Cache-Control"].split(",")
+            if "=" in part
+        )
+
+        five_minutes = int(timedelta(minutes=5).total_seconds())
+        assert int(directives["max-age"]) <= five_minutes
+        assert int(directives["s-maxage"]) <= five_minutes
+        assert "Expires" in response

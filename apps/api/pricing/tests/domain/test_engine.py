@@ -802,3 +802,49 @@ class GlobalTests(SimpleTestCase):
         result = evaluate(inputs(offers=(replace(offer(), market_id=2),)))
 
         assert DecisionStatus.INELIGIBLE in _statuses(result)["offer 1"]
+
+
+class RestrictedPriceTests(SimpleTestCase):
+    """R04: a restricted observation is never one unit's public price."""
+
+    def _with(self, **restriction: object) -> object:
+        return evaluate(
+            inputs(prices=(price(1, "100.00"), price(1, "1.00", **restriction))),
+        )
+
+    def test_restrictions_keep_the_public_price(self) -> None:
+        """Quantity range, order basis, cart stage and observed contexts."""
+        for restriction in (
+            {"quantity_min": 10},
+            {"amount_basis": "order"},
+            {"capture_stage": "cart"},
+            {"context": (("destination", "01310"),)},
+            {"context": (("membership", "prime"),)},
+        ):
+            with self.subTest(restriction):
+                result = self._with(**restriction)
+                assert result.merchandise_total == Decimal("100.00")
+
+    def test_a_quantity_price_applies_inside_its_range(self) -> None:
+        """Ten units at the R$ 1 bulk price."""
+        result = evaluate(
+            inputs(
+                prices=(price(1, "100.00"), price(1, "1.00", quantity_min=10)),
+                context=context(CartLine(1, 10)),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("10.00")
+
+    def test_a_contextual_quote_is_not_accepted_by_default(self) -> None:
+        """quoted_for_context needs a matching context; public policies refuse it."""
+        result = evaluate(
+            inputs(
+                prices=(
+                    price(1, "100.00"),
+                    price(1, "1.00", evidence_level="quoted_for_context"),
+                ),
+            ),
+        )
+
+        assert result.merchandise_total == Decimal("100.00")

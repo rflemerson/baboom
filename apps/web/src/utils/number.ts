@@ -14,3 +14,12 @@ export function formatDecimal(
 
   return numericValue.toFixed(fractionDigits)
 }
+
+/** Format a price with the currency it is charged in, when the API names one. */
+export function formatMoney(
+  value: string | number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  const amount = formatDecimal(value)
+  return currency && amount !== '-' ? `${currency} ${amount}` : amount
+}

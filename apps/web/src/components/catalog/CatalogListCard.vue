@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-vue-next'
 
 import type { CatalogProduct } from '@/types/catalog'
 import BaseMetricCard from '@/components/ui/BaseMetricCard.vue'
-import { formatDecimal } from '@/utils/number'
+import { formatDecimal, formatMoney } from '@/utils/number'
 import { totalPriceLabel } from '@/utils/payment'
 
 defineProps<{
@@ -58,7 +58,7 @@ defineProps<{
           <BaseMetricCard
             compact
             :label="totalPriceLabel(product.paymentMethod, scenarioKey)"
-            :value="formatDecimal(product.price)"
+            :value="formatMoney(product.price, product.currency)"
           />
           <BaseMetricCard
             compact

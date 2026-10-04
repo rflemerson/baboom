@@ -66,6 +66,11 @@ class PriceFact:
     source_field: str = ""
     observed_at: datetime | None = None
     fresh_until: datetime | None = None
+    quantity_min: int = 1
+    quantity_max: int | None = None
+    amount_basis: str = "unit"
+    capture_stage: str = "catalog"
+    context: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -197,9 +202,7 @@ class Policy:
     version: int
     scenario: str
     accepted_semantics: frozenset[str] = frozenset({"known", "legacy_unknown"})
-    accepted_evidence: frozenset[str] = frozenset(
-        {"observed_in_catalog", "quoted_for_context"},
-    )
+    accepted_evidence: frozenset[str] = frozenset({"observed_in_catalog"})
     cash_methods: frozenset[str] = frozenset({"pix", "boleto"})
     include_unknown_payment: bool = True
     allow_codes: bool = False

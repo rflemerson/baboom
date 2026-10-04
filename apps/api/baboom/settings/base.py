@@ -59,10 +59,16 @@ DATABASES = {
 
 CATALOG_DEFAULT_ACTIVE_SLUG = env.str("CATALOG_DEFAULT_ACTIVE_SLUG", "protein")
 
-# Cutover switch: when true, the default catalog ranking reads the pricing
-# projections of the default policy instead of legacy current prices. A
+# The market the public catalog shows when a request names none.
+CATALOG_DEFAULT_COUNTRY = env.str("CATALOG_DEFAULT_COUNTRY", "BR")
+CATALOG_DEFAULT_CURRENCY = env.str("CATALOG_DEFAULT_CURRENCY", "BRL")
+
+# Cutover switch, per country: the default ranking of these countries reads
+# the default policy's projections instead of legacy current prices. A
 # requested scenario (?scenario=cash) always reads projections.
-PRICING_READ_PROJECTIONS = env.bool("PRICING_READ_PROJECTIONS", default=False)
+PRICING_PROJECTION_COUNTRIES = env.list("PRICING_PROJECTION_COUNTRIES", default=[])
+# Projected prices change with promotions; the CDN keeps them at most this long.
+PRICING_EDGE_CACHE_SECONDS = env.int("PRICING_EDGE_CACHE_SECONDS", default=600)
 
 CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS = env.int(
     "CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS",

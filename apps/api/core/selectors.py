@@ -7,11 +7,13 @@ from collections.abc import Callable
 from django.conf import settings
 from django.db.models import (
     CharField,
+    DateTimeField,
     DecimalField,
     Exists,
     ExpressionWrapper,
     F,
     FloatField,
+    IntegerField,
     OuterRef,
     Q,
     QuerySet,
@@ -21,6 +23,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, Coalesce, NullIf
 
+from commerce.models import Market
 from offers.models import Offer, StockStatus
 
 from .dtos import CatalogProductsFilters
@@ -47,9 +50,30 @@ def _cheapest_offer_subquery() -> QuerySet[Offer]:
             delisted_at__isnull=True,
             current_stock_status__in=StockStatus.purchasable(),
         )
-        .annotate(amount=F("current_price"), payment_method=Value(""))
+        .annotate(
+            amount=F("current_price"),
+            payment_method=Value(""),
+            offer_id=F("pk"),
+            expires_at=Value(None, output_field=DateTimeField()),
+        )
         .order_by("current_price", "pk")
     )
+
+
+def legacy_prices(country: str, currency: str) -> PriceSource:
+    """Return legacy current prices, limited to stores of one market.
+
+    A store whose market is known in another country or currency never
+    competes; a store with no market yet is the catalog's original market.
+    """
+    foreign = Market.objects.exclude(country=country, currency_id=currency).values(
+        "namespace",
+    )
+
+    def source() -> QuerySet:
+        return _cheapest_offer_subquery().exclude(store_slug__in=foreign)
+
+    return source
 
 
 def catalog_active(slug: str | None = None) -> Active | None:
@@ -103,6 +127,14 @@ def _annotate_catalog_base_fields(
         payment_method=Subquery(
             cheapest.values("payment_method")[:1],
             output_field=CharField(),
+        ),
+        price_offer_id=Subquery(
+            cheapest.values("offer_id")[:1],
+            output_field=IntegerField(),
+        ),
+        price_expires_at=Subquery(
+            cheapest.values("expires_at")[:1],
+            output_field=DateTimeField(),
         ),
         fraction=fraction,
         combo_total_active=combo_total_active,
