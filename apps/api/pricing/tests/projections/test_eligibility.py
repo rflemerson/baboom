@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -13,7 +12,7 @@ from core.models import Brand, Category, Product, ProductStore
 from offers.models import Evidence
 from pricing.models import OfferScenarioProjection
 from pricing.projections import ProjectionService
-from pricing.tests.projections.test_invalidation import DELAY, LOCAL
+from pricing.tests.projections.test_invalidation import DELAY
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import (
     Promotion,
@@ -68,7 +67,6 @@ class EligibilityCatalog(TwoProductCatalog):
     def _scheduled(self, change: object) -> list[object]:
         with (
             patch(DELAY) as delay,
-            patch(LOCAL, threading.local()),
             self.captureOnCommitCallbacks(execute=True),
         ):
             change()

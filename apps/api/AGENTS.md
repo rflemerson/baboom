@@ -127,8 +127,11 @@ offers that a successful crawl no longer sees.
   (best price paid now; falls back to normal).
 - `pricing.invalidation.Repricing` decides what a change reaches: it first
   expires rows the change may have made wrong (a moved route's old and new
-  offers; prices a changed promotion gave), then gathers the offers of one
-  transaction into a single `refresh_projections` after commit. `pre_save`
+  offers; prices a changed promotion gave) under the offers' row locks, the
+  ones a refresh takes, so a refresh and an expiry never interleave; then each
+  call registers its own `refresh_projections` with `transaction.on_commit`
+  (a rolled-back savepoint drops it; the refresh is idempotent, so repeated
+  tasks are accepted). `pre_save`
   receivers keep the replaced row so its old targets are repriced too.
   A change that may take a promotion away (an offer linked to another product,
   a product's brand or category, a category moved with treebeard's manager

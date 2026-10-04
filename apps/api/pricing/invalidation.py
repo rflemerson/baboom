@@ -1,16 +1,20 @@
 """Decide which projections a change can reach, and reprice only those.
 
 A change first expires the rows it may have made wrong, at once, so the
-catalog never serves them while the refresh waits; then it schedules one
-refresh per transaction for every offer it reached, old and new.
+catalog never serves them while the refresh waits; then it schedules a refresh
+of every offer it reached, old and new, after the transaction commits. Calls
+in one transaction schedule one task each: the refresh is idempotent, and a
+rolled-back savepoint takes its tasks with it.
+
+Expiring takes the offers' row locks, as a refresh does and until the same
+transaction ends. A refresh that read facts before the change then publishes
+before the expiry runs, which expires its rows; one that starts after waits for
+the change to commit and reads it. Neither can leave an old price valid.
 """
 
 from __future__ import annotations
 
-import threading
-from dataclasses import dataclass, field
-
-from django.db import connection, transaction
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -34,47 +38,21 @@ _OFFER_LOOKUPS = {
 }
 
 
-@dataclass
-class _Pending:
-    """Offers one transaction changed; refreshed once, after it commits."""
-
-    every: bool = False
-    offer_ids: set[int] = field(default_factory=set)
-
-    def flush(self) -> None:
-        """Schedule one refresh for everything gathered."""
-        if getattr(_local, "pending", None) is self:
-            _local.pending = None
-        _schedule(None if self.every else sorted(self.offer_ids))
-
-
-# Per thread: each request or task gathers its own transaction's offers.
-_local = threading.local()
-
-
-def _schedule(offer_ids: list[int] | None) -> None:
-    if offer_ids != []:
-        refresh_projections.delay(offer_ids=offer_ids)
-
-
 class Repricing:
     """Expire what a change may have made wrong; refresh what it reached."""
 
     def offers(self, offer_ids: list[int] | None, *, expire: bool = False) -> None:
-        """Refresh these offers, or every linked one with None."""
+        """Refresh these offers, or every linked one with None, after commit."""
         if expire:
+            self._lock(offer_ids)
             rows = OfferScenarioProjection.objects.all()
             if offer_ids is not None:
                 rows = rows.filter(offer_id__in=offer_ids)
             rows.update(expires_at=timezone.now())
-        if not connection.in_atomic_block:
-            _schedule(None if offer_ids is None else sorted(set(offer_ids)))
+        ids = None if offer_ids is None else sorted(set(offer_ids))
+        if ids == []:
             return
-        pending = self._pending()
-        if offer_ids is None:
-            pending.every = True
-        else:
-            pending.offer_ids.update(offer_ids)
+        transaction.on_commit(lambda: refresh_projections.delay(offer_ids=ids))
 
     def store(self, store_slug: str) -> None:
         """Refresh a store's linked offers after a crawl changed them."""
@@ -101,6 +79,7 @@ class Repricing:
             ).values_list("pk", flat=True),
         )
         reached = self._reach(revisions)
+        self._lock(reached)
         rows = OfferScenarioProjection.objects.exclude(explanation__applied=[])
         if reached is not None:
             rows = rows.filter(offer_id__in=reached)
@@ -121,6 +100,7 @@ class Repricing:
         product, brand or category, a moved category): the rows that applied
         a revision stop serving at once; the others never relied on one.
         """
+        self._lock(offer_ids)
         OfferScenarioProjection.objects.filter(offer_id__in=offer_ids).exclude(
             explanation__applied=[],
         ).update(expires_at=timezone.now())
@@ -136,6 +116,19 @@ class Repricing:
     def unlink(self, offer_id: int) -> None:
         """Drop an unlinked offer's projections; nothing ranks it any more."""
         OfferScenarioProjection.objects.filter(offer_id=offer_id).delete()
+
+    @staticmethod
+    def _lock(offer_ids: list[int] | None) -> None:
+        """Lock the linked offers among these (all with None) in a refresh's order."""
+        linked = Offer.objects.filter(product_store__isnull=False)
+        if offer_ids is not None:
+            linked = linked.filter(pk__in=offer_ids)
+        with transaction.atomic():
+            list(
+                Offer.objects.select_for_update()
+                .filter(pk__in=linked.values("pk"))
+                .order_by("pk"),
+            )
 
     @staticmethod
     def _reach(revisions: set[int]) -> list[int] | None:
@@ -167,21 +160,6 @@ class Repricing:
                 listing_variant__listing_id=route.listing_id,
             ).values_list("pk", flat=True),
         )
-
-    @staticmethod
-    def _pending() -> _Pending:
-        """Return this transaction's gathered offers, registering one flush.
-
-        A rolled-back transaction drops its callback, so a gathering whose
-        flush is no longer registered is discarded.
-        """
-        pending = getattr(_local, "pending", None)
-        if pending is None or not any(
-            entry[1] == pending.flush for entry in connection.run_on_commit
-        ):
-            pending = _local.pending = _Pending()
-            transaction.on_commit(pending.flush)
-        return pending
 
 
 def _subtree(category_id: int | None) -> list[int]:

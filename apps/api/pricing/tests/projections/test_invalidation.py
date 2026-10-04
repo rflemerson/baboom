@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import threading
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.admin import site
+from django.db import transaction
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
@@ -21,8 +21,6 @@ from promotions.models import PurchaseRoute
 from promotions.services import PromotionService
 
 DELAY = "pricing.invalidation.refresh_projections.delay"
-# TestCase never commits: each captured change starts its own gathering.
-LOCAL = "pricing.invalidation._local"
 
 
 class InvalidationTests(TwoProductCatalog, TestCase):
@@ -36,7 +34,6 @@ class InvalidationTests(TwoProductCatalog, TestCase):
     def _scheduled(self, change: object) -> list[object]:
         with (
             patch(DELAY) as delay,
-            patch(LOCAL, threading.local()),
             self.captureOnCommitCallbacks(execute=True),
         ):
             change()
@@ -114,7 +111,6 @@ class PreviousStateTests(TwoProductCatalog, TestCase):
     def _scheduled(self, change: object) -> list[object]:
         with (
             patch(DELAY) as delay,
-            patch(LOCAL, threading.local()),
             self.captureOnCommitCallbacks(execute=True),
         ):
             change()
@@ -161,8 +157,19 @@ class PreviousStateTests(TwoProductCatalog, TestCase):
         assert normal.expires_at is None or normal.expires_at > now
         assert not self._expired("A")
 
-    def test_one_transaction_schedules_one_refresh(self) -> None:
-        """Two products saved together: one task with both offers."""
+    def test_a_rolled_back_savepoint_schedules_nothing(self) -> None:
+        """Work undone inside a savepoint never reaches the queue."""
+        product = Product.objects.get(name="A")
+
+        def attempt() -> None:
+            with transaction.atomic():
+                product.save()
+                transaction.set_rollback(True)
+
+        assert self._scheduled(attempt) == []
+
+    def test_each_call_schedules_its_own_idempotent_refresh(self) -> None:
+        """Two saves in one transaction queue two tasks; none is merged away."""
 
         def save_both() -> None:
             for product in Product.objects.filter(name__in=["A", "B"]):
@@ -170,7 +177,7 @@ class PreviousStateTests(TwoProductCatalog, TestCase):
 
         calls = self._scheduled(save_both)
 
-        assert calls == [sorted(offer.pk for offer in self.offers.values())]
+        assert sorted(calls) == sorted([offer.pk] for offer in self.offers.values())
 
     def test_a_programme_change_seen_from_the_programme_expires_its_routes(
         self,
