@@ -496,7 +496,7 @@ def _apply(
     held: dict[int, Tri] = {}
     for stage in STAGES:
         if stage == "shipping":
-            _match_order_value(inputs, outcome)
+            _shipping(inputs, outcome)
         for revision, effect in _ordered(subset, stage):
             if revision.id not in held:
                 held[revision.id] = _check(
@@ -587,50 +587,45 @@ def _check(
     return result.value
 
 
-def _match_order_value(inputs: Inputs, outcome: _Outcome) -> None:
-    """Drop shipping quoted for another order value than the cart now has.
+def _shipping(inputs: Inputs, outcome: _Outcome) -> None:
+    """Take each group's cheapest quote that holds for the cart as it is now.
 
-    A carrier that prices by order value quoted one cart; after discounts
-    the cart may be worth another amount, and that quote no longer holds.
+    A quote must be current, in the cart's currency and, when the carrier
+    priced by order value, quoted for the cart's current value. Called before
+    the stages and again at the shipping stage, after discounts changed it.
     """
-    if not outcome.shipping_known:
-        return
+    context = inputs.context
+    groups = context.groups or ()
+    keys = [group.key for group in groups] or ["all"]
     value = round_money(
         sum((line.current for line in outcome.lines), ZERO),
-        inputs.context.minor_unit,
+        context.minor_unit,
     )
-    for quote in inputs.shipping:
-        if quote.order_value is not None and quote.order_value != value:
+    amounts = []
+    for key in keys:
+        quotes = [
+            quote
+            for quote in inputs.shipping
+            if quote.group_key == key
+            and quote.amount is not None
+            and quote.currency == context.currency
+            and (quote.observed_at is None or quote.observed_at <= context.now)
+            and (quote.expires_at is None or quote.expires_at > context.now)
+        ]
+        holding = [
+            quote
+            for quote in quotes
+            if quote.order_value is None or quote.order_value == value
+        ]
+        if not holding:
             outcome.missing.append(
-                f"shipping quoted for an order of {quote.order_value}, not {value}",
+                f"shipping quoted for an order of {quotes[0].order_value}, not {value}"
+                if quotes
+                else f"shipping quote for group {key}",
             )
             outcome.shipping, outcome.shipping_known = None, False
             return
-
-
-def _shipping(inputs: Inputs, outcome: _Outcome) -> None:
-    """Read the known shipping of every checkout group, or mark it unknown."""
-    groups = inputs.context.groups or ()
-    keys = [group.key for group in groups] or ["all"]
-    quotes = {
-        quote.group_key: quote
-        for quote in inputs.shipping
-        if quote.currency == inputs.context.currency
-        and (quote.observed_at is None or quote.observed_at <= inputs.context.now)
-        and (quote.expires_at is None or quote.expires_at > inputs.context.now)
-    }
-    amounts = []
-    for key in keys:
-        quote = quotes.get(key)
-        if (
-            quote is None
-            or quote.amount is None
-            or quote.currency != inputs.context.currency
-        ):
-            outcome.missing.append(f"shipping quote for group {key}")
-            outcome.shipping, outcome.shipping_known = None, False
-            return
-        amounts.append(quote.amount)
+        amounts.append(min(quote.amount for quote in holding))
     outcome.shipping, outcome.shipping_known = sum(amounts, ZERO), True
 
 

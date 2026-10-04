@@ -22,7 +22,9 @@ class CostBook:
     their costs once keeps the number of queries independent of their count.
     """
 
-    shipping: dict[str, ShippingFact]
+    # Every current quote per group: which applies depends on the cart's
+    # value and currency, which only the engine knows.
+    shipping: dict[str, list[ShippingFact]]
     fees: dict[str, list[TaxFeeQuote]]
 
     @classmethod
@@ -32,7 +34,10 @@ class CostBook:
         by_group: dict[str, list[TaxFeeQuote]] = {}
         for fee in fees:
             by_group.setdefault(fee.group_fingerprint, []).append(fee)
-        return cls(shipping={fact.group_key: fact for fact in shipping}, fees=by_group)
+        quotes: dict[str, list[ShippingFact]] = {}
+        for fact in shipping:
+            quotes.setdefault(fact.group_key, []).append(fact)
+        return cls(shipping=quotes, fees=by_group)
 
     def for_groups(
         self,
@@ -41,11 +46,25 @@ class CostBook:
     ) -> tuple[tuple[ShippingFact, ...], tuple[FeeFact, ...], str]:
         """Return what the engine reads for these groups."""
         fees = [fee for key in group_keys for fee in self.fees.get(key, [])]
+        statuses = {
+            self._status(self.fees.get(key, []), tax_inclusion) for key in group_keys
+        }
         return (
-            tuple(self.shipping[key] for key in group_keys if key in self.shipping),
+            tuple(fact for key in group_keys for fact in self.shipping.get(key, [])),
             tuple(self._fee_fact(fee) for fee in fees if fee.kind != "none"),
-            self._status(fees, tax_inclusion),
+            self._combined(statuses),
         )
+
+    @staticmethod
+    def _combined(statuses: set[str]) -> str:
+        """Know the sum only when every group's charges are known."""
+        if len(statuses) == 1:
+            return next(iter(statuses))
+        if statuses <= {"included_in_prices", "consulted"}:
+            return "consulted"
+        if statuses & {"consulted", "partial"}:
+            return "partial"
+        return "not_consulted"
 
     @staticmethod
     def _status(fees: list[TaxFeeQuote], tax_inclusion: str) -> str:
@@ -92,25 +111,22 @@ class CostBook:
                 "group_fingerprint", "currency_id", "amount", "-observed_at", "-pk"
             )
         )
-        cheapest: dict[tuple[str, str], ShippingFact] = {}
-        for quote in shipping:
-            key = (quote.group_fingerprint, quote.currency_id)
-            cheapest.setdefault(
-                key,
-                ShippingFact(
-                    group_key=quote.group_fingerprint,
-                    amount=quote.amount,
-                    currency=quote.currency_id,
-                    modality=quote.modality,
-                    estimate_days=quote.estimate_days,
-                    included_benefits=tuple(quote.included_benefits or ()),
-                    id=quote.pk,
-                    source=quote.source,
-                    observed_at=quote.observed_at,
-                    expires_at=quote.expires_at,
-                    order_value=quote.order_value,
-                ),
+        current = [
+            ShippingFact(
+                group_key=quote.group_fingerprint,
+                amount=quote.amount,
+                currency=quote.currency_id,
+                modality=quote.modality,
+                estimate_days=quote.estimate_days,
+                included_benefits=tuple(quote.included_benefits or ()),
+                id=quote.pk,
+                source=quote.source,
+                observed_at=quote.observed_at,
+                expires_at=quote.expires_at,
+                order_value=quote.order_value,
             )
+            for quote in shipping
+        ]
         latest_fee = TaxFeeQuote.objects.filter(
             group_fingerprint=OuterRef("group_fingerprint"),
             source=OuterRef("source"),
@@ -125,7 +141,7 @@ class CostBook:
                 observed_at__lte=now,
             ).filter(pk=Subquery(latest_fee.values("pk")[:1]), expires_at__gt=now),
         )
-        return list(cheapest.values()), fees
+        return current, fees
 
     @staticmethod
     def _fee_fact(quote: TaxFeeQuote) -> FeeFact:

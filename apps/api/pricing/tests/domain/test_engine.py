@@ -968,3 +968,30 @@ class OrderValueShippingTests(SimpleTestCase):
         assert unchanged.shipping_total == Decimal("10.00")
         assert discounted.shipping_total is None
         assert any("order of 100" in item for item in discounted.missing_context)
+
+    def test_a_cheaper_quote_for_another_value_never_hides_one_that_holds(
+        self,
+    ) -> None:
+        """R$ 5 quoted for R$ 200, R$ 10 for R$ 100: a R$ 100 cart pays R$ 10."""
+        cheap = ShippingFact(
+            "all", Decimal(5), "BRL", modality="standard", order_value=Decimal(200)
+        )
+        holds = ShippingFact(
+            "all", Decimal(10), "BRL", modality="express", order_value=Decimal(100)
+        )
+
+        result = evaluate(inputs(shipping=(cheap, holds)))
+
+        assert result.shipping_total == Decimal("10.00")
+
+    def test_a_discount_moves_the_cart_to_the_quote_for_its_new_value(self) -> None:
+        """After R$ 10 off, the quote for R$ 90 applies."""
+        quotes = (
+            ShippingFact("all", Decimal(10), "BRL", order_value=Decimal(100)),
+            ShippingFact("all", Decimal(12), "BRL", order_value=Decimal(90)),
+        )
+        promo = revision(1, effect("fixed_amount", params={"amount": "10"}))
+
+        result = evaluate(inputs(shipping=quotes, revisions=(promo,)))
+
+        assert result.shipping_total == Decimal("12.00")

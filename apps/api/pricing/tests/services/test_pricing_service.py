@@ -356,6 +356,31 @@ class StoredCostTests(TestCase):
 class FeeStatusTests(TestCase):
     """A04: what is known about taxes and fees, in five distinct states."""
 
+    def test_one_covered_group_does_not_cover_another(self) -> None:
+        """A complete reading of group one says nothing about group two."""
+        book = CostBook(
+            shipping={},
+            fees={"one": [self._fee(group_fingerprint="one", covers_all_charges=True)]},
+        )
+
+        _shipping, _fees, status = book.for_groups(["one", "two"], "unknown")
+
+        assert status == "partial"
+
+    def test_every_group_covered_is_consulted(self) -> None:
+        """Both groups read completely: the sum is known."""
+        fees = {
+            key: [self._fee(group_fingerprint=key, covers_all_charges=True)]
+            for key in ("one", "two")
+        }
+
+        _shipping, _fees, status = CostBook(shipping={}, fees=fees).for_groups(
+            ["one", "two"],
+            "unknown",
+        )
+
+        assert status == "consulted"
+
     def _fee(self, **values: object) -> TaxFeeQuote:
         base = {
             "group_fingerprint": "g",
