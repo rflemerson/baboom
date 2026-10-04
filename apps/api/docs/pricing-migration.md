@@ -88,7 +88,10 @@ offer's last read price (`core.selectors.current_prices`).
 5. **Coverage:** `manage.py pricing_coverage --country BR --currency BRL
    --details` lists, per policy, products priced today that projections
    leave without a price, by store and reason (stale, unavailable, no
-   projection). Wait for full crawls of the stores it names and repeat.
+   projection) for the offer that wins today's price, and where the winning
+   offer or link differs from the `normal` projection's. `--fail-on-loss` exits
+   with an error while any product loses its price. Wait for full crawls of
+   the stores it names and repeat.
 6. **Switch:** add the country to `PRICING_PROJECTION_COUNTRIES`. Rollback is
    removing it.
 7. **After every market is switched and stable:** remove the setting and
