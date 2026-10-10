@@ -83,7 +83,9 @@ offer's last read price (`core.selectors.current_prices`).
 2. **Identity:** `manage.py backfill_commercial_identity`, read the preview,
    then `--apply`.
 3. **History:** `manage.py backfill_legacy_price_observations`, then
-   `--apply`. Legacy prices become `legacy_unknown` and keep their age.
+   `--apply`. Legacy prices become `legacy_unknown` and keep their age,
+   except the newest copy of a listed offer whose `current_price` it states:
+   the last crawl read that price, so it is confirmed at `last_seen_at`.
 4. **Projections:** `manage.py rebuild_pricing_projections --apply`.
 5. **Coverage:** `manage.py pricing_coverage --country BR --currency BRL
    --details` lists, per policy, products priced today that projections
