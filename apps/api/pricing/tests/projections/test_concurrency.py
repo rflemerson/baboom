@@ -1,4 +1,4 @@
-"""SYNTHETIC, PostgreSQL only: concurrent refreshes never publish an older price."""
+"""SYNTHETIC: concurrent refreshes never publish an older price."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from django.db import connection, connections, transaction
+from django.db import connections, transaction
 from django.test import TransactionTestCase
 from django.utils import timezone
 
@@ -63,14 +63,14 @@ class ConcurrentRefreshTests(TwoProductCatalog, TransactionTestCase):
     """Row locks order refreshes; a refresh never replaces a newer one."""
 
     def setUp(self) -> None:
-        """Run on PostgreSQL only: SQLite has no row locks.
+        """Recreate what the flush removed.
 
         A TransactionTestCase empties the tables, seeded rows included, so
         the test recreates the currency and the policy it needs.
         """
-        if connection.vendor != "postgresql":
-            self.skipTest("Row locks exist on PostgreSQL only.")
         Currency.objects.get_or_create(code="BRL", defaults={"minor_unit": 2})
+        # These tests commit, so refreshes would reach the broker; none is needed.
+        self.enterContext(patch(DELAY))
         super().setUp()
         PricingPolicyRevision.objects.get_or_create(
             key="concurrent",

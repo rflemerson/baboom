@@ -7,7 +7,12 @@
 
 ## Commands
 
+PostgreSQL is the only database, in development, tests and production (triggers
+and row locks are part of the behaviour under test). Start the local one first;
+`DATABASE_URL` defaults to it.
+
 ```bash
+docker compose -f docker-compose.dev.yml up -d --wait   # from the repository root
 pip install -e .[dev]
 prek run --all-files
 .venv/bin/python manage.py check

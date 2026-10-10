@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 
@@ -53,8 +52,6 @@ class PolicyTriggerTests(TestCase):
 
     def test_raw_updates_and_deletes_are_refused(self) -> None:
         """Only is_default may move once published."""
-        if connection.vendor != "postgresql":
-            self.skipTest("Triggers exist on PostgreSQL only.")
         policy = PricingPolicyRevision.objects.get(key="best", number=1)
         PricingPolicyRevision.objects.filter(pk=policy.pk).update(is_default=False)
 

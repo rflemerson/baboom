@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from django.db import IntegrityError, connection
+from django.db import IntegrityError
 from django.test import TestCase
 
 from common.testing import raised
@@ -223,8 +223,6 @@ class FrozenTests(TestCase):
 
     def test_the_database_refuses_raw_updates_on_postgresql(self) -> None:
         """Below the ORM, the trigger freezes the terms too."""
-        if connection.vendor != "postgresql":
-            self.skipTest("Triggers exist on PostgreSQL only.")
         raised(
             lambda: PromotionRevision.objects.filter(pk=self.revision.pk).update(
                 limitations="raw",

@@ -54,7 +54,10 @@ TEST_RUNNER = "baboom.test_runner.NoNetworkTestRunner"
 
 
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
+    "default": env.db(
+        "DATABASE_URL",
+        default="postgres://baboom:baboom-dev@127.0.0.1:55440/baboom",
+    ),
 }
 
 CATALOG_DEFAULT_ACTIVE_SLUG = env.str("CATALOG_DEFAULT_ACTIVE_SLUG", "protein")

@@ -81,10 +81,8 @@ def _run(schema_editor, sql):
 
 
 def _install(apps, schema_editor):
-    """Create the functions and triggers on PostgreSQL only."""
+    """Create the functions and triggers."""
     _ = apps
-    if schema_editor.connection.vendor != "postgresql":
-        return
     _run(schema_editor, REVISION_FUNCTION)
     _run(schema_editor, CHILD_FUNCTION)
     _run(
@@ -105,8 +103,6 @@ def _install(apps, schema_editor):
 def _remove(apps, schema_editor):
     """Drop the triggers and functions."""
     _ = apps
-    if schema_editor.connection.vendor != "postgresql":
-        return
     _run(
         schema_editor,
         "DROP TRIGGER IF EXISTS promotions_freeze_revision "
