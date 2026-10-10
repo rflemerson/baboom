@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from ...normalizers.shopify import ShopifyNormalizer
 from ..base import CatalogSpider
+from ..web_bot_auth import USER_AGENT
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -24,7 +25,17 @@ SHOPIFY_PAGE_SIZE = 250
 
 
 class ShopifyApiSpider(CatalogSpider):
-    """Crawl Shopify collections and emit one normalized page per product."""
+    """Crawl Shopify collections and emit one normalized page per product.
+
+    Shopify throttles unidentified bots hardest: this one names itself,
+    signs its requests and obeys robots.txt.
+    """
+
+    IDENTIFIES_ITSELF = True
+    custom_settings: ClassVar[dict[str, object]] = {
+        "ROBOTSTXT_OBEY": True,
+        "USER_AGENT": USER_AGENT,
+    }
 
     BRAND_NAME = ""
     STORE_SLUG = ""

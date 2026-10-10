@@ -169,6 +169,27 @@ class EmptyMonitorRunTests(TestCase):
         assert "8" in run.error_message
         assert "layout" not in run.error_message
 
+    def test_an_empty_run_refused_by_a_bot_challenge_says_so(self) -> None:
+        """Shopify's bot challenge ends in 403: refused, not a new layout."""
+        ScraperRun.objects.create(
+            label=self.LABEL,
+            status=ScraperRun.Status.SUCCESS,
+            items_count=112,
+        )
+        stats = {
+            "item_scraped_count": 0,
+            "downloader/request_count": 5,
+            "downloader/response_status_count/403": 1,
+        }
+
+        with _fake_crawl(stats):
+            _raised(lambda: run_spider_monitor("dux", self.LABEL), EmptyMonitorRunError)
+
+        run = ScraperRun.objects.filter(items_count=0).get()
+        assert "1 with HTTP 403" in run.error_message
+        assert "bot challenge" in run.error_message
+        assert "layout" not in run.error_message
+
     def test_empty_run_of_another_monitor_does_not_raise(self) -> None:
         """History is per monitor, so a healthy store does not fail its peer."""
         ScraperRun.objects.create(

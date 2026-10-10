@@ -1,9 +1,11 @@
-"""Admin, OAuth, MCP, public catalog API, and liveness routes."""
+"""Admin, OAuth, MCP, public catalog API, crawler key and liveness routes."""
 
 from django.contrib import admin
 from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
 from oauth2_provider.urls import metadata_urlpatterns
+
+from scrapers.views import signature_directory
 
 
 def healthz(_request: HttpRequest) -> JsonResponse:
@@ -17,6 +19,11 @@ urlpatterns = [
     path(
         "",
         include((metadata_urlpatterns, "oauth2_provider"), namespace="oauth2_metadata"),
+    ),
+    path(
+        ".well-known/http-message-signatures-directory",
+        signature_directory,
+        name="http-message-signatures-directory",
     ),
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     path("healthz/", healthz),

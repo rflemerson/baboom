@@ -23,6 +23,10 @@ CRAWL_TIMEOUT_SECONDS = 1800
 TERMINATION_GRACE_SECONDS = 5
 
 
+# 429: rate limit. 403: bot challenge (Shopify's ends in one).
+REFUSAL_STATUSES = (429, 403)
+
+
 class EmptyMonitorRunError(RuntimeError):
     """A monitor that used to return products returned none."""
 
@@ -198,11 +202,15 @@ def run_spider_monitor(spider_name: str, label: str) -> str:
         raise RuntimeError(error_message)
 
     if not items_count and _monitor_has_produced_items(label):
-        rate_limited = _stat_int(stats, "downloader/response_status_count/429")
+        refused = ", ".join(
+            f"{count} with HTTP {status}"
+            for status in REFUSAL_STATUSES
+            if (count := _stat_int(stats, f"downloader/response_status_count/{status}"))
+        )
         cause = (
-            f"The store refused {rate_limited} responses with HTTP 429, its "
-            f"rate limit: the catalog was not read, and nothing was delisted."
-            if rate_limited
+            f"The store refused {refused} (a rate limit or a bot challenge): "
+            "the catalog was not read, and nothing was delisted."
+            if refused
             else "The store layout or endpoint has most likely changed."
         )
         message = (

@@ -74,6 +74,12 @@ offers that a successful crawl no longer sees.
 - Celery launches one `scrapy crawl <spider>` subprocess per monitor and uses
   the dumped Scrapy statistics to close `ScraperRun`; the task preserves the
   empty-after-history failure rule and terminates crawls over 30 minutes.
+- Shopify spiders identify themselves (`BaboomBot`, robots.txt obeyed) and
+  sign every request with Web Bot Auth (`scrapers/crawler/web_bot_auth.py`)
+  when `WEB_BOT_AUTH_PRIVATE_KEY` holds an Ed25519 seed; the API publishes the
+  public key at `/.well-known/http-message-signatures-directory`. Other
+  platforms still rotate browser identities. A run emptied by HTTP 429/403 is
+  reported as refused by the store, not as a layout change.
 - Each normalized page states its coverage per dimension (`CoverageInput`):
   only a page whose `offers` were read completely reconciles absent units;
   partial pages never delist. A price-less unit remains present but

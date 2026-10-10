@@ -70,6 +70,9 @@ CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS = env.int(
     "CATALOG_PRODUCTS_BROWSER_CACHE_SECONDS",
     default=300,
 )
+# Ed25519 seed (32 bytes, base64url) the crawler signs Shopify requests with.
+WEB_BOT_AUTH_PRIVATE_KEY = env.str("WEB_BOT_AUTH_PRIVATE_KEY", default="")
+
 # Temporary launch switch: markets whose catalog reads pricing projections.
 # Others keep each offer's last read price until their coverage is checked
 # (manage.py pricing_coverage). Removed once every market is switched.

@@ -1,12 +1,14 @@
-"""Downloader policy for browser impersonation and soft WAF blocks."""
+"""Downloader policy: request identity (browser or signed bot) and WAF retries."""
 
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from scrapy.downloadermiddlewares.retry import get_retry_request
 
 # Scrapy itself imports the reactor at module scope, including in
@@ -14,6 +16,8 @@ from scrapy.downloadermiddlewares.retry import get_retry_request
 # chosen by TWISTED_REACTOR is already installed by the time a middleware runs.
 from twisted.internet import reactor
 from twisted.internet.task import deferLater
+
+from .web_bot_auth import load_private_key, request_headers
 
 if TYPE_CHECKING:
     from scrapy import Request, Spider
@@ -87,18 +91,28 @@ def is_blocked(body: str) -> bool:
 
 
 class ImpersonationMiddleware:
-    """Rotate TLS identities and retry status/WAF responses politely."""
+    """Choose each request's identity and retry status/WAF responses politely.
+
+    A spider with ``IDENTIFIES_ITSELF`` keeps its own User-Agent and signs
+    every attempt (Web Bot Auth); the others rotate browser TLS identities.
+    """
 
     impersonations = IMPERSONATIONS
 
     def __init__(self) -> None:
         """Keep the rotation index per spider name, out of the spider itself."""
         self._indexes: dict[str, int] = {}
+        seed = settings.WEB_BOT_AUTH_PRIVATE_KEY
+        self._key = load_private_key(seed) if seed else None
 
     def process_request(self, request: Request, spider: Spider) -> None:
-        """Assign one stable browser identity to a new request."""
-        if "impersonate" not in request.meta:
-            request.meta["impersonate"] = self._current_identity(spider)
+        """Sign a self-identifying request, or give it a browser identity."""
+        if self._disguised(spider):
+            request.meta.setdefault("impersonate", self._current_identity(spider))
+        elif self._key is not None:
+            signed = request_headers(self._key, request.url, int(time.time()))
+            for name, value in signed.items():
+                request.headers[name] = value
 
     def process_response(
         self,
@@ -115,7 +129,8 @@ class ImpersonationMiddleware:
         retry = get_retry_request(request, spider=spider, reason=reason)
         if retry is None:
             return response
-        retry.meta["impersonate"] = self._next_identity(spider)
+        if self._disguised(spider):
+            retry.meta["impersonate"] = self._next_identity(spider)
         wait = parse_retry_after(response)
         if wait is None and response.status == HTTP_TOO_MANY_REQUESTS:
             wait = rate_limit_backoff(int(retry.meta.get("retry_times", 1)))
@@ -123,6 +138,11 @@ class ImpersonationMiddleware:
             return retry
         logger.info("Waiting %.1fs before retrying %s", wait, request.url)
         return deferLater(reactor, wait, lambda: retry)
+
+    @staticmethod
+    def _disguised(spider: Spider) -> bool:
+        """Tell whether the spider crawls as a browser instead of as itself."""
+        return getattr(spider, "IDENTIFIES_ITSELF", False) is not True
 
     def _current_identity(self, spider: Spider) -> str:
         """Return the identity currently assigned to this spider."""
