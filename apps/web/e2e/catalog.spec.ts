@@ -198,12 +198,33 @@ const PRODUCTS: Product[] = [
     category: { name: 'Protein Bars' },
     tags: [{ name: 'Snack' }],
   },
+  {
+    id: 14,
+    name: 'Whey Gone 900g',
+    packagingDisplay: 'Refill Package',
+    netMass: '900',
+    price: '99.90',
+    pricePerActive: '0.13',
+    concentration: '80',
+    totalActive: '720',
+    externalLink: 'https://example.com/whey-gone',
+    brand: { name: 'dux' },
+    category: { name: 'Whey Protein' },
+    tags: [],
+  },
 ]
 
 const FLAVORS = ['Chocolate', 'Baunilha', 'Morango']
 
 function flavorOf(product: Product) {
   return FLAVORS[product.id % FLAVORS.length] ?? 'Chocolate'
+}
+
+// One product is sold out: the default "in stock" filter hides it.
+const SOLD_OUT = 'Whey Gone 900g'
+
+function stockOf(product: Product) {
+  return product.name === SOLD_OUT ? 'out_of_stock' : 'in_stock'
 }
 
 function readNumber(product: Product, key: string) {
@@ -220,6 +241,7 @@ async function fulfillCatalog(route: Route) {
   const params = url.searchParams
   const chosen = (name: string) => params.getAll(name)
   const [brands, flavors, categories] = [chosen('brand'), chosen('flavor'), chosen('category')]
+  const stock = chosen('stock')
   const sortBy = params.get('sort_by') ?? 'price_per_active'
   const direction = params.get('sort_dir') === 'desc' ? -1 : 1
   const perPage = Number(params.get('per_page') ?? 12)
@@ -227,7 +249,8 @@ async function fulfillCatalog(route: Route) {
     (product) =>
       (!brands.length || brands.includes(product.brand.name)) &&
       (!flavors.length || flavors.includes(flavorOf(product))) &&
-      (!categories.length || categories.includes(product.category.name)),
+      (!categories.length || categories.includes(product.category.name)) &&
+      (!stock.length || stock.includes(stockOf(product))),
   ).sort((left, right) => (readNumber(left, sortBy) - readNumber(right, sortBy)) * direction)
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const currentPage = Math.min(Number(params.get('page') ?? 1), totalPages)
@@ -333,6 +356,7 @@ test.describe('desktop', () => {
     await expect(page.getByText('13 produtos')).toBeVisible()
 
     await page.locator('summary', { hasText: 'Filtros' }).click()
+    await choose(page, 'Filtrar por', 'Marca')
     const byBrand = catalogRequest(page, (params) => params.getAll('brand').includes('dux'))
     await page.getByRole('checkbox', { name: 'dux', exact: true }).check()
     await byBrand
@@ -353,9 +377,24 @@ test.describe('desktop', () => {
     await expect(page.getByText('13 produtos')).toBeVisible()
   })
 
+  test('lists only products in stock until sold-out ones are asked for', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByText('13 produtos')).toBeVisible()
+    await expect(page.getByRole('heading', { name: SOLD_OUT })).toHaveCount(0)
+
+    await page.locator('summary', { hasText: 'Filtros' }).click()
+    const withSoldOut = catalogRequest(page, (params) =>
+      params.getAll('stock').includes('out_of_stock'),
+    )
+    await page.getByRole('checkbox', { name: 'Sem estoque', exact: true }).check()
+    await withSoldOut
+    await expect(page.getByText('14 produtos')).toBeVisible()
+  })
+
   test('shows an empty state when no product matches', async ({ page }) => {
     await page.goto('/')
     await page.locator('summary', { hasText: 'Filtros' }).click()
+    await choose(page, 'Filtrar por', 'Marca')
     await page.getByRole('checkbox', { name: 'bold', exact: true }).check()
     // "bold" sells only Baunilha: with Chocolate too, nothing is left.
     await choose(page, 'Filtrar por', 'Sabor')
@@ -398,16 +437,16 @@ test.describe('desktop', () => {
     expect(overflow).toBeLessThanOrEqual(0)
     await page.screenshot({ path: testInfo.outputPath('catalog-desktop.png'), fullPage: true })
 
-    await expect(page.getByRole('columnheader', { name: 'Categoria', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('columnheader', { name: 'Marca', exact: true })).toHaveCount(0)
     await page.locator('summary', { hasText: 'Colunas' }).click()
-    await page.getByRole('checkbox', { name: 'Categoria', exact: true }).check()
-    await expect(page.getByRole('columnheader', { name: 'Categoria', exact: true })).toBeVisible()
-    await page.getByRole('checkbox', { name: 'Categoria', exact: true }).uncheck()
-    await expect(page.getByRole('columnheader', { name: 'Categoria', exact: true })).toHaveCount(0)
+    await page.getByRole('checkbox', { name: 'Marca', exact: true }).check()
+    await expect(page.getByRole('columnheader', { name: 'Marca', exact: true })).toBeVisible()
+    await page.getByRole('checkbox', { name: 'Marca', exact: true }).uncheck()
+    await expect(page.getByRole('columnheader', { name: 'Marca', exact: true })).toHaveCount(0)
     expect(requests).toHaveLength(initialRequests)
 
     await page.getByRole('table').click({ position: { x: 5, y: 5 } })
-    await expect(page.getByRole('checkbox', { name: 'Categoria', exact: true })).toBeHidden()
+    await expect(page.getByRole('checkbox', { name: 'Marca', exact: true })).toBeHidden()
   })
 
   test('subscribes alerts and handles a duplicate email', async ({ page }) => {

@@ -133,6 +133,14 @@ const NUMERIC = ['pricePerActive', 'price', 'concentration', 'totalActive', 'mas
                   : formatQuantity(cell.getValue() as string)
               }}</span
             >
+            <span
+              v-else-if="cell.column.id === 'stock'"
+              class="whitespace-nowrap"
+              :class="
+                row.original.stockStatus === 'in_stock' ? 'app-status--success' : 'app-copy-soft'
+              "
+              >{{ t(`catalog.stock.${row.original.stockStatus ?? 'unknown'}`) }}</span
+            >
             <template v-else-if="cell.column.id === 'offer'">
               <a
                 v-if="row.original.externalLink"

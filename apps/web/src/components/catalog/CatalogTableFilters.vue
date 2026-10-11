@@ -6,23 +6,41 @@ import type { Table } from '@tanstack/vue-table'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { useCatalogFilterOptions } from '@/composables/useCatalogFilterOptions'
 import { useDisclosure } from '@/composables/useDisclosure'
-import type { CatalogFilterOptions, CatalogProduct } from '@/types/catalog'
+import {
+  STOCK_STATUSES,
+  type CatalogFilterOption,
+  type CatalogFilterOptions,
+  type CatalogProduct,
+} from '@/types/catalog'
 
 const props = defineProps<{ table: Table<CatalogProduct> }>()
 const { t } = useI18n()
 const { options } = useCatalogFilterOptions()
 // Column whose filter holds the choice, and the options it is chosen from.
 const FIELDS = {
+  stock: 'stock',
   brand: 'brands',
   flavors: 'flavors',
   category: 'categories',
-} as const satisfies Record<string, keyof CatalogFilterOptions>
+} as const satisfies Record<string, keyof CatalogFilterOptions | 'stock'>
 type Field = keyof typeof FIELDS
 const { root, escape } = useDisclosure()
-const field = ref<Field>('brand')
+const field = ref<Field>('stock')
 const chosen = computed<string[]>(() => {
   const value: unknown = props.table.getColumn(field.value)?.getFilterValue()
   return Array.isArray(value) ? value : []
+})
+
+const changed = computed(
+  () =>
+    JSON.stringify(props.table.getState().columnFilters) !==
+    JSON.stringify(props.table.initialState.columnFilters),
+)
+// Stock states are fixed; the other options come from the catalog.
+const choices = computed<CatalogFilterOption[]>(() => {
+  const source = FIELDS[field.value]
+  if (source !== 'stock') return options.value[source]
+  return STOCK_STATUSES.map((name) => ({ name, label: t(`catalog.stock.${name}`) }))
 })
 
 function header(id: string): string {
@@ -50,7 +68,7 @@ function toggle(name: string, checked: boolean) {
         />
       </div>
       <ul class="app-filter-panel__list mt-3">
-        <li v-for="option in options[FIELDS[field]]" :key="option.name">
+        <li v-for="option in choices" :key="option.name">
           <label class="flex items-center gap-2 py-1.5">
             <input
               type="checkbox"
@@ -59,12 +77,12 @@ function toggle(name: string, checked: boolean) {
             />{{ option.label }}
           </label>
         </li>
-        <li v-if="!options[FIELDS[field]].length" class="app-copy-soft py-1.5">
+        <li v-if="!choices.length" class="app-copy-soft py-1.5">
           {{ t('catalog.noOptions') }}
         </li>
       </ul>
       <button
-        v-if="table.getState().columnFilters.length"
+        v-if="changed"
         type="button"
         class="app-menu__action mt-3"
         @click="table.resetColumnFilters()"

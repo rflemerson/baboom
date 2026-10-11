@@ -30,6 +30,13 @@ const { t } = useI18n()
             }}<span v-if="row.original.netMass">
               · {{ formatQuantity(row.original.netMass) }} {{ massUnit }}</span
             >
+            ·
+            <span
+              :class="
+                row.original.stockStatus === 'in_stock' ? 'app-status--success' : 'app-copy-soft'
+              "
+              >{{ t(`catalog.stock.${row.original.stockStatus ?? 'unknown'}`) }}</span
+            >
           </p>
         </div>
         <a

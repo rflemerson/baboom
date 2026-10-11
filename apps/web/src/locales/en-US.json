@@ -50,7 +50,8 @@
       "totalActive": "Total active (g)",
       "flavors": "Flavor",
       "tags": "Tags",
-      "offer": "Offer"
+      "offer": "Offer",
+      "stock": "Stock"
     },
     "pagination": {
       "label": "Catalog pages",
@@ -78,6 +79,12 @@
       "price_desc": "Highest price",
       "concentration_desc": "Highest concentration",
       "totalActive_desc": "Most active"
+    },
+    "stock": {
+      "in_stock": "In stock",
+      "out_of_stock": "Out of stock",
+      "preorder": "Pre-order",
+      "unknown": "Unknown"
     }
   },
   "payment": {

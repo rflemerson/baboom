@@ -24,29 +24,27 @@ function updated<T>(updater: Updater<T>, previous: T): T {
   return typeof updater === 'function' ? (updater as (value: T) => T)(previous) : updater
 }
 
+// The catalog lists what can be bought now unless a visitor asks otherwise.
+function defaultFilters(): ColumnFiltersState {
+  return [{ id: 'stock', value: ['in_stock'] }]
+}
+
 export function useCatalogTable() {
   const rows = shallowRef<CatalogProduct[]>([])
   const pageInfo = ref<CatalogPageInfo | null>(null)
   const activeName = ref('')
   const sorting = ref<SortingState>([{ id: 'pricePerActive', desc: false }])
-  const columnFilters = ref<ColumnFiltersState>([])
+  const columnFilters = ref<ColumnFiltersState>(defaultFilters())
   const globalFilter = ref('')
   const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 12 })
-  const compact =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(max-width: 640px)').matches
   const columnVisibility = ref<VisibilityState>({
-    totalActive: !compact,
-    flavors: !compact,
     brand: false,
-    category: false,
     packaging: false,
     mass: false,
     tags: false,
   })
   const scenario = ref('')
-  const debouncedFilters = ref<ColumnFiltersState>([])
+  const debouncedFilters = ref<ColumnFiltersState>(defaultFilters())
   const debouncedSearch = ref('')
   let timer: ReturnType<typeof setTimeout> | undefined
   const { t } = i18n.global
@@ -59,10 +57,16 @@ export function useCatalogTable() {
       enableHiding: false,
     },
     {
-      id: 'pricePerActive',
-      accessorFn: (row) => pricePer100g(row.pricePerActive),
-      header: t('catalog.column.pricePerActive'),
-      enableSorting: true,
+      id: 'category',
+      accessorFn: (row) => row.category?.name,
+      header: t('catalog.column.category'),
+      enableColumnFilter: true,
+    },
+    {
+      id: 'flavors',
+      accessorFn: (row) => row.nutritionProfile?.flavors.join(', '),
+      header: t('catalog.column.flavors'),
+      enableColumnFilter: true,
     },
     {
       id: 'price',
@@ -83,21 +87,21 @@ export function useCatalogTable() {
       enableSorting: true,
     },
     {
-      id: 'flavors',
-      accessorFn: (row) => row.nutritionProfile?.flavors.join(', '),
-      header: t('catalog.column.flavors'),
+      id: 'pricePerActive',
+      accessorFn: (row) => pricePer100g(row.pricePerActive),
+      header: t('catalog.column.pricePerActive'),
+      enableSorting: true,
+    },
+    {
+      id: 'stock',
+      accessorKey: 'stockStatus',
+      header: t('catalog.column.stock'),
       enableColumnFilter: true,
     },
     {
       id: 'brand',
       accessorFn: (row) => row.brand.name,
       header: t('catalog.column.brand'),
-      enableColumnFilter: true,
-    },
-    {
-      id: 'category',
-      accessorFn: (row) => row.category?.name,
-      header: t('catalog.column.category'),
       enableColumnFilter: true,
     },
     { id: 'packaging', accessorKey: 'packagingDisplay', header: t('catalog.column.packaging') },
@@ -124,6 +128,7 @@ export function useCatalogTable() {
       return pageInfo.value?.totalCount ?? 0
     },
     defaultColumn: { enableSorting: false, enableColumnFilter: false, sortDescFirst: false },
+    initialState: { columnFilters: defaultFilters() },
     getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => `${row.id}:${row.nutritionProfile?.id ?? 'none'}`,
     manualFiltering: true,
@@ -195,20 +200,25 @@ export function useCatalogTable() {
         brands: chosen('brand'),
         flavors: chosen('flavors'),
         categories: chosen('category'),
+        stock: chosen('stock'),
         sortBy: SORT_KEYS[sort?.id ?? 'pricePerActive'] ?? 'price_per_active',
         sortDir: sort?.desc ? 'desc' : 'asc',
         scenario: scenario.value || null,
       },
     }
   })
-  const filtersActive = computed(() => Boolean(globalFilter.value || columnFilters.value.length))
+  const filtersActive = computed(
+    () =>
+      Boolean(globalFilter.value) ||
+      JSON.stringify(columnFilters.value) !== JSON.stringify(defaultFilters()),
+  )
 
   function clearFilters() {
     clearTimeout(timer)
     table.setGlobalFilter('')
-    table.resetColumnFilters(true)
+    columnFilters.value = defaultFilters()
     debouncedSearch.value = ''
-    debouncedFilters.value = []
+    debouncedFilters.value = defaultFilters()
     resetPage()
   }
 

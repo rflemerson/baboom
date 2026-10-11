@@ -50,7 +50,8 @@
       "totalActive": "Ativo total (g)",
       "flavors": "Sabor",
       "tags": "Tags",
-      "offer": "Oferta"
+      "offer": "Oferta",
+      "stock": "Estoque"
     },
     "pagination": {
       "label": "Páginas do catálogo",
@@ -78,6 +79,12 @@
       "price_desc": "Maior preço",
       "concentration_desc": "Maior concentração",
       "totalActive_desc": "Mais ativo"
+    },
+    "stock": {
+      "in_stock": "Em estoque",
+      "out_of_stock": "Sem estoque",
+      "preorder": "Sob encomenda",
+      "unknown": "Desconhecido"
     }
   },
   "payment": {

@@ -1,5 +1,6 @@
 export interface CatalogProductsFilters {
   brands?: string[]
+  stock?: string[]
   categories?: string[]
   flavors?: string[]
   page?: number | null
@@ -46,6 +47,7 @@ export interface CatalogProduct {
     currency: string
   } | null
   routeInstructions?: string | null
+  stockStatus?: CatalogStockStatus
   optimizationStatus?: 'complete' | 'bounded' | null
   currency?: string | null
   linkSelectsSeller?: boolean | null
@@ -94,3 +96,6 @@ export interface CatalogFilterOptions {
   flavors: CatalogFilterOption[]
   categories: CatalogFilterOption[]
 }
+
+export const STOCK_STATUSES = ['in_stock', 'out_of_stock', 'preorder', 'unknown'] as const
+export type CatalogStockStatus = (typeof STOCK_STATUSES)[number]

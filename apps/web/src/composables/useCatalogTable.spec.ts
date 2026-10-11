@@ -47,6 +47,12 @@ describe('catalog server table', () => {
     })
   })
 
+  it('lists products in stock unless asked otherwise', () => {
+    const { variables, filtersActive } = setupTable()
+    expect(variables.value.filters?.stock).toEqual(['in_stock'])
+    expect(filtersActive.value).toBe(false)
+  })
+
   it('clears filters without resetting the price scenario or visible columns', async () => {
     vi.useFakeTimers()
     const { table, scenario, clearFilters, variables, filtersActive } = setupTable()
@@ -59,6 +65,7 @@ describe('catalog server table', () => {
     clearFilters()
     expect(filtersActive.value).toBe(false)
     expect(variables.value.filters?.brands).toEqual([])
+    expect(variables.value.filters?.stock).toEqual(['in_stock'])
     expect(scenario.value).toBe('best')
     expect(table.getColumn('tags')?.getIsVisible()).toBe(true)
   })
