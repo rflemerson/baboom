@@ -9,7 +9,7 @@ vi.mock('@/composables/useCatalogQuery', () => ({
 import { useCatalogQuery } from '@/composables/useCatalogQuery'
 import CatalogView from './CatalogView.vue'
 
-function queryResult(scenarioAvailable: boolean) {
+function queryResult() {
   return {
     active: computed(() => ({ slug: 'protein', name: 'Protein' })),
     massUnit: computed(() => 'g'),
@@ -41,7 +41,6 @@ function queryResult(scenarioAvailable: boolean) {
     ]),
     refetch: vi.fn(),
     result: ref(null),
-    scenarioAvailable: ref(scenarioAvailable),
   }
 }
 
@@ -54,15 +53,15 @@ function scenarioOptions(wrapper: ReturnType<typeof mount>) {
 
 describe('CatalogView', () => {
   it('renders the fetched item', () => {
-    vi.mocked(useCatalogQuery).mockReturnValue(queryResult(true))
+    vi.mocked(useCatalogQuery).mockReturnValue(queryResult())
 
     const wrapper = mount(CatalogView)
 
     expect(wrapper.text()).toContain('100% Whey Concentrado 900g')
   })
 
-  it('offers the best price where the market has projections', () => {
-    vi.mocked(useCatalogQuery).mockReturnValue(queryResult(true))
+  it('offers the normal and the best price', () => {
+    vi.mocked(useCatalogQuery).mockReturnValue(queryResult())
 
     const wrapper = mount(CatalogView)
 
@@ -70,16 +69,8 @@ describe('CatalogView', () => {
     expect(options.map((option) => option.text())).toEqual(['Preço normal', 'Melhor preço'])
   })
 
-  it('hides the best price where the market still reads current prices', () => {
-    vi.mocked(useCatalogQuery).mockReturnValue(queryResult(false))
-
-    const wrapper = mount(CatalogView)
-
-    const options = scenarioOptions(wrapper)
-    expect(options.map((option) => option.text())).toEqual(['Preço normal'])
-  })
   it('shows a recoverable error and retries the API request', async () => {
-    const query = queryResult(true)
+    const query = queryResult()
     vi.mocked(useCatalogQuery).mockReturnValue({
       ...query,
       error: computed(() => new Error('Failed request')),
@@ -91,7 +82,7 @@ describe('CatalogView', () => {
   })
 
   it('renders the 100 g price without rounding the per-gram value first', () => {
-    vi.mocked(useCatalogQuery).mockReturnValue(queryResult(true))
+    vi.mocked(useCatalogQuery).mockReturnValue(queryResult())
     const wrapper = mount(CatalogView)
     expect(wrapper.findAll('td').some((cell) => cell.text().includes('18,00'))).toBe(true)
     expect(wrapper.text()).toContain('Por 100 g de Protein')

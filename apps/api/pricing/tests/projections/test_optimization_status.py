@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision
@@ -50,10 +50,3 @@ class OptimizationStatusTests(TwoProductCatalog, TestCase):
 
         assert items["B"]["optimizationStatus"] == "bounded"
         assert items["A"]["optimizationStatus"] == "complete"
-
-    @override_settings(PRICING_PROJECTION_COUNTRIES=[])
-    def test_a_price_read_from_the_last_crawl_states_no_search(self) -> None:
-        """Without projections nothing was searched: the status is null."""
-        items = self._items()
-
-        assert items["A"]["optimizationStatus"] is None

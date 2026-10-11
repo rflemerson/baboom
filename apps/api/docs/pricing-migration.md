@@ -16,7 +16,7 @@ what works, what was tested and what is still pending.
 | 4 | `promotions` with immutable revisions, scopes, conditions, effects, reward terms, compatibility, codes, evidence and routes; `PromotionService` for admin and MCP | Done. PRIMEIRACOMPRA is registered and published through the admin JSON API (the MCP surface); a published revision is frozen in the models and by PostgreSQL triggers; a new revision leaves the old hash intact |
 | 5 | `pricing.domain`: every mechanic listed in the model, the condition tree, stages and precedence, allocation, rewards | Done. `pricing/tests/domain/test_engine.py` runs the matrix offline, including the research's full example (R$ 114.60, net R$ 109.47) |
 | 6 | Cart and checkout groups, `ShippingQuote`, `TaxFeeQuote`, `PricingQuote` | Done for single-checkout purchases. Quotes replay from their snapshot alone (`pricing.replay`), with codes and postal codes as keyed tokens; stored shipping and tax quotes reach the engine; taxes are unknown unless the market's prices include them or a source was consulted. **Pending:** no adapter writes `ShippingQuote` or `TaxFeeQuote` yet (the VTEX cart simulation is a pilot, not enabled), and order-level terms across several checkout groups are reported `unsupported` instead of evaluated per group |
-| 7 | `PricingPolicyRevision`, `OfferScenarioProjection`, invalidation, REST, Vue | Done. Projections per offer, policy and market; ranking and pagination in the database, one country and currency per request; `?scenario=cash` in the API and a "Price shown" selector in Vue; caches bounded by the earliest expiry; the link limitation of third-party sellers shown; the default stays legacy per country until listed in `PRICING_PROJECTION_COUNTRIES` |
+| 7 | `PricingPolicyRevision`, `OfferScenarioProjection`, invalidation, REST, Vue | Done. Projections per offer, policy and market; ranking and pagination in the database, one country and currency per request; `?scenario=cash` in the API and a "Price shown" selector in Vue; caches bounded by the earliest expiry; the link limitation of third-party sellers shown; every market reads projections since 2026-10-11 (the launch switch `PRICING_PROJECTION_COUNTRIES` is gone) |
 | 8 | Current adapters on the new contract; Amazon and Mercado Livre per authorized access; onboarding procedure; quota-aware scheduling | Done for what access allows: capabilities per adapter, provider limits, a configuration-only feed adapter proven by synthetic marketplace tests, and the onboarding procedure. Amazon and Mercado Livre wait for authorized access (see connectors) |
 | 9 | Shadow run, comparison, activation per market and policy, rollback, removal of compatibility fields | Code done: `compare_pricing_shadow` per market (amount, offer, seller, variant, link), the per-country switch and the runbook below. Activation and the removal of compatibility fields wait for a production shadow run |
 
@@ -70,10 +70,11 @@ and per-dimension coverage replaced the single `complete_unit_list` flag.
 
 ## Cutover runbook
 
-Production runs `767150b`, before every pricing app. The deploy changes no
-price a buyer sees: a market reads projections only once
-`PRICING_PROJECTION_COUNTRIES` names it; until then the catalog shows each
-offer's last read price (`core.selectors.current_prices`).
+Ran in production on 2026-10-11 (coverage 510/510, no loss). The catalog now
+always reads projections, so a new market runs steps 2-5 before it opens:
+without projections it shows no price. `core.selectors.current_prices` (each
+offer's last read price) stays only as the baseline `pricing_coverage`
+compares against.
 
 1. **Deploy.** Migrations create `commerce`, `promotions` and `pricing`, add
    identity columns to `offers`, `core` and `scrapers`, seed the reference
@@ -94,10 +95,9 @@ offer's last read price (`core.selectors.current_prices`).
    offer or link differs from the `normal` projection's. `--fail-on-loss` exits
    with an error while any product loses its price. Wait for full crawls of
    the stores it names and repeat.
-6. **Switch:** add the country to `PRICING_PROJECTION_COUNTRIES`. Rollback is
-   removing it.
-7. **After every market is switched and stable:** remove the setting and
-   `current_prices`, then the legacy writes (`Offer.current_price`,
+6. **Switch:** done for BR by removing the launch switch; rollback is a
+   revert and deploy.
+7. **Next:** remove the legacy writes (`Offer.current_price`,
    `PriceObservation`) once ingestion updates offers and stock without them.
    The two backfills go after the recovery period;
    `rebuild_pricing_projections` and `pricing_coverage` stay as operational

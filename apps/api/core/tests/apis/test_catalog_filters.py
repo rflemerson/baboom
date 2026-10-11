@@ -18,6 +18,7 @@ from core.models import (
 )
 from core.tests.helpers import store_seller
 from offers.models import Offer, StockStatus
+from pricing.projections import ProjectionService
 
 PRODUCTS = "/api/catalog/products/"
 FILTERS = "/api/catalog/filters/"
@@ -65,6 +66,7 @@ class CatalogFilterTests(TestCase):
             brand=Brand.objects.create(name="hidden", display_name="Hidden"),
             is_published=False,
         )
+        ProjectionService().refresh()
 
     def _names(self, query: str = "") -> list[str]:
         items = self.client.get(f"{PRODUCTS}?per_page=48{query}").json()["items"]

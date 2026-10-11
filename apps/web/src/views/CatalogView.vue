@@ -22,14 +22,11 @@ const {
   filtersActive,
   clearFilters,
 } = useCatalogTable()
-const { active, error, loading, massUnit, pageInfo, products, refetch, scenarioAvailable } =
-  useCatalogQuery(variables)
-const shownScenario = computed(() => (scenarioAvailable.value ? scenario.value : ''))
+const { active, error, loading, massUnit, pageInfo, products, refetch } = useCatalogQuery(variables)
 watchEffect(() => {
   rows.value = products.value
   tablePageInfo.value = pageInfo.value
   activeName.value = active.value?.name ?? ''
-  if (!scenarioAvailable.value) scenario.value = ''
 })
 const hasRows = computed(() => !error.value && products.value.length > 0)
 // What the cards sort by, where there is no column header to click.
@@ -56,12 +53,7 @@ function setPage(page: number) {
 <template>
   <main id="catalog" class="app-catalog-page py-4 sm:py-6">
     <div class="app-shell px-4 sm:px-6">
-      <CatalogToolbar
-        :active="active"
-        :scenario="shownScenario"
-        :scenario-available="scenarioAvailable"
-        @update:scenario="scenario = $event"
-      />
+      <CatalogToolbar :active="active" :scenario="scenario" @update:scenario="scenario = $event" />
       <div class="my-3 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <BaseSelect

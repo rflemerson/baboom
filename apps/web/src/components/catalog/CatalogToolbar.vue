@@ -7,7 +7,6 @@ import type { CatalogActive } from '@/types/catalog'
 defineProps<{
   active: CatalogActive | null
   scenario: string
-  scenarioAvailable: boolean
 }>()
 const emit = defineEmits<{ 'update:scenario': [value: string] }>()
 const { t } = useI18n()
@@ -38,7 +37,7 @@ const { t } = useI18n()
           :model-value="scenario"
           :options="[
             { value: '', label: t('catalog.normalPrice') },
-            ...(scenarioAvailable ? [{ value: 'best', label: t('catalog.bestPrice') }] : []),
+            { value: 'best', label: t('catalog.bestPrice') },
           ]"
           @update:model-value="emit('update:scenario', $event)"
         />

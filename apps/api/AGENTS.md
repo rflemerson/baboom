@@ -138,8 +138,8 @@ offers that a successful crawl no longer sees.
   takes the cheapest still valid, so an ended promotion falls back to a price
   without waiting for the worker. `?scenario=<policy key>` picks the policy (default:
   the `is_default` one); every request ranks one market (`?country=`,
-  `?currency=`, default BR/BRL). Until `PRICING_PROJECTION_COUNTRIES` names a market (temporary
-  launch switch), its catalog reads `core.selectors.current_prices` instead.
+  `?currency=`, default BR/BRL). Every market reads projections; run
+  `rebuild_pricing_projections` before opening a new one.
   Public policies: `normal` (store price, no benefits, default) and `best`
   (best price paid now; falls back to normal).
 - `pricing.invalidation.Repricing` decides what a change reaches: it first

@@ -21,7 +21,6 @@ from core.dtos import CatalogProductsFilters
 from core.selectors import (
     catalog_active,
     catalog_filter_options,
-    current_prices,
     public_catalog_products,
 )
 from core.services import AlertSubscriptionService
@@ -250,11 +249,8 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     policy = public_policy(_optional_str(request.GET.get("scenario")))
     if policy is None:
         return HttpResponseBadRequest("Unknown pricing scenario.")
-    projected = country in settings.PRICING_PROJECTION_COUNTRIES
-    price_source = (
-        projected_prices(policy, timezone.now(), country=country, currency=currency)
-        if projected
-        else current_prices(country, currency)
+    price_source = projected_prices(
+        policy, timezone.now(), country=country, currency=currency
     )
     queryset = public_catalog_products(price_source, query_filters)
     currency_row = Currency.objects.get(code=currency)
@@ -272,11 +268,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
             "active": ({"slug": active.slug, "name": active.name} if active else None),
             "massUnit": units.MASS_UNIT,
             "market": {"country": country, "currency": currency},
-            "scenario": (
-                {"key": policy.key, "version": policy.number}
-                if projected
-                else {"key": "current", "version": None}
-            ),
+            "scenario": {"key": policy.key, "version": policy.number},
             "pageInfo": {
                 "currentPage": page_obj.number,
                 "perPage": per_page,

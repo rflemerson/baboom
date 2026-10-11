@@ -455,6 +455,7 @@ class ProductStatsTests(TestCase):
             Flavor.objects.create(name="Chocolate"),
             Flavor.objects.create(name="Chocolate Hazelnut"),
         )
+        ProjectionService().refresh()
         payload = self.client.get(
             "/api/catalog/products/",
             {"search": "Chocolate"},

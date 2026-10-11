@@ -89,10 +89,8 @@ cd apps/web && npm run format
 
 ## Price scenarios
 
-- The "Price shown" selector offers `best` only where the API answers with a
-  projected scenario. A response with `scenario.key === "current"` (a market
-  not yet switched to projections) hides "Best price" and later requests send
-  no `scenario`.
+- The "Price shown" selector offers "Normal price" (no `scenario`) and
+  "Best price" (`scenario=best`); every market reads projections.
 - A table row tells what the shown price needs: `couponCodes`, `paymentMethod`,
   `cashback` (apart from `price`) and `routeInstructions`, through
   `CatalogPriceNotes`.

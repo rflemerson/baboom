@@ -1,4 +1,4 @@
-"""SYNTHETIC: the launch switch keeps prices until a market is ready."""
+"""SYNTHETIC: the catalog reads projections; coverage names what they lose."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from decimal import Decimal
 from io import StringIO
 
 from django.core.management import CommandError, call_command
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from common.testing import raised
 from core.models import Product, ProductStore
@@ -17,29 +17,20 @@ from pricing.tests.projections.test_projections import URL, TwoProductCatalog
 
 
 class CutoverTests(TwoProductCatalog, TestCase):
-    """Before the switch, the last read price; after it, projections."""
+    """The catalog reads projections only: no projection, no price."""
 
     def _prices(self) -> dict[str, str | None]:
         items = self.client.get(URL).json()["items"]
         return {item["name"]: item["price"] for item in items}
 
-    @override_settings(PRICING_PROJECTION_COUNTRIES=[])
-    def test_an_unswitched_market_keeps_its_prices_before_any_projection(
-        self,
-    ) -> None:
-        """Deploying changes nothing a buyer sees until the market switches."""
-        payload = self.client.get(URL).json()
-
-        assert self._prices() == {"A": "100.00", "B": "120.00"}
-        assert payload["scenario"] == {"key": "current", "version": None}
-
-    def test_a_switched_market_reads_projections(self) -> None:
-        """After the switch, only projected prices rank."""
+    def test_the_catalog_reads_projections(self) -> None:
+        """Before a rebuild nothing is priced; after it, both products are."""
         assert self._prices() == {}
 
         ProjectionService().refresh()
 
         assert self._prices() == {"A": "100.00", "B": "120.00"}
+        assert self.client.get(URL).json()["scenario"]["key"] == "normal"
 
 
 class CoverageReportTests(TwoProductCatalog, TestCase):

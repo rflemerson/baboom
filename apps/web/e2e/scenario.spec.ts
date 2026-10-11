@@ -106,31 +106,3 @@ test('the best price with a coupon says which coupon to use', async ({ page }) =
   await expect(page.getByRole('table').getByText('+ R$ 8,00 de cashback')).toBeVisible()
   await expect(page.getByRole('table').getByText('R$ 79,90')).toBeVisible()
 })
-
-test('a market without projections hides the best price and never asks for it', async ({
-  page,
-}) => {
-  const scenarios: Array<string | null> = []
-  await page.route('**/api/catalog/products/**', async (route: Route) => {
-    scenarios.push(new URL(route.request().url()).searchParams.get('scenario'))
-    await route.fulfill({
-      json: {
-        active: { slug: 'protein', name: 'Protein' },
-        massUnit: 'g',
-        market: { country: 'BR', currency: 'BRL' },
-        scenario: { key: 'current', version: null },
-        pageInfo: PAGE_INFO,
-        items: [product('99.88', null, true)],
-      },
-    })
-  })
-
-  await page.goto('/')
-  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
-
-  await page.locator(`summary[aria-label="${SCENARIO}"]`).click()
-  await expect(scenarioMenu(page).getByRole('button')).toHaveText(['Preço normal'])
-  await page.getByRole('button', { name: 'Ordenar por Preço', exact: true }).click()
-  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
-  expect(scenarios.every((scenario) => scenario === null)).toBe(true)
-})

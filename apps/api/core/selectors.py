@@ -50,10 +50,9 @@ PriceSource = Callable[[], QuerySet]
 def current_prices(country: str, currency: str) -> PriceSource:
     """Return each listed offer's last read price, whatever its stock.
 
-    For markets not switched to pricing. Temporary: serves the catalog until
-    ``PRICING_PROJECTION_COUNTRIES`` names the market, and goes with that
-    setting once every market reads projections. A store of another known
-    market never competes.
+    The baseline ``pricing_coverage`` compares projections against before a
+    market opens; the catalog always reads projections. A store of another
+    known market never competes.
     """
     foreign = Market.objects.exclude(country=country, currency_id=currency).values(
         "namespace",
