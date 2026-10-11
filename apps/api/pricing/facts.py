@@ -16,7 +16,7 @@ from django.db.models import OuterRef, Q, Subquery
 
 from commerce.models import Market
 from core.models import Category, ProductStore
-from offers.models import Offer, OfferPriceObservation, StockStatus
+from offers.models import Offer, OfferPriceObservation
 from promotions.models import PromotionRevision, PurchaseRoute
 
 from .domain.conditions import (
@@ -36,9 +36,7 @@ from .domain.types import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from datetime import timedelta
 
-    from .models import PricingPolicyRevision
 
 LEGACY_PRICE_ID = 0
 EMPTY_AMOUNTS = Amounts(
@@ -99,17 +97,13 @@ class Facts:
 class FactLoader:
     """Turn rows into the engine's inputs, in a fixed number of queries."""
 
-    def load(
-        self,
-        offer_ids: Iterable[int],
-        policy: PricingPolicyRevision,
-    ) -> Facts:
+    def load(self, offer_ids: Iterable[int]) -> Facts:
         """Load everything the engine reads about these offers."""
         ids = sorted(set(offer_ids))
         offers = self.offers(ids)
         return Facts(
             offers=offers,
-            prices=self.prices(ids, policy.freshness),
+            prices=self.prices(ids),
             revisions=reaching(self.revisions(), offers.values()),
             routes=self.routes(ids),
         )
@@ -202,10 +196,7 @@ class FactLoader:
                 brand_id=product.brand_id if product else None,
                 category_ids=categories,
                 external_categories=frozenset({offer.category} - {""}),
-                purchasable=(
-                    offer.delisted_at is None
-                    and offer.current_stock_status in StockStatus.purchasable()
-                ),
+                listed=offer.delisted_at is None,
                 seller_is_owner=bool(
                     offer.seller_account and offer.seller_account.is_channel_owner,
                 ),
@@ -213,7 +204,7 @@ class FactLoader:
         return facts
 
     @staticmethod
-    def prices(ids: list[int], window: timedelta) -> tuple[PriceFact, ...]:
+    def prices(ids: list[int]) -> tuple[PriceFact, ...]:
         """Return the standing observation of each condition of each offer.
 
         The newest row of a condition decides: if it was withdrawn, the
@@ -275,7 +266,6 @@ class FactLoader:
                 evidence_level=row.evidence_level,
                 source_field=row.source_field,
                 observed_at=row.observed_at,
-                fresh_until=row.confirmed_at + window,
                 quantity_min=row.quantity_min,
                 quantity_max=row.quantity_max,
                 amount_basis=row.amount_basis,
@@ -302,7 +292,6 @@ class FactLoader:
                 currency=markets.get(offer.store_slug, "BRL"),
                 semantics="legacy_unknown",
                 source_field="Offer.current_price",
-                fresh_until=(offer.last_seen_at or offer.updated_at) + window,
             )
             for offer in legacy
         )

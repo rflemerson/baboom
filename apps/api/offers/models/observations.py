@@ -401,7 +401,6 @@ class OfferPriceObservation(BaseModel):
         help_text=_("The first complete read that no longer stated this condition."),
     )
     valid_until = models.DateTimeField(_("Valid Until"), null=True, blank=True)
-    fresh_until = models.DateTimeField(_("Fresh Until"), null=True, blank=True)
     composition = models.CharField(
         _("Composition"),
         max_length=7,

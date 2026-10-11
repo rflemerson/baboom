@@ -17,8 +17,10 @@ stores crawled today are integration samples, not its definition.
   purchasable unit, with no membership, first-purchase, subscription, coupon or
   cashback requirement. The payment method behind it is always shown.
 - **Default ranking, until observations carry their meaning:** the price the
-  store reports (`Offer.current_price`), only among offers in a purchasable
-  state (`StockStatus.purchasable()`, an allowlist). Prices of unknown meaning
+  store reports (`Offer.current_price`) for every listed offer. Stock is not
+  price: it is reported and filtered apart, and an offer leaves only when the
+  store stops publishing it (a complete crawl that no longer sees it). A price
+  holds until the next read; nothing expires it by age. Prices of unknown meaning
   are not relabelled as unconditional.
 - **Selectable scenarios:** cash, a given payment method, installments,
   coupons, cashback, quantity and shipping. A payment discount already

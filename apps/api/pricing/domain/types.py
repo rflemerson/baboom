@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
 
-ENGINE_VERSION = "1.2.0"
+ENGINE_VERSION = "1.3.0"
 
 
 class Tri(StrEnum):
@@ -29,7 +29,6 @@ class DecisionStatus(StrEnum):
     UNKNOWN = "unknown"
     UNSUPPORTED = "unsupported"
     CONFLICT = "conflict"
-    STALE = "stale"
     ACCESS_UNAVAILABLE = "access_unavailable"
     INFORMATIVE = "informative"
     NOT_CHOSEN = "not_chosen"
@@ -65,7 +64,6 @@ class PriceFact:
     evidence_level: str = "observed_in_catalog"
     source_field: str = ""
     observed_at: datetime | None = None
-    fresh_until: datetime | None = None
     quantity_min: int = 1
     quantity_max: int | None = None
     amount_basis: str = "unit"
@@ -88,7 +86,7 @@ class OfferFact:
     category_ids: frozenset[int] = frozenset()
     merchant_id: int | None = None
     external_categories: frozenset[str] = frozenset()
-    purchasable: bool = True
+    listed: bool = True
     access_available: bool = True
     seller_is_owner: bool = True
 

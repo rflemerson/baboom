@@ -35,6 +35,28 @@ class StockStatus(models.TextChoices):
         """Return the states a buyer can order now; a new state starts outside."""
         return (cls.AVAILABLE, cls.LAST_UNITS)
 
+    @classmethod
+    def group(cls, status: str | None) -> str:
+        """Name the public group of a status: what a visitor filters by."""
+        return next(
+            (name for name, states in STOCK_GROUPS.items() if status in states),
+            "unknown",
+        )
+
+    @classmethod
+    def of_groups(cls, groups: list[str]) -> list[str]:
+        """Return the statuses of these public groups."""
+        return [state for name in groups for state in STOCK_GROUPS.get(name, ())]
+
+
+# What a visitor sees and filters by; an unread stock is "unknown".
+STOCK_GROUPS: dict[str, tuple[str, ...]] = {
+    "in_stock": (StockStatus.AVAILABLE, StockStatus.LAST_UNITS),
+    "out_of_stock": (StockStatus.OUT_OF_STOCK,),
+    "preorder": (StockStatus.PREORDER, StockStatus.BACKORDER),
+    "unknown": (StockStatus.UNKNOWN,),
+}
+
 
 FLAVOR_OPTION_PREFIXES = ("sabor", "flavor")
 

@@ -75,7 +75,7 @@ def _offer_refusal(
             DecisionStatus.ACCESS_UNAVAILABLE,
             "source unavailable",
         ),
-        (not offer.purchasable, DecisionStatus.INELIGIBLE, "not purchasable"),
+        (not offer.listed, DecisionStatus.INELIGIBLE, "delisted"),
         (
             offer.market_id != inputs.context.market_id,
             DecisionStatus.INELIGIBLE,
@@ -128,13 +128,6 @@ def _base_options(
         if price.semantics not in policy.accepted_semantics:
             continue
         if price.evidence_level not in policy.accepted_evidence:
-            continue
-        if price.fresh_until is not None and price.fresh_until <= context.now:
-            decisions.append(
-                Decision(
-                    f"price {price.id}", DecisionStatus.STALE, "past its freshness"
-                ),
-            )
             continue
         restriction = _restriction(price, line.quantity)
         if restriction is not None:

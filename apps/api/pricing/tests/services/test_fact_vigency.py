@@ -4,18 +4,14 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from io import StringIO
 
-from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from offers.models import PriceObservation, StockStatus
 from offers.observations import ObservationService, PriceRead, PriceRecord, PriceSubject
 from pricing.facts import FactLoader
 from pricing.tests.services.test_pricing_service import _ingest_max_titanium
 
-WINDOW = timedelta(hours=72)
 FIELD = "review.pix"
 
 
@@ -53,7 +49,7 @@ class VigencyTests(TestCase):
         )
 
     def _standing(self) -> list[Decimal]:
-        facts = FactLoader.prices([self.offer.pk], WINDOW)
+        facts = FactLoader.prices([self.offer.pk])
         return [fact.amount for fact in facts if fact.source_field == FIELD]
 
     def test_a_change_keeps_only_the_newest_value(self) -> None:
@@ -100,31 +96,4 @@ class VigencyTests(TestCase):
         self._read("80")
         self._read()
 
-        assert FactLoader.prices([self.offer.pk], WINDOW) == ()
-
-
-class LegacyFreshnessTests(TestCase):
-    """R02: migrated history is as old as it was observed."""
-
-    def test_old_history_is_stale_even_after_a_second_backfill(self) -> None:
-        """A 30-day-old price never becomes fresh by being migrated."""
-        offer = _ingest_max_titanium()
-        offer.price_points.all().delete()
-        PriceObservation.objects.filter(offer=offer).delete()
-        old = timezone.now() - timedelta(days=30)
-        PriceObservation.objects.create(
-            offer=offer,
-            price=Decimal(1),
-            stock_status=StockStatus.AVAILABLE,
-            observed_at=old,
-        )
-        for _ in range(2):
-            call_command(
-                "backfill_legacy_price_observations",
-                "--apply",
-                stdout=StringIO(),
-            )
-
-        facts = FactLoader.prices([offer.pk], WINDOW)
-        assert facts
-        assert all(fact.fresh_until <= timezone.now() for fact in facts)
+        assert FactLoader.prices([self.offer.pk]) == ()

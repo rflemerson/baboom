@@ -9,6 +9,8 @@ from django.utils import timezone
 from common.testing import raised
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision
 from pricing.policies import PolicyService
+from pricing.projections import ProjectionService
+from pricing.selectors import public_policy
 from pricing.tasks import refresh_projections
 from pricing.tests.projections.test_projections import TwoProductCatalog
 
@@ -18,7 +20,7 @@ class RefreshTaskTests(TwoProductCatalog, TestCase):
 
     def test_refresh_by_store_and_for_all(self) -> None:
         """Two offers of one store, two seeded policies."""
-        policies = PricingPolicyRevision.objects.count()
+        policies = len(ProjectionService.policies())
         winners = OfferScenarioProjection.objects.filter(alternative="best")
 
         written = refresh_projections("store")
@@ -52,7 +54,7 @@ class PolicyTriggerTests(TestCase):
 
     def test_raw_updates_and_deletes_are_refused(self) -> None:
         """Only is_default may move once published."""
-        policy = PricingPolicyRevision.objects.get(key="best", number=1)
+        policy = public_policy("best")
         PricingPolicyRevision.objects.filter(pk=policy.pk).update(is_default=False)
 
         raised(
@@ -89,7 +91,7 @@ class PolicyValidationTests(TestCase):
         policy.refresh_from_db()
         assert policy.published_at is None
 
-    def test_seeded_policies_are_valid(self) -> None:
-        """The seeds pass the same check."""
-        for policy in PricingPolicyRevision.objects.all():
+    def test_policies_in_force_are_valid(self) -> None:
+        """The newest version of each public policy passes the same check."""
+        for policy in ProjectionService.policies():
             policy.clean()

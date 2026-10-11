@@ -6,9 +6,8 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from pricing.models import PricingPolicyRevision
 from pricing.projections import ProjectionService
-from pricing.selectors import BenefitFilter
+from pricing.selectors import BenefitFilter, public_policy
 from pricing.tests.projections.test_benefit_alternatives import BenefitCatalog
 
 REQUIRED, FORBIDDEN, ANY = True, False, None
@@ -54,7 +53,7 @@ class BenefitMatrixTests(BenefitCatalog, TestCase):
         coupon: bool | None,
         cashback: bool | None,
     ) -> dict:
-        policy = PricingPolicyRevision.objects.get(key=key)
+        policy = public_policy(key)
         ranking = self._ranking(policy, BenefitFilter(coupon, cashback))
         return {name: price for name, price in ranking if price is not None}
 

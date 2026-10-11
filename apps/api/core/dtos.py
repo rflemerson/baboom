@@ -45,6 +45,7 @@ class CatalogProductsFilters(BaseModel):
     brands: list[str] = []
     flavors: list[str] = []
     categories: list[str] = []
+    stock: list[str] = []
     active: str | None = None
     price_min: float | None = None
     price_max: float | None = None

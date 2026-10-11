@@ -116,17 +116,9 @@ class BasePriceTests(SimpleTestCase):
         assert result.merchandise_total == Decimal("120.00")
         assert [p.amount for p in result.payment_schedule] == [Decimal("40.00")] * 3
 
-    def test_a_stale_price_is_not_used(self) -> None:
-        """Past its freshness, a price is reported stale."""
-        stale = price(1, "80.00", fresh_until=NOW - timedelta(hours=1))
-        result = evaluate(inputs(prices=(stale, price(1, "100.00"))))
-
-        assert result.merchandise_total == Decimal("100.00")
-        assert DecisionStatus.STALE in _statuses(result)[f"price {stale.id}"]
-
-    def test_an_unpurchasable_offer_has_no_price(self) -> None:
-        """Out of stock or delisted never wins."""
-        result = evaluate(inputs(offers=(offer(purchasable=False),)))
+    def test_a_delisted_offer_has_no_price(self) -> None:
+        """An offer the store stopped publishing is not priced."""
+        result = evaluate(inputs(offers=(offer(listed=False),)))
 
         assert result.merchandise_total is None
         assert DecisionStatus.INELIGIBLE in _statuses(result)["offer 1"]

@@ -20,7 +20,7 @@ from pricing.domain.types import CartLine
 from pricing.groups import group_fingerprint
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision, ShippingQuote
 from pricing.projections import ProjectionService
-from pricing.selectors import BenefitFilter, projected_prices
+from pricing.selectors import BenefitFilter, projected_prices, public_policy
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import (
     ActivationCode,
@@ -151,8 +151,8 @@ class ObjectiveTests(BenefitCatalog, TestCase):
             alternative="best",
         )
 
-        # Without shipping the net cost is unknown, never zero.
-        assert unquoted == {"A": None, "B": None}
+        # Without shipping the net cost is unknown, never zero: nothing ranks.
+        assert unquoted == {}
         assert payable_ranking[0] == ("B", Decimal(90))
         assert net_ranking[0] == ("A", Decimal(80))
         assert a_net.amount == Decimal(100)
@@ -245,7 +245,7 @@ class CouponAlternativeTests(BenefitCatalog, TestCase):
 
         assert default["A"] == Decimal(100)
         assert with_coupon["A"] == Decimal(110)
-        assert with_coupon["B"] is None
+        assert "B" not in with_coupon
 
     def test_a_coupon_alternative_survives_a_better_offer_winner(self) -> None:
         """B wins with a 30% automatic discount; its 10-off coupon is still found."""
@@ -331,7 +331,7 @@ class PersonalBenefitTests(BenefitCatalog, TestCase):
 
     def policy_for_public(self) -> PricingPolicyRevision:
         """Return the seeded public policy, which counts no buyer claim."""
-        return PricingPolicyRevision.objects.get(key="best", number=1)
+        return public_policy("best")
 
 
 class ExclusionTests(BenefitCatalog, TestCase):
@@ -369,4 +369,4 @@ class ExclusionTests(BenefitCatalog, TestCase):
         )
 
         assert ranking["A"] == Decimal(100)
-        assert ranking["B"] is None
+        assert "B" not in ranking

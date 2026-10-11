@@ -8,15 +8,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from io import StringIO
 
-from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from commerce.services import CommerceIdentityService, MarketRef, SellerRef
 from core.selectors import public_catalog_products
-from offers.models import Offer, OfferPriceObservation, PriceObservation, StockStatus
+from offers.models import Offer, OfferPriceObservation, StockStatus
 from offers.observations import ObservationService, PriceRead, PriceRecord, PriceSubject
 from pricing.domain.engine import evaluate
 from pricing.domain.types import CartLine, RewardTermsFact
@@ -38,8 +36,6 @@ from pricing.tests.projections.test_projections import TwoProductCatalog
 from pricing.tests.services.test_pricing_service import _ingest_max_titanium, _policy
 from scrapers.stores.max_titanium import MaxTitaniumSpider
 from scrapers.tests.services.test_typed_observations import _payload, _save, _vtex_raw
-
-WINDOW = timedelta(hours=72)
 
 
 class StoredFactsReview(TestCase):
@@ -76,7 +72,7 @@ class StoredFactsReview(TestCase):
                     points, complete=True, observed_at=now + timedelta(seconds=index)
                 ),
             )
-        loaded = FactLoader.prices([self.offer.pk], WINDOW)
+        loaded = FactLoader.prices([self.offer.pk])
         assert not [p for p in loaded if p.source_field == "review.pix"], loaded
 
     def test_price_minimum_quantity_must_be_enforced(self) -> None:
@@ -104,21 +100,6 @@ class StoredFactsReview(TestCase):
             QuoteRequest((CartLine(self.offer.pk),), _policy("listed")),
         )
         assert quote.total_payable is None
-
-    def test_legacy_import_does_not_refresh_old_prices(self) -> None:
-        """R02: a 30-day-old price stays stale after the backfill."""
-        self.offer.price_points.all().delete()
-        PriceObservation.objects.filter(offer=self.offer).delete()
-        old = timezone.now() - timedelta(days=30)
-        PriceObservation.objects.create(
-            offer=self.offer,
-            price=Decimal(1),
-            stock_status=StockStatus.AVAILABLE,
-            observed_at=old,
-        )
-        call_command("backfill_legacy_price_observations", "--apply", stdout=StringIO())
-        points = FactLoader.prices([self.offer.pk], WINDOW)
-        assert all(p.fresh_until <= timezone.now() for p in points), points
 
     def test_seller_collision_must_not_overwrite_price(self) -> None:
         """R03: the third-party offer keeps its R$ 250."""

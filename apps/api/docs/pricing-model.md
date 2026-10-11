@@ -140,8 +140,8 @@ query a plain filter. Nothing is lost; the grouping is in the field names.
 `AvailabilityObservation` (table, append-only): `offer`, `batch`, `status`
 (available, last_units, out_of_stock, preorder, backorder, unknown),
 `quantity`, `destination` (nullable: stock is not deliverability),
-`observed_at`. `StockStatus.purchasable()` is the allowlist the ranking uses;
-a new state starts outside it. `StockReading` loses its optimistic
+`observed_at`. Stock never decides a price; `StockStatus.group()` names the
+public stock groups the catalog reports and filters by. `StockReading` loses its optimistic
 `AVAILABLE` default: a source that says nothing is `unknown`.
 
 `Offer` keeps `current_price`, `current_stock_status` and `last_seen_at` as

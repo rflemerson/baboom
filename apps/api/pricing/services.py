@@ -68,10 +68,7 @@ class PricingService:
     def inputs(self, request: QuoteRequest, now: datetime | None = None) -> Inputs:
         """Build the engine's inputs for one request."""
         moment = now or timezone.now()
-        facts = self.loader.load(
-            (line.offer_id for line in request.lines),
-            request.policy,
-        )
+        facts = self.loader.load(line.offer_id for line in request.lines)
         first = facts.offers.get(request.lines[0].offer_id) if request.lines else None
         market = Market.objects.select_related("currency").get(
             pk=first.market_id if first else request.policy.market_id,

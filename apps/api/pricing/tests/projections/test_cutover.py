@@ -35,7 +35,7 @@ class CutoverTests(TwoProductCatalog, TestCase):
 
     def test_a_switched_market_reads_projections(self) -> None:
         """After the switch, only projected prices rank."""
-        assert self._prices() == {"A": None, "B": None}
+        assert self._prices() == {}
 
         ProjectionService().refresh()
 

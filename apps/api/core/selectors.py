@@ -41,17 +41,19 @@ from .models import (
 )
 
 # A price source returns, for the outer product, its priced offers cheapest
-# first, each with ``amount``, ``url``, ``payment_method`` and ``search_status``.
-# The catalog does not know which pricing policy produced them.
+# first, each with ``amount``, ``url``, ``payment_method``, ``search_status`` and
+# the offer's ``stock_status``. The catalog does not know which pricing policy
+# produced them.
 PriceSource = Callable[[], QuerySet]
 
 
 def current_prices(country: str, currency: str) -> PriceSource:
-    """Return each offer's last read price, for markets not switched to pricing.
+    """Return each listed offer's last read price, whatever its stock.
 
-    Temporary: serves the catalog until ``PRICING_PROJECTION_COUNTRIES`` names
-    the market, and goes with that setting once every market reads
-    projections. A store of another known market never competes.
+    For markets not switched to pricing. Temporary: serves the catalog until
+    ``PRICING_PROJECTION_COUNTRIES`` names the market, and goes with that
+    setting once every market reads projections. A store of another known
+    market never competes.
     """
     foreign = Market.objects.exclude(country=country, currency_id=currency).values(
         "namespace",
@@ -63,7 +65,6 @@ def current_prices(country: str, currency: str) -> PriceSource:
                 product_store__product=OuterRef("pk"),
                 current_price__isnull=False,
                 delisted_at__isnull=True,
-                current_stock_status__in=StockStatus.purchasable(),
             )
             .exclude(store_slug__in=foreign)
             .annotate(
@@ -74,6 +75,7 @@ def current_prices(country: str, currency: str) -> PriceSource:
                 offer_id=F("pk"),
                 expires_at=Value(None, output_field=DateTimeField()),
                 search_status=Value(""),
+                stock_status=F("current_stock_status"),
                 link_fixes=Coalesce(
                     F("seller_account__is_channel_owner"),
                     Value(value=True),
@@ -95,9 +97,16 @@ def _annotate_catalog_base_fields(
     queryset: QuerySet[Product],
     active: Active | None,
     price_source: PriceSource,
+    stock: list[str],
 ) -> QuerySet[Product]:
-    """Annotate catalog fields loaded directly from subqueries."""
+    """Annotate catalog fields loaded directly from subqueries.
+
+    A stock filter chooses which offers may price the product, so the price
+    shown is that of an offer in the chosen state.
+    """
     cheapest = price_source()
+    if stock:
+        cheapest = cheapest.filter(stock_status__in=StockStatus.of_groups(stock))
 
     fraction = (
         Value(None, output_field=DecimalField(max_digits=12, decimal_places=8))
@@ -151,6 +160,10 @@ def _annotate_catalog_base_fields(
             cheapest.values("expires_at")[:1],
             output_field=DateTimeField(),
         ),
+        price_stock_status=Subquery(
+            cheapest.values("stock_status")[:1],
+            output_field=CharField(),
+        ),
         price_search_status=Subquery(
             cheapest.values("search_status")[:1],
             output_field=CharField(),
@@ -202,6 +215,7 @@ def _annotate_catalog_metrics(queryset: QuerySet[Product]) -> QuerySet[Product]:
 def public_catalog_products_with_stats(
     price_source: PriceSource,
     active_slug: str | None = None,
+    stock: list[str] | None = None,
 ) -> QuerySet[Product]:
     """Return public catalog products annotated with catalog-facing metrics.
 
@@ -221,6 +235,7 @@ def public_catalog_products_with_stats(
             queryset,
             catalog_active(active_slug),
             price_source,
+            stock or [],
         ),
     )
 
@@ -386,7 +401,8 @@ def public_catalog_products(
     queryset = public_catalog_products_with_stats(
         price_source,
         resolved_filters.active,
-    ).filter(is_published=True)
+        resolved_filters.stock,
+    ).filter(is_published=True, price__isnull=False)
     queryset = _apply_catalog_search(queryset, resolved_filters)
     queryset = _apply_catalog_choice_filters(queryset, resolved_filters)
     queryset = _apply_catalog_numeric_filters(queryset, resolved_filters)

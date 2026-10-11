@@ -99,6 +99,7 @@ def projected_prices(
             .annotate(
                 url=Coalesce(NullIf("resolved_url", Value("")), F("offer__url")),
                 link_fixes=F("link_fixes_seller"),
+                stock_status=F("offer__current_stock_status"),
                 search_status=F("optimization_status"),
                 pricing_details=F("explanation"),
             )

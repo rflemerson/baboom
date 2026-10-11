@@ -96,17 +96,14 @@ class CatalogActiveRankingTests(TestCase):
 
         assert [product.name for product in results] == ["Whey", "Blend"]
 
-    def test_missing_current_price_hides_old_observation_from_catalog(self) -> None:
-        """A price-less or delisted offer must not surface yesterday's price."""
+    def test_a_product_without_any_price_leaves_the_catalog(self) -> None:
+        """A row never shows without a price: a price-less product is not listed."""
         link = self.whey.store_links.get()
         assert link.offer is not None
         link.offer.current_price = None
         link.offer.save(update_fields=["current_price"])
 
-        row = projected_catalog().get(pk=self.whey.pk)
-
-        assert row.price is None
-        assert row.external_link is None
+        assert not projected_catalog().filter(pk=self.whey.pk).exists()
 
     def test_delisted_offer_hides_old_observation_from_catalog(self) -> None:
         """An archived offer's historical price remains stored, not ranked."""
@@ -115,7 +112,7 @@ class CatalogActiveRankingTests(TestCase):
         link.offer.delisted_at = timezone.now()
         link.offer.save(update_fields=["delisted_at"])
 
-        assert projected_catalog().get(pk=self.whey.pk).price is None
+        assert not projected_catalog().filter(pk=self.whey.pk).exists()
         assert link.offer.price_observations.count() == 1
 
     def test_requesting_another_active_changes_the_ranking(self) -> None:
@@ -412,6 +409,18 @@ class ProductStatsTests(TestCase):
                 proteins=Decimal(21),
             ),
         ).flavors.add(Flavor.objects.create(name="Vanilla"))
+        ProductStore.objects.create(
+            product=vanilla,
+            offer=Offer.objects.create(
+                seller_account=store_seller(self.store.scraper_slug),
+                store_slug=self.store.scraper_slug,
+                external_id="vanilla",
+                url="https://example.com/vanilla",
+                current_price=Decimal(100),
+                current_stock_status=StockStatus.AVAILABLE,
+                options=[{"name": "Sabor", "value": "Vanilla"}],
+            ),
+        )
         ProjectionService().refresh()
 
         payload = self.client.get("/api/catalog/products/").json()
@@ -604,32 +613,36 @@ class CatalogAvailabilityTests(TestCase):
         )
         ProductStore.objects.create(product=self.product, offer=offer)
 
-    def test_an_offer_of_unknown_stock_never_wins(self) -> None:
-        """A source that said nothing about stock has not said it is buyable."""
+    def test_stock_does_not_rank_offers(self) -> None:
+        """Price is not stock: the cheapest read wins, whatever its stock."""
+        self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
+        self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
+
+        row = projected_catalog().get(pk=self.product.pk)
+
+        assert row.price == Decimal("90.00")
+        assert row.price_stock_status == StockStatus.OUT_OF_STOCK
+
+    def test_a_stock_filter_prices_with_an_offer_in_that_state(self) -> None:
+        """Filtering in stock shows the price a buyer can pay now."""
+        self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
         self._sell("unknown", "80.00", StockStatus.UNKNOWN)
         self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
 
-        row = projected_catalog().get(pk=self.product.pk)
-
-        assert row.price == Decimal("120.00")
-
-    def test_a_sold_out_offer_never_wins_over_one_in_stock(self) -> None:
-        """The cheapest price must be one the buyer can actually pay."""
-        self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
-        self._sell("in-stock", "120.00", StockStatus.AVAILABLE)
-
-        row = projected_catalog().get(pk=self.product.pk)
+        row = projected_catalog(CatalogProductsFilters(stock=["in_stock"])).get(
+            pk=self.product.pk,
+        )
 
         assert row.price == Decimal("120.00")
         assert row.external_link == "https://growth.example/in-stock"
+        assert row.price_stock_status == StockStatus.AVAILABLE
 
-    def test_a_product_with_only_sold_out_offers_stays_listed_without_price(
-        self,
-    ) -> None:
-        """Publication is editorial; a missing price is not a missing product."""
+    def test_a_sold_out_product_keeps_its_last_price(self) -> None:
+        """Stock may come back; the product stays listed at its last read."""
         self._sell("sold-out", "90.00", StockStatus.OUT_OF_STOCK)
 
         row = projected_catalog().get(pk=self.product.pk)
+        in_stock = projected_catalog(CatalogProductsFilters(stock=["in_stock"]))
 
-        assert row.price is None
-        assert row.external_link is None
+        assert row.price == Decimal("90.00")
+        assert not in_stock.filter(pk=self.product.pk).exists()

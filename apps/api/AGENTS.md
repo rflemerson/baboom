@@ -127,7 +127,9 @@ offers that a successful crawl no longer sees.
   revision in force of each promotion; `quote()` keeps a `PricingQuote` whose
   snapshot reproduces the result, with buyer codes and postal codes hashed.
   Policies (`PricingPolicyRevision`) are frozen once published; `normal` and
-  `best` v1 are seeded.
+  `best` v2 are in force (v1 carried the retired `freshness_hours`). A base
+  price holds until the next read replaces it; only a delisted offer (one a
+  complete crawl no longer saw) has no price. Stock never removes a price.
 - Ranking reads `OfferScenarioProjection` rows (one per linked offer and
   published public policy) through `pricing.selectors.projected_prices`, passed
   to `core.selectors.public_catalog_products` as its price source; expiry is
@@ -177,7 +179,9 @@ offers that a successful crawl no longer sees.
 - `scrapers/management/commands/cutover_offer_identities.py` is an explicit,
   preview-first legacy-identity transition. It never runs on deployment;
   operators must review ambiguous mappings before opting into archival.
-- Public catalog and alerts: REST. Each product states what the shown price
+- Public catalog and alerts: REST. A product is listed only with a price;
+  `stockStatus` reports the stock of the offer that prices it and `?stock=`
+  filters by it (the web defaults to `in_stock`). Each product states what the shown price
   needs: `couponCodes`, `paymentMethod`, `cashback` (shown apart, never taken
   off `price`) and `routeInstructions`, read from the projection's explanation.
 - Scrapers retain `ScrapedPage` metadata and the store's own product context;

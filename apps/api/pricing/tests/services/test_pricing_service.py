@@ -24,6 +24,7 @@ from pricing.models import (
     ShippingQuote,
     TaxFeeQuote,
 )
+from pricing.selectors import public_policy
 from pricing.services import (
     PricingService,
     QuoteRequest,
@@ -72,7 +73,7 @@ SCENARIO_RULES: dict[str, dict[str, object]] = {
 def _policy(key: str) -> PricingPolicyRevision:
     """Return a seeded public policy, or a published one for a bare scenario."""
     if key not in SCENARIO_RULES:
-        return PricingPolicyRevision.objects.get(key=key, number=1)
+        return public_policy(key)
     policy, _created = PricingPolicyRevision.objects.get_or_create(
         key=f"scenario-{key}",
         number=1,
@@ -110,11 +111,21 @@ class ScenarioTests(TestCase):
         assert result.merchandise_total == Decimal("96.03")
         assert result.selected_prices[0].payment_method == "pix"
 
-    def test_a_sold_out_offer_has_no_price(self) -> None:
-        """Availability is read from the offer."""
+    def test_a_sold_out_offer_keeps_its_price(self) -> None:
+        """Stock is not price: a sold-out offer is priced at its last read."""
         Offer.objects.filter(pk=self.offer.pk).update(
             current_stock_status=StockStatus.OUT_OF_STOCK,
         )
+
+        result = self.service.evaluate(
+            QuoteRequest(lines=(CartLine(self.offer.pk),), policy=_policy("listed")),
+        )
+
+        assert result.merchandise_total is not None
+
+    def test_a_delisted_offer_has_no_price(self) -> None:
+        """An offer the store stopped publishing is not priced."""
+        Offer.objects.filter(pk=self.offer.pk).update(delisted_at=timezone.now())
 
         result = self.service.evaluate(
             QuoteRequest(lines=(CartLine(self.offer.pk),), policy=_policy("listed")),
@@ -288,12 +299,10 @@ class StoredRouteTests(TestCase):
 class PricelessQuoteTests(TestCase):
     """R11: a scenario without a price is a quote, not an exception."""
 
-    def test_an_unavailable_offer_is_quoted_without_a_price(self) -> None:
+    def test_a_delisted_offer_is_quoted_without_a_price(self) -> None:
         """The quote keeps the line, with no base amount."""
         offer = _ingest_max_titanium()
-        Offer.objects.filter(pk=offer.pk).update(
-            current_stock_status=StockStatus.OUT_OF_STOCK,
-        )
+        Offer.objects.filter(pk=offer.pk).update(delisted_at=timezone.now())
 
         quote = PricingService().quote(
             QuoteRequest(lines=(CartLine(offer.pk),), policy=_policy("listed")),

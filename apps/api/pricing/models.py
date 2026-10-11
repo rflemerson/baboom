@@ -8,7 +8,6 @@ adapter results; nothing here invents a freight or tax engine.
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
@@ -27,7 +26,6 @@ if TYPE_CHECKING:
 MONEY = {"max_digits": 19, "decimal_places": 6}
 
 
-DEFAULT_FRESHNESS_HOURS = 72
 # Stored alternatives that are not an exact set of benefits: the winner, and
 # the store's price with no promotion at all.
 BEST = "best"
@@ -66,7 +64,6 @@ RULES: dict[str, tuple[Callable[[object], bool], str]] = {
     "net_cost_counts_money_rewards": (_flag, "true or false"),
     "assume_full_caps": (_flag, "true or false"),
     "max_combinations": (_positive, "a positive integer"),
-    "freshness_hours": (_positive, "a positive integer"),
 }
 
 
@@ -82,8 +79,7 @@ def rule_errors(rules: object) -> list[str]:
     return errors
 
 
-# The rules the engine's Policy reads; freshness is read by the fact loader.
-POLICY_FIELDS = tuple(key for key in RULES if key != "freshness_hours")
+POLICY_FIELDS = tuple(RULES)
 
 
 class PricingPolicyRevision(BaseModel):
@@ -91,7 +87,7 @@ class PricingPolicyRevision(BaseModel):
 
     ``rules`` is the typed policy the engine reads: accepted price meanings
     and evidence, the cash methods, whether codes, conditions and rewards
-    count, the freshness of each source and the search bound.
+    count and the search bound.
     """
 
     key = models.SlugField(_("Key"), max_length=50)
@@ -158,12 +154,6 @@ class PricingPolicyRevision(BaseModel):
         return Policy(
             key=self.key, version=self.number, scenario=self.scenario, **values
         )
-
-    @property
-    def freshness(self) -> timedelta:
-        """How long an observation stays usable after a read confirmed it."""
-        hours = (self.rules or {}).get("freshness_hours", DEFAULT_FRESHNESS_HOURS)
-        return timedelta(hours=int(hours))
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Refuse changes to a published policy; publish a new number instead."""
@@ -436,7 +426,7 @@ class OfferScenarioProjection(BaseModel):
 
         PRICED = "priced", _("Priced")
         NO_PRICE = "no_price", _("No price in this scenario")
-        UNAVAILABLE = "unavailable", _("Not purchasable")
+        UNAVAILABLE = "unavailable", _("Delisted")
 
     offer = models.ForeignKey(
         "offers.Offer",

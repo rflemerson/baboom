@@ -28,6 +28,7 @@ from pricing.models import (
     TaxFeeQuote,
 )
 from pricing.projections import ProjectionService
+from pricing.selectors import public_policy
 from pricing.services import PricingService, QuoteRequest
 from pricing.tests.domain.builders import (
     NOW,
@@ -114,7 +115,7 @@ class SecondReviewTests(SimpleTestCase):
         deadline = NOW + timedelta(minutes=5)
         result = evaluate(
             inputs(
-                prices=(price(1, "100", fresh_until=NOW + timedelta(hours=72)),),
+                prices=(price(1, "100"),),
                 shipping=(ShippingFact("all", Decimal(5), "BRL", expires_at=deadline),),
             )
         )
@@ -229,15 +230,14 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
         )
         ScraperService.save_product_snapshot(payload)
         restricted = Offer.objects.get(external_id="restricted")
-        policy_row = PricingPolicyRevision.objects.get(key="best")
-        facts = FactLoader().load([restricted.pk], policy_row)
+        facts = FactLoader().load([restricted.pk])
         assert facts.prices[0].quantity_min == MIN_QUANTITY
         assert facts.prices[0].amount_basis == "order"
         assert facts.prices[0].context == (("program_id", str(PROGRAM_ID)),)
         result = PricingService().evaluate(
             QuoteRequest(
                 lines=(CartLine(restricted.pk),),
-                policy=policy_row,
+                policy=public_policy("best"),
             )
         )
         assert result.merchandise_total is None

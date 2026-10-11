@@ -19,7 +19,6 @@ from core.models import Product, ProductStore
 from offers.models import Offer, StockStatus
 from pricing import projections
 from pricing.facts import FactLoader
-from pricing.models import PricingPolicyRevision
 from pricing.projections import ProjectionService
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.services import PromotionService
@@ -62,12 +61,11 @@ class ScaleTests(TwoProductCatalog, TestCase):
 
     def test_loading_facts_issues_a_fixed_number_of_queries(self) -> None:
         """Ten offers and fifty offers cost the same round trips."""
-        policy = PricingPolicyRevision.objects.get(key="best", number=1)
         few = self._add(10)
         many = few + self._add(40)
 
-        small = self._queries(lambda: FactLoader().load(few, policy))
-        large = self._queries(lambda: FactLoader().load(many, policy))
+        small = self._queries(lambda: FactLoader().load(few))
+        large = self._queries(lambda: FactLoader().load(many))
 
         assert small == large
 

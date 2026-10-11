@@ -15,8 +15,9 @@ from commerce.models import Currency, Market
 from commerce.services import CommerceIdentityService, MarketRef, SellerRef
 from core.models import Brand, Product, ProductStore, Store
 from offers.models import Evidence, Offer, StockStatus
-from pricing.models import OfferScenarioProjection, PricingPolicyRevision
+from pricing.models import OfferScenarioProjection
 from pricing.projections import ProjectionService
+from pricing.selectors import public_policy
 from promotions.models import (
     Promotion,
     PromotionEffect,
@@ -113,9 +114,7 @@ class RankingTests(TwoProductCatalog, TestCase):
         ProjectionService().refresh()
 
         winners = OfferScenarioProjection.objects.filter(alternative="best")
-        assert (
-            winners.count() == len(self.offers) * PricingPolicyRevision.objects.count()
-        )
+        assert winners.count() == len(self.offers) * len(ProjectionService.policies())
         projection = winners.get(offer=self.offers["A"], policy__key="best")
         assert projection.amount == Decimal("100.00")
         assert projection.status == "priced"
@@ -174,20 +173,9 @@ class RankingTests(TwoProductCatalog, TestCase):
         assert prices["B"] == Decimal("120.00")
         assert prices["A"] == Decimal("100.00")
 
-    def test_a_price_past_its_freshness_still_leaves_the_ranking(self) -> None:
-        """Without a valid alternative the offer has no price."""
-        moment = timezone.now()
-        ProjectionService().refresh(now=moment)
-        later = moment + timedelta(hours=73)
-
-        with patch("core.rest.views.timezone.now", return_value=later):
-            items = self._page(scenario="best")["items"]
-
-        assert {item["name"]: item["price"] for item in items}["B"] is None
-
     def test_the_best_policy_counts_payment_and_calendar_conditions(self) -> None:
         """Public conditions count; personal ones (membership, new customer) do not."""
-        allowed = PricingPolicyRevision.objects.get(key="best").as_policy()
+        allowed = public_policy("best").as_policy()
 
         assert {"payment_method", "calendar"} <= allowed.allow_conditions
         assert not {"new_customer", "program_member", "subscription"} & (
@@ -201,7 +189,7 @@ class RankingTests(TwoProductCatalog, TestCase):
 
         payload = self._page()
 
-        assert payload["scenario"] == {"key": "normal", "version": 1}
+        assert payload["scenario"] == {"key": "normal", "version": 2}
         assert payload["items"][0]["name"] == "A"
 
     def test_an_unknown_scenario_is_refused(self) -> None:
@@ -261,7 +249,7 @@ class MarketIsolationTests(MexicanMarket, TestCase):
                 payload = self._items(**params)
                 prices = {item["name"]: item["price"] for item in payload["items"]}
                 assert payload["market"] == {"country": "BR", "currency": "BRL"}
-                assert prices == {"A": "100.00", "B": None}
+                assert prices == {"A": "100.00"}
 
     def test_the_mexican_catalog_shows_pesos(self) -> None:
         """Each market ranks in its own currency, and says which."""
@@ -270,7 +258,7 @@ class MarketIsolationTests(MexicanMarket, TestCase):
             item["name"]: (item["price"], item["currency"]) for item in payload["items"]
         }
 
-        assert prices == {"A": (None, None), "B": ("1.00", "MXN")}
+        assert prices == {"B": ("1.00", "MXN")}
 
     def test_an_unknown_currency_is_refused(self) -> None:
         """A typo is not silently another market."""

@@ -35,8 +35,9 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class _Refresh:
-    """What every policy of one refresh shares: markets, clock and costs."""
+    """What every policy of one refresh shares: facts, markets, clock and costs."""
 
+    facts: Facts
     markets: dict[int, Market]
     moment: datetime
     costs: CostBook
@@ -103,6 +104,7 @@ class ProjectionService:
             return 0
         list(Offer.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
         shared = _Refresh(
+            facts=self.loader.load(ids),
             markets=self._markets(ids),
             moment=moment,
             costs=CostBook.load(
@@ -112,7 +114,7 @@ class ProjectionService:
         )
         written = 0
         for policy_row in self.policies():
-            batch = self._batch(policy_row, ids, shared)
+            batch = self._batch(policy_row, shared)
             newer = set(
                 OfferScenarioProjection.objects.filter(
                     policy=policy_row,
@@ -146,11 +148,10 @@ class ProjectionService:
     def _batch(
         self,
         policy_row: PricingPolicyRevision,
-        ids: list[int],
         shared: _Refresh,
     ) -> _Batch:
         policy = policy_row.as_policy()
-        facts = self.loader.load(ids, policy_row)
+        facts = shared.facts
         codes = (
             frozenset(
                 code
@@ -244,7 +245,7 @@ class ProjectionService:
             market=market,
             currency_id=market.currency_id,
             amount=result.merchandise_total,
-            status=self._status(result, purchasable=offer.purchasable),
+            status=self._status(result, listed=offer.listed),
             payment_method=result.payment.method if result.payment else "",
             observation_id=(
                 result.selected_prices[0].observation_id
@@ -330,10 +331,10 @@ class ProjectionService:
         return {market.pk: market for market in rows.distinct()}
 
     @staticmethod
-    def _status(result: PricingResult, *, purchasable: bool) -> str:
+    def _status(result: PricingResult, *, listed: bool) -> str:
         if result.merchandise_total is not None:
             return OfferScenarioProjection.Status.PRICED
-        if not purchasable:
+        if not listed:
             return OfferScenarioProjection.Status.UNAVAILABLE
         return OfferScenarioProjection.Status.NO_PRICE
 

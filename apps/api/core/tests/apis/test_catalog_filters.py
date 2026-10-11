@@ -13,7 +13,11 @@ from core.models import (
     NutritionFacts,
     Product,
     ProductNutrition,
+    ProductStore,
+    Store,
 )
+from core.tests.helpers import store_seller
+from offers.models import Offer, StockStatus
 
 PRODUCTS = "/api/catalog/products/"
 FILTERS = "/api/catalog/filters/"
@@ -24,12 +28,13 @@ class CatalogFilterTests(TestCase):
 
     def setUp(self) -> None:
         """Whey (alpha, chocolate) and Pea (beta, vanilla) under Proteins."""
+        Store.objects.create(name="shop", display_name="Shop", scraper_slug="shop")
         proteins = Category.add_root(name="Proteins")
         plant = proteins.add_child(name="Plant protein")
         whey = proteins.add_child(name="Whey")
-        for name, brand, flavor, category in (
-            ("Whey", "alpha", "Chocolate", whey),
-            ("Pea", "beta", "Vanilla", plant),
+        for name, brand, flavor, category, stock in (
+            ("Whey", "alpha", "Chocolate", whey, StockStatus.AVAILABLE),
+            ("Pea", "beta", "Vanilla", plant, StockStatus.OUT_OF_STOCK),
         ):
             product = Product.objects.create(
                 name=name,
@@ -45,6 +50,16 @@ class CatalogFilterTests(TestCase):
                 ),
             )
             profile.flavors.add(Flavor.objects.create(name=flavor))
+            offer = Offer.objects.create(
+                seller_account=store_seller("shop"),
+                store_slug="shop",
+                external_id=name,
+                url=f"https://shop.example/{name}",
+                current_price=Decimal(100),
+                current_stock_status=stock,
+                options=[{"name": "Sabor", "value": flavor}],
+            )
+            ProductStore.objects.create(product=product, offer=offer)
         Product.objects.create(
             name="Draft",
             brand=Brand.objects.create(name="hidden", display_name="Hidden"),
@@ -70,6 +85,18 @@ class CatalogFilterTests(TestCase):
         """Different kinds narrow together; a blank value filters nothing."""
         assert self._names("&brand=alpha&flavor=Vanilla") == []
         assert self._names("&brand=&flavor=") == ["Pea", "Whey"]
+
+    def test_stock_is_reported_and_filtered_apart_from_price(self) -> None:
+        """A sold-out product keeps its price; the stock filter can hide it."""
+        items = self.client.get(f"{PRODUCTS}?per_page=48").json()["items"]
+        stock = {item["name"]: (item["stockStatus"], item["price"]) for item in items}
+
+        assert stock == {
+            "Whey": ("in_stock", "100.00"),
+            "Pea": ("out_of_stock", "100.00"),
+        }
+        assert self._names("&stock=in_stock") == ["Whey"]
+        assert self._names("&stock=in_stock&stock=out_of_stock") == ["Pea", "Whey"]
 
     def test_the_options_are_those_of_published_products(self) -> None:
         """Drafts add no option; categories come with their ancestors, by path."""

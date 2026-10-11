@@ -25,6 +25,7 @@ from core.selectors import (
     public_catalog_products,
 )
 from core.services import AlertSubscriptionService
+from offers.models import StockStatus
 from pricing.selectors import projected_prices, public_policy
 
 if TYPE_CHECKING:
@@ -71,6 +72,7 @@ def _catalog_filters_from_request(request: HttpRequest) -> CatalogProductsFilter
         brands=_choices(query_params.getlist("brand")),
         flavors=_choices(query_params.getlist("flavor")),
         categories=_choices(query_params.getlist("category")),
+        stock=_choices(query_params.getlist("stock")),
         active=_optional_str(query_params.get("active")),
         price_min=_optional_float(query_params.get("price_min")),
         price_max=_optional_float(query_params.get("price_max")),
@@ -192,6 +194,7 @@ def _serialize_catalog_product(
         ),
         "paymentMethod": product.payment_method or None,
         "optimizationStatus": product.price_search_status or None,
+        "stockStatus": StockStatus.group(product.price_stock_status),
         "linkSelectsSeller": product.link_selects_seller,
         "brand": {"name": product.brand.name},
         "category": {"name": product.category.name} if product.category else None,

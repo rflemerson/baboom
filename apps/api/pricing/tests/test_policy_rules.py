@@ -27,7 +27,6 @@ ACCEPTED = {
     "net_cost_counts_money_rewards": [True],
     "assume_full_caps": [True],
     "max_combinations": [5],
-    "freshness_hours": [5],
 }
 
 

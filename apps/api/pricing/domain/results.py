@@ -96,7 +96,7 @@ def build_result(
         policy_key=policy.key,
         policy_version=policy.version,
         evaluated_at=context.now,
-        expires_at=_expiry(inputs, selected, outcome),
+        expires_at=_expiry(inputs, outcome),
         optimization_status=status,
     )
 
@@ -126,20 +126,14 @@ def _schedule(
     ]
 
 
-def _expiry(
-    inputs: Inputs,
-    selected: list[SelectedPrice],
-    outcome: Outcome,
-) -> datetime | None:
-    """Return when this alternative stops holding: only what it used counts."""
+def _expiry(inputs: Inputs, outcome: Outcome) -> datetime | None:
+    """Return when this alternative stops holding: only what it used counts.
+
+    A base price holds until the next read replaces it; only quotes and
+    promotions end on their own.
+    """
     context = inputs.context
-    chosen = {price.observation_id for price in selected}
-    moments = [
-        price.fresh_until
-        for price in inputs.prices
-        if price.id in chosen and price.fresh_until is not None
-    ]
-    moments += outcome.quote_expiries
+    moments = list(outcome.quote_expiries)
     if inputs.fees_status in {"included_in_prices", "consulted"}:
         moments += [fee.expires_at for fee in inputs.fees if fee.expires_at is not None]
     for revision in inputs.revisions:
