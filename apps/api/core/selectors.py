@@ -29,7 +29,16 @@ from commerce.models import Market
 from offers.models import Offer, StockStatus
 
 from .dtos import CatalogProductsFilters
-from .models import Active, ComboActive, Product, ProductActive, ProductNutrition
+from .models import (
+    Active,
+    Brand,
+    Category,
+    ComboActive,
+    Flavor,
+    Product,
+    ProductActive,
+    ProductNutrition,
+)
 
 # A price source returns, for the outer product, its priced offers cheapest
 # first, each with ``amount``, ``url``, ``payment_method`` and ``search_status``.
@@ -254,14 +263,68 @@ def _apply_catalog_search(
     )
 
 
-def _apply_catalog_brand_filter(
+def _apply_catalog_choice_filters(
     queryset: QuerySet[Product],
     filters: CatalogProductsFilters,
 ) -> QuerySet[Product]:
-    """Apply brand filtering when a brand query is present."""
-    if not filters.brand:
-        return queryset
-    return queryset.filter(brand__name__icontains=filters.brand)
+    """Keep rows of the chosen brands, flavors and categories, by name.
+
+    A flavor is matched on the row's own nutrition profile; a category keeps
+    its descendants. An empty choice filters nothing.
+    """
+    if filters.brands:
+        queryset = queryset.filter(brand__name__in=filters.brands)
+    if filters.flavors:
+        queryset = queryset.filter(
+            Exists(
+                ProductNutrition.objects.filter(
+                    pk=OuterRef("nutrition_profile_id"),
+                    flavors__name__in=filters.flavors,
+                ),
+            ),
+        )
+    if filters.categories:
+        paths = Category.objects.filter(name__in=filters.categories).values_list(
+            "path", flat=True
+        )
+        subtree = Q(pk__in=[])
+        for path in paths:
+            subtree |= Q(category__path__startswith=path)
+        queryset = queryset.filter(subtree)
+    return queryset
+
+
+def catalog_filter_options() -> dict[str, list[tuple[str, str]]]:
+    """Return the brands, flavors and categories of published products.
+
+    Each option is ``(name, label)``: the name filters, the label is shown.
+    A category's ancestors are options too: choosing one keeps its subtree.
+    """
+    published = Product.objects.filter(is_published=True)
+    brands = Brand.objects.filter(product__in=published).distinct()
+    flavors = Flavor.objects.filter(
+        productnutrition__product__in=published,
+    ).distinct()
+    used = Category.objects.filter(product__in=published).distinct()
+    categories = {
+        node.pk: node
+        for category in used
+        for node in [*category.get_ancestors(), category]
+    }.values()
+    return {
+        "brands": sorted(
+            ((brand.name, brand.display_name) for brand in brands),
+            key=lambda option: option[1].casefold(),
+        ),
+        "flavors": sorted(
+            ((flavor.name, flavor.name) for flavor in flavors),
+            key=lambda option: option[1].casefold(),
+        ),
+        "categories": sorted(
+            ((category.name, str(category)) for category in categories),
+            key=lambda option: option[1].casefold(),
+        ),
+    }
 
 
 def _apply_catalog_numeric_filters(
@@ -325,6 +388,6 @@ def public_catalog_products(
         resolved_filters.active,
     ).filter(is_published=True)
     queryset = _apply_catalog_search(queryset, resolved_filters)
-    queryset = _apply_catalog_brand_filter(queryset, resolved_filters)
+    queryset = _apply_catalog_choice_filters(queryset, resolved_filters)
     queryset = _apply_catalog_numeric_filters(queryset, resolved_filters)
     return _apply_catalog_sorting(queryset, resolved_filters)

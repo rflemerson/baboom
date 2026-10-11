@@ -42,7 +42,9 @@ class CatalogProductsFilters(BaseModel):
     """DTO for public catalog filtering and sorting."""
 
     search: str | None = None
-    brand: str | None = None
+    brands: list[str] = []
+    flavors: list[str] = []
+    categories: list[str] = []
     active: str | None = None
     price_min: float | None = None
     price_max: float | None = None

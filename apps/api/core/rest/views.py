@@ -18,7 +18,12 @@ from django.views.decorators.http import require_GET, require_POST
 from commerce.models import Currency
 from core import units
 from core.dtos import CatalogProductsFilters
-from core.selectors import catalog_active, current_prices, public_catalog_products
+from core.selectors import (
+    catalog_active,
+    catalog_filter_options,
+    current_prices,
+    public_catalog_products,
+)
 from core.services import AlertSubscriptionService
 from pricing.selectors import projected_prices, public_policy
 
@@ -53,12 +58,19 @@ def _positive_int(value: str | None, default: int) -> int:
     return max(int(value), 1)
 
 
+def _choices(values: list[str]) -> list[str]:
+    """Keep the non-empty values of a repeated query parameter."""
+    return [value for value in values if value.strip()]
+
+
 def _catalog_filters_from_request(request: HttpRequest) -> CatalogProductsFilters:
     """Map public query string params to the selector DTO."""
     query_params = request.GET
     return CatalogProductsFilters(
         search=_optional_str(query_params.get("search")),
-        brand=_optional_str(query_params.get("brand")),
+        brands=_choices(query_params.getlist("brand")),
+        flavors=_choices(query_params.getlist("flavor")),
+        categories=_choices(query_params.getlist("category")),
         active=_optional_str(query_params.get("active")),
         price_min=_optional_float(query_params.get("price_min")),
         price_max=_optional_float(query_params.get("price_max")),
@@ -279,6 +291,17 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     return _apply_catalog_cache_headers(
         response,
         expires_at=min(expiries) if expiries else None,
+    )
+
+
+@require_GET
+def catalog_filters(_request: HttpRequest) -> JsonResponse:
+    """Return the brands, flavors and categories the catalog filters by."""
+    return JsonResponse(
+        {
+            kind: [{"name": name, "label": label} for name, label in options]
+            for kind, options in catalog_filter_options().items()
+        },
     )
 
 
