@@ -364,8 +364,15 @@ class ProductNutritionAdmin(admin.ModelAdmin):
 class ActiveAdmin(admin.ModelAdmin):
     """Admin for the substances the catalog ranks products by."""
 
-    list_display = ("name", "slug", "display_unit", "nutrition_field")
-    list_filter = ("display_unit",)
+    list_display = (
+        "name",
+        "slug",
+        "display_unit",
+        "nutrition_field",
+        "show_in_catalog",
+    )
+    list_editable = ("show_in_catalog",)
+    list_filter = ("show_in_catalog", "display_unit")
     search_fields = ("name", "slug")
     prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {"slug": ("name",)}
     list_per_page = 50

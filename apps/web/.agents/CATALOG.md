@@ -6,7 +6,10 @@
   pagination and column visibility. `useCatalogQuery` only reads REST data.
 - Never sort/filter only the current API page or invent API filters. The only
   sortable columns are price, price per active, concentration and total active.
-  Filters cover brand, price, price per active and concentration, plus search.
+  The "Filters" menu covers the concentration of the selected active as a
+  minimum and maximum percentage (10% minimum by default, sent as
+  `concentration_min` / `concentration_max`), stock (in stock by default),
+  brand, flavor and category, from `/api/catalog/filters/`, plus search.
 - Search and column filters are debounced together; restart pagination when
   the debounced query changes. The API accepts 12, 24 or 48 rows per page.
 - API `pricePerActive` and its filter limits remain per gram of the selected
@@ -19,17 +22,18 @@
   and column visibility.
 - Keep offer conditions (payment, coupons, cashback, route instructions),
   incomplete optimization status and seller-selection warnings visible.
-- Public catalog has a compact table and filter and sort menus in each column header. There are no
-  card modes, filter drawers, product photographs or product comparison flows.
+- Desktop shows a compact table, sorted from its column headers; phones show
+  cards with a sort select. No product photographs or comparison flows.
 - Keep the header full width: logo at the far left, name beside it, theme and
   bomb alert button at right. Keep the alert button text visible on mobile. No navigation tabs or public login.
 - The table grows with its rows; horizontal overflow is only for narrow screens.
 - Column filter controls remain available for empty and loading results.
 - Comparison dropdowns use BaseSelect for rounded fields and popup menus.
-- Start with a discreet two-field comparison bar: current active and supported
-  payment scenarios. No search or column picker in this bar. Column visibility is on the left
-  above the table, with page size on the right. The API currently
-  returns one active, so do not invent additional choices. Omit the title,
+- The comparison bar has three fields: the active to compare by, the payment
+  scenario and the benefits. The actives are those `/api/catalog/filters/`
+  lists (curators tick "Show in catalog" on `Active` in the admin); choosing
+  one sends `active=<slug>`. No search or column picker in this bar. Page size
+  sits left above the table, filters and columns on the right. Omit the title,
   subtitle and market badge.
 - Snapshots, CDN publishing and client-side full-catalog processing are deferred.
 

@@ -326,7 +326,7 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
 
 @require_GET
 def catalog_filters(_request: HttpRequest) -> JsonResponse:
-    """Return the brands, flavors and categories the catalog filters by."""
+    """Return the actives, brands, flavors and categories the catalog offers."""
     return JsonResponse(
         {
             kind: [{"name": name, "label": label} for name, label in options]

@@ -183,7 +183,9 @@ offers that a successful crawl no longer sees.
 - `scrapers/management/commands/cutover_offer_identities.py` is an explicit,
   preview-first legacy-identity transition. It never runs on deployment;
   operators must review ambiguous mappings before opting into archival.
-- Public catalog and alerts: REST. A product is listed only with a price;
+- Public catalog and alerts: REST. `/api/catalog/filters/` lists the actives
+  (`Active.show_in_catalog`, measured in some published product; the default
+  `CATALOG_DEFAULT_ACTIVE_SLUG` first), brands, flavors and categories. A product is listed only with a price;
   `stockStatus` reports the stock of the offer that prices it and `?stock=`
   filters by it (the web defaults to `in_stock`). Each product states what the shown price
   needs: `couponCodes`, `paymentMethod`, `cashback` and `points` (shown apart,

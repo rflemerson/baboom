@@ -290,6 +290,10 @@ async function fulfillFilters(route: Route) {
     [...new Set(values)].sort().map((name) => ({ name, label: name }))
   await route.fulfill({
     json: {
+      actives: [
+        { name: 'protein', label: 'Protein' },
+        { name: 'creatina', label: 'Creatina' },
+      ],
       brands: unique(PRODUCTS.map((product) => product.brand.name)),
       flavors: unique(FLAVORS),
       categories: unique(PRODUCTS.map((product) => product.category.name)),
@@ -335,6 +339,20 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1280, height: 900 } })
+
+  test('compares by another active the curators show', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('table')).toBeVisible()
+
+    await page.locator('summary[aria-label="Ativo para comparar"]').click()
+    const request = page.waitForRequest(
+      (sent) =>
+        sent.url().includes('/api/catalog/products/') && sent.url().includes('active=creatina'),
+    )
+    await page.getByRole('button', { name: 'Creatina', exact: true }).click()
+
+    await request
+  })
 
   test('loads the catalog and paginates through results', async ({ page }) => {
     await page.goto('/')
@@ -383,12 +401,34 @@ test.describe('desktop', () => {
     await expect(page.getByRole('heading', { name: SOLD_OUT })).toHaveCount(0)
 
     await page.locator('summary', { hasText: 'Filtros' }).click()
+    await choose(page, 'Filtrar por', 'Estoque')
     const withSoldOut = catalogRequest(page, (params) =>
       params.getAll('stock').includes('out_of_stock'),
     )
     await page.getByRole('checkbox', { name: 'Sem estoque', exact: true }).check()
     await withSoldOut
     await expect(page.getByText('14 produtos')).toBeVisible()
+  })
+
+  test('filters the active between 10% and any maximum by default', async ({ page }) => {
+    const first = catalogRequest(
+      page,
+      (params) => params.get('concentration_min') === '10' && !params.has('concentration_max'),
+    )
+    await page.goto('/')
+    await first
+
+    await page.locator('summary', { hasText: 'Filtros' }).click()
+    const ranged = catalogRequest(
+      page,
+      (params) =>
+        params.get('concentration_min') === '70' && params.get('concentration_max') === '90',
+    )
+    await page.getByLabel('Mínimo (%)').fill('70')
+    await page.getByLabel('Mínimo (%)').press('Tab')
+    await page.getByLabel('Máximo (%)').fill('90')
+    await page.getByLabel('Máximo (%)').press('Tab')
+    await ranged
   })
 
   test('shows an empty state when no product matches', async ({ page }) => {

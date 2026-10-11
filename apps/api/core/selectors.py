@@ -315,12 +315,18 @@ def _apply_catalog_choice_filters(
 
 
 def catalog_filter_options() -> dict[str, list[tuple[str, str]]]:
-    """Return the brands, flavors and categories of published products.
+    """Return the actives, brands, flavors and categories of published products.
 
     Each option is ``(name, label)``: the name filters, the label is shown.
     A category's ancestors are options too: choosing one keeps its subtree.
+    An active is offered when curators show it and a published product has it;
+    the default active leads.
     """
     published = Product.objects.filter(is_published=True)
+    actives = Active.objects.filter(
+        show_in_catalog=True,
+        product_amounts__nutrition_profile__product__in=published,
+    ).distinct()
     brands = Brand.objects.filter(product__in=published).distinct()
     flavors = Flavor.objects.filter(
         productnutrition__product__in=published,
@@ -332,6 +338,13 @@ def catalog_filter_options() -> dict[str, list[tuple[str, str]]]:
         for node in [*category.get_ancestors(), category]
     }.values()
     return {
+        "actives": sorted(
+            ((active.slug, active.name) for active in actives),
+            key=lambda option: (
+                option[0] != settings.CATALOG_DEFAULT_ACTIVE_SLUG,
+                option[1].casefold(),
+            ),
+        ),
         "brands": sorted(
             ((brand.name, brand.display_name) for brand in brands),
             key=lambda option: option[1].casefold(),

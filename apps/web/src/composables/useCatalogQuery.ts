@@ -33,6 +33,8 @@ function buildCatalogUrl(variables: CatalogProductsVariables) {
   for (const category of filters.categories ?? []) params.append('category', category)
   for (const stock of filters.stock ?? []) params.append('stock', stock)
   appendOptionalParam(params, 'active', filters.active)
+  appendOptionalParam(params, 'concentration_min', filters.concentrationMin)
+  appendOptionalParam(params, 'concentration_max', filters.concentrationMax)
   appendOptionalParam(params, 'sort_by', filters.sortBy)
   appendOptionalParam(params, 'sort_dir', filters.sortDir)
   appendOptionalParam(params, 'scenario', filters.scenario)

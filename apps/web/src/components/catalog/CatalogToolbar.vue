@@ -1,17 +1,28 @@
 <script setup lang="ts">
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { Coins, FlaskConical, Star, Ticket } from 'lucide-vue-next'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useCatalogFilterOptions } from '@/composables/useCatalogFilterOptions'
 import type { CatalogActive } from '@/types/catalog'
 
-defineProps<{
+const props = defineProps<{
   active: CatalogActive | null
   scenario: string
 }>()
+// The chosen active; empty until the buyer picks one other than the default.
+const activeSlug = defineModel<string>('activeSlug', { required: true })
 // The benefits the price may count on, whichever the scenario.
 const benefits = defineModel<string[]>('benefits', { required: true })
 const emit = defineEmits<{ 'update:scenario': [value: string] }>()
 const { t } = useI18n()
+const { options } = useCatalogFilterOptions()
+// The actives curators show, or the one the catalog answered with until they load.
+const activeOptions = computed(() =>
+  options.value.actives.length
+    ? options.value.actives.map((active) => ({ value: active.name, label: active.label }))
+    : [{ value: props.active?.slug ?? '', label: props.active?.name || t('common.missing') }],
+)
 </script>
 
 <template>
@@ -23,9 +34,10 @@ const { t } = useI18n()
         }}</span>
         <BaseSelect
           :label="t('catalog.compareActive')"
-          :model-value="active?.slug ?? ''"
+          :model-value="activeSlug || active?.slug || ''"
           :disabled="!active"
-          :options="[{ value: active?.slug ?? '', label: active?.name || t('common.missing') }]"
+          :options="activeOptions"
+          @update:model-value="activeSlug = $event"
         >
           <template #icon><FlaskConical class="app-copy-brand h-3.5 w-3.5 shrink-0" /></template>
         </BaseSelect>

@@ -18,14 +18,16 @@ const { t } = useI18n()
 const { options } = useCatalogFilterOptions()
 // Column whose filter holds the choice, and the options it is chosen from.
 const FIELDS = {
+  concentration: 'concentration',
   stock: 'stock',
   brand: 'brands',
   flavors: 'flavors',
   category: 'categories',
-} as const satisfies Record<string, keyof CatalogFilterOptions | 'stock'>
+} as const satisfies Record<string, keyof CatalogFilterOptions | 'stock' | 'concentration'>
 type Field = keyof typeof FIELDS
 const { root, escape } = useDisclosure()
-const field = ref<Field>('stock')
+const field = ref<Field>('concentration')
+const range = computed(() => field.value === 'concentration')
 const chosen = computed<string[]>(() => {
   const value: unknown = props.table.getColumn(field.value)?.getFilterValue()
   return Array.isArray(value) ? value : []
@@ -36,15 +38,22 @@ const changed = computed(
     JSON.stringify(props.table.getState().columnFilters) !==
     JSON.stringify(props.table.initialState.columnFilters),
 )
-// Stock states are fixed; the other options come from the catalog.
+// Stock states and concentration steps are fixed; the rest comes from the catalog.
 const choices = computed<CatalogFilterOption[]>(() => {
   const source = FIELDS[field.value]
+  if (source === 'concentration') return []
   if (source !== 'stock') return options.value[source]
   return STOCK_STATUSES.map((name) => ({ name, label: t(`catalog.stock.${name}`) }))
 })
 
 function header(id: string): string {
   return String(props.table.getColumn(id)?.columnDef.header ?? id)
+}
+// The concentration filter is [min, max] in percent; an empty bound is open.
+function setBound(index: number, value: string) {
+  const next = [chosen.value[0] ?? '', chosen.value[1] ?? '']
+  next[index] = value.trim()
+  props.table.getColumn('concentration')?.setFilterValue(next.some(Boolean) ? next : undefined)
 }
 function toggle(name: string, checked: boolean) {
   const next = checked ? [...chosen.value, name] : chosen.value.filter((item) => item !== name)
@@ -67,7 +76,29 @@ function toggle(name: string, checked: boolean) {
           @update:model-value="field = $event as Field"
         />
       </div>
-      <ul class="app-filter-panel__list mt-3">
+      <fieldset v-if="range" class="mt-3 flex flex-col gap-1.5">
+        <legend class="app-copy-soft mb-1.5">{{ t('catalog.concentration.range') }}</legend>
+        <div class="flex items-center gap-2">
+          <template v-for="(bound, index) in ['min', 'max']" :key="bound">
+            <span v-if="index" class="app-copy-soft" aria-hidden="true">–</span>
+            <label class="app-range-field">
+              <span class="sr-only">{{ t(`catalog.concentration.${bound}`) }}</span>
+              <input
+                type="number"
+                inputmode="decimal"
+                min="0"
+                max="100"
+                step="1"
+                :value="chosen[index] ?? ''"
+                :placeholder="index ? '100' : '0'"
+                @change="setBound(index, ($event.target as HTMLInputElement).value)"
+              />
+              <span class="app-copy-soft" aria-hidden="true">%</span>
+            </label>
+          </template>
+        </div>
+      </fieldset>
+      <ul v-else class="app-filter-panel__list mt-3">
         <li v-for="option in choices" :key="option.name">
           <label class="flex items-center gap-2 py-1.5">
             <input
@@ -96,6 +127,44 @@ function toggle(name: string, checked: boolean) {
 <style scoped lang="scss">
 .app-filter-panel {
   min-width: 18rem;
+}
+
+.app-range-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: var(--app-control-height);
+  border: 1px solid var(--app-border);
+  border-radius: 0.875rem;
+  padding: 0 0.875rem;
+  background: var(--app-surface-soft);
+  font-size: 0.75rem;
+
+  &:focus-within {
+    border-color: var(--app-brand);
+  }
+
+  input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-text);
+    font: inherit;
+    outline: none;
+    appearance: textfield;
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      margin: 0;
+      appearance: none;
+    }
+
+    &::placeholder {
+      color: var(--app-text-soft);
+    }
+  }
 }
 
 .app-filter-panel__list {

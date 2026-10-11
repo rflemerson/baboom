@@ -1,6 +1,9 @@
 export interface CatalogProductsFilters {
   brands?: string[]
   stock?: string[]
+  // Least percentage of the selected active in the product's mass.
+  concentrationMin?: number | null
+  concentrationMax?: number | null
   categories?: string[]
   flavors?: string[]
   page?: number | null
@@ -101,6 +104,7 @@ export interface CatalogFilterOption {
 }
 
 export interface CatalogFilterOptions {
+  actives: CatalogFilterOption[]
   brands: CatalogFilterOption[]
   flavors: CatalogFilterOption[]
   categories: CatalogFilterOption[]

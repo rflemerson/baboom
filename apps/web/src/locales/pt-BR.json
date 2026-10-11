@@ -101,7 +101,12 @@
     "coupons": "Cupons",
     "cashback": "Cashback",
     "points": "Pontos",
-    "noBenefits": "Nenhum"
+    "noBenefits": "Nenhum",
+    "concentration": {
+      "min": "Mínimo (%)",
+      "max": "Máximo (%)",
+      "range": "Entre"
+    }
   },
   "payment": {
     "pix": "Pix",

@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from core.models import (
+    Active,
     Brand,
     Category,
     Flavor,
@@ -117,3 +118,15 @@ class CatalogFilterTests(TestCase):
             {"name": "Plant protein", "label": "Proteins > Plant protein"},
             {"name": "Whey", "label": "Proteins > Whey"},
         ]
+
+    def test_only_shown_actives_some_product_has_are_offered(self) -> None:
+        """Protein is shown and measured; a hidden or unmeasured active is not."""
+        Active.objects.filter(slug="protein").update(show_in_catalog=True)
+        Active.objects.create(name="Caffeine", slug="caffeine", show_in_catalog=True)
+        Active.objects.create(name="Sodium extra", slug="sodium-extra")
+
+        options = self.client.get(FILTERS).json()
+
+        assert options["actives"] == [{"name": "protein", "label": "Protein"}]
+        Active.objects.filter(slug="protein").update(show_in_catalog=False)
+        assert self.client.get(FILTERS).json()["actives"] == []

@@ -116,6 +116,14 @@ class Active(BaseModel):
         blank=True,
         help_text=_("Active description"),
     )
+    show_in_catalog = models.BooleanField(
+        _("Show in catalog"),
+        default=False,
+        help_text=_(
+            "Offer it in the catalog's active selector. Sodium or trans fats are "
+            "measured, but nobody compares supplements by them.",
+        ),
+    )
 
     class Meta:
         """Meta options."""

@@ -24,15 +24,22 @@ function updated<T>(updater: Updater<T>, previous: T): T {
   return typeof updater === 'function' ? (updater as (value: T) => T)(previous) : updater
 }
 
-// The catalog lists what can be bought now unless a visitor asks otherwise.
+// The catalog lists what can be bought now, and products where the active is
+// at least 10% of the mass, unless a visitor asks otherwise.
 function defaultFilters(): ColumnFiltersState {
-  return [{ id: 'stock', value: ['in_stock'] }]
+  return [
+    { id: 'stock', value: ['in_stock'] },
+    // [min, max] in percent; an empty bound is open.
+    { id: 'concentration', value: ['10', ''] },
+  ]
 }
 
 export function useCatalogTable() {
   const rows = shallowRef<CatalogProduct[]>([])
   const pageInfo = ref<CatalogPageInfo | null>(null)
   const activeName = ref('')
+  // The active to compare by; empty asks for the catalog's default.
+  const activeSlug = ref('')
   const sorting = ref<SortingState>([{ id: 'pricePerActive', desc: false }])
   const columnFilters = ref<ColumnFiltersState>(defaultFilters())
   const globalFilter = ref('')
@@ -74,6 +81,7 @@ export function useCatalogTable() {
       accessorKey: 'concentration',
       header: t('catalog.column.concentration'),
       enableSorting: true,
+      enableColumnFilter: true,
     },
     {
       id: 'totalActive',
@@ -191,12 +199,16 @@ export function useCatalogTable() {
     },
     { deep: true },
   )
-  watch([scenario, benefits], resetPage, { deep: true })
+  watch([scenario, benefits, activeSlug], resetPage, { deep: true })
   onScopeDispose(() => clearTimeout(timer))
 
   function chosen(id: string): string[] {
     const value: unknown = debouncedFilters.value.find((filter) => filter.id === id)?.value
     return Array.isArray(value) ? value.filter((name) => typeof name === 'string') : []
+  }
+  function bound(index: number): number | null {
+    const value = chosen('concentration')[index]
+    return value ? Number(value) : null
   }
   const variables = computed<CatalogProductsVariables>(() => {
     const sort = sorting.value[0]
@@ -209,9 +221,12 @@ export function useCatalogTable() {
         flavors: chosen('flavors'),
         categories: chosen('category'),
         stock: chosen('stock'),
+        concentrationMin: bound(0),
+        concentrationMax: bound(1),
         sortBy: SORT_KEYS[sort?.id ?? 'pricePerActive'] ?? 'price_per_active',
         sortDir: sort?.desc ? 'desc' : 'asc',
         scenario: scenario.value || null,
+        active: activeSlug.value || null,
         coupon: benefits.value.includes('coupon'),
         cashback: benefits.value.includes('cashback'),
         points: benefits.value.includes('points'),
@@ -238,6 +253,7 @@ export function useCatalogTable() {
     rows,
     pageInfo,
     activeName,
+    activeSlug,
     scenario,
     benefits,
     variables,

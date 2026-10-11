@@ -17,6 +17,7 @@ const {
   rows,
   pageInfo: tablePageInfo,
   activeName,
+  activeSlug,
   scenario,
   benefits,
   variables,
@@ -55,6 +56,7 @@ function setPage(page: number) {
   <main id="catalog" class="app-catalog-page py-4 sm:py-6">
     <div class="app-shell px-4 sm:px-6">
       <CatalogToolbar
+        v-model:active-slug="activeSlug"
         v-model:benefits="benefits"
         :active="active"
         :scenario="scenario"
