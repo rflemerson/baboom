@@ -41,8 +41,9 @@ from .models import (
 )
 
 # A price source returns, for the outer product, its priced offers cheapest
-# first, each with ``amount``, ``url``, ``payment_method``, ``search_status`` and
-# the offer's ``stock_status``. The catalog does not know which pricing policy
+# first, each with ``amount``, ``list_amount`` (the store's price before any
+# benefit), ``url``, ``payment_method``, ``search_status`` and the offer's
+# ``stock_status``. The catalog does not know which pricing policy
 # produced them.
 PriceSource = Callable[[], QuerySet]
 
@@ -68,6 +69,7 @@ def current_prices(country: str, currency: str) -> PriceSource:
             .exclude(store_slug__in=foreign)
             .annotate(
                 amount=F("current_price"),
+                list_amount=F("current_price"),
                 comparison_amount=F("current_price"),
                 pricing_details=Value({}, output_field=JSONField()),
                 payment_method=Value(""),
@@ -140,6 +142,10 @@ def _annotate_catalog_base_fields(
         ),
         comparison_price=Subquery(
             cheapest.values("comparison_amount")[:1],
+            output_field=DecimalField(max_digits=19, decimal_places=6),
+        ),
+        list_price=Subquery(
+            cheapest.values("list_amount")[:1],
             output_field=DecimalField(max_digits=19, decimal_places=6),
         ),
         pricing_details=Subquery(cheapest.values("pricing_details")[:1]),

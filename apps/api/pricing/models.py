@@ -529,3 +529,30 @@ class OfferScenarioProjection(BaseModel):
     def __str__(self) -> str:
         """Return offer, policy and amount."""
         return f"{self.offer_id} {self.policy} {self.amount or self.status}"
+
+
+class ProjectionRefreshRequest(BaseModel):
+    """Offers a change left to reprice, until the worker drains the queue.
+
+    Written in the change's own transaction, so a rollback takes it along and
+    the API never needs the broker: the worker reads this table every minute.
+    """
+
+    offer_ids = models.JSONField(
+        _("Offer ids"),
+        null=True,
+        blank=True,
+        help_text=_("Empty means every linked offer."),
+    )
+
+    class Meta:
+        """Meta options."""
+
+        verbose_name = _("Projection Refresh Request")
+        verbose_name_plural = _("Projection Refresh Requests")
+
+    def __str__(self) -> str:
+        """Return how many offers wait."""
+        if self.offer_ids is None:
+            return "every linked offer"
+        return f"{len(self.offer_ids)} offer(s)"

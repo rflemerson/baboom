@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from django.test import TestCase
 from django.utils import timezone
 
 from commerce.models import Program
 from core.models import Brand, Category, Product, ProductStore
 from offers.models import Evidence
-from pricing.models import OfferScenarioProjection
+from pricing.models import OfferScenarioProjection, ProjectionRefreshRequest
 from pricing.projections import ProjectionService
-from pricing.tests.projections.test_invalidation import DELAY
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import (
     Promotion,
@@ -60,17 +57,23 @@ class EligibilityCatalog(TwoProductCatalog):
             parameters={"rate": rate},
         )
         revision.evidence.add(Evidence.objects.create(kind="announcement", excerpt="x"))
-        with patch(DELAY):
-            assert PromotionService().publish(revision, "executable").published
+        assert PromotionService().publish(revision, "executable").published
         ProjectionService().refresh()
 
     def _scheduled(self, change: object) -> list[object]:
-        with (
-            patch(DELAY) as delay,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            change()
-        return [call.kwargs.get("offer_ids") for call in delay.call_args_list]
+        """Return the offer ids of each refresh request the change queued."""
+        last = (
+            ProjectionRefreshRequest.objects.order_by("-pk")
+            .values_list("pk", flat=True)
+            .first()
+            or 0
+        )
+        change()
+        return list(
+            ProjectionRefreshRequest.objects.filter(pk__gt=last)
+            .order_by("pk")
+            .values_list("offer_ids", flat=True)
+        )
 
     def _expired(self, name: str, *, key: str = "best") -> bool:
         row = OfferScenarioProjection.objects.get(

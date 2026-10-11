@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from django.db.models import Case, F, OuterRef, Q, Value, When
+from django.db.models import Case, F, OuterRef, Q, Subquery, Value, When
 from django.db.models.functions import Coalesce, NullIf
 
 from .models import BASE, BEST, OfferScenarioProjection, PricingPolicyRevision
@@ -66,6 +66,18 @@ def _choices(*, wanted: bool | None) -> tuple[bool, ...]:
 DEFAULT_BENEFITS = BenefitFilter()
 
 
+def _alternative_amount(policy: PricingPolicyRevision, alternative: str) -> Subquery:
+    """Return the outer projection's offer amount under another alternative."""
+    return Subquery(
+        OfferScenarioProjection.objects.filter(
+            offer=OuterRef("offer_id"),
+            policy=policy,
+            market=OuterRef("market_id"),
+            alternative=alternative,
+        ).values("amount")[:1],
+    )
+
+
 def projected_prices(
     policy: PricingPolicyRevision,
     now: datetime,
@@ -102,11 +114,20 @@ def projected_prices(
                 stock_status=F("offer__current_stock_status"),
                 search_status=F("optimization_status"),
                 pricing_details=F("explanation"),
+                # The store's own price, before any benefit: ``base`` when a
+                # promotion applies without one, else ``none``, else the price.
+                list_amount=Coalesce(
+                    _alternative_amount(policy, BASE),
+                    _alternative_amount(policy, "none"),
+                    F("amount"),
+                ),
             )
             .order_by(
                 "comparison_amount",
                 "offer_id",
                 Case(When(alternative=BEST, then=0), default=1),
+                # At one price, the alternative that also pays cashback.
+                F("monetary_reward").desc(nulls_last=True),
             )
         )
 

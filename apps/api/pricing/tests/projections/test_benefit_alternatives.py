@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -45,7 +44,7 @@ class BenefitCatalog(TwoProductCatalog):
         code: str = "",
         reward_rate: Decimal | None = None,
     ) -> PromotionRevision:
-        stage = "reward" if reward_rate is not None else "order"
+        stage = "reward" if kind in {"cashback", "points"} else "order"
         promotion = Promotion.objects.create(
             title=f"{kind} {offer.external_id} {code}",
             issuer_seller=self.seller,
@@ -70,15 +69,15 @@ class BenefitCatalog(TwoProductCatalog):
             position=1,
             kind=kind,
             stage=stage,
-            basis="eligible_subtotal" if kind == "cashback" else "current",
+            basis="eligible_subtotal" if stage == "reward" else "current",
             target="order",
             allocation="once",
             parameters=parameters,
         )
-        if reward_rate is not None:
+        if stage == "reward":
             RewardTerms.objects.create(
                 effect=effect,
-                credited_as="money",
+                credited_as="points" if kind == "points" else "money",
                 rate=reward_rate,
             )
         if code:
@@ -87,8 +86,7 @@ class BenefitCatalog(TwoProductCatalog):
             )
         evidence = Evidence.objects.create(kind="announcement", excerpt="x")
         revision.evidence.add(evidence)
-        with patch("pricing.invalidation.refresh_projections.delay"):
-            assert PromotionService().publish(revision, "executable").published
+        assert PromotionService().publish(revision, "executable").published
         return revision
 
     def _policy(self, key: str, **rules: object) -> PricingPolicyRevision:
@@ -273,6 +271,79 @@ class CouponAlternativeTests(BenefitCatalog, TestCase):
 
         assert ranking["A"] == Decimal(100)
 
+    def test_the_rest_catalog_drops_the_benefits_a_buyer_refuses(self) -> None:
+        """coupon=0 hides A2's coupon price; cashback=0 hides B's cashback."""
+        self._publish(self.a2, "fixed_amount", {"amount": "50"}, code="SYN50")
+        self._publish(self.offers["B"], "cashback", {}, reward_rate=Decimal(10))
+        ProjectionService().refresh()
+
+        def items(**params: str) -> dict[str, dict]:
+            query = {"scenario": "coupons", **params}
+            rows = self.client.get("/api/catalog/products/", query).json()["items"]
+            return {row["name"]: row for row in rows}
+
+        assert items()["A"]["couponCodes"] == ["SYN50"]
+        assert items()["A"]["price"] == "80.00"
+        assert items()["A"]["listPrice"] == "130.00"
+        assert items(coupon="0")["A"]["couponCodes"] == []
+        assert items(coupon="0")["A"]["price"] == "100.00"
+        assert items()["B"]["cashback"] is not None
+        assert items(cashback="0")["B"]["cashback"] is None
+        # Refusing the coupon keeps the cashback that needs none.
+        assert items(coupon="0")["B"]["cashback"] is not None
+
+    def test_points_are_shown_apart_and_never_priced(self) -> None:
+        """B earns 1 point per real: as many points as reais, price unchanged."""
+        self._publish(
+            self.offers["B"],
+            "points",
+            {"per_currency_unit": "1"},
+        )
+        ProjectionService().refresh()
+
+        rows = self.client.get("/api/catalog/products/", {"scenario": "coupons"}).json()
+        b = next(row for row in rows["items"] if row["name"] == "B")
+
+        assert b["points"] == int(self.offers["B"].current_price)
+        assert b["price"] == "120.00"
+        assert b["cashback"] is None
+        hidden = self.client.get(
+            "/api/catalog/products/", {"scenario": "coupons", "points": "0"}
+        ).json()
+        assert {row["points"] for row in hidden["items"]} == {None}
+
+    def test_an_informative_coupon_is_shown_and_never_priced(self) -> None:
+        """B's store has coupons nobody publishes: named, price unchanged."""
+        promotion = Promotion.objects.create(
+            title="Cupons de influenciadores",
+            issuer_seller=self.seller,
+            source_key="influencers",
+        )
+        revision = PromotionRevision.objects.create(
+            promotion=promotion,
+            number=1,
+            currency_id="BRL",
+            timezone="America/Sao_Paulo",
+            verified_at=timezone.now(),
+            conditions={"root": {"kind": "code_required"}},
+        )
+        PromotionScope.objects.create(
+            revision=revision, role="target", kind="offer", ref_id=self.offers["B"].pk
+        )
+        revision.evidence.add(Evidence.objects.create(kind="announcement", excerpt="x"))
+        assert PromotionService().publish(revision, "informative").published
+        ProjectionService().refresh()
+
+        rows = self.client.get("/api/catalog/products/", {"scenario": "coupons"}).json()
+        items = {row["name"]: row for row in rows["items"]}
+
+        assert items["B"]["storePromotions"] == [
+            {"title": "Cupons de influenciadores", "kind": "coupon"}
+        ]
+        assert items["B"]["price"] == "120.00"
+        assert items["B"]["couponCodes"] == []
+        assert items["A"]["storePromotions"] == []
+
     def test_a_small_page_keeps_the_global_order(self) -> None:
         """Filtering happens before choosing the winner and before paging."""
         self._publish(self.a2, "fixed_amount", {"amount": "40"}, code="SYN40")
@@ -321,8 +392,7 @@ class PersonalBenefitTests(BenefitCatalog, TestCase):
             },
         }
         draft.save()
-        with patch("pricing.invalidation.refresh_projections.delay"):
-            assert PromotionService().publish(draft, "executable").published
+        assert PromotionService().publish(draft, "executable").published
         ProjectionService().refresh()
 
         ranking = dict(self._ranking(self.policy_for_public()))

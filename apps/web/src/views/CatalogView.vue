@@ -18,6 +18,7 @@ const {
   pageInfo: tablePageInfo,
   activeName,
   scenario,
+  benefits,
   variables,
   filtersActive,
   clearFilters,
@@ -53,7 +54,12 @@ function setPage(page: number) {
 <template>
   <main id="catalog" class="app-catalog-page py-4 sm:py-6">
     <div class="app-shell px-4 sm:px-6">
-      <CatalogToolbar :active="active" :scenario="scenario" @update:scenario="scenario = $event" />
+      <CatalogToolbar
+        v-model:benefits="benefits"
+        :active="active"
+        :scenario="scenario"
+        @update:scenario="scenario = $event"
+      />
       <div class="my-3 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <BaseSelect

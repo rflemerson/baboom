@@ -137,18 +137,22 @@ offers that a successful crawl no longer sees.
   exact set of coupon and cashback, and `base` (no promotion); the default read
   takes the cheapest still valid, so an ended promotion falls back to a price
   without waiting for the worker. `?scenario=<policy key>` picks the policy (default:
-  the `is_default` one); every request ranks one market (`?country=`,
+  the `is_default` one); `?coupon=0` and `?cashback=0` drop the alternatives
+  that need that benefit (`?points=0` only hides points), and at one price the larger cashback wins; every
+  request ranks one market (`?country=`,
   `?currency=`, default BR/BRL). Every market reads projections; run
   `rebuild_pricing_projections` before opening a new one.
-  Public policies: `normal` (store price, no benefits, default) and `best`
-  (best price paid now; falls back to normal).
+  Public policies: `best` (best price paid now, cash methods included;
+  default) and `normal` (the catalog price: the store's price paid any way,
+  with coupons and cashback, no cash-method discount).
 - `pricing.invalidation.Repricing` decides what a change reaches: it first
   expires rows the change may have made wrong (a moved route's old and new
   offers; prices a changed promotion gave) under the offers' row locks, the
   ones a refresh takes, so a refresh and an expiry never interleave; then each
-  call registers its own `refresh_projections` with `transaction.on_commit`
-  (a rolled-back savepoint drops it; the refresh is idempotent, so repeated
-  tasks are accepted). `pre_save`
+  call queues a `ProjectionRefreshRequest` row in the same transaction (a
+  rolled-back savepoint drops it). The API never talks to the broker, which
+  lives only on the worker machine: `drain_projection_requests` runs every
+  minute there, merges the queued offers into one refresh and deletes them. `pre_save`
   receivers keep the replaced row so its old targets are repriced too.
   A change that may take a promotion away (an offer linked to another product,
   a product's brand or category, a category moved with treebeard's manager
@@ -182,8 +186,11 @@ offers that a successful crawl no longer sees.
 - Public catalog and alerts: REST. A product is listed only with a price;
   `stockStatus` reports the stock of the offer that prices it and `?stock=`
   filters by it (the web defaults to `in_stock`). Each product states what the shown price
-  needs: `couponCodes`, `paymentMethod`, `cashback` (shown apart, never taken
-  off `price`) and `routeInstructions`, read from the projection's explanation.
+  needs: `couponCodes`, `paymentMethod`, `cashback` and `points` (shown apart,
+  never taken off `price`) and `routeInstructions`, read from the projection's
+  explanation; `listPrice` is the store's price before any benefit.
+  `storePromotions` (title, kind) names the informative promotions in force
+  that reach the offer: the store has them, the price never takes them.
 - Scrapers retain `ScrapedPage` metadata and the store's own product context;
   humans curate the catalog through Django admin.
 - Nothing here fetches or stores product-page HTML. Reading a product page is

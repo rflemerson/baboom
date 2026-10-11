@@ -27,11 +27,13 @@ BEST = {
     (FORBIDDEN, FORBIDDEN): {"A": HUNDRED, "B": DEAR},
 }
 
-# The normal policy applies no benefit: the store's price uses neither, so a
+# The catalog price (`normal`) takes the same coupon and cashback; it only
+# leaves out cash-method discounts, which this catalog has none of.
+NORMAL = BEST
+
+# A policy that applies no benefit: the store's price uses neither, so a
 # filter that requires one finds nothing.
-NORMAL = {
-    cell: ({} if REQUIRED in cell else {"A": HUNDRED, "B": DEAR}) for cell in BEST
-}
+PLAIN = {cell: ({} if REQUIRED in cell else {"A": HUNDRED, "B": DEAR}) for cell in BEST}
 
 
 class BenefitMatrixTests(BenefitCatalog, TestCase):
@@ -66,9 +68,19 @@ class BenefitMatrixTests(BenefitCatalog, TestCase):
                 )
 
     def test_the_normal_policy(self) -> None:
-        """The store's price answers every filter that does not require a benefit."""
+        """The catalog price answers each filter as the best price does here."""
         for (coupon, cashback), expected in NORMAL.items():
             with self.subTest(coupon=coupon, cashback=cashback):
                 assert (
                     self._priced("normal", coupon=coupon, cashback=cashback) == expected
+                )
+
+    def test_a_policy_without_benefits(self) -> None:
+        """The store's price answers every filter that does not require a benefit."""
+        self._policy("plain", apply_benefits=False)
+        ProjectionService().refresh()
+        for (coupon, cashback), expected in PLAIN.items():
+            with self.subTest(coupon=coupon, cashback=cashback):
+                assert (
+                    self._priced("plain", coupon=coupon, cashback=cashback) == expected
                 )

@@ -108,8 +108,7 @@ class WorkTests(TwoProductCatalog, TestCase):
         revision = self._promote_b("10")
         for _number in range(5):
             draft = PromotionService().revise(revision.promotion)
-            with patch("pricing.invalidation.refresh_projections.delay"):
-                assert PromotionService().publish(draft, "executable").published
+            assert PromotionService().publish(draft, "executable").published
             revision = draft
 
         loaded = FactLoader.revisions()

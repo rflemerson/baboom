@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import { FlaskConical } from 'lucide-vue-next'
+import { Coins, FlaskConical, Star, Ticket } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import type { CatalogActive } from '@/types/catalog'
 
@@ -8,13 +8,15 @@ defineProps<{
   active: CatalogActive | null
   scenario: string
 }>()
+// The benefits the price may count on, whichever the scenario.
+const benefits = defineModel<string[]>('benefits', { required: true })
 const emit = defineEmits<{ 'update:scenario': [value: string] }>()
 const { t } = useI18n()
 </script>
 
 <template>
   <section class="app-catalog-toolbar" :aria-label="t('catalog.comparisonSettings')">
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div class="grid gap-4 sm:grid-cols-3">
       <div class="flex min-w-0 flex-col gap-1.5">
         <span class="app-copy-soft text-[10px] tracking-wide uppercase">{{
           t('catalog.compareActive')
@@ -36,10 +38,25 @@ const { t } = useI18n()
           :label="t('catalog.scenarioLabel')"
           :model-value="scenario"
           :options="[
-            { value: '', label: t('catalog.normalPrice') },
             { value: 'best', label: t('catalog.bestPrice') },
+            { value: 'normal', label: t('catalog.catalogPrice') },
           ]"
           @update:model-value="emit('update:scenario', $event)"
+        />
+      </div>
+      <div class="flex min-w-0 flex-col gap-1.5">
+        <span class="app-copy-soft text-[10px] tracking-wide uppercase">{{
+          t('catalog.benefits')
+        }}</span>
+        <BaseSelect
+          v-model="benefits"
+          :label="t('catalog.benefits')"
+          :empty-label="t('catalog.noBenefits')"
+          :options="[
+            { value: 'coupon', label: t('catalog.coupons'), icon: Ticket },
+            { value: 'cashback', label: t('catalog.cashback'), icon: Coins },
+            { value: 'points', label: t('catalog.points'), icon: Star },
+          ]"
         />
       </div>
     </div>

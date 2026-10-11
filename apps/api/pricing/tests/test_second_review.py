@@ -3,7 +3,6 @@
 from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
@@ -128,15 +127,14 @@ class RouteIntegrationTests(TwoProductCatalog, TestCase):
     def test_curated_route_reaches_rest(self) -> None:
         """The route URL and seller flag must describe the same link."""
         route_url = "https://synthetic.example/selected?seller=9&variant=2"
-        with patch("pricing.invalidation.refresh_projections.delay"):
-            PurchaseRoute.objects.create(
-                offer=self.offers["B"],
-                kind="marketplace_listing",
-                url=route_url,
-                fixes_seller=True,
-                fixes_variant=True,
-                instructions="Synthetic seller selection",
-            )
+        PurchaseRoute.objects.create(
+            offer=self.offers["B"],
+            kind="marketplace_listing",
+            url=route_url,
+            fixes_seller=True,
+            fixes_variant=True,
+            instructions="Synthetic seller selection",
+        )
         ProjectionService().refresh()
         payload = self.client.get(URL, {"scenario": "best"}).json()
         item = next(row for row in payload["items"] if row["name"] == "B")
@@ -343,7 +341,7 @@ class CouponScenarioTests(TwoProductCatalog, TestCase):
     """Compare public coupon scenarios before selecting winners and paging."""
 
     def test_public_coupon_changes_global_ranking(self) -> None:
-        """A=100 wins by default; B=110 minus public twenty wins at ninety."""
+        """A=100 wins without coupons; B=110 minus public twenty wins at ninety."""
         Offer.objects.filter(pk=self.offers["B"].pk).update(current_price=110)
         promo = Promotion.objects.create(
             title="Synthetic public coupon", issuer_seller=self.seller
@@ -393,6 +391,7 @@ class CouponScenarioTests(TwoProductCatalog, TestCase):
             URL,
             {
                 "scenario": "normal",
+                "coupon": "0",
                 "sort_by": "price",
                 "sort_dir": "asc",
                 "per_page": 1,

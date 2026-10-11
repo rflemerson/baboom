@@ -1,20 +1,40 @@
-<script setup lang="ts">
-import { computed } from 'vue'
+<script setup lang="ts" generic="T extends string | string[]">
+import { computed, type Component } from 'vue'
 import { Check, ChevronDown } from 'lucide-vue-next'
 import { useDisclosure } from '@/composables/useDisclosure'
 
+// A list model picks several options and keeps the menu open.
 const props = defineProps<{
-  modelValue: string
-  options: { value: string; label: string }[]
+  modelValue: T
+  options: { value: string; label: string; icon?: Component }[]
   label: string
   disabled?: boolean
+  emptyLabel?: string
 }>()
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: T] }>()
 const { root, closeAndFocus, escape } = useDisclosure()
-const selected = computed(() => props.options.find((option) => option.value === props.modelValue))
+const multiple = computed(() => Array.isArray(props.modelValue))
+function isSelected(value: string): boolean {
+  return Array.isArray(props.modelValue)
+    ? props.modelValue.includes(value)
+    : props.modelValue === value
+}
+const selected = computed(() => props.options.filter((option) => isSelected(option.value)))
+const summary = computed(
+  () => selected.value.map((option) => option.label).join(', ') || props.emptyLabel || '',
+)
 function select(value: string) {
-  emit('update:modelValue', value)
-  closeAndFocus()
+  if (!Array.isArray(props.modelValue)) {
+    emit('update:modelValue', value as T)
+    closeAndFocus()
+    return
+  }
+  const chosen = isSelected(value)
+    ? props.modelValue.filter((option) => option !== value)
+    : props.options
+        .map((option) => option.value)
+        .filter((option) => option === value || isSelected(option))
+  emit('update:modelValue', chosen as T)
 }
 </script>
 
@@ -25,20 +45,31 @@ function select(value: string) {
       :aria-disabled="disabled || undefined"
       @click="disabled && $event.preventDefault()"
     >
-      <slot name="icon" />
-      <span class="min-w-0 flex-1 truncate">{{ selected?.label }}</span>
+      <slot name="icon">
+        <component
+          :is="option.icon"
+          v-for="option in selected.filter((option) => option.icon)"
+          :key="option.value"
+          class="app-copy-brand h-3.5 w-3.5 shrink-0"
+          aria-hidden="true"
+        />
+      </slot>
+      <span class="min-w-0 flex-1 truncate">{{ summary }}</span>
       <ChevronDown class="h-3.5 w-3.5 shrink-0" />
     </summary>
-    <div class="app-select__menu" :aria-label="label">
+    <div class="app-select__menu" :aria-label="label" :aria-multiselectable="multiple || undefined">
       <button
         v-for="option in options"
         :key="option.value"
         type="button"
-        :aria-pressed="option.value === modelValue"
+        :aria-pressed="isSelected(option.value)"
         @click="select(option.value)"
       >
-        <span>{{ option.label }}</span>
-        <Check v-if="option.value === modelValue" class="h-3.5 w-3.5" />
+        <span class="flex items-center gap-2">
+          <component :is="option.icon" v-if="option.icon" class="h-3.5 w-3.5" aria-hidden="true" />
+          {{ option.label }}
+        </span>
+        <Check v-if="isSelected(option.value)" class="h-3.5 w-3.5" />
       </button>
     </div>
   </details>

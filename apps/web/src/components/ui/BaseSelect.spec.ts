@@ -33,4 +33,28 @@ describe('BaseSelect', () => {
     expect(root.open).toBe(false)
     wrapper.unmount()
   })
+
+  it('picks several options from a list model and stays open', async () => {
+    const wrapper = mount(BaseSelect, {
+      props: {
+        modelValue: ['coupon'],
+        label: 'Benefits',
+        emptyLabel: 'None',
+        options: [
+          { value: 'coupon', label: 'Coupons' },
+          { value: 'cashback', label: 'Cashback' },
+        ],
+      },
+    })
+    const root = wrapper.element as HTMLDetailsElement
+    root.open = true
+    expect(wrapper.get('summary').text()).toBe('Coupons')
+    await wrapper.findAll('button')[1]?.trigger('click')
+    await wrapper.findAll('button')[0]?.trigger('click')
+    expect(wrapper.emitted('update:modelValue')).toEqual([[['coupon', 'cashback']], [[]]])
+    expect(root.open).toBe(true)
+    await wrapper.setProps({ modelValue: [] })
+    expect(wrapper.get('summary').text()).toBe('None')
+    wrapper.unmount()
+  })
 })

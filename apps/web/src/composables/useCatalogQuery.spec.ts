@@ -84,4 +84,18 @@ describe('useCatalogQuery', () => {
     await vi.waitFor(() => expect(loading.value).toBe(false))
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('scenario=best')
   })
+
+  it('asks to drop only the benefits the buyer refuses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({}) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { loading } = useCatalogQuery({
+      filters: { page: 1, scenario: 'best', coupon: false, cashback: true },
+    })
+
+    await vi.waitFor(() => expect(loading.value).toBe(false))
+    const url = String(fetchMock.mock.calls[0]?.[0])
+    expect(url).toContain('coupon=0')
+    expect(url).not.toContain('cashback')
+  })
 })

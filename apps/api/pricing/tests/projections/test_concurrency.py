@@ -7,7 +7,6 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 from django.db import connections, transaction
 from django.test import TransactionTestCase
@@ -27,35 +26,23 @@ if TYPE_CHECKING:
     from pricing.facts import Facts
 
 WAIT_SECONDS = 1.0
-DELAY = "pricing.invalidation.refresh_projections.delay"
 
 
 class PausingLoader(FactLoader):
-    """Read the facts of one policy, then wait while the test changes them."""
+    """Read the facts of a refresh, then wait while the test changes them."""
 
-    def __init__(
-        self,
-        policy_key: str,
-        read: threading.Event,
-        proceed: threading.Event,
-    ) -> None:
-        """Pause after reading this policy's facts, until ``proceed`` is set."""
+    def __init__(self, read: threading.Event, proceed: threading.Event) -> None:
+        """Pause after reading the facts, until ``proceed`` is set."""
         super().__init__()
-        self.policy_key = policy_key
         self.read = read
         self.proceed = proceed
 
-    def load(
-        self,
-        offer_ids: Iterable[int],
-        policy: PricingPolicyRevision,
-    ) -> Facts:
-        """Load the facts; for the chosen policy, hold the refresh afterwards."""
-        facts = super().load(offer_ids, policy)
-        if policy.key == self.policy_key:
-            self.read.set()
-            self.proceed.wait(timeout=10)
-            time.sleep(WAIT_SECONDS)
+    def load(self, offer_ids: Iterable[int]) -> Facts:
+        """Load the facts, then hold the refresh before it prices them."""
+        facts = super().load(offer_ids)
+        self.read.set()
+        self.proceed.wait(timeout=10)
+        time.sleep(WAIT_SECONDS)
         return facts
 
 
@@ -69,8 +56,6 @@ class ConcurrentRefreshTests(TwoProductCatalog, TransactionTestCase):
         the test recreates the currency and the policy it needs.
         """
         Currency.objects.get_or_create(code="BRL", defaults={"minor_unit": 2})
-        # These tests commit, so refreshes would reach the broker; none is needed.
-        self.enterContext(patch(DELAY))
         super().setUp()
         PricingPolicyRevision.objects.get_or_create(
             key="concurrent",
@@ -148,11 +133,10 @@ class ConcurrentRefreshTests(TwoProductCatalog, TransactionTestCase):
             rules={"freshness_hours": 72},
             published_at=timezone.now(),
         )
-        with patch(DELAY):
-            revision = self._promote_b("30")
+        revision = self._promote_b("30")
         ProjectionService().refresh([offer.pk])
         facts_read, suspending = threading.Event(), threading.Event()
-        loader = PausingLoader("racing", facts_read, suspending)
+        loader = PausingLoader(facts_read, suspending)
 
         def refresh() -> None:
             try:
@@ -164,8 +148,7 @@ class ConcurrentRefreshTests(TwoProductCatalog, TransactionTestCase):
             try:
                 facts_read.wait(timeout=10)
                 suspending.set()
-                with patch(DELAY):
-                    PromotionService.set_status(revision, "suspended")
+                PromotionService.set_status(revision, "suspended")
             finally:
                 connections.close_all()
 

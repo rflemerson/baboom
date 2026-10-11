@@ -17,10 +17,12 @@ from django.utils import timezone
 
 from commerce.models import Market
 from offers.models import Offer
+from promotions.models import PromotionRevision
 
 from .context import Terms
 from .costs import CostBook
 from .domain.engine import evaluate
+from .domain.scopes import targets
 from .domain.types import CartLine, PurchaseContext
 from .facts import LEGACY_PRICE_ID, FactLoader, Facts
 from .groups import group_fingerprint, one_group
@@ -30,7 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from datetime import datetime
 
-    from .domain.types import Policy, PricingResult
+    from .domain.types import Policy, PricingResult, RevisionRule
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ class _Batch:
     moment: datetime
     costs: CostBook
     codes: frozenset[str]
+    # Informative revisions in force, each with its promotion's public title.
+    informative: tuple[tuple[RevisionRule, str], ...] = ()
 
     def alternatives(self) -> list[str]:
         """Name the winner, each exact set of coupon and cashback, and the base.
@@ -170,7 +174,31 @@ class ProjectionService:
             shared.moment,
             shared.costs,
             codes,
+            self._informative(facts, shared.moment) if policy.apply_benefits else (),
         )
+
+    @staticmethod
+    def _informative(
+        facts: Facts, moment: datetime
+    ) -> tuple[tuple[RevisionRule, str], ...]:
+        """Return the informative revisions in force, with their titles.
+
+        They never enter a price: the catalog only says the store has them,
+        without a code it does not know or must not publish.
+        """
+        rules = [
+            rule
+            for rule in facts.revisions
+            if rule.status == PromotionRevision.Status.INFORMATIVE
+            and (rule.starts_at is None or rule.starts_at <= moment)
+            and (rule.ends_at is None or moment < rule.ends_at)
+        ]
+        titles = dict(
+            PromotionRevision.objects.filter(
+                pk__in=[rule.id for rule in rules]
+            ).values_list("pk", "promotion__title")
+        )
+        return tuple((rule, titles.get(rule.id, "")) for rule in rules)
 
     def _projections(
         self, offer_id: int, batch: _Batch
@@ -273,6 +301,12 @@ class ProjectionService:
                 **self._explanation(result),
                 "objective": policy.objective,
                 "cashback": str(reward) if reward else None,
+                "points": self._points(result),
+                "store_promotions": [
+                    {"title": title, "kind": _informative_kind(rule)}
+                    for rule, title in batch.informative
+                    if targets(rule, offer)
+                ],
                 "public_codes": sorted(
                     {
                         code
@@ -287,6 +321,19 @@ class ProjectionService:
             computed_at=batch.moment,
             expires_at=result.expires_at,
         )
+
+    @staticmethod
+    def _points(result: PricingResult) -> str | None:
+        """Total the loyalty points earned: their own unit, shown, never priced."""
+        points = sum(
+            (
+                reward.amount
+                for reward in result.deferred_rewards
+                if reward.credited_as == "points" and reward.amount is not None
+            ),
+            Decimal(0),
+        )
+        return str(points) if points else None
 
     @staticmethod
     def policies() -> list[PricingPolicyRevision]:
@@ -380,6 +427,18 @@ class ProjectionService:
 def _alternative(benefits: frozenset[str]) -> str:
     """Name an exact set of benefits: "none", or its names joined."""
     return "+".join(sorted(benefits)) or "none"
+
+
+def _informative_kind(rule: RevisionRule) -> str:
+    """Name what an informative promotion offers, for its badge."""
+    kinds = {effect.kind for effect in rule.effects}
+    if rule.codes or "code_required" in str(rule.conditions):
+        return "coupon"
+    if "cashback" in kinds:
+        return "cashback"
+    if "points" in kinds:
+        return "points"
+    return "promotion"
 
 
 def _benefits(alternative: str) -> frozenset[str] | None:

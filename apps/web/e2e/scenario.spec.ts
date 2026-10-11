@@ -42,7 +42,7 @@ async function chooseScenario(page: Page, option: string) {
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
-test('choosing the best price ranks by the price paid now', async ({ page }) => {
+test('the best price leads; the catalog price is one choice away', async ({ page }) => {
   const scenarios: Array<string | null> = []
   await page.route('**/api/catalog/products/**', async (route: Route) => {
     const url = new URL(route.request().url())
@@ -62,22 +62,25 @@ test('choosing the best price ranks by the price paid now', async ({ page }) => 
   })
 
   await page.goto('/')
-  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
-  await expect(
-    page.getByRole('columnheader', { name: 'Ordenar por Preço', exact: true }),
-  ).toBeVisible()
-
-  await chooseScenario(page, 'Melhor preço')
-
   await expect(page.getByRole('table').getByText('R$ 89,90')).toBeVisible()
   await expect(page.getByRole('table').getByText('Pagando com Pix')).toBeVisible()
   await expect(
     page.getByRole('table').getByText('A página da loja pode abrir a oferta de outro vendedor.'),
   ).toBeVisible()
-  expect(scenarios).toContain('best')
+  expect(scenarios[0]).toBe('best')
+
+  await chooseScenario(page, 'Preço de catálogo')
+
+  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
+  await expect(
+    page.getByRole('columnheader', { name: 'Ordenar por Preço', exact: true }),
+  ).toBeVisible()
+  expect(scenarios.at(-1)).toBe('normal')
 })
 
-test('the best price with a coupon says which coupon to use', async ({ page }) => {
+test('the benefits column lists the coupon, the payment method and the cashback', async ({
+  page,
+}) => {
   await page.route('**/api/catalog/products/**', async (route: Route) => {
     await route.fulfill({
       json: {
@@ -89,9 +92,11 @@ test('the best price with a coupon says which coupon to use', async ({ page }) =
         items: [
           {
             ...product('79.90', 'pix', true),
+            listPrice: '99.90',
             couponCodes: ['SYNTH20'],
             cashback: { amount: '8.00', currency: 'BRL' },
             routeInstructions: null,
+            storePromotions: [{ title: 'Cupons de influenciadores', kind: 'coupon' }],
           },
         ],
       },
@@ -99,10 +104,14 @@ test('the best price with a coupon says which coupon to use', async ({ page }) =
   })
 
   await page.goto('/')
-  await chooseScenario(page, 'Melhor preço')
 
-  await expect(page.getByRole('table').getByText('Use o cupom SYNTH20')).toBeVisible()
-  await expect(page.getByRole('table').getByText('Pagando com Pix')).toBeVisible()
-  await expect(page.getByRole('table').getByText('+ R$ 8,00 de cashback')).toBeVisible()
-  await expect(page.getByRole('table').getByText('R$ 79,90')).toBeVisible()
+  const table = page.getByRole('table')
+  await expect(table.getByRole('columnheader', { name: 'Benefícios' })).toBeVisible()
+  await expect(table.getByTestId('benefits')).toContainText('SYNTH20')
+  await expect(table.getByTestId('benefits')).toContainText('Pix')
+  await expect(table.getByTestId('benefits')).toContainText('R$ 8,00')
+  await expect(table.getByTestId('benefits')).toContainText('Cupom na loja')
+  await expect(table.getByTitle('Cupons de influenciadores')).toBeVisible()
+  await expect(table.getByText('R$ 79,90')).toBeVisible()
+  await expect(table.locator('s')).toHaveText('R$ 99,90')
 })

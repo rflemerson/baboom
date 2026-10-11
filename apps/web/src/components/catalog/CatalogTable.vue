@@ -4,7 +4,8 @@ import { useI18n } from 'vue-i18n'
 import type { Table } from '@tanstack/vue-table'
 import type { CatalogProduct } from '@/types/catalog'
 import { formatDecimal, formatMoney, formatQuantity, pricePer100g } from '@/utils/number'
-import CatalogPriceNotes from './CatalogPriceNotes.vue'
+import { usePriceDisplay } from '@/composables/usePriceDisplay'
+import CatalogBenefits from './CatalogBenefits.vue'
 
 defineProps<{
   table: Table<CatalogProduct>
@@ -13,6 +14,7 @@ defineProps<{
   loading: boolean
 }>()
 const { t } = useI18n()
+const { discounted } = usePriceDisplay()
 const NUMERIC = ['pricePerActive', 'price', 'concentration', 'totalActive', 'mass']
 </script>
 
@@ -111,7 +113,12 @@ const NUMERIC = ['pricePerActive', 'price', 'concentration', 'totalActive', 'mas
               <span class="font-medium whitespace-nowrap">{{
                 formatMoney(row.original.price, row.original.currency)
               }}</span>
-              <CatalogPriceNotes :product="row.original" />
+              <s
+                v-if="discounted(row.original)"
+                class="app-copy-soft block text-xs whitespace-nowrap"
+                :aria-label="t('catalog.listPrice')"
+                >{{ formatMoney(row.original.listPrice, row.original.currency) }}</s
+              >
               <p
                 v-if="row.original.optimizationStatus === 'bounded'"
                 class="app-copy-soft mt-1 text-xs"
@@ -119,6 +126,7 @@ const NUMERIC = ['pricePerActive', 'price', 'concentration', 'totalActive', 'mas
                 {{ t('catalog.bounded') }}
               </p>
             </template>
+            <CatalogBenefits v-else-if="cell.column.id === 'benefits'" :product="row.original" />
             <span v-else-if="cell.column.id === 'concentration'" class="whitespace-nowrap">{{
               row.original.concentration == null
                 ? t('common.missing')

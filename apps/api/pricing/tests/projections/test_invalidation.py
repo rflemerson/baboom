@@ -14,13 +14,15 @@ from commerce.models import Program
 from core.models import Brand, Product, ProductStore
 from offers.models import Offer, StockStatus
 from pricing.admin import PricingPolicyRevisionAdmin
-from pricing.models import OfferScenarioProjection, PricingPolicyRevision
+from pricing.models import (
+    OfferScenarioProjection,
+    PricingPolicyRevision,
+    ProjectionRefreshRequest,
+)
 from pricing.projections import ProjectionService
 from pricing.tests.projections.test_projections import TwoProductCatalog
 from promotions.models import PurchaseRoute
 from promotions.services import PromotionService
-
-DELAY = "pricing.invalidation.refresh_projections.delay"
 
 
 class InvalidationTests(TwoProductCatalog, TestCase):
@@ -32,12 +34,19 @@ class InvalidationTests(TwoProductCatalog, TestCase):
         ProjectionService().refresh()
 
     def _scheduled(self, change: object) -> list[object]:
-        with (
-            patch(DELAY) as delay,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            change()
-        return [call.kwargs.get("offer_ids") for call in delay.call_args_list]
+        """Return the offer ids of each refresh request the change queued."""
+        last = (
+            ProjectionRefreshRequest.objects.order_by("-pk")
+            .values_list("pk", flat=True)
+            .first()
+            or 0
+        )
+        change()
+        return list(
+            ProjectionRefreshRequest.objects.filter(pk__gt=last)
+            .order_by("pk")
+            .values_list("offer_ids", flat=True)
+        )
 
     def test_a_route_expires_and_reprices_only_its_offer(self) -> None:
         """B's old link stops serving at once; A is untouched."""
@@ -109,12 +118,19 @@ class PreviousStateTests(TwoProductCatalog, TestCase):
         ProjectionService().refresh()
 
     def _scheduled(self, change: object) -> list[object]:
-        with (
-            patch(DELAY) as delay,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            change()
-        return [call.kwargs.get("offer_ids") for call in delay.call_args_list]
+        """Return the offer ids of each refresh request the change queued."""
+        last = (
+            ProjectionRefreshRequest.objects.order_by("-pk")
+            .values_list("pk", flat=True)
+            .first()
+            or 0
+        )
+        change()
+        return list(
+            ProjectionRefreshRequest.objects.filter(pk__gt=last)
+            .order_by("pk")
+            .values_list("offer_ids", flat=True)
+        )
 
     def _expired(self, name: str) -> bool:
         now = timezone.now()
@@ -146,15 +162,13 @@ class PreviousStateTests(TwoProductCatalog, TestCase):
         revision = self._promote_b("30")
         ProjectionService().refresh()
 
-        with patch(DELAY):
-            PromotionService.set_status(revision, "suspended")
+        PromotionService.set_status(revision, "suspended")
 
         now = timezone.now()
         rows = OfferScenarioProjection.objects.filter(alternative="best")
-        promoted = rows.get(offer=self.offers["B"], policy__key="best")
-        normal = rows.get(offer=self.offers["B"], policy__key="normal")
-        assert promoted.expires_at <= now
-        assert normal.expires_at is None or normal.expires_at > now
+        # The catalog price took the promotion too: both stop serving it.
+        for key in ("best", "normal"):
+            assert rows.get(offer=self.offers["B"], policy__key=key).expires_at <= now
         assert not self._expired("A")
 
     def test_a_rolled_back_savepoint_schedules_nothing(self) -> None:
@@ -169,7 +183,7 @@ class PreviousStateTests(TwoProductCatalog, TestCase):
         assert self._scheduled(attempt) == []
 
     def test_each_call_schedules_its_own_idempotent_refresh(self) -> None:
-        """Two saves in one transaction queue two tasks; none is merged away."""
+        """Two saves in one transaction queue two requests; the worker merges them."""
 
         def save_both() -> None:
             for product in Product.objects.filter(name__in=["A", "B"]):

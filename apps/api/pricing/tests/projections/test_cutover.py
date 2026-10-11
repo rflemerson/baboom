@@ -30,7 +30,7 @@ class CutoverTests(TwoProductCatalog, TestCase):
         ProjectionService().refresh()
 
         assert self._prices() == {"A": "100.00", "B": "120.00"}
-        assert self.client.get(URL).json()["scenario"]["key"] == "normal"
+        assert self.client.get(URL).json()["scenario"]["key"] == "best"
 
 
 class CoverageReportTests(TwoProductCatalog, TestCase):

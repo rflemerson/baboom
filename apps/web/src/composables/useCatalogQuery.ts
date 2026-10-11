@@ -36,6 +36,9 @@ function buildCatalogUrl(variables: CatalogProductsVariables) {
   appendOptionalParam(params, 'sort_by', filters.sortBy)
   appendOptionalParam(params, 'sort_dir', filters.sortDir)
   appendOptionalParam(params, 'scenario', filters.scenario)
+  if (filters.coupon === false) params.set('coupon', '0')
+  if (filters.cashback === false) params.set('cashback', '0')
+  if (filters.points === false) params.set('points', '0')
 
   const queryString = params.toString()
   return queryString ? `${catalogApiUrl}?${queryString}` : catalogApiUrl

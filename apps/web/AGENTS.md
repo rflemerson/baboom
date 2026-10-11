@@ -89,8 +89,14 @@ cd apps/web && npm run format
 
 ## Price scenarios
 
-- The "Price shown" selector offers "Normal price" (no `scenario`) and
-  "Best price" (`scenario=best`); every market reads projections.
-- A table row tells what the shown price needs: `couponCodes`, `paymentMethod`,
-  `cashback` (apart from `price`) and `routeInstructions`, through
-  `CatalogPriceNotes`.
+- The payment scenario defaults to "Best price" (`scenario=best`); "Catalog
+  price" sends `scenario=normal`: the store's price, with coupons and cashback
+  but no cash-method discount. "Benefits" is a multi-select `BaseSelect`
+  (list model, icons) of coupons, cashback and points; only coupons by default;
+  each one off sends `coupon=0`, `cashback=0` or `points=0`.
+- The price cell shows `price` and, struck through, `listPrice` when higher.
+  One "Benefits" column stacks `CatalogBenefits` badges, one under another:
+  coupon codes, payment method and route instructions (blue), then cashback
+  (green), points (purple) and, dashed and grey, `storePromotions` the store
+  has but the price never takes (title on hover); "—" when empty. The phone card shows the same
+  badges under the price.

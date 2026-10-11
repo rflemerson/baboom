@@ -25,7 +25,7 @@ from core.selectors import (
 )
 from core.services import AlertSubscriptionService
 from offers.models import StockStatus
-from pricing.selectors import projected_prices, public_policy
+from pricing.selectors import BenefitFilter, projected_prices, public_policy
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -61,6 +61,17 @@ def _positive_int(value: str | None, default: int) -> int:
 def _choices(values: list[str]) -> list[str]:
     """Keep the non-empty values of a repeated query parameter."""
     return [value for value in values if value.strip()]
+
+
+def _benefits_from_request(request: HttpRequest) -> BenefitFilter:
+    """Read the benefits the buyer refuses: ``coupon=0`` or ``cashback=0``.
+
+    ``points=0`` only hides points: they never change a price or a ranking.
+    """
+    return BenefitFilter(
+        uses_coupon=False if request.GET.get("coupon") == "0" else None,
+        has_cashback=False if request.GET.get("cashback") == "0" else None,
+    )
 
 
 def _catalog_filters_from_request(request: HttpRequest) -> CatalogProductsFilters:
@@ -131,12 +142,15 @@ def _profiles_by_id(products: list[Product]) -> dict[int, ProductNutrition]:
     }
 
 
-def _pricing_terms(details: object, currency: Currency) -> dict[str, Any]:
+def _pricing_terms(
+    details: object, currency: Currency, *, points: bool
+) -> dict[str, Any]:
     """Name what the buyer needs to execute the shown price.
 
-    The coupon codes the price requires, the monetary cashback of the same
-    alternative (shown apart, never taken off the price) and the route's
-    activation instruction.
+    The coupon codes the price requires, the monetary cashback and the
+    loyalty points of the same alternative (shown apart, never taken off the
+    price), the store's informative promotions (shown, never priced) and the
+    route's activation instruction.
     """
     found = details if isinstance(details, dict) else {}
     cashback = found.get("cashback")
@@ -151,6 +165,15 @@ def _pricing_terms(details: object, currency: Currency) -> dict[str, Any]:
             if cashback
             else None
         ),
+        "points": (
+            int(Decimal(str(found["points"])))
+            if points and found.get("points")
+            else None
+        ),
+        "storePromotions": [
+            {"title": str(item.get("title") or ""), "kind": str(item.get("kind"))}
+            for item in found.get("store_promotions") or []
+        ],
         "routeInstructions": next(
             (route["instructions"] for route in routes if route.get("instructions")),
             None,
@@ -162,6 +185,8 @@ def _serialize_catalog_product(
     product: Product,
     profiles: dict[int, ProductNutrition],
     currency: Currency,
+    *,
+    points: bool = True,
 ) -> dict[str, Any]:
     """Serialize the public catalog product shape used by the frontend."""
     profile = profiles.get(product.nutrition_profile_id)
@@ -180,13 +205,14 @@ def _serialize_catalog_product(
         "packagingDisplay": product.get_packaging_display(),
         "netMass": _decimal_to_str(product.net_mass),
         "price": _money_to_str(product.price, currency.minor_unit),
+        "listPrice": _money_to_str(product.list_price, currency.minor_unit),
         "currency": currency.code if product.price is not None else None,
         "pricePerActive": _decimal_to_str(product.price_per_active),
         "concentration": _decimal_to_str(product.concentration),
         "totalActive": _decimal_to_str(product.total_active),
         "externalLink": product.external_link,
         "pricingDetails": product.pricing_details,
-        **_pricing_terms(product.pricing_details, currency),
+        **_pricing_terms(product.pricing_details, currency, points=points),
         "comparisonAmount": _money_to_str(
             product.comparison_price,
             currency.minor_unit,
@@ -250,7 +276,11 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
     if policy is None:
         return HttpResponseBadRequest("Unknown pricing scenario.")
     price_source = projected_prices(
-        policy, timezone.now(), country=country, currency=currency
+        policy,
+        timezone.now(),
+        country=country,
+        currency=currency,
+        benefits=_benefits_from_request(request),
     )
     queryset = public_catalog_products(price_source, query_filters)
     currency_row = Currency.objects.get(code=currency)
@@ -278,7 +308,12 @@ def catalog_products(request: HttpRequest) -> JsonResponse | HttpResponseBadRequ
                 "hasNextPage": page_obj.has_next(),
             },
             "items": [
-                _serialize_catalog_product(product, profiles, currency_row)
+                _serialize_catalog_product(
+                    product,
+                    profiles,
+                    currency_row,
+                    points=request.GET.get("points") != "0",
+                )
                 for product in page_obj.object_list
             ],
         },

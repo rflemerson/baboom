@@ -118,8 +118,8 @@ class RankingTests(TwoProductCatalog, TestCase):
         assert projection.amount == Decimal("100.00")
         assert projection.status == "priced"
 
-    def test_the_normal_price_ignores_promotions(self) -> None:
-        """B stays R$ 120 under the normal price; the best price is R$ 84."""
+    def test_the_catalog_price_takes_promotions(self) -> None:
+        """B costs R$ 84 under both: only a cash-method discount sets them apart."""
         self._promote_b("30")
         ProjectionService().refresh()
 
@@ -131,7 +131,7 @@ class RankingTests(TwoProductCatalog, TestCase):
             )
             for key in ("normal", "best")
         )
-        assert normal.amount == Decimal("120.00")
+        assert normal.amount == Decimal("84.00")
         assert best.amount == Decimal("84.00")
 
     def test_a_promoted_offer_wins_before_pagination(self) -> None:
@@ -182,14 +182,14 @@ class RankingTests(TwoProductCatalog, TestCase):
         )
 
     def test_the_default_ranking_reads_the_default_policy(self) -> None:
-        """Without a scenario, the normal price ranks: B's promotion is ignored."""
+        """Without a scenario, the best price ranks: B's promotion wins."""
         self._promote_b("30")
         ProjectionService().refresh()
 
         payload = self._page()
 
-        assert payload["scenario"] == {"key": "normal", "version": 2}
-        assert payload["items"][0]["name"] == "A"
+        assert payload["scenario"] == {"key": "best", "version": 2}
+        assert payload["items"][0]["name"] == "B"
 
     def test_an_unknown_scenario_is_refused(self) -> None:
         """A typo is not silently the default."""

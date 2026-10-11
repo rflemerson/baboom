@@ -7,11 +7,15 @@ from django.test import TestCase
 from django.utils import timezone
 
 from common.testing import raised
-from pricing.models import OfferScenarioProjection, PricingPolicyRevision
+from pricing.models import (
+    OfferScenarioProjection,
+    PricingPolicyRevision,
+    ProjectionRefreshRequest,
+)
 from pricing.policies import PolicyService
 from pricing.projections import ProjectionService
 from pricing.selectors import public_policy
-from pricing.tasks import refresh_projections
+from pricing.tasks import drain_projection_requests, refresh_projections
 from pricing.tests.projections.test_projections import TwoProductCatalog
 
 
@@ -27,6 +31,31 @@ class RefreshTaskTests(TwoProductCatalog, TestCase):
         assert winners.count() == len(self.offers) * policies
         assert refresh_projections("elsewhere") == 0
         assert refresh_projections() == written
+
+
+class DrainTaskTests(TwoProductCatalog, TestCase):
+    """The worker reprices what changes queued, once, and empties the queue."""
+
+    def test_queued_offers_are_merged_into_one_refresh(self) -> None:
+        """A twice and B once: one refresh of both, no request left."""
+        a, b = self.offers["A"].pk, self.offers["B"].pk
+        for ids in ([a], [a, b], [a]):
+            ProjectionRefreshRequest.objects.create(offer_ids=ids)
+        winners = OfferScenarioProjection.objects.filter(alternative="best")
+
+        written = drain_projection_requests()
+
+        assert written == refresh_projections()
+        assert winners.count() == len(self.offers) * len(ProjectionService.policies())
+        assert not ProjectionRefreshRequest.objects.exists()
+        assert drain_projection_requests() == 0
+
+    def test_a_request_for_every_offer_refreshes_all(self) -> None:
+        """One request without ids widens the whole batch."""
+        ProjectionRefreshRequest.objects.create(offer_ids=[self.offers["A"].pk])
+        ProjectionRefreshRequest.objects.create(offer_ids=None)
+
+        assert drain_projection_requests() == refresh_projections()
 
 
 class PolicyFreezeTests(TestCase):

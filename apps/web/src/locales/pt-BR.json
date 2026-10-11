@@ -21,7 +21,6 @@
     "columnSelection": "Colunas visíveis",
     "filters": "Filtros",
     "clearFilters": "Limpar filtros",
-    "normalPrice": "Preço normal",
     "bestPrice": "Melhor preço",
     "scenarioLabel": "Preço que o catálogo compara",
     "perPage": "Resultados por página",
@@ -51,7 +50,8 @@
       "flavors": "Sabor",
       "tags": "Tags",
       "offer": "Oferta",
-      "stock": "Estoque"
+      "stock": "Estoque",
+      "benefits": "Benefícios"
     },
     "pagination": {
       "label": "Páginas do catálogo",
@@ -64,7 +64,16 @@
     "notes": {
       "coupon": "Use o cupom {code}",
       "payment": "Pagando com {method}",
-      "cashback": "+ {amount} de cashback"
+      "cashback": "+ {amount} de cashback",
+      "points": "+ {count} ponto | + {count} pontos",
+      "route": "Instruções",
+      "pointsShort": "{count} pts",
+      "store": {
+        "coupon": "Cupom na loja",
+        "cashback": "Cashback na loja",
+        "points": "Pontos na loja",
+        "promotion": "Promoção na loja"
+      }
     },
     "compareActive": "Ativo para comparar",
     "paymentScenario": "Cenário de pagamento",
@@ -85,7 +94,14 @@
       "out_of_stock": "Sem estoque",
       "preorder": "Sob encomenda",
       "unknown": "Desconhecido"
-    }
+    },
+    "benefits": "Benefícios",
+    "listPrice": "Preço da loja, sem benefícios",
+    "catalogPrice": "Preço de catálogo",
+    "coupons": "Cupons",
+    "cashback": "Cashback",
+    "points": "Pontos",
+    "noBenefits": "Nenhum"
   },
   "payment": {
     "pix": "Pix",

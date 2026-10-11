@@ -60,13 +60,13 @@ describe('CatalogView', () => {
     expect(wrapper.text()).toContain('100% Whey Concentrado 900g')
   })
 
-  it('offers the normal and the best price', () => {
+  it('leads with the best price and offers the catalog price', () => {
     vi.mocked(useCatalogQuery).mockReturnValue(queryResult())
 
     const wrapper = mount(CatalogView)
 
     const options = scenarioOptions(wrapper)
-    expect(options.map((option) => option.text())).toEqual(['Preço normal', 'Melhor preço'])
+    expect(options.map((option) => option.text())).toEqual(['Melhor preço', 'Preço de catálogo'])
   })
 
   it('shows a recoverable error and retries the API request', async () => {

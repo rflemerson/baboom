@@ -38,18 +38,25 @@ export function useCatalogTable() {
   const globalFilter = ref('')
   const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 12 })
   const columnVisibility = ref<VisibilityState>({
+    flavors: false,
+    stock: false,
     brand: false,
     packaging: false,
     mass: false,
     tags: false,
   })
-  const scenario = ref('')
+  // The best price leads; "normal" is the catalog price.
+  const scenario = ref('best')
+  // Coupons count by default; cashback and points only when asked for.
+  const benefits = ref<string[]>(['coupon'])
   const debouncedFilters = ref<ColumnFiltersState>(defaultFilters())
   const debouncedSearch = ref('')
   let timer: ReturnType<typeof setTimeout> | undefined
   const { t } = i18n.global
 
   const columns = computed<ColumnDef<CatalogProduct>[]>(() => [
+    // What it is, how much active, what it costs, what the active costs, then
+    // the offer; the rest waits in the column picker.
     {
       id: 'product',
       accessorKey: 'name',
@@ -61,18 +68,6 @@ export function useCatalogTable() {
       accessorFn: (row) => row.category?.name,
       header: t('catalog.column.category'),
       enableColumnFilter: true,
-    },
-    {
-      id: 'flavors',
-      accessorFn: (row) => row.nutritionProfile?.flavors.join(', '),
-      header: t('catalog.column.flavors'),
-      enableColumnFilter: true,
-    },
-    {
-      id: 'price',
-      accessorKey: 'price',
-      header: t('catalog.column.price'),
-      enableSorting: true,
     },
     {
       id: 'concentration',
@@ -87,10 +82,24 @@ export function useCatalogTable() {
       enableSorting: true,
     },
     {
+      id: 'price',
+      accessorKey: 'price',
+      header: t('catalog.column.price'),
+      enableSorting: true,
+    },
+    { id: 'benefits', header: t('catalog.column.benefits') },
+    {
       id: 'pricePerActive',
       accessorFn: (row) => pricePer100g(row.pricePerActive),
       header: t('catalog.column.pricePerActive'),
       enableSorting: true,
+    },
+    { id: 'offer', accessorKey: 'externalLink', header: t('catalog.column.offer') },
+    {
+      id: 'flavors',
+      accessorFn: (row) => row.nutritionProfile?.flavors.join(', '),
+      header: t('catalog.column.flavors'),
+      enableColumnFilter: true,
     },
     {
       id: 'stock',
@@ -111,7 +120,6 @@ export function useCatalogTable() {
       accessorFn: (row) => row.tags.map((tag) => tag.name).join(', '),
       header: t('catalog.column.tags'),
     },
-    { id: 'offer', accessorKey: 'externalLink', header: t('catalog.column.offer') },
   ])
 
   function resetPage() {
@@ -183,7 +191,7 @@ export function useCatalogTable() {
     },
     { deep: true },
   )
-  watch(scenario, resetPage)
+  watch([scenario, benefits], resetPage, { deep: true })
   onScopeDispose(() => clearTimeout(timer))
 
   function chosen(id: string): string[] {
@@ -204,6 +212,9 @@ export function useCatalogTable() {
         sortBy: SORT_KEYS[sort?.id ?? 'pricePerActive'] ?? 'price_per_active',
         sortDir: sort?.desc ? 'desc' : 'asc',
         scenario: scenario.value || null,
+        coupon: benefits.value.includes('coupon'),
+        cashback: benefits.value.includes('cashback'),
+        points: benefits.value.includes('points'),
       },
     }
   })
@@ -222,5 +233,15 @@ export function useCatalogTable() {
     resetPage()
   }
 
-  return { table, rows, pageInfo, activeName, scenario, variables, filtersActive, clearFilters }
+  return {
+    table,
+    rows,
+    pageInfo,
+    activeName,
+    scenario,
+    benefits,
+    variables,
+    filtersActive,
+    clearFilters,
+  }
 }

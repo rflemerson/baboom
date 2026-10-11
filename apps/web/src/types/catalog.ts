@@ -7,6 +7,10 @@ export interface CatalogProductsFilters {
   perPage?: number | null
   active?: string | null
   scenario?: string | null
+  // False drops the prices that need that benefit.
+  coupon?: boolean
+  cashback?: boolean
+  points?: boolean
   search?: string | null
   sortBy?: string | null
   sortDir?: string | null
@@ -36,6 +40,8 @@ export interface CatalogProduct {
   packagingDisplay: string
   netMass?: string | null
   price?: string | null
+  // The store's own price before any benefit; equal to price when none applies.
+  listPrice?: string | null
   pricePerActive?: string | null
   concentration?: string | null
   totalActive?: string | null
@@ -46,6 +52,9 @@ export interface CatalogProduct {
     amount: string
     currency: string
   } | null
+  points?: number | null
+  // Promotions the store has that never enter the price (no code to publish).
+  storePromotions?: { title: string; kind: 'coupon' | 'cashback' | 'points' | 'promotion' }[]
   routeInstructions?: string | null
   stockStatus?: CatalogStockStatus
   optimizationStatus?: 'complete' | 'bounded' | null

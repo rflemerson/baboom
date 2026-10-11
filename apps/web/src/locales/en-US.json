@@ -21,7 +21,6 @@
     "columnSelection": "Visible columns",
     "filters": "Filters",
     "clearFilters": "Clear filters",
-    "normalPrice": "Normal price",
     "bestPrice": "Best price",
     "scenarioLabel": "Price the catalog compares",
     "perPage": "Results per page",
@@ -51,7 +50,8 @@
       "flavors": "Flavor",
       "tags": "Tags",
       "offer": "Offer",
-      "stock": "Stock"
+      "stock": "Stock",
+      "benefits": "Benefits"
     },
     "pagination": {
       "label": "Catalog pages",
@@ -64,7 +64,16 @@
     "notes": {
       "coupon": "Use coupon {code}",
       "payment": "Paying with {method}",
-      "cashback": "+ {amount} cashback"
+      "cashback": "+ {amount} cashback",
+      "points": "+ {count} point | + {count} points",
+      "route": "Instructions",
+      "pointsShort": "{count} pts",
+      "store": {
+        "coupon": "Store coupon",
+        "cashback": "Store cashback",
+        "points": "Store points",
+        "promotion": "Store promotion"
+      }
     },
     "compareActive": "Active to compare",
     "paymentScenario": "Payment scenario",
@@ -85,7 +94,14 @@
       "out_of_stock": "Out of stock",
       "preorder": "Pre-order",
       "unknown": "Unknown"
-    }
+    },
+    "benefits": "Benefits",
+    "listPrice": "Store price, before benefits",
+    "catalogPrice": "Catalog price",
+    "coupons": "Coupons",
+    "cashback": "Cashback",
+    "points": "Points",
+    "noBenefits": "None"
   },
   "payment": {
     "pix": "Pix",

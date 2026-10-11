@@ -4,7 +4,8 @@ import { useI18n } from 'vue-i18n'
 import type { Table } from '@tanstack/vue-table'
 import type { CatalogProduct } from '@/types/catalog'
 import { formatDecimal, formatMoney, formatQuantity, pricePer100g } from '@/utils/number'
-import CatalogPriceNotes from './CatalogPriceNotes.vue'
+import { usePriceDisplay } from '@/composables/usePriceDisplay'
+import CatalogBenefits from './CatalogBenefits.vue'
 
 defineProps<{
   table: Table<CatalogProduct>
@@ -12,6 +13,7 @@ defineProps<{
   massUnit: string
 }>()
 const { t } = useI18n()
+const { discounted, hasBenefits } = usePriceDisplay()
 </script>
 
 <template>
@@ -61,13 +63,19 @@ const { t } = useI18n()
         </div>
         <div class="text-right text-xs">
           <p class="font-medium">{{ formatMoney(row.original.price, row.original.currency) }}</p>
+          <s
+            v-if="discounted(row.original)"
+            class="app-copy-soft block"
+            :aria-label="t('catalog.listPrice')"
+            >{{ formatMoney(row.original.listPrice, row.original.currency) }}</s
+          >
           <p v-if="row.original.concentration != null" class="app-copy-soft mt-1">
             {{ formatDecimal(row.original.concentration, 1) }}%
             {{ t('catalog.column.concentration').toLowerCase() }}
           </p>
         </div>
       </div>
-      <CatalogPriceNotes :product="row.original" />
+      <CatalogBenefits v-if="hasBenefits(row.original)" class="mt-2" :product="row.original" />
       <p v-if="row.original.optimizationStatus === 'bounded'" class="app-copy-soft mt-1 text-xs">
         {{ t('catalog.bounded') }}
       </p>

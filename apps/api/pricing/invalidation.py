@@ -1,10 +1,11 @@
 """Decide which projections a change can reach, and reprice only those.
 
 A change first expires the rows it may have made wrong, at once, so the
-catalog never serves them while the refresh waits; then it schedules a refresh
-of every offer it reached, old and new, after the transaction commits. Calls
-in one transaction schedule one task each: the refresh is idempotent, and a
-rolled-back savepoint takes its tasks with it.
+catalog never serves them while the refresh waits; then it queues a refresh
+of every offer it reached, old and new, as a ``ProjectionRefreshRequest`` row
+in its own transaction. The worker drains that table every minute, so the API
+never talks to the broker; a rolled-back savepoint takes its request along,
+and calls in one transaction queue one row each.
 
 Expiring takes the offers' row locks, as a refresh does and until the same
 transaction ends. A refresh that read facts before the change then publishes
@@ -22,8 +23,7 @@ from core.models import Category
 from offers.models import Offer
 from promotions.models import PromotionRevision, PromotionScope, PurchaseRoute
 
-from .models import OfferScenarioProjection
-from .tasks import refresh_projections
+from .models import OfferScenarioProjection, ProjectionRefreshRequest
 
 # Scope kinds that name offers through a plain relation. The others
 # (store categories, channels, merchants) reach every offer.
@@ -42,7 +42,7 @@ class Repricing:
     """Expire what a change may have made wrong; refresh what it reached."""
 
     def offers(self, offer_ids: list[int] | None, *, expire: bool = False) -> None:
-        """Refresh these offers, or every linked one with None, after commit."""
+        """Queue a refresh of these offers, or of every linked one with None."""
         if expire:
             self._lock(offer_ids)
             rows = OfferScenarioProjection.objects.all()
@@ -52,7 +52,7 @@ class Repricing:
         ids = None if offer_ids is None else sorted(set(offer_ids))
         if ids == []:
             return
-        transaction.on_commit(lambda: refresh_projections.delay(offer_ids=ids))
+        ProjectionRefreshRequest.objects.create(offer_ids=ids)
 
     def store(self, store_slug: str) -> None:
         """Refresh a store's linked offers after a crawl changed them."""
