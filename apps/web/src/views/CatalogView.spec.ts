@@ -45,6 +45,13 @@ function queryResult(scenarioAvailable: boolean) {
   }
 }
 
+function scenarioOptions(wrapper: ReturnType<typeof mount>) {
+  const select = wrapper
+    .findAll('details')
+    .find((details) => details.find('summary[aria-label="Preço que o catálogo compara"]').exists())
+  return select?.findAll('.app-select__menu button') ?? []
+}
+
 describe('CatalogView', () => {
   it('renders the fetched item', () => {
     vi.mocked(useCatalogQuery).mockReturnValue(queryResult(true))
@@ -59,8 +66,8 @@ describe('CatalogView', () => {
 
     const wrapper = mount(CatalogView)
 
-    const options = wrapper.findAll('select[aria-label="Price the catalog compares"] option')
-    expect(options.map((option) => option.text())).toEqual(['Normal price', 'Best price'])
+    const options = scenarioOptions(wrapper)
+    expect(options.map((option) => option.text())).toEqual(['Preço normal', 'Melhor preço'])
   })
 
   it('hides the best price where the market still reads current prices', () => {
@@ -68,7 +75,26 @@ describe('CatalogView', () => {
 
     const wrapper = mount(CatalogView)
 
-    const options = wrapper.findAll('select[aria-label="Price the catalog compares"] option')
-    expect(options.map((option) => option.text())).toEqual(['Normal price'])
+    const options = scenarioOptions(wrapper)
+    expect(options.map((option) => option.text())).toEqual(['Preço normal'])
+  })
+  it('shows a recoverable error and retries the API request', async () => {
+    const query = queryResult(true)
+    vi.mocked(useCatalogQuery).mockReturnValue({
+      ...query,
+      error: computed(() => new Error('Failed request')),
+    })
+    const wrapper = mount(CatalogView)
+    expect(wrapper.get('[role="alert"]').text()).toContain('Não foi possível carregar o catálogo')
+    await wrapper.get('[role="alert"] button').trigger('click')
+    expect(query.refetch).toHaveBeenCalledOnce()
+  })
+
+  it('renders the 100 g price without rounding the per-gram value first', () => {
+    vi.mocked(useCatalogQuery).mockReturnValue(queryResult(true))
+    const wrapper = mount(CatalogView)
+    expect(wrapper.findAll('td').some((cell) => cell.text().includes('18,00'))).toBe(true)
+    expect(wrapper.text()).toContain('Por 100 g de Protein')
+    expect(wrapper.find('img').exists()).toBe(false)
   })
 })

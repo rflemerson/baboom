@@ -1,0 +1,107 @@
+{
+  "common": {
+    "close": "Fechar",
+    "cancel": "Cancelar",
+    "missing": "—"
+  },
+  "header": {
+    "home": "Ir para o catálogo",
+    "logo": "Logo do Baboom",
+    "alerts": "Alertas",
+    "openAlerts": "Abrir alertas",
+    "light": "Mudar para o tema claro",
+    "dark": "Mudar para o tema escuro"
+  },
+  "catalog": {
+    "results": "{count} produtos",
+    "active": "Ativo",
+    "activeBasis": "Por 100 g de {active}",
+    "activeFallback": "ativo",
+    "columns": "Colunas",
+    "columnSelection": "Colunas visíveis",
+    "filters": "Filtros",
+    "clearFilters": "Limpar filtros",
+    "normalPrice": "Preço normal",
+    "bestPrice": "Melhor preço",
+    "scenarioLabel": "Preço que o catálogo compara",
+    "perPage": "Resultados por página",
+    "noResults": "Nenhum produto encontrado",
+    "emptyHint": "Tente mudar ou limpar os filtros.",
+    "emptyCatalog": "Não há produtos disponíveis agora.",
+    "loadError": "Não foi possível carregar o catálogo",
+    "retry": "Tentar de novo",
+    "loading": "Carregando produtos…",
+    "requestError": "Não foi possível carregar o catálogo. Tente de novo.",
+    "tableLabel": "Catálogo de suplementos",
+    "sort": "Ordenar por {column}",
+    "sellerWarning": "A página da loja pode abrir a oferta de outro vendedor.",
+    "offerLabel": "Ver oferta de {product}",
+    "offer": "Ver oferta",
+    "bounded": "Busca de preço incompleta",
+    "column": {
+      "product": "Produto",
+      "brand": "Marca",
+      "category": "Categoria",
+      "packaging": "Embalagem",
+      "mass": "Massa líquida (g)",
+      "price": "Preço",
+      "pricePerActive": "Preço/100 g",
+      "concentration": "Concentração",
+      "totalActive": "Ativo total (g)",
+      "flavors": "Sabor",
+      "tags": "Tags",
+      "offer": "Oferta"
+    },
+    "pagination": {
+      "label": "Páginas do catálogo",
+      "summary": "Página {page} de {pages}",
+      "previousLabel": "Ir para a página anterior",
+      "nextLabel": "Ir para a próxima página",
+      "currentLabel": "Página atual, página {page}",
+      "pageLabel": "Ir para a página {page}"
+    },
+    "notes": {
+      "coupon": "Use o cupom {code}",
+      "payment": "Pagando com {method}",
+      "cashback": "+ {amount} de cashback"
+    },
+    "compareActive": "Ativo para comparar",
+    "paymentScenario": "Cenário de pagamento",
+    "comparisonSettings": "Configurações da comparação",
+    "rowsPerPage": "{count} / página",
+    "filterBy": "Filtrar por",
+    "noOptions": "Nada para escolher",
+    "sortBy": "Ordenar por",
+    "sortChoice": {
+      "pricePerActive_asc": "Menor preço por 100 g",
+      "price_asc": "Menor preço",
+      "price_desc": "Maior preço",
+      "concentration_desc": "Maior concentração",
+      "totalActive_desc": "Mais ativo"
+    }
+  },
+  "payment": {
+    "pix": "Pix",
+    "boleto": "Boleto",
+    "credit_card": "Cartão",
+    "debit_card": "Cartão de débito",
+    "wallet": "Carteira digital",
+    "gift_card": "Vale-presente"
+  },
+  "alerts": {
+    "title": "Alertas",
+    "intro": "Informe seu e-mail para receber avisos.",
+    "email": "E-mail",
+    "emailPlaceholder": "seu{'@'}email.com",
+    "successTitle": "Inscrição feita!",
+    "successBody": "Adicionamos {email} à nossa lista. Você será o primeiro a saber quando o preço cair!",
+    "duplicateTitle": "Já inscrito",
+    "duplicateBody": "O e-mail {email} já está na nossa lista.",
+    "another": "Inscrever outro e-mail",
+    "useAnother": "Usar outro e-mail",
+    "subscribing": "Inscrevendo...",
+    "subscribe": "Inscrever",
+    "invalidEmail": "Informe um e-mail válido.",
+    "unavailable": "Não foi possível inscrever agora."
+  }
+}

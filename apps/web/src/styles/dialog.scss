@@ -1,0 +1,23 @@
+.app-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 60%);
+  backdrop-filter: blur(6px);
+}
+
+:root[data-theme='light'] .app-dialog-backdrop,
+:root:not([data-theme]) .app-dialog-backdrop {
+  background: rgb(28 25 23 / 28%);
+}
+
+.app-dialog {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-strong);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow);
+  transition:
+    background var(--app-theme-duration) var(--app-theme-easing),
+    border-color var(--app-theme-duration) var(--app-theme-easing),
+    color var(--app-theme-duration) var(--app-theme-easing);
+}

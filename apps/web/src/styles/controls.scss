@@ -1,0 +1,107 @@
+.app-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: var(--app-control-height);
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background var(--app-theme-duration) var(--app-theme-easing),
+    border-color var(--app-theme-duration) var(--app-theme-easing),
+    color var(--app-theme-duration) var(--app-theme-easing),
+    opacity var(--app-theme-duration) var(--app-theme-easing);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--app-brand);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.app-button--icon-square {
+  width: var(--app-control-height);
+  padding: 0;
+}
+
+.app-button--primary {
+  background: var(--app-brand);
+  color: #fff7ed;
+
+  &:hover:not(:disabled) {
+    background: var(--app-brand-strong);
+  }
+}
+
+.app-button--secondary {
+  border-color: var(--app-border);
+  background: transparent;
+  color: var(--app-text);
+
+  &:hover:not(:disabled) {
+    border-color: var(--app-border-strong);
+  }
+}
+
+.app-button--ghost {
+  border-color: var(--app-border);
+  background: var(--app-surface-strong);
+  color: var(--app-text);
+
+  &:hover:not(:disabled) {
+    border-color: var(--app-brand);
+  }
+}
+
+.app-button--accent {
+  border-color: rgb(249 115 22 / 45%);
+  background: var(--app-brand-soft);
+  color: var(--app-brand-fg);
+
+  &:hover:not(:disabled) {
+    border-color: var(--app-brand);
+  }
+}
+
+.app-input {
+  width: 100%;
+  min-height: var(--app-control-height);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-strong);
+  color: var(--app-text);
+  outline: none;
+  transition:
+    background var(--app-theme-duration) var(--app-theme-easing),
+    border-color var(--app-theme-duration) var(--app-theme-easing),
+    color var(--app-theme-duration) var(--app-theme-easing),
+    box-shadow var(--app-theme-duration) var(--app-theme-easing);
+
+  &::placeholder {
+    color: var(--app-text-soft);
+  }
+
+  &:focus {
+    border-color: var(--app-brand);
+    box-shadow: 0 0 0 3px rgb(249 115 22 / 12%);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--app-brand);
+    outline-offset: 2px;
+  }
+
+  &.is-invalid {
+    border-color: var(--app-danger);
+    box-shadow: 0 0 0 3px rgb(252 165 165 / 12%);
+  }
+}

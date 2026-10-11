@@ -1,14 +1,10 @@
 export interface CatalogProductsFilters {
-  brand?: string | null
-  concentrationMax?: number | null
-  concentrationMin?: number | null
+  brands?: string[]
+  categories?: string[]
+  flavors?: string[]
   page?: number | null
   perPage?: number | null
-  priceMax?: number | null
-  priceMin?: number | null
   active?: string | null
-  pricePerActiveMax?: number | null
-  pricePerActiveMin?: number | null
   scenario?: string | null
   search?: string | null
   sortBy?: string | null
@@ -86,4 +82,15 @@ export interface CatalogProductsResponse {
   scenario?: CatalogScenario
   pageInfo: CatalogPageInfo
   items: CatalogProduct[]
+}
+
+export interface CatalogFilterOption {
+  name: string
+  label: string
+}
+
+export interface CatalogFilterOptions {
+  brands: CatalogFilterOption[]
+  flavors: CatalogFilterOption[]
+  categories: CatalogFilterOption[]
 }

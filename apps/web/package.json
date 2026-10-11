@@ -22,10 +22,12 @@
   "dependencies": {
     "@sentry/vue": "^10.49.0",
     "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/vue-table": "^8.21.3",
     "lucide-vue-next": "^0.577.0",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.2.1",
     "vue": "^3.5.29",
+    "vue-i18n": "^11.4.14",
     "vue-router": "^5.0.3"
   },
   "devDependencies": {

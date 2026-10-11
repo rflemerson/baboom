@@ -10,7 +10,18 @@
 ## Current project pattern
 
 - Global Tailwind entry lives in `src/styles.css`.
-- Theme tokens and semantic UI classes live in `src/theme.scss`.
+- `src/theme.scss` only `@use`s the shared partials under `src/styles/`:
+  `tokens.scss` (colors, theme timing, `--app-control-height`: 40px on touch,
+  36px from 768px), `base.scss` (page, shell, copy colors, panels, skeleton,
+  status), `controls.scss` (`app-button` and its color modifiers, `app-input`),
+  `menu.scss` (`app-menu`, a `<details>` with a floating `__panel` and
+  `__action` rows) and `dialog.scss`.
+- A style used by one component lives in that component's
+  `<style scoped lang="scss">` (table, cards, pagination, catalog toolbar,
+  `BaseSelect`, header), never in the theme.
+- Buttons have one size, from `--app-control-height`; modifiers only change
+  color (`--primary`, `--secondary`, `--ghost`, `--accent`) or make an icon
+  square (`--icon-square`).
 - The app theme is controlled through `document.documentElement.dataset.theme` and toggled by `useThemeMode`.
 - Prefer utility classes first.
 - Reach for Sass when the component or the whole app needs semantic tokens, shared UI primitives, or repeated styling logic.
@@ -25,16 +36,14 @@
 - Keep component-level Sass scoped.
 - Avoid rebuilding a separate design system on top of Tailwind too early.
 - Prefer extracting repeated markup into Vue components before extracting repeated utility sets into custom classes.
-- Put theme colors, borders, and reusable UI primitives in `src/theme.scss` so visual changes can cascade from one place.
+- Put theme colors and reusable UI primitives in `src/styles/` so visual changes cascade from one place; a class only one component uses belongs to that component.
 - Keep the light theme as the default token set in `:root` and add dark overrides under `:root[data-theme='dark']`.
 - Use Tailwind primarily for layout, spacing, sizing, and responsive behavior.
 - Use semantic classes such as buttons, panels, inputs, and dialog shells to avoid long repeated class strings in templates.
-- Keep transitions for theme-sensitive surfaces, text, and controls centralized in `src/theme.scss` so light/dark toggles stay visually synchronized.
+- Theme-sensitive transitions use the shared `--app-theme-duration` and `--app-theme-easing` tokens so light/dark toggles stay synchronized.
 - For empty, error, or other catalog state panels, prefer a shared semantic class such as `app-state-panel` instead of reassembling dashed borders and muted surfaces per component.
-- When multiple controls should share the same visual size, prefer semantic button size modifiers from `src/theme.scss` instead of per-component padding tweaks.
-- Keep theme-toggle animation timing centralized in `src/theme.scss` with shared duration/easing tokens so dark/light transitions stay visually synchronized across surfaces, controls, and text.
-- For binary icon toggles, prefer a reusable Vue component such as `BaseBinaryToggle` over hand-writing sibling buttons in each feature component.
-- For repeated metric blocks with label/value presentation, prefer `BaseMetricCard` instead of duplicating markup in feature components.
+- When controls should share a size, use `--app-control-height` instead of per-component heights.
+- Keep theme-toggle animation timing centralized in `src/styles/tokens.scss` with shared duration/easing tokens so dark/light transitions stay visually synchronized across surfaces, controls, and text.
 - For shared modal behavior, prefer `BaseModal` so keyboard handling, focus management, and overlay behavior stay consistent.
 - Let Prettier handle Tailwind class ordering instead of trying to enforce that through custom manual conventions.
 - Keep CSS class names in the semantic project namespace: `app-*` for shared UI and layout primitives, `alert-*` for alert-specific local styles, optional `__element` and `--modifier` suffixes, plus `is-*` for state classes.
@@ -42,6 +51,9 @@
 - If Tailwind-specific linting is revisited later, re-check Tailwind 4 compatibility first instead of forcing the older ESLint plugin into the toolchain.
 
 ## Sources
+
+- Vue scoped CSS: https://vuejs.org/api/sfc-css-features.html#scoped-css
+- WCAG 2.5.8 target size: https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
 
 - Tailwind with Vite: https://tailwindcss.com/docs/installation/using-vite
 - Stylelint getting started: https://stylelint.io/user-guide/get-started

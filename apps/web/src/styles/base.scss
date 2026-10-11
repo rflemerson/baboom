@@ -1,0 +1,83 @@
+body {
+  background: radial-gradient(circle at top, var(--app-bg-accent), transparent 38%), var(--app-bg);
+  color: var(--app-text);
+  transition:
+    background var(--app-theme-duration) var(--app-theme-easing),
+    color var(--app-theme-duration) var(--app-theme-easing);
+}
+
+.app-page {
+  min-height: 100vh;
+  color: var(--app-text);
+}
+
+.app-shell {
+  margin-inline: auto;
+  max-width: 96rem;
+}
+
+.app-panel,
+.app-copy-muted,
+.app-copy-soft {
+  transition:
+    background var(--app-theme-duration) var(--app-theme-easing),
+    border-color var(--app-theme-duration) var(--app-theme-easing),
+    color var(--app-theme-duration) var(--app-theme-easing),
+    box-shadow var(--app-theme-duration) var(--app-theme-easing);
+}
+
+.app-panel {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.app-state-panel {
+  border: 1px dashed var(--app-border-strong);
+  background: color-mix(in srgb, var(--app-surface-soft) 82%, transparent);
+}
+
+.app-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--app-surface-soft) 0%,
+    color-mix(in srgb, var(--app-surface-strong) 82%, white 18%) 50%,
+    var(--app-surface-soft) 100%
+  );
+  background-size: 200% 100%;
+  animation: app-skeleton-shimmer 1.2s linear infinite;
+}
+
+@keyframes app-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.app-copy-muted {
+  color: var(--app-text-muted);
+}
+
+.app-copy-soft {
+  color: var(--app-text-soft);
+}
+
+.app-copy-brand {
+  color: var(--app-brand-fg);
+}
+
+.app-status--success {
+  color: var(--app-success);
+}
+
+.app-status--info {
+  color: var(--app-info);
+}
+
+.app-status--danger {
+  color: var(--app-danger);
+}

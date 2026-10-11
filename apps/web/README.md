@@ -1,6 +1,18 @@
 # apps/web
 
-This template should help get you started developing with Vue 3 in Vite.
+Public Baboom catalog, built with Vue 3, Vite and TypeScript.
+
+The catalog uses TanStack Table with server-side search, column filters, sorting
+and pagination through the existing Django REST API. Prices per active are shown
+per **100 g of the selected active ingredient**; the API continues to use per-gram
+values. Column visibility is controlled in the browser.
+
+Interface messages live in `src/locales/en-US.json` and use Vue I18n semantic keys.
+English is the base and fallback; Portuguese translations can be added later.
+The header preserves the Baboom SVGs, theme toggle and alert subscriptions.
+
+Catalog snapshots and CDN publication are deferred. See `.agents/CATALOG.md` and
+`.agents/I18N.md` for the integration rules.
 
 ## Recommended IDE Setup
 
@@ -61,7 +73,7 @@ npm run test:e2e
 # Runs the tests only on Chromium
 npm run test:e2e -- --project=chromium
 # Runs the tests of a specific file
-npm run test:e2e -- tests/example.spec.ts
+npm run test:e2e -- e2e/catalog.spec.ts
 # Runs the tests in debug mode
 npm run test:e2e -- --debug
 ```

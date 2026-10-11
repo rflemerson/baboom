@@ -30,9 +30,9 @@ describe('AlertSubscribeDialog', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Alerts')
-    expect(wrapper.text()).toContain('Enter your email to receive notifications.')
-    expect(wrapper.text()).toContain('Subscribe')
+    expect(wrapper.text()).toContain('Alertas')
+    expect(wrapper.text()).toContain('Informe seu e-mail para receber avisos.')
+    expect(wrapper.text()).toContain('Inscrever')
   })
 
   it('renders the success state', () => {
@@ -55,7 +55,7 @@ describe('AlertSubscribeDialog', () => {
       },
     })
 
-    expect(wrapper.text()).toContain("You're Subscribed!")
+    expect(wrapper.text()).toContain('Inscrição feita!')
   })
 
   it('renders inline validation feedback on error', () => {
@@ -63,7 +63,7 @@ describe('AlertSubscribeDialog', () => {
       canSubmit: computed(() => false),
       email: ref('invalid-email'),
       emailIsValid: computed(() => false),
-      errorMessage: ref('Please enter a valid email address.'),
+      errorMessage: ref('Informe um e-mail válido.'),
       hasEmail: computed(() => true),
       loading: ref(false),
       reset: vi.fn(),
@@ -78,7 +78,7 @@ describe('AlertSubscribeDialog', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Please enter a valid email address.')
+    expect(wrapper.text()).toContain('Informe um e-mail válido.')
     expect(wrapper.find('input[type="email"]').classes()).toContain('is-invalid')
   })
 

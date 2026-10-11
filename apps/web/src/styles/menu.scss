@@ -1,0 +1,41 @@
+// A <details> whose summary opens a floating panel: filters, columns.
+.app-menu {
+  position: relative;
+
+  > summary {
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+}
+
+.app-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 20;
+  min-width: 12rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  background: var(--app-surface-strong);
+  box-shadow: var(--app-shadow);
+  font-size: 0.75rem;
+  color: var(--app-text);
+}
+
+.app-menu__action {
+  display: block;
+  width: 100%;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--app-surface-soft);
+  }
+}

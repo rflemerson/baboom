@@ -15,21 +15,6 @@ type Product = {
   tags: Array<{ name: string }>
 }
 
-type CatalogVariables = {
-  page: number
-  perPage: number
-  search?: string | null
-  brand?: string | null
-  priceMin?: number | null
-  priceMax?: number | null
-  pricePerActiveMin?: number | null
-  pricePerActiveMax?: number | null
-  concentrationMin?: number | null
-  concentrationMax?: number | null
-  sortBy: string
-  sortDir: string
-}
-
 const PRODUCTS: Product[] = [
   {
     id: 1,
@@ -215,135 +200,77 @@ const PRODUCTS: Product[] = [
   },
 ]
 
-function normalize(value: string | null | undefined) {
-  return value?.trim().toLowerCase() ?? ''
+const FLAVORS = ['Chocolate', 'Baunilha', 'Morango']
+
+function flavorOf(product: Product) {
+  return FLAVORS[product.id % FLAVORS.length] ?? 'Chocolate'
 }
 
-function sortProducts(products: Product[], sortBy: string, sortDir: string) {
-  const direction = sortDir === 'desc' ? -1 : 1
-
-  const readNumber = (product: Product, key: string) => {
-    switch (key) {
-      case 'last_price':
-        return Number(product.price)
-      case 'price_per_active':
-        return Number(product.pricePerActive)
-      case 'total_active':
-        return Number(product.totalActive)
-      case 'concentration':
-        return Number(product.concentration)
-      default:
-        return Number(product.pricePerActive)
-    }
+function readNumber(product: Product, key: string) {
+  const values: Record<string, string> = {
+    price: product.price,
+    total_active: product.totalActive,
+    concentration: product.concentration,
   }
-
-  return [...products].sort((left, right) => {
-    return (readNumber(left, sortBy) - readNumber(right, sortBy)) * direction
-  })
-}
-
-function filterProducts(variables: CatalogVariables) {
-  const search = normalize(variables.search)
-  const brand = normalize(variables.brand)
-
-  const filtered = PRODUCTS.filter((product) => {
-    return (
-      matchesSearch(product, search) &&
-      matchesBrand(product, brand) &&
-      matchesNumericRange(Number(product.price), variables.priceMin, variables.priceMax) &&
-      matchesNumericRange(
-        Number(product.pricePerActive),
-        variables.pricePerActiveMin,
-        variables.pricePerActiveMax,
-      ) &&
-      matchesNumericRange(
-        Number(product.concentration),
-        variables.concentrationMin,
-        variables.concentrationMax,
-      )
-    )
-  })
-
-  const sorted = sortProducts(filtered, variables.sortBy, variables.sortDir)
-  const totalCount = sorted.length
-  const totalPages = Math.max(1, Math.ceil(totalCount / variables.perPage))
-  const currentPage = Math.min(variables.page, totalPages)
-  const start = (currentPage - 1) * variables.perPage
-  const items = sorted.slice(start, start + variables.perPage)
-
-  return {
-    catalogProducts: {
-      active: { slug: 'protein', name: 'Protein' },
-      massUnit: 'g',
-      pageInfo: {
-        currentPage,
-        perPage: variables.perPage,
-        totalPages,
-        totalCount,
-        hasPreviousPage: currentPage > 1,
-        hasNextPage: currentPage < totalPages,
-      },
-      items,
-    },
-  }
-}
-
-function matchesSearch(product: Product, search: string) {
-  if (!search) {
-    return true
-  }
-
-  const haystack = [
-    product.name,
-    product.brand.name,
-    product.category.name,
-    ...product.tags.map((tag) => tag.name),
-  ]
-    .join(' ')
-    .toLowerCase()
-
-  return haystack.includes(search)
-}
-
-function matchesBrand(product: Product, brand: string) {
-  return !brand || product.brand.name.toLowerCase().includes(brand)
-}
-
-function matchesNumericRange(value: number, min?: number | null, max?: number | null) {
-  if (min != null && value < min) {
-    return false
-  }
-  if (max != null && value > max) {
-    return false
-  }
-  return true
+  return Number(values[key] ?? product.pricePerActive)
 }
 
 async function fulfillCatalog(route: Route) {
   const url = new URL(route.request().url())
-  const readNumberParam = (name: string) => {
-    const value = url.searchParams.get(name)
-    return value ? Number(value) : null
-  }
-  const variables: CatalogVariables = {
-    page: Number(url.searchParams.get('page') ?? 1),
-    perPage: Number(url.searchParams.get('per_page') ?? 12),
-    search: url.searchParams.get('search'),
-    brand: url.searchParams.get('brand'),
-    priceMin: readNumberParam('price_min'),
-    priceMax: readNumberParam('price_max'),
-    pricePerActiveMin: readNumberParam('price_per_active_min'),
-    pricePerActiveMax: readNumberParam('price_per_active_max'),
-    concentrationMin: readNumberParam('concentration_min'),
-    concentrationMax: readNumberParam('concentration_max'),
-    sortBy: url.searchParams.get('sort_by') ?? 'price_per_active',
-    sortDir: url.searchParams.get('sort_dir') ?? 'asc',
-  }
-  const payload = filterProducts(variables)
-
+  const params = url.searchParams
+  const chosen = (name: string) => params.getAll(name)
+  const [brands, flavors, categories] = [chosen('brand'), chosen('flavor'), chosen('category')]
+  const sortBy = params.get('sort_by') ?? 'price_per_active'
+  const direction = params.get('sort_dir') === 'desc' ? -1 : 1
+  const perPage = Number(params.get('per_page') ?? 12)
+  const filtered = PRODUCTS.filter(
+    (product) =>
+      (!brands.length || brands.includes(product.brand.name)) &&
+      (!flavors.length || flavors.includes(flavorOf(product))) &&
+      (!categories.length || categories.includes(product.category.name)),
+  ).sort((left, right) => (readNumber(left, sortBy) - readNumber(right, sortBy)) * direction)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const currentPage = Math.min(Number(params.get('page') ?? 1), totalPages)
+  const start = (currentPage - 1) * perPage
   await route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(payload.catalogProducts),
+    json: {
+      active: { slug: 'protein', name: 'Proteína' },
+      massUnit: 'g',
+      market: { country: 'BR', currency: 'BRL' },
+      scenario: { key: 'normal', version: 1 },
+      pageInfo: {
+        currentPage,
+        perPage,
+        totalPages,
+        totalCount: filtered.length,
+        hasPreviousPage: currentPage > 1,
+        hasNextPage: currentPage < totalPages,
+      },
+      items: filtered.slice(start, start + perPage).map((product) => ({
+        ...product,
+        currency: 'BRL',
+        nutritionProfile: {
+          id: product.id,
+          nutritionFactsId: product.id,
+          flavors: [flavorOf(product)],
+        },
+        couponCodes: [],
+        cashback: null,
+        routeInstructions: null,
+      })),
+    },
+  })
+}
+
+async function fulfillFilters(route: Route) {
+  const unique = (values: string[]) =>
+    [...new Set(values)].sort().map((name) => ({ name, label: name }))
+  await route.fulfill({
+    json: {
+      brands: unique(PRODUCTS.map((product) => product.brand.name)),
+      flavors: unique(FLAVORS),
+      categories: unique(PRODUCTS.map((product) => product.category.name)),
+    },
   })
 }
 
@@ -351,108 +278,177 @@ async function fulfillAlerts(route: Route) {
   const body = route.request().postDataJSON() as { email?: string }
   const email = typeof body.email === 'string' ? body.email : ''
   const alreadySubscribed = email.toLowerCase() === 'already@subscribed.com'
-
   await route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(
-      alreadySubscribed
-        ? {
-            success: false,
-            alreadySubscribed: true,
-            email,
-            errors: [],
-          }
-        : {
-            success: true,
-            alreadySubscribed: false,
-            email,
-            errors: null,
-          },
-    ),
+    json: {
+      success: !alreadySubscribed,
+      alreadySubscribed,
+      email,
+      errors: alreadySubscribed ? [] : null,
+    },
   })
 }
 
 async function setupApiMock(page: Page) {
   await page.route('**/api/catalog/products/**', fulfillCatalog)
+  await page.route('**/api/catalog/filters/', fulfillFilters)
   await page.route('**/api/alerts/subscribe/', fulfillAlerts)
+}
+
+function catalogRequest(page: Page, matches: (params: URLSearchParams) => boolean) {
+  return page.waitForRequest((request) => {
+    const url = new URL(request.url())
+    return url.pathname === '/api/catalog/products/' && matches(url.searchParams)
+  })
+}
+
+async function choose(page: Page, label: string, option: string) {
+  await page.locator(`summary[aria-label="${label}"]`).click()
+  await page.getByRole('button', { name: option, exact: true }).click()
 }
 
 test.beforeEach(async ({ page }) => {
   await setupApiMock(page)
 })
 
-test('loads the catalog and paginates through results', async ({ page }) => {
-  await page.goto('/')
+test.describe('desktop', () => {
+  test.use({ viewport: { width: 1280, height: 900 } })
 
-  await expect(page.getByText('13 products')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Whey Budget 900g' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Go to next page' })).toBeVisible()
+  test('loads the catalog and paginates through results', async ({ page }) => {
+    await page.goto('/')
 
-  await page.getByLabel('Results per page').selectOption('24')
+    await expect(page.getByText('13 produtos')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Whey Budget 900g' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ir para a próxima página' })).toBeVisible()
 
-  await expect(page.getByRole('button', { name: 'Go to next page' })).toHaveCount(0)
+    await choose(page, 'Resultados por página', '24 / página')
+    await expect(page.getByRole('button', { name: 'Ir para a próxima página' })).toHaveCount(0)
 
-  await page.getByLabel('Results per page').selectOption('12')
-  await page.getByRole('button', { name: 'Go to next page' }).click()
+    await choose(page, 'Resultados por página', '12 / página')
+    await page.getByRole('button', { name: 'Ir para a próxima página' }).click()
+    await expect(page.getByText('Página 2 de 2')).toBeVisible()
+  })
 
-  await expect(page.getByText('Page 2 of 2')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Pre Rush 300g' })).toBeVisible()
+  test('filters by brand, flavor and category, and clears them', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByText('13 produtos')).toBeVisible()
+
+    await page.locator('summary', { hasText: 'Filtros' }).click()
+    const byBrand = catalogRequest(page, (params) => params.getAll('brand').includes('dux'))
+    await page.getByRole('checkbox', { name: 'dux', exact: true }).check()
+    await byBrand
+    await expect(page.getByRole('heading', { name: 'Whey Prime 900g' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Isolate Gold 1kg' })).toHaveCount(0)
+
+    await choose(page, 'Filtrar por', 'Categoria')
+    const byCategory = catalogRequest(
+      page,
+      (params) => params.get('category') === 'Creatine' && params.get('brand') === 'dux',
+    )
+    await page.getByRole('checkbox', { name: 'Creatine', exact: true }).check()
+    await byCategory
+    await expect(page.getByRole('heading', { name: 'Creatine Pure 300g' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Whey Prime 900g' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click()
+    await expect(page.getByText('13 produtos')).toBeVisible()
+  })
+
+  test('shows an empty state when no product matches', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('summary', { hasText: 'Filtros' }).click()
+    await page.getByRole('checkbox', { name: 'bold', exact: true }).check()
+    // "bold" sells only Baunilha: with Chocolate too, nothing is left.
+    await choose(page, 'Filtrar por', 'Sabor')
+    await page.getByRole('checkbox', { name: 'Chocolate', exact: true }).check()
+    await page.keyboard.press('Escape')
+
+    const emptyState = page
+      .locator('section')
+      .filter({ hasText: 'Tente mudar ou limpar os filtros.' })
+    await expect(emptyState).toBeVisible()
+    await emptyState.getByRole('button', { name: 'Limpar filtros' }).click()
+    await expect(page.getByText('13 produtos')).toBeVisible()
+  })
+
+  test('sorts through the API from the column header', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('table')).toBeVisible()
+    const sortRequest = catalogRequest(
+      page,
+      (params) => params.get('sort_by') === 'price' && params.get('sort_dir') === 'asc',
+    )
+    await page.getByRole('button', { name: 'Ordenar por Preço', exact: true }).click()
+    await sortRequest
+    await expect(
+      page.getByRole('columnheader', { name: 'Ordenar por Preço', exact: true }),
+    ).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  test('shows and hides columns without fetching another page', async ({ page }, testInfo) => {
+    const requests: string[] = []
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/catalog/products/') requests.push(request.url())
+    })
+    await page.goto('/')
+    await expect(page.getByRole('table')).toBeVisible()
+    const initialRequests = requests.length
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+    await page.screenshot({ path: testInfo.outputPath('catalog-desktop.png'), fullPage: true })
+
+    await expect(page.getByRole('columnheader', { name: 'Categoria', exact: true })).toHaveCount(0)
+    await page.locator('summary', { hasText: 'Colunas' }).click()
+    await page.getByRole('checkbox', { name: 'Categoria', exact: true }).check()
+    await expect(page.getByRole('columnheader', { name: 'Categoria', exact: true })).toBeVisible()
+    await page.getByRole('checkbox', { name: 'Categoria', exact: true }).uncheck()
+    await expect(page.getByRole('columnheader', { name: 'Categoria', exact: true })).toHaveCount(0)
+    expect(requests).toHaveLength(initialRequests)
+
+    await page.getByRole('table').click({ position: { x: 5, y: 5 } })
+    await expect(page.getByRole('checkbox', { name: 'Categoria', exact: true })).toBeHidden()
+  })
+
+  test('subscribes alerts and handles a duplicate email', async ({ page }) => {
+    await page.goto('/')
+
+    await page.getByRole('button', { name: 'Abrir alertas' }).click()
+    await page.getByLabel('E-mail').fill('new@example.com')
+    await page.getByRole('button', { name: 'Inscrever', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Inscrição feita!' })).toBeVisible()
+    await page.getByRole('button', { name: 'Inscrever outro e-mail' }).click()
+
+    await page.getByLabel('E-mail').fill('already@subscribed.com')
+    await page.getByRole('button', { name: 'Inscrever', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Já inscrito' })).toBeVisible()
+  })
 })
 
-test('supports view toggle, search, filters, and clearing filters', async ({ page }) => {
-  await page.goto('/')
+test.describe('mobile', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
 
-  await page.getByLabel('View mode: Grid view').click()
-  await expect(page.getByLabel('View mode: List view')).toBeVisible()
+  test('lists cards, sorts from the select and switches theme', async ({ page }, testInfo) => {
+    await page.goto('/')
+    const card = page.getByTestId(/^catalog-card-/).first()
+    await expect(card).toBeVisible()
+    await expect(page.getByRole('table')).toBeHidden()
+    await expect(card.getByRole('link', { name: /^Ver oferta de / })).toBeVisible()
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
 
-  await page.getByLabel('Search catalog').fill('creatine')
-  await expect(page.getByRole('heading', { name: 'Creatine Pure 300g' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Go to next page' })).toHaveCount(0)
+    const sortRequest = catalogRequest(
+      page,
+      (params) => params.get('sort_by') === 'concentration' && params.get('sort_dir') === 'desc',
+    )
+    await choose(page, 'Ordenar por', 'Maior concentração')
+    await sortRequest
+    await expect(page.getByTestId(/^catalog-card-/).first()).toContainText('Iso Hydro 900g')
 
-  await page.getByLabel('Clear filters').click()
-  await expect(page.getByText('13 products')).toBeVisible()
-
-  await page.getByLabel('Open filters').click()
-  await page.getByLabel('Brand').fill('dux')
-  await page.getByRole('button', { name: 'Apply filters' }).click()
-
-  await expect(page.getByRole('heading', { name: 'Whey Prime 900g' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Iso Hydro 900g' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Whey Budget 900g' })).toHaveCount(0)
-
-  await page.getByLabel('Clear filters').click()
-  await expect(page.getByText('13 products')).toBeVisible()
-})
-
-test('shows product-like empty state after restrictive filters', async ({ page }) => {
-  await page.goto('/')
-
-  await page.getByLabel('Open filters').click()
-  await page.getByPlaceholder('Min').first().fill('999')
-  await page.getByRole('button', { name: 'Apply filters' }).click()
-
-  const emptyState = page
-    .getByRole('heading', { name: 'No products matched this search' })
-    .locator('xpath=ancestor::section[1]')
-
-  await expect(emptyState).toBeVisible()
-  await emptyState.getByRole('button', { name: 'Clear filters' }).click()
-
-  await expect(page.getByText('13 products')).toBeVisible()
-})
-
-test('subscribes alerts and handles duplicate email', async ({ page }) => {
-  await page.goto('/')
-
-  await page.getByRole('button', { name: 'Open alerts' }).click()
-  await page.getByLabel('Email').fill('new@example.com')
-  await page.getByRole('button', { name: 'Subscribe' }).click()
-
-  await expect(page.getByRole('heading', { name: "You're Subscribed!" })).toBeVisible()
-  await page.getByRole('button', { name: 'Subscribe another email' }).click()
-
-  await page.getByLabel('Email').fill('already@subscribed.com')
-  await page.getByRole('button', { name: 'Subscribe' }).click()
-
-  await expect(page.getByRole('heading', { name: 'Already Subscribed' })).toBeVisible()
+    await page.getByRole('button', { name: 'Mudar para o tema escuro' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.screenshot({ path: testInfo.outputPath('catalog-mobile-dark.png'), fullPage: true })
+  })
 })

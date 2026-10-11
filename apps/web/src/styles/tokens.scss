@@ -1,0 +1,51 @@
+:root {
+  --app-control-height: 2.5rem;
+  --app-theme-duration: 120ms;
+  --app-theme-easing: ease-out;
+  --app-bg: #f7f2ea;
+  --app-bg-accent: rgb(249 115 22 / 12%);
+  --app-surface: rgb(255 252 247 / 88%);
+  --app-surface-strong: rgb(255 249 240 / 96%);
+  --app-surface-soft: rgb(120 53 15 / 5%);
+  --app-border: rgb(120 53 15 / 12%);
+  --app-border-strong: rgb(120 53 15 / 25%);
+  --app-text: #1c1917;
+  --app-text-muted: #57534e;
+  --app-text-soft: #78716c;
+  --app-brand: #ea580c;
+  --app-brand-strong: #c2410c;
+  --app-brand-soft: rgb(249 115 22 / 14%);
+  --app-brand-fg: #9a3412;
+  --app-success: #15803d;
+  --app-info: #0369a1;
+  --app-danger: #b91c1c;
+  --app-shadow: 0 24px 80px rgb(120 53 15 / 12%);
+}
+
+:root[data-theme='dark'] {
+  --app-bg: #0f0b0a;
+  --app-bg-accent: rgb(249 115 22 / 8%);
+  --app-surface: rgb(28 25 23 / 90%);
+  --app-surface-strong: rgb(12 10 9 / 96%);
+  --app-surface-soft: rgb(255 255 255 / 5%);
+  --app-border: rgb(255 255 255 / 10%);
+  --app-border-strong: rgb(255 255 255 / 22%);
+  --app-text: #fafaf9;
+  --app-text-muted: #d6d3d1;
+  --app-text-soft: #a8a29e;
+  --app-brand: #f97316;
+  --app-brand-strong: #fb923c;
+  --app-brand-soft: rgb(249 115 22 / 14%);
+  --app-brand-fg: #fed7aa;
+  --app-success: #86efac;
+  --app-info: #7dd3fc;
+  --app-danger: #fca5a5;
+  --app-shadow: 0 24px 80px rgb(0 0 0 / 35%);
+}
+
+// Touch needs taller targets than a pointer.
+@media (width >= 768px) {
+  :root {
+    --app-control-height: 2.25rem;
+  }
+}

@@ -1,6 +1,8 @@
 import { computed, ref, watch } from 'vue'
+import { i18n } from '@/i18n'
 
-const INVALID_EMAIL_MESSAGE = 'Please enter a valid email address.'
+const { t } = i18n.global
+const INVALID_EMAIL_MESSAGE = t('alerts.invalidEmail')
 const DEBUG_ALERTS = import.meta.env.DEV
 const alertsApiUrl = import.meta.env.VITE_ALERTS_API_URL || '/api/alerts/subscribe/'
 
@@ -142,7 +144,7 @@ export function useAlertSubscription() {
     } catch (caughtError) {
       debugLog('[alerts] REST request failed', { error: caughtError })
       status.value = 'error'
-      errorMessage.value = 'Unable to subscribe right now.'
+      errorMessage.value = t('alerts.unavailable')
       return
     } finally {
       loading.value = false
@@ -165,7 +167,7 @@ export function useAlertSubscription() {
 
     debugLog('[alerts] backend returned error payload', { result })
     status.value = 'error'
-    errorMessage.value = result.errors?.[0]?.message ?? 'Unable to subscribe right now.'
+    errorMessage.value = result.errors?.[0]?.message ?? t('alerts.unavailable')
   }
 
   function reset() {

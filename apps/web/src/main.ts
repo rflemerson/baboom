@@ -7,6 +7,7 @@ import './theme.scss'
 
 import App from './App.vue'
 import router from './router'
+import { i18n } from './i18n'
 
 const app = createApp(App)
 
@@ -39,5 +40,6 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 app.use(createPinia())
 app.use(router)
+app.use(i18n)
 
 app.mount('#app')

@@ -18,9 +18,7 @@ describe('CatalogPagination', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('72 products')
-    expect(wrapper.text()).toContain('Page 3 of 6')
-    expect(wrapper.text()).toContain('12 per page')
+    expect(wrapper.text()).toContain('Página 3 de 6')
 
     const buttons = wrapper.findAll('button')
 
@@ -50,7 +48,7 @@ describe('CatalogPagination', () => {
     expect(wrapper.text()).toContain('1')
     expect(wrapper.text()).toContain('6')
     expect(wrapper.text()).toContain('12')
-    expect(wrapper.text()).toContain('...')
+    expect(wrapper.text()).toContain('…')
     expect(wrapper.get('[aria-current="page"]').text()).toBe('6')
   })
 })

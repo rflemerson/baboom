@@ -1,4 +1,4 @@
-import { expect, test, type Route } from '@playwright/test'
+import { expect, test, type Page, type Route } from '@playwright/test'
 
 const PAGE_INFO = {
   currentPage: 1,
@@ -29,6 +29,19 @@ function product(price: string, paymentMethod: string | null, linkSelectsSeller:
   }
 }
 
+const SCENARIO = 'Preço que o catálogo compara'
+
+function scenarioMenu(page: Page) {
+  return page.locator('details').filter({ has: page.locator(`summary[aria-label="${SCENARIO}"]`) })
+}
+
+async function chooseScenario(page: Page, option: string) {
+  await page.locator(`summary[aria-label="${SCENARIO}"]`).click()
+  await scenarioMenu(page).getByRole('button', { name: option, exact: true }).click()
+}
+
+test.use({ viewport: { width: 1280, height: 900 } })
+
 test('choosing the best price ranks by the price paid now', async ({ page }) => {
   const scenarios: Array<string | null> = []
   await page.route('**/api/catalog/products/**', async (route: Route) => {
@@ -49,14 +62,18 @@ test('choosing the best price ranks by the price paid now', async ({ page }) => 
   })
 
   await page.goto('/')
-  await expect(page.getByText('BRL 99.88')).toBeVisible()
-  await expect(page.getByText('Total price', { exact: true })).toBeVisible()
+  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
+  await expect(
+    page.getByRole('columnheader', { name: 'Ordenar por Preço', exact: true }),
+  ).toBeVisible()
 
-  await page.getByLabel('Price the catalog compares').selectOption('best')
+  await chooseScenario(page, 'Melhor preço')
 
-  await expect(page.getByText('BRL 89.90')).toBeVisible()
-  await expect(page.getByText('Total price (Pix)')).toBeVisible()
-  await expect(page.getByText("may open another seller's offer")).toBeVisible()
+  await expect(page.getByRole('table').getByText('R$ 89,90')).toBeVisible()
+  await expect(page.getByRole('table').getByText('Pagando com Pix')).toBeVisible()
+  await expect(
+    page.getByRole('table').getByText('A página da loja pode abrir a oferta de outro vendedor.'),
+  ).toBeVisible()
   expect(scenarios).toContain('best')
 })
 
@@ -82,12 +99,12 @@ test('the best price with a coupon says which coupon to use', async ({ page }) =
   })
 
   await page.goto('/')
-  await page.getByLabel('Price the catalog compares').selectOption('best')
+  await chooseScenario(page, 'Melhor preço')
 
-  await expect(page.getByText('Use o cupom SYNTH20')).toBeVisible()
-  await expect(page.getByText('Pagando com Pix')).toBeVisible()
-  await expect(page.getByText('+ BRL 8.00 de cashback')).toBeVisible()
-  await expect(page.getByText('BRL 79.90')).toBeVisible()
+  await expect(page.getByRole('table').getByText('Use o cupom SYNTH20')).toBeVisible()
+  await expect(page.getByRole('table').getByText('Pagando com Pix')).toBeVisible()
+  await expect(page.getByRole('table').getByText('+ R$ 8,00 de cashback')).toBeVisible()
+  await expect(page.getByRole('table').getByText('R$ 79,90')).toBeVisible()
 })
 
 test('a market without projections hides the best price and never asks for it', async ({
@@ -109,11 +126,11 @@ test('a market without projections hides the best price and never asks for it', 
   })
 
   await page.goto('/')
-  await expect(page.getByText('BRL 99.88')).toBeVisible()
+  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
 
-  const options = page.getByLabel('Price the catalog compares').locator('option')
-  await expect(options).toHaveText(['Normal price'])
-  await page.getByLabel('Sort catalog results').selectOption('price')
-  await expect(page.getByText('BRL 99.88')).toBeVisible()
+  await page.locator(`summary[aria-label="${SCENARIO}"]`).click()
+  await expect(scenarioMenu(page).getByRole('button')).toHaveText(['Preço normal'])
+  await page.getByRole('button', { name: 'Ordenar por Preço', exact: true }).click()
+  await expect(page.getByRole('table').getByText('R$ 99,88')).toBeVisible()
   expect(scenarios.every((scenario) => scenario === null)).toBe(true)
 })

@@ -33,7 +33,9 @@ describe('AppHeader', () => {
       },
     })
 
-    const links = wrapper.findAllComponents(RouterLinkStub)
+    const links = wrapper
+      .findAllComponents(RouterLinkStub)
+      .filter((link) => link.find('img').exists())
 
     expect(links).toHaveLength(2)
     expect(links[0]?.props('to')).toBe('/')

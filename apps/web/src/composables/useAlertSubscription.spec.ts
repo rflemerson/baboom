@@ -13,7 +13,7 @@ describe('useAlertSubscription', () => {
     await submit()
 
     expect(status.value).toBe('error')
-    expect(errorMessage.value).toBe('Please enter a valid email address.')
+    expect(errorMessage.value).toBe('Informe um e-mail válido.')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

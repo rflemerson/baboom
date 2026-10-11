@@ -1,0 +1,107 @@
+{
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "missing": "—"
+  },
+  "header": {
+    "home": "Go to catalog home",
+    "logo": "Baboom logo",
+    "alerts": "Alerts",
+    "openAlerts": "Open alerts",
+    "light": "Switch to light theme",
+    "dark": "Switch to dark theme"
+  },
+  "catalog": {
+    "results": "{count} products",
+    "active": "Active ingredient",
+    "activeBasis": "Per 100 g of {active}",
+    "activeFallback": "active ingredient",
+    "columns": "Columns",
+    "columnSelection": "Visible columns",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "normalPrice": "Normal price",
+    "bestPrice": "Best price",
+    "scenarioLabel": "Price the catalog compares",
+    "perPage": "Results per page",
+    "noResults": "No products matched this search",
+    "emptyHint": "Try changing the search or clearing filters.",
+    "emptyCatalog": "There are no products available right now.",
+    "loadError": "We couldn't load the catalog",
+    "retry": "Try again",
+    "loading": "Loading products…",
+    "requestError": "Unable to load the catalog. Please try again.",
+    "tableLabel": "Supplement catalog",
+    "sort": "Sort by {column}",
+    "sellerWarning": "The store’s page may open another seller’s offer.",
+    "offerLabel": "View offer for {product}",
+    "offer": "View offer",
+    "bounded": "Price search is incomplete",
+    "column": {
+      "product": "Product",
+      "brand": "Brand",
+      "category": "Category",
+      "packaging": "Packaging",
+      "mass": "Net mass (g)",
+      "price": "Price",
+      "pricePerActive": "Price/100 g",
+      "concentration": "Concentration",
+      "totalActive": "Total active (g)",
+      "flavors": "Flavor",
+      "tags": "Tags",
+      "offer": "Offer"
+    },
+    "pagination": {
+      "label": "Catalog pages",
+      "summary": "Page {page} of {pages}",
+      "previousLabel": "Go to previous page",
+      "nextLabel": "Go to next page",
+      "currentLabel": "Current page, page {page}",
+      "pageLabel": "Go to page {page}"
+    },
+    "notes": {
+      "coupon": "Use coupon {code}",
+      "payment": "Paying with {method}",
+      "cashback": "+ {amount} cashback"
+    },
+    "compareActive": "Active to compare",
+    "paymentScenario": "Payment scenario",
+    "comparisonSettings": "Comparison settings",
+    "rowsPerPage": "{count} / page",
+    "filterBy": "Filter by",
+    "noOptions": "Nothing to choose",
+    "sortBy": "Sort by",
+    "sortChoice": {
+      "pricePerActive_asc": "Lowest price per 100 g",
+      "price_asc": "Lowest price",
+      "price_desc": "Highest price",
+      "concentration_desc": "Highest concentration",
+      "totalActive_desc": "Most active"
+    }
+  },
+  "payment": {
+    "pix": "Pix",
+    "boleto": "Boleto",
+    "credit_card": "Card",
+    "debit_card": "Debit card",
+    "wallet": "Wallet",
+    "gift_card": "Gift card"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "intro": "Enter your email to receive notifications.",
+    "email": "Email",
+    "emailPlaceholder": "your{'@'}email.com",
+    "successTitle": "You're Subscribed!",
+    "successBody": "We've added {email} to our list. You'll be the first to know about price drops!",
+    "duplicateTitle": "Already Subscribed",
+    "duplicateBody": "The email {email} is already in our database.",
+    "another": "Subscribe another email",
+    "useAnother": "Use another email",
+    "subscribing": "Subscribing...",
+    "subscribe": "Subscribe",
+    "invalidEmail": "Please enter a valid email address.",
+    "unavailable": "Unable to subscribe right now."
+  }
+}

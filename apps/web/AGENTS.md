@@ -1,6 +1,8 @@
 @/AGENTS.md
 @/apps/web/.agents/STYLING.md
 @/apps/web/.agents/VUE_PRACTICES.md
+@/apps/web/.agents/CATALOG.md
+@/apps/web/.agents/I18N.md
 
 ---
 
@@ -70,7 +72,7 @@ cd apps/web && npm run format
 - Public frontend flows must not depend on browser-exposed API keys; add
   explicit REST endpoints in Django instead.
 - Keep feature components focused on presentation; use composables for query state, filters, and mutations.
-- Keep shared styling rules in `src/theme.scss`; prefer semantic classes and reusable UI components over one-off per-component styling hacks.
+- Keep shared styling in `src/styles/` (imported by `src/theme.scss`) and component-only styling in that component's scoped `<style>`; see `.agents/STYLING.md`.
 - Prefer Playwright request mocking for frontend-only E2E coverage of catalog and alerts flows so the tests do not depend on a live Django server.
 - Keep `Knip` enabled for unused files, unused exports, and dependency drift; fix the code or package manifest instead of ignoring findings.
 - Keep typed ESLint rules enabled for async/control-flow smells; fix promise handling and unnecessary conditions instead of suppressing the rule.
@@ -91,6 +93,6 @@ cd apps/web && npm run format
   projected scenario. A response with `scenario.key === "current"` (a market
   not yet switched to projections) hides "Best price" and later requests send
   no `scenario`.
-- A card tells what the shown price needs: `couponCodes`, `paymentMethod`,
+- A table row tells what the shown price needs: `couponCodes`, `paymentMethod`,
   `cashback` (apart from `price`) and `routeInstructions`, through
   `CatalogPriceNotes`.

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CircleAlert, CircleCheckBig, Mail } from 'lucide-vue-next'
 
 import { useAlertSubscription } from '@/composables/useAlertSubscription'
 import BaseModal from '@/components/ui/BaseModal.vue'
+
+const { t } = useI18n()
 
 const DEBUG_ALERTS = import.meta.env.DEV
 
@@ -72,10 +75,9 @@ async function onSubmit() {
       <div class="flex justify-center">
         <CircleCheckBig class="app-status--success h-16 w-16" />
       </div>
-      <h2 :id="titleId" class="text-2xl font-semibold">You're Subscribed!</h2>
+      <h2 :id="titleId" class="text-2xl font-semibold">{{ t('alerts.successTitle') }}</h2>
       <p class="app-copy-muted text-sm">
-        We&apos;ve added <strong>{{ email }}</strong> to our list. You&apos;ll be the first to know
-        about price drops!
+        {{ t('alerts.successBody', { email }) }}
       </p>
       <div class="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <button
@@ -83,14 +85,14 @@ async function onSubmit() {
           class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
           @click="emit('update:modelValue', false)"
         >
-          Close
+          {{ t('common.close') }}
         </button>
         <button
           type="button"
           class="app-button app-button--secondary flex-1 rounded-xl px-4 py-3 text-sm"
           @click="reset"
         >
-          Subscribe another email
+          {{ t('alerts.another') }}
         </button>
       </div>
     </div>
@@ -99,9 +101,9 @@ async function onSubmit() {
       <div class="flex justify-center">
         <CircleAlert class="app-status--info h-14 w-14" />
       </div>
-      <h2 :id="titleId" class="text-2xl font-semibold">Already Subscribed</h2>
+      <h2 :id="titleId" class="text-2xl font-semibold">{{ t('alerts.duplicateTitle') }}</h2>
       <p class="app-copy-muted text-sm">
-        The email <strong>{{ email }}</strong> is already in our database.
+        {{ t('alerts.duplicateBody', { email }) }}
       </p>
       <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button
@@ -109,27 +111,29 @@ async function onSubmit() {
           class="app-button app-button--secondary flex-1 rounded-xl px-4 py-3 text-sm"
           @click="emit('update:modelValue', false)"
         >
-          Close
+          {{ t('common.close') }}
         </button>
         <button
           type="button"
           class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
           @click="reset"
         >
-          Use another email
+          {{ t('alerts.useAnother') }}
         </button>
       </div>
     </div>
 
     <div v-else class="space-y-5">
       <div class="space-y-3">
-        <h2 :id="titleId" class="text-2xl font-semibold">Alerts</h2>
-        <p class="app-copy-muted text-sm">Enter your email to receive notifications.</p>
+        <h2 :id="titleId" class="text-2xl font-semibold">{{ t('alerts.title') }}</h2>
+        <p class="app-copy-muted text-sm">{{ t('alerts.intro') }}</p>
       </div>
 
       <form class="space-y-4" @submit.prevent="onSubmit">
         <label class="flex flex-col gap-2">
-          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">Email</span>
+          <span class="app-copy-soft text-xs tracking-[0.24em] uppercase">{{
+            t('alerts.email')
+          }}</span>
           <div class="relative">
             <Mail
               class="app-copy-soft pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2"
@@ -137,7 +141,7 @@ async function onSubmit() {
             <input
               v-model="email"
               type="email"
-              placeholder="your@email.com"
+              :placeholder="t('alerts.emailPlaceholder')"
               class="app-input rounded-xl px-11 py-3 text-sm"
               :class="{ 'is-invalid': showFieldError }"
             />
@@ -154,14 +158,14 @@ async function onSubmit() {
             class="app-button app-button--secondary flex-1 rounded-xl px-4 py-3 text-sm"
             @click="emit('update:modelValue', false)"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             type="submit"
             :disabled="!canSubmit"
             class="app-button app-button--primary flex-1 rounded-xl px-4 py-3 text-sm"
           >
-            {{ loading ? 'Subscribing...' : 'Subscribe' }}
+            {{ loading ? t('alerts.subscribing') : t('alerts.subscribe') }}
           </button>
         </div>
       </form>
