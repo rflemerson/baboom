@@ -127,6 +127,6 @@ class CatalogFilterTests(TestCase):
 
         options = self.client.get(FILTERS).json()
 
-        assert options["actives"] == [{"name": "protein", "label": "Protein"}]
+        assert options["actives"] == [{"name": "protein", "label": "Proteína"}]
         Active.objects.filter(slug="protein").update(show_in_catalog=False)
         assert self.client.get(FILTERS).json()["actives"] == []
