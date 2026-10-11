@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from .models import (
     Listing,
@@ -120,6 +120,14 @@ class VariantRef:
     options: tuple[dict[str, str], ...] = ()
     selection: dict[str, object] | None = None
     gtin: str = ""
+    # The lengths GS1 defines: GTIN-8, UPC-A, EAN-13 and GTIN-14.
+    GTIN_LENGTHS: ClassVar[frozenset[int]] = frozenset({8, 12, 13, 14})
+
+    @property
+    def valid_gtin(self) -> str:
+        """Return the GTIN when it is one; sources put any text in that field."""
+        gtin = self.gtin.strip()
+        return gtin if gtin.isdigit() and len(gtin) in self.GTIN_LENGTHS else ""
 
 
 @dataclass(frozen=True)
@@ -168,7 +176,7 @@ class OfferIdentityService:
             defaults={
                 "options": list(variant.options),
                 "selection": variant.selection or {},
-                "gtin": variant.gtin,
+                "gtin": variant.valid_gtin,
             },
         )
         updates: list[str] = []

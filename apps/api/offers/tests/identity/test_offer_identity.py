@@ -26,6 +26,29 @@ VARIANT = VariantRef(
 class OfferIdentityTests(TestCase):
     """Sellers, markets and keys never collide or move silently."""
 
+    def test_only_a_real_gtin_is_kept(self) -> None:
+        """A store may fill its EAN field with a name; that is no GTIN."""
+        market = MarketFactory()
+        seller = SellerAccountFactory(market=market)
+        service = OfferIdentityService()
+        for external_id, gtin, kept in (
+            ("v1", "Hórus Gel Frut Verm + Creatina 120 caps", ""),
+            ("v2", " 7898938890113 ", "7898938890113"),
+        ):
+            variant = service.bind(
+                OfferFactory(),
+                OfferIdentityRef(
+                    market=market,
+                    listing=LISTING,
+                    variant=VariantRef(external_id=external_id, gtin=gtin),
+                    seller_account=seller,
+                    scheme="marketplace",
+                    key=f"{external_id}@{seller.external_id}",
+                ),
+            )
+
+            assert variant.gtin == kept
+
     def test_two_sellers_of_one_variant_are_two_offers(self) -> None:
         """Neither seller's price or stock overwrites the other's."""
         market = MarketFactory()
