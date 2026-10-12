@@ -147,6 +147,10 @@ class ShopifyFixtureTests(SimpleTestCase):
                     category="whey",
                 )
                 assert _price(product) == price
+                payable = next(
+                    p for p in product.offers[0].prices if p.role == "payable"
+                )
+                assert payable.payment_scope == "any"
 
 
 class WapStoreFixtureTests(SimpleTestCase):

@@ -30,7 +30,7 @@ class ShopifyNormalizer:
 
     provider = "shopify"
     capabilities = AdapterCapabilities(
-        version="2",
+        version="3",
         variants="complete",
         sellers="channel_owner_only",
         payment_prices="none",
@@ -214,8 +214,15 @@ class ShopifyNormalizer:
         """Read the variant price and its compare-at reference."""
         if price is None:
             return []
+        # Checkout charges the variant price whatever the method; a store's
+        # Pix discount is a promotion conditioned on the method, applied on top.
         prices = [
-            PriceInput(role="payable", amount=price, source_field="variant.price"),
+            PriceInput(
+                role="payable",
+                amount=price,
+                source_field="variant.price",
+                payment_scope="any",
+            ),
         ]
         reference = self.parse_price(variant.get("compare_at_price"))
         if reference is not None:

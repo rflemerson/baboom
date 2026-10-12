@@ -14,7 +14,7 @@ from django.utils import timezone
 from core.dtos import CatalogProductsFilters
 from core.models import Product, ProductStore
 from core.selectors import public_catalog_products
-from offers.models import Evidence, Offer, StockStatus
+from offers.models import Evidence, Offer, OfferPriceObservation, StockStatus
 from pricing.domain.types import CartLine
 from pricing.groups import group_fingerprint
 from pricing.models import OfferScenarioProjection, PricingPolicyRevision, ShippingQuote
@@ -343,6 +343,55 @@ class CouponAlternativeTests(BenefitCatalog, TestCase):
         assert items["B"]["price"] == "120.00"
         assert items["B"]["couponCodes"] == []
         assert items["A"]["storePromotions"] == []
+
+    def test_a_store_wide_pix_discount_lowers_only_the_best_price(self) -> None:
+        """B charges R$ 120 any way; 5% off with Pix gives R$ 114 at best."""
+        OfferPriceObservation.objects.create(
+            offer=self.offers["B"],
+            role="payable",
+            amount=Decimal("120.00"),
+            currency_id="BRL",
+            source_field="synthetic.price",
+            payment_scope="any",
+        )
+        promotion = Promotion.objects.create(
+            title="5% no Pix", issuer_seller=self.seller, source_key="pix-5"
+        )
+        revision = PromotionRevision.objects.create(
+            promotion=promotion,
+            number=1,
+            currency_id="BRL",
+            timezone="America/Sao_Paulo",
+            verified_at=timezone.now(),
+            conditions={"root": {"kind": "payment_method", "codes": ["pix"]}},
+        )
+        PromotionScope.objects.create(
+            revision=revision,
+            role="target",
+            kind="seller_account",
+            ref_id=self.seller.pk,
+        )
+        PromotionEffect.objects.create(
+            revision=revision,
+            position=1,
+            kind="percentage",
+            stage="payment",
+            basis="current",
+            target="order",
+            allocation="once",
+            parameters={"rate": "5"},
+        )
+        revision.evidence.add(Evidence.objects.create(kind="announcement", excerpt="x"))
+        assert PromotionService().publish(revision, "executable").published
+        ProjectionService().refresh()
+
+        def b(scenario: str) -> dict:
+            rows = self.client.get("/api/catalog/products/", {"scenario": scenario})
+            return next(row for row in rows.json()["items"] if row["name"] == "B")
+
+        assert b("best")["price"] == "114.00"
+        assert b("best")["paymentMethod"] == "pix"
+        assert b("normal")["price"] == "120.00"
 
     def test_a_small_page_keeps_the_global_order(self) -> None:
         """Filtering happens before choosing the winner and before paging."""
