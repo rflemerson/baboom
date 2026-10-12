@@ -15,6 +15,7 @@ from scrapers.crawler.spiders.shopify import (
     SHOPIFY_PAGE_SIZE,
     ShopifyApiSpider,
 )
+from scrapers.services import RecheckCandidate
 
 SHOPIFY_URL = "https://shopify.example.com"
 COLLECTIONS_URL = f"{SHOPIFY_URL}/collections.json"
@@ -331,3 +332,47 @@ class ShopifyDetailSpiderTests(SimpleTestCase):
         detail_failed = attrgetter("_detail_failed")(self.spider)
 
         assert list(detail_failed(SimpleNamespace(request=request))) == []
+
+
+class ShopifyRecheckTests(SimpleTestCase):
+    """A product the collections dropped is looked up by its own handle."""
+
+    def setUp(self) -> None:
+        """Create a Shopify spider and one missed sold-out candidate."""
+        self.spider = _TestShopifySpider()
+        self.candidate = RecheckCandidate(
+            external_id="variant-7",
+            provider_product_id="7",
+            url=f"{SHOPIFY_URL}/products/camiseta-4?variant=variant-7",
+            category="acessorios",
+        )
+
+    def test_the_recheck_asks_for_the_product_json(self) -> None:
+        """The handle comes from the offer's URL; the category rides along."""
+        request = self.spider.recheck_request(self.candidate)
+
+        assert request is not None
+        assert request.url == f"{SHOPIFY_URL}/products/camiseta-4.json"
+        assert request.meta == {"category": "acessorios"}
+
+    def test_a_served_sold_out_product_is_emitted(self) -> None:
+        """The page still answers: its unit is seen, sold out."""
+        product = _product("7", handle="camiseta-4")
+        product["variants"][0]["available"] = False
+        response = _response(
+            {"product": product},
+            meta={"category": "acessorios"},
+            url=f"{SHOPIFY_URL}/products/camiseta-4.json",
+        )
+
+        emitted = list(attrgetter("_parse_recheck")(self.spider)(response))
+
+        assert [item.offers[0].stock_status for item in emitted] == ["O"]
+        assert emitted[0].category == "acessorios"
+        assert "variant-7" in self.spider.seen_external_ids
+
+    def test_an_offer_url_without_a_handle_is_not_rechecked(self) -> None:
+        """Nothing to ask for: the unit stays missed."""
+        candidate = RecheckCandidate("v", "p", f"{SHOPIFY_URL}/collections/x", "")
+
+        assert self.spider.recheck_request(candidate) is None

@@ -84,6 +84,15 @@ offers that a successful crawl no longer sees.
   only a page whose `offers` were read completely reconciles absent units;
   partial pages never delist. A price-less unit remains present but
   unavailable; an unread stock is `unknown`, never available.
+- Stock never delists: a unit leaves only when the store no longer has it.
+  A full run that misses a unit counts the miss; before the run that would
+  delist it ends, the spider asks for the unit's own product
+  (`CatalogSpider.recheck_request`: Shopify `/products/<handle>.json`, VTEX
+  search by `productId`, the Nuvemshop page), since stores drop sold-out
+  products from their listings. A product that still answers is seen, sold
+  out or not, and an offer delisted as gone in the last 30 days that answers
+  is listed again. Wapstore has no per-product lookup and keeps the listing
+  rule.
 - Every price a source states travels as a `PriceInput` (role, payment scope
   and method, installments, what it already includes) and is appended by
   `offers.observations.ObservationService` as an `OfferPriceObservation` only

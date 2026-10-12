@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from scrapy.http import Response
 
     from ...contracts import ScrapedProductInput
+    from ...services import RecheckCandidate
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,32 @@ class VtexSearchSpider(CatalogSpider):
             meta={"category": category, "start": 0},
             handle_httpstatus_list=list(VTEX_SUCCESS_CODES),
         )
+
+    def recheck_request(self, candidate: RecheckCandidate) -> Request | None:
+        """Search the product by id, outside the categories that missed it."""
+        if not candidate.provider_product_id:
+            return None
+        return self.request(
+            f"{self.BASE_URL}/api/catalog_system/pub/products/search",
+            callback=self._parse_recheck,
+            params={"fq": f"productId:{candidate.provider_product_id}"},
+            headers=self.get_headers(),
+            meta={"category": candidate.category},
+            handle_httpstatus_list=list(VTEX_SUCCESS_CODES),
+        )
+
+    def _parse_recheck(self, response: Response) -> Iterator[ScrapedProductInput]:
+        """Emit the product the search still finds; an empty answer stays missed."""
+        try:
+            data = response.json()
+        except (TypeError, ValueError) as exc:
+            logger.debug("VTEX recheck payload unreadable at %s: %s", response.url, exc)
+            return
+        for raw in data if isinstance(data, list) else []:
+            if isinstance(raw, dict):
+                yield from self.process_raw_product(
+                    raw, str(response.meta["category"]), claim_id=False
+                )
 
     def get_headers(self) -> dict[str, str]:
         """Return headers for VTEX's JSON endpoints."""

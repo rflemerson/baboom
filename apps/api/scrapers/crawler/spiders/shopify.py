@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, ClassVar
+from urllib.parse import urlsplit
 
 from ...normalizers.shopify import ShopifyNormalizer
 from ..base import CatalogSpider
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from scrapy.http import Response
 
     from ...contracts import ScrapedProductInput
+    from ...services import RecheckCandidate
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +64,35 @@ class ShopifyApiSpider(CatalogSpider):
             headers=self.get_headers(),
             meta={"category": category, "page": 1},
         )
+
+    def recheck_request(self, candidate: RecheckCandidate) -> Request | None:
+        """Ask for the product's own JSON, which collections may no longer list."""
+        path = urlsplit(candidate.url).path.rstrip("/")
+        handle = (
+            path.split("/products/", maxsplit=1)[-1] if "/products/" in path else ""
+        )
+        if not handle or "/" in handle:
+            return None
+        return self.request(
+            f"{self.BASE_URL}/products/{handle}.json",
+            callback=self._parse_recheck,
+            headers=self.get_headers(),
+            meta={"category": candidate.category},
+        )
+
+    def _parse_recheck(self, response: Response) -> Iterator[ScrapedProductInput]:
+        """Emit a product the store still serves; a missing one stays missed."""
+        try:
+            product = response.json().get("product")
+        except (AttributeError, TypeError, ValueError) as exc:
+            logger.debug(
+                "Shopify recheck payload unreadable at %s: %s", response.url, exc
+            )
+            return
+        if isinstance(product, dict):
+            yield from self.process_raw_product(
+                product, str(response.meta["category"]), claim_id=False
+            )
 
     def get_headers(self) -> dict[str, str]:
         """Return headers for Shopify's JSON endpoints."""

@@ -8,14 +8,17 @@ import secrets
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
-from scrapy import Request, Spider
+from scrapy import Request, Spider, signals
+from scrapy.exceptions import DontCloseSpider
 
 from ..capabilities import PROVIDER_LIMITS
 from ..contracts import MarketInput, ScrapedProductInput
+from ..services import RecheckCandidate, ScraperService
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
 
+    from scrapy.crawler import Crawler
     from scrapy.settings import Settings
 
     from ..normalizers.base import ProductNormalizer
@@ -66,6 +69,17 @@ class CatalogSpider(Spider):
         else:
             self.categories_to_crawl = categories
         self.processed_ids: set[str] = set()
+        # Units this run emitted, and those to look for once more before the
+        # run ends because one more miss would delist them.
+        self.seen_external_ids: set[str] = set()
+        self.recheck: list[RecheckCandidate] = []
+
+    @classmethod
+    def from_crawler(cls, crawler: Crawler, *args: object, **kwargs: object) -> Spider:
+        """Recheck missed units when discovery runs out of requests."""
+        spider = super().from_crawler(crawler, *args, **kwargs)
+        crawler.signals.connect(spider.recheck_missed, signal=signals.spider_idle)
+        return spider
 
     async def start(self) -> AsyncIterator[Request]:
         """Spread full runs before scheduling the first request."""
@@ -75,6 +89,10 @@ class CatalogSpider(Spider):
         if crawler is not None:
             crawler.stats.set_value("scraper/store_slug", self.STORE_SLUG)
         if not self.categories_to_crawl:
+            # Only a full run can miss a unit; a category run never delists.
+            self.recheck = await asyncio.to_thread(
+                ScraperService.recheck_candidates, self.STORE_SLUG
+            )
             await asyncio.sleep(_jitter.uniform(*self.STARTUP_JITTER_SECONDS))
         for request in self.start_category_requests():
             yield request
@@ -137,6 +155,32 @@ class CatalogSpider(Spider):
         """Return the platform-specific first page request for a category."""
         raise NotImplementedError
 
+    def recheck_request(self, candidate: RecheckCandidate) -> Request | None:
+        """Ask for one missed unit's own product, or None where none exists.
+
+        A store that hides sold-out products from its listings still serves
+        their pages: a page that answers keeps its units listed, sold out or
+        not, and only a unit the store no longer has stays missed.
+        """
+        _ = candidate
+        return None
+
+    def recheck_missed(self) -> None:
+        """Once discovery is done, look up each candidate this run missed."""
+        candidates, self.recheck = self.recheck, []
+        requests = [
+            request
+            for candidate in candidates
+            if candidate.external_id not in self.seen_external_ids
+            and (request := self.recheck_request(candidate)) is not None
+        ]
+        if not requests:
+            return
+        self._set_stat("units_rechecked", len(requests))
+        for request in requests:
+            self.crawler.engine.crawl(request)
+        raise DontCloseSpider
+
     def request(
         self,
         url: str,
@@ -194,6 +238,7 @@ class CatalogSpider(Spider):
 
     def with_market(self, product: ScrapedProductInput) -> ScrapedProductInput:
         """Attach the declared market to a normalized page."""
+        self.seen_external_ids.update(offer.external_id for offer in product.offers)
         return product.model_copy(
             update={
                 "market": self.market_input(),

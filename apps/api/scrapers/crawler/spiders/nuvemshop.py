@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from scrapy.http import Response
 
     from ...contracts import ScrapedProductInput
+    from ...services import RecheckCandidate
 
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,28 @@ class NuvemshopSpider(CatalogSpider):
                 headers=self.get_headers(),
                 meta={"category": category, "listing": listing},
             )
+
+    def recheck_request(self, candidate: RecheckCandidate) -> Request | None:
+        """Ask for the product page itself; its JSON-LD stands in for the listing."""
+        page_url = candidate.url.split("?", maxsplit=1)[0]
+        if not page_url.startswith(self.BASE_URL):
+            return None
+        return self.request(
+            page_url,
+            callback=self._parse_recheck,
+            headers=self.get_headers(),
+            meta={"category": candidate.category},
+        )
+
+    def _parse_recheck(self, response: Response) -> Iterator[ScrapedProductInput]:
+        """Read a still-served page like a listed one; a gone page stays missed."""
+        if response.status != NUVEMSHOP_SUCCESS_CODE:
+            return
+        listings = self.extract_products(response.text)
+        if not listings:
+            return
+        response.meta["listing"] = listings[0]
+        yield from self._parse_product(response)
 
     def _parse_product(self, response: Response) -> Iterator[ScrapedProductInput]:
         """Emit every unit a product page sells, or its listing unit if lost."""

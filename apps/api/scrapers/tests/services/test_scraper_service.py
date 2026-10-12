@@ -9,6 +9,7 @@ from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from offers.models import DelistReason, Offer, PriceObservation
+from offers.tests.factories import OfferFactory
 from scrapers.contracts import (
     CoverageInput,
     ScrapedItemIngestionInput,
@@ -375,3 +376,32 @@ class OfferVariantRecordTests(TestCase):
         ScraperService.save_product_snapshot(self._page("Natural", "Chocolate"))
 
         assert Offer.objects.get(external_id="185-Chocolate").delisted_reason == ""
+
+
+class RecheckCandidateTests(TestCase):
+    """The offers one more missed run would delist are named, with a category."""
+
+    def test_only_offers_one_miss_from_delisting_are_candidates(self) -> None:
+        """One miss from delisting, or delisted as gone lately: looked for again."""
+        fresh = OfferFactory(store_slug="shop", missed_runs=0)
+        missed = OfferFactory(
+            store_slug="shop", missed_runs=MISSED_RUNS_BEFORE_DELISTING - 1
+        )
+        OfferFactory(store_slug="elsewhere", missed_runs=5)
+        gone = OfferFactory(
+            store_slug="shop",
+            delisted_at=timezone.now() - timedelta(days=3),
+            delisted_reason=DelistReason.GONE,
+        )
+        OfferFactory(
+            store_slug="shop",
+            delisted_at=timezone.now() - timedelta(days=90),
+            delisted_reason=DelistReason.GONE,
+        )
+
+        candidates = ScraperService.recheck_candidates("shop")
+
+        assert sorted(c.external_id for c in candidates) == sorted(
+            [missed.external_id, gone.external_id]
+        )
+        assert fresh.external_id not in {c.external_id for c in candidates}

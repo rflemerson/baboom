@@ -10,14 +10,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from django.test import SimpleTestCase
 from scrapy import Request
+from scrapy.exceptions import DontCloseSpider
 from scrapy.http import TextResponse
 
+from common.testing import raised
 from scrapers.crawler.base import CatalogSpider
 from scrapers.crawler.middlewares import (
     ImpersonationMiddleware,
     parse_retry_after,
 )
 from scrapers.normalizers.shopify import ShopifyNormalizer
+from scrapers.services import RecheckCandidate
 from scrapers.stores.dark_lab import DarkLabSpider
 from scrapers.tests.helpers import EXPECTED_FALLBACK_CATEGORY_COUNT
 
@@ -156,6 +159,10 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
             patch(
                 "scrapers.crawler.base.asyncio.sleep", new_callable=AsyncMock
             ) as sleep,
+            patch(
+                "scrapers.crawler.base.ScraperService.recheck_candidates",
+                return_value=[],
+            ),
         ):
             requests = asyncio.run(collect())
         sleep.assert_awaited_once_with(2.0)
@@ -191,3 +198,47 @@ class ScrapyRequiredBehaviorTests(SimpleTestCase):
         )
         assert cents.parse_price(12990) == SOLDIERS_PRICE_IN_REAIS
         assert DarkLabSpider.normalizer.parse_price(12990) == DARK_LAB_PRICE_IN_REAIS
+
+
+class _RecheckingSpider(_DummyCatalogSpider):
+    """Dummy spider that can look up a product by its id."""
+
+    name = "dummy-rechecking"
+
+    def recheck_request(self, candidate: RecheckCandidate) -> Request | None:
+        """Ask for the product's page by id."""
+        return Request(f"{self.BASE_URL}/p/{candidate.provider_product_id}")
+
+
+class RecheckPhaseTests(SimpleTestCase):
+    """Once discovery runs dry, missed candidates get one more look."""
+
+    def _spider(self) -> _RecheckingSpider:
+        spider = _RecheckingSpider()
+        spider.crawler = MagicMock()
+        spider.recheck = [
+            RecheckCandidate("seen", "1", "", ""),
+            RecheckCandidate("missed", "2", "", ""),
+        ]
+        spider.seen_external_ids = {"seen"}
+        return spider
+
+    def test_only_missed_candidates_are_requested_and_the_run_waits(self) -> None:
+        """The seen unit needs nothing; the missed one keeps the spider open."""
+        spider = self._spider()
+
+        raised(spider.recheck_missed, DontCloseSpider)
+
+        crawled = [
+            call.args[0].url for call in spider.crawler.engine.crawl.call_args_list
+        ]
+        assert crawled == ["https://dummy.example.com/p/2"]
+
+    def test_the_recheck_runs_once(self) -> None:
+        """The next idle closes the spider: nothing is asked twice."""
+        spider = self._spider()
+        raised(spider.recheck_missed, DontCloseSpider)
+
+        spider.recheck_missed()
+
+        assert spider.crawler.engine.crawl.call_count == 1

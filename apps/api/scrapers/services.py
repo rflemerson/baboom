@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
@@ -51,6 +52,19 @@ logger = logging.getLogger(__name__)
 # Two daily runs: one incomplete crawl cannot delist, and a unit that is really
 # gone leaves the ranking within two days.
 MISSED_RUNS_BEFORE_DELISTING = 2
+# Units delisted as gone this recently are looked for again, so a sold-out
+# product a listing dropped comes back when its page still answers.
+RECHECK_DELISTED_DAYS = 30
+
+
+@dataclass(frozen=True)
+class RecheckCandidate:
+    """An offer this run would delist if it misses it, and where to look again."""
+
+    external_id: str
+    provider_product_id: str
+    url: str
+    category: str
 
 
 def market_ref(declared: MarketInput) -> MarketRef:
@@ -427,6 +441,42 @@ class ScraperService:
                 key=f"{variant_id}@{seller_key}",
             ),
         )
+
+    @staticmethod
+    def recheck_candidates(store_slug: str) -> list[RecheckCandidate]:
+        """Return the offers to look for again if this run misses them.
+
+        Stores drop sold-out products from their listings while the product
+        page stays up; the spider asks for each candidate's own page before
+        the run ends, so only a product the store no longer has is delisted.
+        Listed offers one more miss would delist are candidates, and so are
+        offers recently delisted as gone, which a page that answers relists.
+        """
+        recent = timezone.now() - timedelta(days=RECHECK_DELISTED_DAYS)
+        offers = (
+            Offer.objects.filter(store_slug=store_slug)
+            .filter(
+                Q(
+                    delisted_at__isnull=True,
+                    missed_runs__gte=MISSED_RUNS_BEFORE_DELISTING - 1,
+                )
+                | Q(delisted_reason=DelistReason.GONE, delisted_at__gte=recent),
+            )
+            .select_related("scraped_item__source_page")
+        )
+        candidates = []
+        for offer in offers:
+            item = getattr(offer, "scraped_item", None)
+            context = item.source_page.api_context if item else {}
+            candidates.append(
+                RecheckCandidate(
+                    external_id=offer.external_id,
+                    provider_product_id=offer.pid,
+                    url=offer.url,
+                    category=str((context or {}).get("category") or ""),
+                ),
+            )
+        return candidates
 
     @staticmethod
     @transaction.atomic
